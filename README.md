@@ -21,6 +21,10 @@ procedurally in code when the game starts.
 - **Redstone**: dust (power fades over 15 blocks and climbs steps), redstone torches (inverters and clocks), levers, stone
   buttons, redstone blocks, redstone lamps, pistons and sticky pistons (push up to 12 blocks), and TNT that explodes with a
   chain reaction.
+- **Mobs**: cows, pigs and sheep wander the grasslands (and run when hit). Zombies chase and hit you at night and in caves,
+  and burn in sunlight. **Boomlings**, the game's own exploding stone creatures, sneak up, hiss and blow up.
+  Tap a mob to attack it; swords and axes hit harder. You have 10 hearts, regenerate over time, take fall and blast damage,
+  and respawn if you die. "Mobs: Peaceful" in the pause menu turns monsters off.
 - **Rendering**: face culling, smooth sky lighting with ambient occlusion, cut-out foliage, translucent water and ice, distance fog,
   frustum culling, day/night cycle with sun, moon, sunset tint and drifting clouds, underwater fog.
 - **Gameplay**: walking with collision, auto-jump up single steps, swimming, creative flight, mining with crack
@@ -35,7 +39,7 @@ procedurally in code when the game starts.
 | --- | --- |
 | Move | Left-side joystick |
 | Look | Drag anywhere on the world |
-| Place block / use item / flip lever / press button | Tap |
+| Attack mob / place block / use item / flip lever / press button | Tap |
 | Mine block | Touch and hold |
 | Jump / swim / fly up | ▲ |
 | Fly down | ▼ (while flying) |
@@ -67,6 +71,7 @@ app/src/main/java/com/vishucraft/game/
 │   ├── Game.kt            simulation: chunk streaming, mining, placing, time of day, saving
 │   ├── Player.kt          movement, collision, swimming, flight
 │   ├── Raycast.kt         voxel DDA for block targeting
+│   ├── Mobs.kt            mob spawning, AI, physics, combat
 │   └── GameInput.kt       thread-safe touch state
 ├── world/
 │   ├── Blocks.kt          block and texture-tile registry
@@ -79,6 +84,7 @@ app/src/main/java/com/vishucraft/game/
 ├── render/
 │   ├── GameRenderer.kt    GLSurfaceView renderer / game loop
 │   ├── WorldRenderer.kt   chunk meshes, sky, clouds, selection, cracks
+│   ├── MobRenderer.kt     animated box models for mobs
 │   ├── ChunkMesher.kt     face culling, lighting and AO meshing
 │   ├── TextureAtlas.kt    procedural pixel-art textures
 │   └── GlUtil.kt          shaders, buffers, VAOs

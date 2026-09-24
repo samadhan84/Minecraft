@@ -28,8 +28,8 @@ class Redstone(private val world: World, private val set: (Int, Int, Int, Int, I
     private val fuses = HashMap<Long, Int>()
     private val rnd = Random()
 
-    /** Called with the explosion centre so the game can shake the camera / knock the player back. */
-    var onExplosion: ((Float, Float, Float) -> Unit)? = null
+    /** Called with the explosion centre and radius so the game can hurt / knock back the player and mobs. */
+    var onExplosion: ((Float, Float, Float, Float) -> Unit)? = null
 
     private fun id(p: Long) = world.getBlock(RedstoneIds.x(p), RedstoneIds.y(p), RedstoneIds.z(p))
     private fun meta(p: Long) = world.getMeta(RedstoneIds.x(p), RedstoneIds.y(p), RedstoneIds.z(p))
@@ -223,10 +223,15 @@ class Redstone(private val world: World, private val set: (Int, Int, Int, Int, I
     }
 
     private fun explode(p: Long) {
-        val cx = RedstoneIds.x(p); val cy = RedstoneIds.y(p); val cz = RedstoneIds.z(p)
         setAt(p, Blocks.AIR)
-        val r = 3.6f
-        for (dy in -4..4) for (dz in -4..4) for (dx in -4..4) {
+        explodeAt(RedstoneIds.x(p) + 0.5f, RedstoneIds.y(p) + 0.5f, RedstoneIds.z(p) + 0.5f, 3.6f)
+    }
+
+    /** Blasts a roughly spherical crater and chain-primes TNT. */
+    fun explodeAt(fx: Float, fy: Float, fz: Float, r: Float) {
+        val cx = kotlin.math.floor(fx).toInt(); val cy = kotlin.math.floor(fy).toInt(); val cz = kotlin.math.floor(fz).toInt()
+        val reach = r.toInt() + 1
+        for (dy in -reach..reach) for (dz in -reach..reach) for (dx in -reach..reach) {
             val d = sqrt((dx * dx + dy * dy + dz * dz).toFloat())
             if (d > r * (0.75f + rnd.nextFloat() * 0.25f)) continue
             val x = cx + dx; val y = cy + dy; val z = cz + dz
@@ -239,6 +244,6 @@ class Redstone(private val world: World, private val set: (Int, Int, Int, Int, I
                 else -> set(x, y, z, Blocks.AIR, 0)
             }
         }
-        onExplosion?.invoke(cx + 0.5f, cy + 0.5f, cz + 0.5f)
+        onExplosion?.invoke(fx, fy, fz, r)
     }
 }

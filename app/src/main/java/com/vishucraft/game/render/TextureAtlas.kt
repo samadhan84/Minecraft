@@ -742,9 +742,113 @@ object TextureAtlas {
         for (i in 0..8) t[3 + i, 3 - (if (i in 2..6) 1 else 0) + (if (i == 0 || i == 8) 1 else 0)] = scale(metal, 0.6f)
     }
 
+    // ---------------------------------------------------------------- mob skins (original designs)
+
+    private fun patchy(t: Tile, base: Int, patch: Int, cells: Int, share: Int) {
+        val (ids, _) = voronoi(t.rnd, cells)
+        val dark = BooleanArray(cells) { t.rnd.nextInt(100) < share }
+        t.fill { x, y -> scale(if (dark[ids[y][x]]) patch else base, t.jitter(0.05f)) }
+    }
+
+    private fun eyes(t: Tile, y: Int, lx: Int, rx: Int, white: Int = rgb(240, 240, 240), pupil: Int = rgb(20, 20, 20)) {
+        t[lx, y] = white; t[lx + 1, y] = pupil; t[rx, y] = pupil; t[rx + 1, y] = white
+    }
+
+    private fun hoof(t: Tile, rows: Int, c: Int) { for (y in 16 - rows until 16) for (x in 0 until 16) t[x, y] = scale(c, t.jitter(0.05f)) }
+
+    private fun mobSkin(name: String, t: Tile): Boolean {
+        val cowWhite = rgb(236, 232, 222); val cowBrown = rgb(78, 52, 38)
+        val pig = rgb(238, 166, 166)
+        val zSkin = rgb(104, 132, 96)
+        val shell = rgb(62, 60, 66)
+        when (name) {
+            "cow_hide" -> patchy(t, cowWhite, cowBrown, 9, 40)
+            "cow_leg" -> { patchy(t, cowWhite, cowBrown, 5, 40); hoof(t, 3, rgb(52, 42, 36)) }
+            "cow_face" -> {
+                t.fill { x, _ -> if (x in 6..9) scale(cowWhite, t.jitter(0.04f)) else scale(rgb(112, 76, 52), t.jitter(0.05f)) }
+                eyes(t, 6, 3, 11)
+                for (y in 10..15) for (x in 2..13) t[x, y] = scale(rgb(224, 188, 172), t.jitter(0.04f))
+                t[5, 12] = rgb(90, 60, 60); t[10, 12] = rgb(90, 60, 60)
+            }
+            "horn" -> noisy(t, rgb(228, 220, 196), 0.04f, 0.1f)
+            "pig_skin" -> noisy(t, pig, 0.04f, 0.15f)
+            "pig_leg" -> { noisy(t, pig, 0.04f, 0.15f); hoof(t, 2, rgb(150, 92, 92)) }
+            "pig_face" -> {
+                noisy(t, pig, 0.04f, 0.1f)
+                eyes(t, 5, 3, 11)
+                for (y in 8..12) for (x in 5..10) t[x, y] = rgb(214, 122, 130)
+                t[6, 10] = rgb(140, 64, 74); t[9, 10] = rgb(140, 64, 74)
+            }
+            "sheep_wool" -> {
+                noisy(t, rgb(236, 236, 230), 0.03f, 0.1f)
+                repeat(14) {
+                    val cx = t.rnd.nextInt(16); val cy = t.rnd.nextInt(16)
+                    t[cx, cy] = rgb(208, 208, 200); t[cx + 1, cy] = rgb(214, 214, 206); t[cx, cy + 1] = rgb(214, 214, 206)
+                }
+            }
+            "sheep_leg" -> noisy(t, rgb(200, 182, 160), 0.05f, 0.1f)
+            "sheep_face" -> {
+                t.fill { x, y ->
+                    if (y < 3 || x < 2 || x > 13) scale(rgb(236, 236, 230), t.jitter(0.04f)) else scale(rgb(202, 182, 160), t.jitter(0.04f))
+                }
+                eyes(t, 7, 4, 10)
+                t[7, 11] = rgb(120, 90, 80); t[8, 11] = rgb(120, 90, 80)
+            }
+            "zombie_skin" -> patchy(t, zSkin, rgb(82, 106, 76), 8, 35)
+            "zombie_hair" -> {
+                noisy(t, rgb(46, 40, 34), 0.1f, 0.2f)
+                repeat(12) { t[t.rnd.nextInt(16), t.rnd.nextInt(16)] = zSkin }
+            }
+            "zombie_face" -> {
+                patchy(t, zSkin, rgb(88, 112, 80), 6, 30)
+                for (x in 0 until 16) { t[x, 0] = rgb(46, 40, 34); t[x, 1] = rgb(46, 40, 34) }
+                for (x in 2..6) t[x, 4] = rgb(60, 70, 54)
+                for (x in 9..13) t[x, 4] = rgb(60, 70, 54)
+                for (y in 6..7) { for (x in 3..5) t[x, y] = rgb(30, 34, 30); for (x in 10..12) t[x, y] = rgb(30, 34, 30) }
+                t[4, 6] = rgb(230, 220, 120); t[11, 6] = rgb(230, 220, 120)
+                for (x in 4..11) t[x, 11] = rgb(34, 30, 28)
+                t[5, 11] = rgb(200, 196, 170); t[8, 11] = rgb(200, 196, 170); t[10, 12] = rgb(34, 30, 28)
+                t[13, 8] = rgb(60, 50, 60); t[13, 9] = rgb(60, 50, 60); t[12, 9] = rgb(60, 50, 60)
+            }
+            "zombie_shirt" -> {
+                noisy(t, rgb(112, 52, 40), 0.08f, 0.2f)
+                for (y in 9..12) for (x in 2..5) t[x, y] = scale(rgb(132, 112, 72), t.jitter(0.05f))
+                for (x in 0 until 16) if (t.rnd.nextInt(3) == 0) t[x, 15] = zSkin
+                t[11, 4] = zSkin; t[12, 4] = zSkin; t[11, 5] = zSkin
+            }
+            "zombie_pants" -> {
+                noisy(t, rgb(64, 66, 58), 0.08f, 0.2f)
+                for (x in 4..11) if (t.rnd.nextInt(2) == 0) t[x, 8 + t.rnd.nextInt(2)] = zSkin
+                for (x in 0 until 16) { t[x, 14] = rgb(40, 36, 32); t[x, 15] = rgb(40, 36, 32) }
+            }
+            "boomling_shell" -> {
+                val (_, edge) = voronoi(t.rnd, 7)
+                t.fill { x, y -> if (edge[y][x] < 0.9f) rgb(240, 124, 34) else scale(shell, t.jitter(0.1f)) }
+            }
+            "boomling_leg" -> noisy(t, rgb(42, 40, 44), 0.1f, 0.2f)
+            "boomling_face" -> {
+                val (_, edge) = voronoi(t.rnd, 5)
+                t.fill { x, y -> if (edge[y][x] < 0.7f && y > 12) rgb(200, 100, 30) else scale(shell, t.jitter(0.08f)) }
+                for (y in 4..6) { for (x in 3..5) t[x, y] = rgb(255, 222, 80); for (x in 10..12) t[x, y] = rgb(255, 222, 80) }
+                t[4, 5] = rgb(120, 40, 10); t[11, 5] = rgb(120, 40, 10)
+                for (x in 3..12) t[x, if (x % 2 == 0) 9 else 10] = rgb(255, 150, 40)
+            }
+            "boomling_fuse" -> t.fill { _, y ->
+                when {
+                    y < 3 -> rgb(255, 210, 70)
+                    y % 4 == 0 -> rgb(110, 84, 50)
+                    else -> scale(rgb(172, 142, 92), t.jitter(0.05f))
+                }
+            }
+            else -> return false
+        }
+        return true
+    }
+
     // ---------------------------------------------------------------- dispatch
 
     private fun paint(name: String, t: Tile) {
+        if (mobSkin(name, t)) return
         when {
             name.startsWith("wool_") -> return wool(t, DYE_COLORS.getValue(name.removePrefix("wool_")))
             name.startsWith("concrete_") -> return noisy(t, DYE_COLORS.getValue(name.removePrefix("concrete_")), 0.02f, 0.05f)
@@ -980,6 +1084,7 @@ object TextureAtlas {
         // Make sure every block and item has allocated its tiles.
         Blocks.COUNT.let { Blocks[0] }
         Items.all.size
+        MobModels.models.size
         val atlas = IntArray(SIZE * SIZE)
         val tiles = HashMap<Int, Tile>()
         for ((name, index) in Tiles.all()) {

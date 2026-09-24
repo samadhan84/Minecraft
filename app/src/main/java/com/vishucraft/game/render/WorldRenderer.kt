@@ -38,6 +38,7 @@ class WorldRenderer(private val game: Game) {
     private var atlasTex = 0
     private val dynamic = GpuMesh(GL_DYNAMIC_DRAW)
     private val lines = GpuMesh(GL_DYNAMIC_DRAW)
+    private val mobRenderer = MobRenderer()
     private val dyn = FloatBuilder(4096)
     private val cloudNoise = Noise(game.world.seed + 999)
 
@@ -56,7 +57,7 @@ class WorldRenderer(private val game: Game) {
         // Any previous context is gone: forget stale GL names and re-mesh everything.
         for (m in meshes.values) { m.opaque.invalidate(); m.translucent.invalidate(); m.chunk.uploadedVersion = -1; m.chunk.requestedVersion = -1 }
         meshes.clear()
-        dynamic.invalidate(); lines.invalidate()
+        dynamic.invalidate(); lines.invalidate(); mobRenderer.invalidate()
         QuadIndices.reset()
         for (c in game.world.chunks.values) { c.requestedVersion = -1; c.uploadedVersion = -1; c.meshing = false }
 
@@ -229,6 +230,11 @@ class WorldRenderer(private val game: Game) {
             m.opaque.draw()
         }
         visibleChunks = visible.size
+
+        // Mobs use the same shader (lighting, fog) with a per-mob tint for hurt / fuse flashes.
+        glUniform1f(blockShader.u("uCutout"), 0.5f)
+        mobRenderer.draw(blockShader, game.mobs, ex, ez, far)
+        if (underwater) glUniform3f(blockShader.u("uTint"), 0.55f, 0.7f, 1f)
 
         drawSelection()
         drawClouds(ex, ez, daylight, far)

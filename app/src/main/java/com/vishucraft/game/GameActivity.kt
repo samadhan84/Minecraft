@@ -52,6 +52,8 @@ class GameActivity : Activity() {
     private lateinit var stats: TextView
     private lateinit var toast: TextView
     private lateinit var hand: ImageView
+    private lateinit var hearts: com.vishucraft.game.ui.HeartsView
+    private lateinit var hurtFlash: View
     private lateinit var pauseMenu: LinearLayout
     private lateinit var inventory: InventoryView
     private lateinit var flyButton: HudButton
@@ -72,7 +74,7 @@ class GameActivity : Activity() {
             setEGLContextClientVersion(3)
             setEGLConfigChooser(DepthConfigChooser())
             preserveEGLContextOnPause = true
-            setRenderer(GameRenderer(game) { text -> runOnUiThread { onStats(text) } })
+            setRenderer(GameRenderer(game, { e -> runOnUiThread { onGameEvent(e) } }) { text -> runOnUiThread { onStats(text) } })
             renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
             setOnTouchListener(LookTouchHandler())
         }
@@ -126,7 +128,12 @@ class GameActivity : Activity() {
             gravity = Gravity.CENTER
             alpha = 0f
         }
-        root.addView(toast, lp(-2f, -2f, Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL, b = 56f))
+        root.addView(toast, lp(-2f, -2f, Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL, b = 78f))
+
+        hearts = com.vishucraft.game.ui.HeartsView(this)
+        root.addView(hearts, lp(200f, 20f, Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL, b = 52f))
+        hurtFlash = View(this).apply { setBackgroundColor(Color.argb(110, 220, 0, 0)); alpha = 0f }
+        root.addView(hurtFlash, 1, FrameLayout.LayoutParams(-1, -1))
 
         // The held block or tool, bottom right, swings when you mine or place.
         hand = ImageView(this).apply {
@@ -174,6 +181,11 @@ class GameActivity : Activity() {
         addMenu("Skip to next morning / night") {
             glView.queueEvent { game.timeOfDay = if (game.daylight > 0.5f) 0.52f else 0.0f }
             showPause(false)
+        }
+        addMenu("Mobs: Normal") { b ->
+            val hostile = !game.mobs.hostileEnabled
+            glView.queueEvent { game.mobs.hostileEnabled = hostile }
+            b.text = if (hostile) "Mobs: Normal" else "Mobs: Peaceful (no monsters)"
         }
         addMenu("Save and quit") { finish() }
         root.addView(pauseMenu, FrameLayout.LayoutParams(-1, -1))
@@ -227,7 +239,28 @@ class GameActivity : Activity() {
         input.jumpHeld = false; input.descendHeld = false; input.breakHeld = false
     }
 
+    private fun showToast(text: String) {
+        toast.text = text
+        toast.animate().cancel()
+        toast.alpha = 1f
+        toast.animate().alpha(0f).setStartDelay(1500).setDuration(500).start()
+    }
+
+    private fun onGameEvent(e: String) {
+        when {
+            e == "hurt" -> {
+                hurtFlash.animate().cancel()
+                hurtFlash.alpha = 1f
+                hurtFlash.animate().alpha(0f).setDuration(350).start()
+            }
+            e == "died" -> showToast("You died! Respawning…")
+            e.startsWith("toast:") -> showToast(e.removePrefix("toast:"))
+        }
+        hearts.health = game.health
+    }
+
     private fun onStats(text: String) {
+        hearts.health = game.health
         stats.text = text
         val flying = game.player.flying
         flyButton.toggled = flying

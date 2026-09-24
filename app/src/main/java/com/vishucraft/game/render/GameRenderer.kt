@@ -6,7 +6,11 @@ import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
 
 /** Drives the game loop from the GL thread: simulate, then draw. */
-class GameRenderer(private val game: Game, private val onStats: (String) -> Unit) : GLSurfaceView.Renderer {
+class GameRenderer(
+    private val game: Game,
+    private val onEvent: (String) -> Unit,
+    private val onStats: (String) -> Unit,
+) : GLSurfaceView.Renderer {
     private val world = WorldRenderer(game)
     private var lastNanos = 0L
     private var frames = 0
@@ -28,6 +32,7 @@ class GameRenderer(private val game: Game, private val onStats: (String) -> Unit
         lastNanos = now
 
         game.update(dt)
+        while (true) onEvent(game.uiEvents.poll() ?: break)
         if (game.dirtyChunks.isNotEmpty()) {
             for (key in game.dirtyChunks) world.remeshNow((key shr 32).toInt(), key.toInt())
             game.dirtyChunks.clear()
@@ -47,7 +52,7 @@ class GameRenderer(private val game: Game, private val onStats: (String) -> Unit
                 "%d fps  XYZ %.1f / %.1f / %.1f  %02d:%02d%s".format(
                     fps, p.x, p.y, p.z, hours, mins, if (p.flying) "  [flying]" else ""
                 ) + "\n" + game.world.generator.biomeAt(p.blockX(), p.blockZ()).name.lowercase()
-                    .replaceFirstChar { it.uppercase() } + "  chunks ${world.visibleChunks}"
+                    .replaceFirstChar { it.uppercase() } + "  chunks ${world.visibleChunks}  mobs ${game.mobs.list.size}"
             )
         }
     }

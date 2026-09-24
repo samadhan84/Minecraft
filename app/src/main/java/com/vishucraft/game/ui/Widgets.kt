@@ -276,6 +276,40 @@ class InventoryView(ctx: Context, private val onPick: (Int?) -> Unit) : View(ctx
     private fun dp(v: Float) = context.dp(v)
 }
 
+/** Ten hearts; each heart is two health points. */
+class HeartsView(ctx: Context) : View(ctx) {
+    var health = 20f
+        set(v) { if (field != v) { field = v; invalidate() } }
+    private val full = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(220, 30, 40) }
+    private val empty = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(150, 40, 20, 20) }
+    private val outline = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = ctx.dp(1.5f); color = Color.rgb(30, 10, 10) }
+    private val path = android.graphics.Path()
+
+    private fun heart(cx: Float, cy: Float, s: Float) {
+        path.reset()
+        path.moveTo(cx, cy + s * 0.45f)
+        path.cubicTo(cx - s * 0.9f, cy - s * 0.1f, cx - s * 0.45f, cy - s * 0.75f, cx, cy - s * 0.3f)
+        path.cubicTo(cx + s * 0.45f, cy - s * 0.75f, cx + s * 0.9f, cy - s * 0.1f, cx, cy + s * 0.45f)
+        path.close()
+    }
+
+    override fun onDraw(canvas: Canvas) {
+        val s = height * 0.9f
+        val step = width / 10f
+        for (i in 0 until 10) {
+            val cx = step * i + step / 2; val cy = height / 2f
+            heart(cx, cy, s)
+            canvas.drawPath(path, empty)
+            val hp = health - i * 2
+            if (hp >= 2f) canvas.drawPath(path, full)
+            else if (hp >= 1f) {
+                canvas.save(); canvas.clipRect(cx - s, 0f, cx, height.toFloat()); canvas.drawPath(path, full); canvas.restore()
+            }
+            canvas.drawPath(path, outline)
+        }
+    }
+}
+
 /** Center crosshair. */
 class CrosshairView(ctx: Context) : View(ctx) {
     private val paint = Paint().apply { color = Color.argb(220, 255, 255, 255); strokeWidth = ctx.dp(2f) }

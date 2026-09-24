@@ -46,6 +46,18 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
     val dirtyChunks = HashSet<Long>()
 
     val redstone = Redstone(world) { x, y, z, id, meta -> setBlock(x, y, z, id, meta) }
+    val mobs = Mobs(world)
+
+    /** Player health in half-hearts (20 = ten hearts). */
+    var health = 20f
+        private set
+    val playerAlive get() = health > 0f
+    private var regenTimer = 0f
+    private var lastVy = 0f
+    private var wasOnGround = true
+
+    /** Messages for the UI thread: "hurt", "died", or "toast:<text>". */
+    val uiEvents = java.util.concurrent.ConcurrentLinkedQueue<String>()
 
     init {
         if (level.hasPlayer) {
@@ -63,14 +75,21 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
             for (dz in -r..r) for (dx in -r..r) add(intArrayOf(dx, dz))
         }.sortedBy { it[0] * it[0] + it[1] * it[1] }
 
-        redstone.onExplosion = { ex, ey, ez ->
+        redstone.onExplosion = { ex, ey, ez, r ->
+            val blast = r * 2.2f
             val dx = player.x - ex; val dy = player.eyeY - ey; val dz = player.z - ez
             val d = sqrt(dx * dx + dy * dy + dz * dz)
-            if (d < 10f) {
-                val push = (10f - d) * 1.6f / max(d, 0.5f)
+            if (d < blast) {
+                val push = (blast - d) * 1.4f / max(d, 0.5f)
                 player.vx += dx * push; player.vy += (dy * push).coerceAtLeast(4f); player.vz += dz * push
+                hurtPlayer((1f - d / blast) * r * 5.5f, ex, ez, knockback = false)
             }
             if (d < 40f) shake = 0.6f
+            for (m in mobs.list) {
+                val mx = m.x - ex; val mz = m.z - ez; val my = m.y + m.type.height / 2 - ey
+                val md = sqrt(mx * mx + my * my + mz * mz)
+                if (md < blast) mobs.damage(m, (1f - md / blast) * r * 6f, mx / max(md, 0.5f), mz / max(md, 0.5f))
+            }
         }
     }
 
@@ -103,8 +122,20 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
                 player.y = y + 1f
                 spawned = true
             }
+            lastVy = player.vy
             player.update(dt, world, input.moveForward, input.moveStrafe, input.jumpHeld, input.descendHeld)
-            if (player.y < -20f) { player.y = Chunk.HEIGHT.toFloat(); player.vy = 0f }
+            // Fall damage when landing hard (not while flying or in water).
+            if (player.onGround && !wasOnGround && !player.flying && !player.inWater && lastVy < -14f) {
+                hurtPlayer((-lastVy - 13f) * 0.9f, player.x, player.z, knockback = false)
+            }
+            wasOnGround = player.onGround
+            if (player.y < -20f) hurtPlayer(100f, player.x, player.z, knockback = false)
+            mobs.update(dt, this)
+        }
+
+        if (playerAlive && health < 20f) {
+            regenTimer += dt
+            if (regenTimer >= 3f) { regenTimer = 0f; health = minOf(20f, health + 1f) }
         }
 
         player.lookDir(dir)
@@ -120,6 +151,29 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
 
         timeOfDay = (timeOfDay + dt / DAY_LENGTH_SECONDS) % 1f
     }
+
+    fun hurtPlayer(amount: Float, fromX: Float, fromZ: Float, knockback: Boolean = true) {
+        if (!playerAlive || amount <= 0f) return
+        health -= amount
+        if (knockback) {
+            val dx = player.x - fromX; val dz = player.z - fromZ
+            val d = sqrt(dx * dx + dz * dz).coerceAtLeast(0.1f)
+            player.vx += dx / d * 7f; player.vz += dz / d * 7f; player.vy = max(player.vy, 5f)
+        }
+        uiEvents.add("hurt")
+        if (health <= 0f) respawn()
+    }
+
+    private fun respawn() {
+        val (sx, sy, sz) = world.findSpawn()
+        player.x = sx; player.y = sy; player.z = sz
+        player.vx = 0f; player.vy = 0f; player.vz = 0f
+        health = 20f
+        spawned = false // drop onto the real surface once the chunk is loaded
+        uiEvents.add("died")
+    }
+
+    fun explode(x: Float, y: Float, z: Float, radius: Float) = redstone.explodeAt(x, y, z, radius)
 
     /** Seconds needed to mine [block] with the currently held slot. */
     fun mineTime(block: Int): Float {
@@ -184,6 +238,21 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
     private fun use() {
         val sel = input.selectedBlock
         val item = Items[sel]
+        // Tapping a mob attacks it if it is closer than the targeted block.
+        val mobHit = mobs.raycast(player.x, player.eyeY, player.z, dir[0], dir[1], dir[2], 4f)
+        if (mobHit != null) {
+            val blockDist = target?.let {
+                val bx = it.x + 0.5f - player.x; val by = it.y + 0.5f - player.eyeY; val bz = it.z + 0.5f - player.z
+                sqrt(bx * bx + by * by + bz * bz) - 0.5f
+            } ?: Float.MAX_VALUE
+            if (mobHit.distance <= blockDist) {
+                val dmg = (item?.attack ?: 1).toFloat()
+                val len = sqrt(dir[0] * dir[0] + dir[2] * dir[2]).coerceAtLeast(0.01f)
+                mobs.damage(mobHit.mob, dmg, dir[0] / len, dir[2] / len)
+                if (mobHit.mob.dead) uiEvents.add("toast:${mobHit.mob.type.displayName} defeated")
+                return
+            }
+        }
         val t = if (item?.use == ItemUse.BUCKET) {
             Raycast.cast(world, player.x, player.eyeY, player.z, dir[0], dir[1], dir[2], REACH, hitWater = true)
         } else target
