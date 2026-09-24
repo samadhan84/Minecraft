@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Isometric grass block icon -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path android:fillColor="#2B3A1E" android:pathData="M0,0h108v108h-108z" />
+    <!-- top -->
+    <path android:fillColor="#6DB33F" android:pathData="M54,18 L90,36 L54,54 L18,36 Z" />
+    <path android:fillColor="#5A9A32" android:pathData="M42,30 L48,33 L42,36 L36,33 Z M62,26 L68,29 L62,32 L56,29 Z M66,40 L72,43 L66,46 L60,43 Z" />
+    <!-- left side -->
+    <path android:fillColor="#8A5A3B" android:pathData="M18,36 L54,54 L54,92 L18,74 Z" />
+    <path android:fillColor="#5E9C36" android:pathData="M18,36 L54,54 L54,62 L18,44 Z" />
+    <!-- right side -->
+    <path android:fillColor="#6E4730" android:pathData="M54,54 L90,36 L90,74 L54,92 Z" />
+    <path android:fillColor="#4E8A2C" android:pathData="M54,54 L90,36 L90,44 L54,62 Z" />
+</vector>
