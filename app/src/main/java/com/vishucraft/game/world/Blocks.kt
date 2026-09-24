@@ -1,4 +1,4 @@
-package com.blockcraft.game.world
+package com.vishucraft.game.world
 
 /** Atlas tile indices (16x16 tiles in a 256x256 atlas). */
 object Tiles {

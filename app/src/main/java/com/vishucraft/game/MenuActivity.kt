@@ -1,4 +1,4 @@
-package com.blockcraft.game
+package com.vishucraft.game
 
 import android.app.Activity
 import android.app.AlertDialog
@@ -16,10 +16,10 @@ import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
-import com.blockcraft.game.ui.BlockIcons
-import com.blockcraft.game.ui.dpi
-import com.blockcraft.game.ui.menuButton
-import com.blockcraft.game.world.Tiles
+import com.vishucraft.game.ui.BlockIcons
+import com.vishucraft.game.ui.dpi
+import com.vishucraft.game.ui.menuButton
+import com.vishucraft.game.world.Tiles
 import java.io.File
 
 class MenuActivity : Activity() {
@@ -42,7 +42,7 @@ class MenuActivity : Activity() {
             gravity = Gravity.CENTER_HORIZONTAL
         }
         val title = TextView(this).apply {
-            text = "BlockCraft"
+            text = "VishuCraft"
             textSize = 54f
             typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
             setTextColor(Color.rgb(230, 230, 230))

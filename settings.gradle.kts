@@ -12,5 +12,5 @@ dependencyResolutionManagement {
         mavenCentral()
     }
 }
-rootProject.name = "BlockCraft"
+rootProject.name = "VishuCraft"
 include(":app")

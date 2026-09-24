@@ -1,4 +1,4 @@
-# BlockCraft
+# VishuCraft
 
 An open-world voxel sandbox game for Android (building and exploring with blocks), written from scratch in
 Kotlin and OpenGL ES 3.0. It has no third-party game engine and no image assets: every texture is generated
@@ -43,14 +43,14 @@ adb install app/build/outputs/apk/debug/app-debug.apk
 ```
 
 Every push is built by GitHub Actions (`.github/workflows/android.yml`). The resulting debug and release APKs are uploaded as the
-`BlockCraft-apk` workflow artifact, so you can download and sideload them without building locally.
+`VishuCraft-apk` workflow artifact, so you can download and sideload them without building locally.
 
 Minimum Android version: 7.0 (API 24) with OpenGL ES 3.0.
 
 ## Code layout
 
 ```
-app/src/main/java/com/blockcraft/game/
+app/src/main/java/com/vishucraft/game/
 ├── MenuActivity.kt        title screen, new world / seed dialog
 ├── GameActivity.kt        GL surface, HUD, touch handling, pause menu
 ├── engine/

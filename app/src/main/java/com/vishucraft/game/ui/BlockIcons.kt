@@ -1,13 +1,13 @@
-package com.blockcraft.game.ui
+package com.vishucraft.game.ui
 
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.LightingColorFilter
 import android.graphics.Matrix
 import android.graphics.Paint
-import com.blockcraft.game.render.TextureAtlas
-import com.blockcraft.game.world.Blocks
-import com.blockcraft.game.world.RenderType
+import com.vishucraft.game.render.TextureAtlas
+import com.vishucraft.game.world.Blocks
+import com.vishucraft.game.world.RenderType
 
 /** Renders small isometric block icons from the procedural atlas for the HUD. */
 object BlockIcons {

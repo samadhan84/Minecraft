@@ -4,11 +4,11 @@ plugins {
 }
 
 android {
-    namespace = "com.blockcraft.game"
+    namespace = "com.vishucraft.game"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.blockcraft.game"
+        applicationId = "com.vishucraft.game"
         minSdk = 24
         targetSdk = 35
         versionCode = 1

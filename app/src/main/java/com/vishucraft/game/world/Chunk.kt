@@ -1,4 +1,4 @@
-package com.blockcraft.game.world
+package com.vishucraft.game.world
 
 /** A 16 x 128 x 16 column of blocks. */
 class Chunk(val cx: Int, val cz: Int) {

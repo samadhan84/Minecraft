@@ -1,6 +1,6 @@
-package com.blockcraft.game.render
+package com.vishucraft.game.render
 
-import com.blockcraft.game.world.Tiles
+import com.vishucraft.game.world.Tiles
 import java.util.Random
 import kotlin.math.abs
 import kotlin.math.hypot

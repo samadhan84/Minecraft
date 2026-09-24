@@ -1,4 +1,4 @@
-package com.blockcraft.game.ui
+package com.vishucraft.game.ui
 
 import android.annotation.SuppressLint
 import android.content.Context
@@ -13,7 +13,7 @@ import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
 import android.widget.TextView
-import com.blockcraft.game.engine.GameInput
+import com.vishucraft.game.engine.GameInput
 import kotlin.math.hypot
 import kotlin.math.min
 
@@ -184,7 +184,7 @@ class HotbarView(ctx: Context, private val slots: IntArray, private val onSelect
 /** Creative inventory: grid of every block. */
 @SuppressLint("ViewConstructor")
 class InventoryView(ctx: Context, private val onPick: (Int?) -> Unit) : View(ctx) {
-    private val blocks = com.blockcraft.game.world.Blocks.placeable
+    private val blocks = com.vishucraft.game.world.Blocks.placeable
     private val dim = Paint().apply { color = Color.argb(150, 0, 0, 0) }
     private val panel = Paint().apply { color = Color.rgb(198, 198, 198) }
     private val panelBorder = Paint().apply { style = Paint.Style.STROKE; strokeWidth = ctx.dp(3f); color = Color.rgb(40, 40, 40) }

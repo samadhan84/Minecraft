@@ -1,7 +1,7 @@
-package com.blockcraft.game.render
+package com.vishucraft.game.render
 
 import android.opengl.GLSurfaceView
-import com.blockcraft.game.engine.Game
+import com.vishucraft.game.engine.Game
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
 

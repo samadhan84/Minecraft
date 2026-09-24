@@ -1,4 +1,4 @@
-package com.blockcraft.game.world
+package com.vishucraft.game.world
 
 import java.util.Random
 import kotlin.math.abs
