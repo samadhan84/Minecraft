@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android TV home-screen banner (320x180). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="320dp"
+    android:height="180dp"
+    android:viewportWidth="320"
+    android:viewportHeight="180">
+    <path android:fillColor="#3B2A1C" android:pathData="M0,0h320v180h-320z" />
+    <path android:fillColor="#5E9C36" android:pathData="M0,0h320v28h-320z" />
+    <!-- isometric grass block -->
+    <path android:fillColor="#6DB33F" android:pathData="M60,50 L96,68 L60,86 L24,68 Z" />
+    <path android:fillColor="#8A5A3B" android:pathData="M24,68 L60,86 L60,124 L24,106 Z" />
+    <path android:fillColor="#6E4730" android:pathData="M60,86 L96,68 L96,106 L60,124 Z" />
+    <path android:fillColor="#5E9C36" android:pathData="M24,68 L60,86 L60,94 L24,76 Z" />
+    <path android:fillColor="#4E8A2C" android:pathData="M60,86 L96,68 L96,76 L60,94 Z" />
+    <!-- "VC" blocks -->
+    <path android:fillColor="#E6E6E6" android:pathData="M120,60h14l14,44 14,-44h14l-21,62h-14z" />
+    <path android:fillColor="#E6E6E6" android:pathData="M190,60h56v14h-42v34h42v14h-56z" />
+    <path android:fillColor="#FFFF6E" android:pathData="M120,140h126v6h-126z" />
+</vector>

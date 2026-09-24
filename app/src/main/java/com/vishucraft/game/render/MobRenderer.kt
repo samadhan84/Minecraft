@@ -1,6 +1,6 @@
 package com.vishucraft.game.render
 
-import android.opengl.GLES30.*
+import android.opengl.GLES20.*
 import com.vishucraft.game.engine.Mob
 import com.vishucraft.game.engine.MobType
 import com.vishucraft.game.engine.Mobs

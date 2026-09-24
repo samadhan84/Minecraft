@@ -1,7 +1,7 @@
 package com.vishucraft.game.render
 
 import android.graphics.Bitmap
-import android.opengl.GLES30.*
+import android.opengl.GLES20.*
 import android.opengl.GLUtils
 import android.opengl.Matrix
 import com.vishucraft.game.engine.Game
@@ -29,7 +29,9 @@ class WorldRenderer(private val game: Game) {
     private val meshes = HashMap<Long, ChunkGpu>()
     private val results = ConcurrentLinkedQueue<MeshData>()
     private val localMesher = ChunkMesher()
-    private val workerMesher = ThreadLocal.withInitial { ChunkMesher() }
+    private val workerMesher = object : ThreadLocal<ChunkMesher>() {
+        override fun initialValue() = ChunkMesher()
+    }
     private var inFlight = 0
     private val inFlightLock = Any()
 

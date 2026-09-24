@@ -59,7 +59,23 @@ adb install app/build/outputs/apk/debug/app-debug.apk
 Every push is built by GitHub Actions (`.github/workflows/android.yml`). The resulting debug and release APKs are uploaded as the
 `VishuCraft-apk` workflow artifact, so you can download and sideload them without building locally.
 
-Minimum Android version: 7.0 (API 24) with OpenGL ES 3.0.
+Minimum Android version: 7.0 (API 24) with OpenGL ES 2.0. Runs on phones, tablets and **Android TV**
+(it appears on the TV home screen, and every menu can be used with the remote).
+
+### TV remote, gamepad and keyboard
+
+| Action | TV remote | Gamepad | Keyboard |
+| --- | --- | --- | --- |
+| Walk | Up / Down | Left stick | W A S D |
+| Turn / look | Left / Right, Channel + / − | Right stick | Arrows, R / V |
+| Place / use / attack | OK | LT | Enter or K |
+| Mine | Hold OK | RT | J |
+| Jump / fly up | – | A | Space |
+| Fly down | – | Left stick click | C or Shift |
+| Toggle flight | – | X | F |
+| Inventory | Menu | Y | E |
+| Hotbar slot | Rewind / Fast-forward | LB / RB | 1-9, Q, Tab |
+| Pause | Back | B / Start | Esc |
 
 ## Code layout
 

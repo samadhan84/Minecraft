@@ -65,10 +65,19 @@ class MenuActivity : Activity() {
 
         root.addView(col, FrameLayout.LayoutParams(-2, -2, Gravity.CENTER))
         setContentView(root)
+        playButton.requestFocus()
+        CrashReporter.install(this)
     }
 
     override fun onResume() {
         super.onResume()
+        CrashReporter.takeReport(this)?.let { report ->
+            AlertDialog.Builder(this)
+                .setTitle("The game stopped last time")
+                .setMessage("Sorry! Please send this to the developer:\n\n$report")
+                .setPositiveButton("OK", null)
+                .show()
+        }
         playButton.text = if (hasWorld()) "Continue world" else "Play"
         @Suppress("DEPRECATION")
         window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY or

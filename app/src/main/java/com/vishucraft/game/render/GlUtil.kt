@@ -1,10 +1,10 @@
 package com.vishucraft.game.render
 
-import android.opengl.GLES30.*
+import android.opengl.GLES20.*
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.FloatBuffer
-import java.nio.IntBuffer
+import java.nio.ShortBuffer
 
 class Shader(vertexSrc: String, fragmentSrc: String) {
     val program: Int
@@ -16,6 +16,10 @@ class Shader(vertexSrc: String, fragmentSrc: String) {
         program = glCreateProgram()
         glAttachShader(program, vs)
         glAttachShader(program, fs)
+        // Fixed attribute slots (OpenGL ES 2.0 has no layout qualifiers).
+        glBindAttribLocation(program, 0, "aPos")
+        glBindAttribLocation(program, 1, "aUv")
+        glBindAttribLocation(program, 2, "aLight")
         glLinkProgram(program)
         val status = IntArray(1)
         glGetProgramiv(program, GL_LINK_STATUS, status, 0)
@@ -53,43 +57,40 @@ object Buffers {
         return floatBuf
     }
 
-    fun ints(data: IntArray): IntBuffer {
-        val b = ByteBuffer.allocateDirect(data.size * 4).order(ByteOrder.nativeOrder()).asIntBuffer()
+    fun shorts(data: ShortArray): ShortBuffer {
+        val b = ByteBuffer.allocateDirect(data.size * 2).order(ByteOrder.nativeOrder()).asShortBuffer()
         b.put(data).flip()
         return b
     }
 }
 
-/** A shared index buffer describing quads as two triangles (0,1,2)(0,2,3). */
+/**
+ * A shared 16-bit index buffer describing quads as two triangles (0,1,2)(0,2,3).
+ * OpenGL ES 2.0 only guarantees 16-bit indices, so meshes are drawn in batches of [BATCH] quads.
+ */
 object QuadIndices {
+    const val BATCH = 16384 // 65536 vertices
     var ibo = 0
         private set
-    private var capacity = 0
 
-    fun reset() { ibo = 0; capacity = 0 }
+    fun reset() { ibo = 0 }
 
-    fun ensure(quads: Int) {
-        if (quads <= capacity && ibo != 0) return
-        var cap = maxOf(capacity, 16384)
-        while (cap < quads) cap *= 2
-        val idx = IntArray(cap * 6)
-        for (q in 0 until cap) {
+    fun ensure() {
+        if (ibo != 0) return
+        val idx = ShortArray(BATCH * 6)
+        for (q in 0 until BATCH) {
             val v = q * 4; val i = q * 6
-            idx[i] = v; idx[i + 1] = v + 1; idx[i + 2] = v + 2
-            idx[i + 3] = v; idx[i + 4] = v + 2; idx[i + 5] = v + 3
+            idx[i] = v.toShort(); idx[i + 1] = (v + 1).toShort(); idx[i + 2] = (v + 2).toShort()
+            idx[i + 3] = v.toShort(); idx[i + 4] = (v + 2).toShort(); idx[i + 5] = (v + 3).toShort()
         }
-        if (ibo == 0) {
-            val ids = IntArray(1); glGenBuffers(1, ids, 0); ibo = ids[0]
-        }
+        val ids = IntArray(1); glGenBuffers(1, ids, 0); ibo = ids[0]
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo)
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, idx.size * 4, Buffers.ints(idx), GL_STATIC_DRAW)
-        capacity = cap
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, idx.size * 2, Buffers.shorts(idx), GL_STATIC_DRAW)
     }
 }
 
-/** A VAO + VBO holding quads in the chunk vertex layout (x, y, z, u, v, light). */
+/** A VBO holding quads in the chunk vertex layout (x, y, z, u, v, light). */
 class GpuMesh(private val usage: Int = GL_STATIC_DRAW) {
-    private var vao = 0
     private var vbo = 0
     var quads = 0
         private set
@@ -97,65 +98,76 @@ class GpuMesh(private val usage: Int = GL_STATIC_DRAW) {
     fun upload(data: FloatArray, floatCount: Int = data.size) {
         quads = floatCount / (FLOATS_PER_VERTEX * 4)
         if (quads == 0) return
-        if (vao == 0) {
+        if (vbo == 0) {
             val ids = IntArray(1)
-            glGenVertexArrays(1, ids, 0); vao = ids[0]
             glGenBuffers(1, ids, 0); vbo = ids[0]
-            glBindVertexArray(vao)
-            glBindBuffer(GL_ARRAY_BUFFER, vbo)
-            val stride = FLOATS_PER_VERTEX * 4
-            glEnableVertexAttribArray(0)
-            glVertexAttribPointer(0, 3, GL_FLOAT, false, stride, 0)
-            glEnableVertexAttribArray(1)
-            glVertexAttribPointer(1, 2, GL_FLOAT, false, stride, 12)
-            glEnableVertexAttribArray(2)
-            glVertexAttribPointer(2, 1, GL_FLOAT, false, stride, 20)
-            glBindVertexArray(0)
         }
-        QuadIndices.ensure(quads)
+        QuadIndices.ensure()
         glBindBuffer(GL_ARRAY_BUFFER, vbo)
         glBufferData(GL_ARRAY_BUFFER, floatCount * 4, Buffers.floats(data, floatCount), usage)
     }
 
+    private fun pointers(baseBytes: Int) {
+        val stride = FLOATS_PER_VERTEX * 4
+        glVertexAttribPointer(0, 3, GL_FLOAT, false, stride, baseBytes)
+        glVertexAttribPointer(1, 2, GL_FLOAT, false, stride, baseBytes + 12)
+        glVertexAttribPointer(2, 1, GL_FLOAT, false, stride, baseBytes + 20)
+    }
+
+    private fun bind() {
+        glBindBuffer(GL_ARRAY_BUFFER, vbo)
+        glEnableVertexAttribArray(0)
+        glEnableVertexAttribArray(1)
+        glEnableVertexAttribArray(2)
+    }
+
     fun draw(mode: Int = GL_TRIANGLES) {
-        if (quads == 0 || vao == 0) return
-        glBindVertexArray(vao)
+        if (quads == 0 || vbo == 0) return
+        bind()
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, QuadIndices.ibo)
-        glDrawElements(mode, quads * 6, GL_UNSIGNED_INT, 0)
-        glBindVertexArray(0)
+        var q = 0
+        while (q < quads) {
+            val n = minOf(QuadIndices.BATCH, quads - q)
+            pointers(q * 4 * FLOATS_PER_VERTEX * 4)
+            glDrawElements(mode, n * 6, GL_UNSIGNED_SHORT, 0)
+            q += n
+        }
     }
 
     /** Draws raw vertices (used for line lists). */
     fun drawArrays(mode: Int, vertices: Int) {
-        if (vao == 0) return
-        glBindVertexArray(vao)
+        if (vbo == 0) return
+        bind()
+        pointers(0)
         glDrawArrays(mode, 0, vertices)
-        glBindVertexArray(0)
     }
 
     fun delete() {
-        if (vao != 0) {
-            glDeleteVertexArrays(1, intArrayOf(vao), 0)
-            glDeleteBuffers(1, intArrayOf(vbo), 0)
-        }
-        vao = 0; vbo = 0; quads = 0
+        if (vbo != 0) glDeleteBuffers(1, intArrayOf(vbo), 0)
+        vbo = 0; quads = 0
     }
 
     /** Forget GL names after a context loss without deleting them. */
-    fun invalidate() { vao = 0; vbo = 0; quads = 0 }
+    fun invalidate() { vbo = 0; quads = 0 }
 }
 
 object Shaders {
-    const val BLOCK_VS = """#version 300 es
-layout(location = 0) in vec3 aPos;
-layout(location = 1) in vec2 aUv;
-layout(location = 2) in float aLight;
+    private const val FRAG_PRECISION = """#ifdef GL_FRAGMENT_PRECISION_HIGH
+precision highp float;
+#else
+precision mediump float;
+#endif
+"""
+
+    const val BLOCK_VS = """attribute vec3 aPos;
+attribute vec2 aUv;
+attribute float aLight;
 uniform mat4 uViewProj;
 uniform vec3 uOffset;
 uniform vec3 uCamPos;
-out vec2 vUv;
-out float vLight;
-out float vDist;
+varying vec2 vUv;
+varying float vLight;
+varying float vDist;
 void main() {
     vec3 wp = aPos + uOffset;
     gl_Position = uViewProj * vec4(wp, 1.0);
@@ -165,58 +177,52 @@ void main() {
 }
 """
 
-    const val BLOCK_FS = """#version 300 es
-precision mediump float;
-uniform sampler2D uTex;
+    const val BLOCK_FS = FRAG_PRECISION + """uniform sampler2D uTex;
 uniform float uDaylight;
 uniform vec3 uFogColor;
 uniform float uFogStart;
 uniform float uFogEnd;
 uniform float uCutout;
 uniform vec3 uTint;
-in vec2 vUv;
-in float vLight;
-in float vDist;
-out vec4 fragColor;
+varying vec2 vUv;
+varying float vLight;
+varying float vDist;
 void main() {
-    vec4 c = texture(uTex, vUv);
+    vec4 c = texture2D(uTex, vUv);
     if (c.a < uCutout) discard;
     float l = vLight > 1.5 ? 1.0 : vLight * mix(0.16, 1.0, uDaylight);
     vec3 col = c.rgb * l * uTint;
     float f = clamp((vDist - uFogStart) / (uFogEnd - uFogStart), 0.0, 1.0);
-    fragColor = vec4(mix(col, uFogColor, f), c.a);
+    gl_FragColor = vec4(mix(col, uFogColor, f), c.a);
 }
 """
 
-    const val SIMPLE_VS = """#version 300 es
-layout(location = 0) in vec3 aPos;
-layout(location = 1) in vec2 aUv;
+    const val SIMPLE_VS = """attribute vec3 aPos;
+attribute vec2 aUv;
+attribute float aLight;
 uniform mat4 uViewProj;
 uniform vec3 uCamPos;
-out vec2 vUv;
-out float vDist;
+varying vec2 vUv;
+varying float vDist;
 void main() {
     gl_Position = uViewProj * vec4(aPos, 1.0);
     vUv = aUv;
-    vDist = length(aPos.xz - uCamPos.xz);
+    vDist = length(aPos.xz - uCamPos.xz) + aLight * 0.0;
 }
 """
 
-    const val SIMPLE_FS = """#version 300 es
-precision mediump float;
-uniform sampler2D uTex;
+    const val SIMPLE_FS = FRAG_PRECISION + """uniform sampler2D uTex;
 uniform vec4 uColor;
 uniform vec3 uFogColor;
 uniform float uFogStart;
 uniform float uFogEnd;
-in vec2 vUv;
-in float vDist;
-out vec4 fragColor;
+varying vec2 vUv;
+varying float vDist;
 void main() {
-    vec4 c = texture(uTex, vUv) * uColor;
+    vec4 c = texture2D(uTex, vUv) * uColor;
     if (c.a < 0.01) discard;
     float f = uFogEnd > 0.0 ? clamp((vDist - uFogStart) / (uFogEnd - uFogStart), 0.0, 1.0) : 0.0;
-    fragColor = vec4(c.rgb, c.a * (1.0 - f));
+    gl_FragColor = vec4(c.rgb, c.a * (1.0 - f));
 }
 """
 }

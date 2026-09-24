@@ -13,6 +13,9 @@ class GameInput {
     /** True while the player is holding a finger on the world to mine. */
     @Volatile var breakHeld = false
     @Volatile var selectedBlock = 1
+    /** Continuous look input from gamepad sticks / remote keys, -1..1 (x: right, y: up). */
+    @Volatile var lookStickX = 0f
+    @Volatile var lookStickY = 0f
 
     private var lookDx = 0f
     private var lookDy = 0f

@@ -105,6 +105,8 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
 
         input.consumeLook(look)
         player.rotate(look[0] * LOOK_SENSITIVITY, -look[1] * LOOK_SENSITIVITY)
+        // Sticks and remote keys turn at up to 2.4 rad/s.
+        player.rotate(input.lookStickX * 2.4f * dt, input.lookStickY * 1.8f * dt)
 
         while (true) {
             when (input.actions.poll() ?: break) {

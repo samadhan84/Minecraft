@@ -2,6 +2,7 @@ package com.vishucraft.game
 
 import android.annotation.SuppressLint
 import android.app.Activity
+import android.content.pm.PackageManager
 import android.graphics.Color
 import android.opengl.GLSurfaceView
 import android.os.Bundle
@@ -9,6 +10,8 @@ import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
 import android.view.Gravity
+import android.view.InputDevice
+import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
@@ -41,6 +44,26 @@ class GameActivity : Activity() {
     companion object {
         const val EXTRA_SEED = "seed"
         fun worldDir(activity: Activity) = File(activity.filesDir, "world")
+
+        const val CONTROLS_HELP =
+            "TV remote:\n" +
+                "• Up / Down: walk forward / back\n" +
+                "• Left / Right: turn\n" +
+                "• Channel + / Channel −: look up / down\n" +
+                "• OK: place, use, attack. Hold OK: mine\n" +
+                "• Menu: block inventory\n" +
+                "• Rewind / Fast-forward: previous / next hotbar slot\n" +
+                "• Back: pause menu\n\n" +
+                "Gamepad:\n" +
+                "• Left stick: move, right stick: look\n" +
+                "• RT: mine, LT: place / attack\n" +
+                "• A: jump / fly up, left stick click: fly down\n" +
+                "• X: toggle flying, Y: inventory\n" +
+                "• LB / RB: hotbar slot, B or Start: pause\n\n" +
+                "Keyboard:\n" +
+                "• W A S D: move, arrows: turn, R / V: look up / down\n" +
+                "• Space: jump, C or Shift: fly down, F: fly\n" +
+                "• Enter or K: place, J: mine, E: inventory, 1-9 / Q / Tab: slots"
     }
 
     private lateinit var glView: GLSurfaceView
@@ -71,7 +94,7 @@ class GameActivity : Activity() {
         game = Game(world, level, input, dir)
 
         glView = GLSurfaceView(this).apply {
-            setEGLContextClientVersion(3)
+            setEGLContextClientVersion(2)
             setEGLConfigChooser(DepthConfigChooser())
             preserveEGLContextOnPause = true
             setRenderer(GameRenderer(game, { e -> runOnUiThread { onGameEvent(e) } }) { text -> runOnUiThread { onStats(text) } })
@@ -94,12 +117,13 @@ class GameActivity : Activity() {
 
     private fun buildHud() {
         // Movement
-        root.addView(JoystickView(this, input), lp(200f, 200f, Gravity.BOTTOM or Gravity.START, l = 8f, b = 52f))
+        val touch = packageManager.hasSystemFeature(PackageManager.FEATURE_TOUCHSCREEN)
+        if (touch) root.addView(JoystickView(this, input), lp(200f, 200f, Gravity.BOTTOM or Gravity.START, l = 8f, b = 52f))
 
         val jump = HudButton(this, "▲") { input.jumpHeld = it }
-        root.addView(jump, lp(76f, 76f, Gravity.BOTTOM or Gravity.END, r = 24f, b = 64f))
+        if (touch) root.addView(jump, lp(76f, 76f, Gravity.BOTTOM or Gravity.END, r = 24f, b = 64f))
         downButton = HudButton(this, "▼") { input.descendHeld = it }
-        root.addView(downButton, lp(64f, 64f, Gravity.BOTTOM or Gravity.END, r = 112f, b = 64f))
+        if (touch) root.addView(downButton, lp(64f, 64f, Gravity.BOTTOM or Gravity.END, r = 112f, b = 64f))
         downButton.visibility = View.GONE
 
         flyButton = HudButton(this, "FLY") { if (it) input.actions.add(GameInput.Action.TOGGLE_FLY) }
@@ -187,8 +211,10 @@ class GameActivity : Activity() {
             glView.queueEvent { game.mobs.hostileEnabled = hostile }
             b.text = if (hostile) "Mobs: Normal" else "Mobs: Peaceful (no monsters)"
         }
+        addMenu("Controls") { showControls() }
         addMenu("Save and quit") { finish() }
         root.addView(pauseMenu, FrameLayout.LayoutParams(-1, -1))
+        if (!touch) handler.postDelayed({ showToast("Press MENU / Y for controls help in the pause menu (Back)") }, 800)
     }
 
     private fun updateHand() {
@@ -231,12 +257,26 @@ class GameActivity : Activity() {
 
     private fun showPause(show: Boolean) {
         pauseMenu.visibility = if (show) View.VISIBLE else View.GONE
-        if (show) releaseInputs()
+        if (show) {
+            releaseInputs()
+            pauseMenu.getChildAt(1)?.requestFocus()
+        }
     }
 
     private fun releaseInputs() {
+        keyFwd = false; keyBack = false; keyLeft = false; keyRight = false
+        keyTurnL = false; keyTurnR = false; keyLookU = false; keyLookD = false
+        input.lookStickX = 0f; input.lookStickY = 0f
         input.moveForward = 0f; input.moveStrafe = 0f
         input.jumpHeld = false; input.descendHeld = false; input.breakHeld = false
+    }
+
+    private fun showControls() {
+        android.app.AlertDialog.Builder(this)
+            .setTitle("Controls")
+            .setMessage(CONTROLS_HELP)
+            .setPositiveButton("OK", null)
+            .show()
     }
 
     private fun showToast(text: String) {
@@ -320,21 +360,127 @@ class GameActivity : Activity() {
         }
     }
 
-    /** Prefers a 24-bit depth buffer (less z-fighting), falls back to 16-bit. */
+    /**
+     * Prefers RGB888 with a 24-bit depth buffer (less z-fighting), then falls back step by step so that
+     * older TVs and boxes with OpenGL ES 2.0-only GPUs still get a working surface.
+     */
     private class DepthConfigChooser : GLSurfaceView.EGLConfigChooser {
         override fun chooseConfig(egl: EGL10, display: EGLDisplay): EGLConfig {
-            for (depth in intArrayOf(24, 16)) {
-                val attribs = intArrayOf(
-                    EGL10.EGL_RED_SIZE, 8, EGL10.EGL_GREEN_SIZE, 8, EGL10.EGL_BLUE_SIZE, 8,
-                    EGL10.EGL_DEPTH_SIZE, depth, EGL10.EGL_RENDERABLE_TYPE, 0x40 /* EGL_OPENGL_ES3_BIT_KHR */,
-                    EGL10.EGL_NONE
-                )
+            val es2 = 4 // EGL_OPENGL_ES2_BIT
+            val attempts = listOf(
+                intArrayOf(EGL10.EGL_RED_SIZE, 8, EGL10.EGL_GREEN_SIZE, 8, EGL10.EGL_BLUE_SIZE, 8, EGL10.EGL_DEPTH_SIZE, 24),
+                intArrayOf(EGL10.EGL_RED_SIZE, 8, EGL10.EGL_GREEN_SIZE, 8, EGL10.EGL_BLUE_SIZE, 8, EGL10.EGL_DEPTH_SIZE, 16),
+                intArrayOf(EGL10.EGL_RED_SIZE, 5, EGL10.EGL_GREEN_SIZE, 6, EGL10.EGL_BLUE_SIZE, 5, EGL10.EGL_DEPTH_SIZE, 16),
+                intArrayOf(EGL10.EGL_DEPTH_SIZE, 16),
+            )
+            for (a in attempts) {
+                val attribs = a + intArrayOf(EGL10.EGL_RENDERABLE_TYPE, es2, EGL10.EGL_NONE)
                 val configs = arrayOfNulls<EGLConfig>(1)
                 val num = IntArray(1)
                 if (egl.eglChooseConfig(display, attribs, configs, 1, num) && num[0] > 0) return configs[0]!!
             }
-            throw IllegalStateException("No suitable EGL config")
+            throw IllegalStateException("This device has no OpenGL ES 2.0 display configuration")
         }
+    }
+
+    // ---------------------------------------------------------------- TV remote, keyboard and gamepad
+
+    private var keyFwd = false; private var keyBack = false; private var keyLeft = false; private var keyRight = false
+    private var keyTurnL = false; private var keyTurnR = false; private var keyLookU = false; private var keyLookD = false
+    private var okMining = false
+    private var okDown = false
+    private var triggerPlace = false
+    private val okHold = Runnable { if (okDown) { okMining = true; input.breakHeld = true; handler.post(swingLoop) } }
+
+    private fun applyKeys() {
+        input.moveForward = (if (keyFwd) 1f else 0f) - (if (keyBack) 1f else 0f)
+        input.moveStrafe = (if (keyRight) 1f else 0f) - (if (keyLeft) 1f else 0f)
+        input.lookStickX = (if (keyTurnR) 1f else 0f) - (if (keyTurnL) 1f else 0f)
+        input.lookStickY = (if (keyLookU) 1f else 0f) - (if (keyLookD) 1f else 0f)
+    }
+
+    private fun cycleSlot(delta: Int) {
+        val slot = (hotbar.selected + delta + 9) % 9
+        hotbar.selected = slot
+        selectSlot(slot)
+    }
+
+    override fun dispatchKeyEvent(e: KeyEvent): Boolean {
+        if (inventory.visibility == View.VISIBLE) {
+            if (inventory.handleKey(e)) return true
+            return super.dispatchKeyEvent(e)
+        }
+        if (pauseMenu.visibility == View.VISIBLE) {
+            if (e.keyCode == KeyEvent.KEYCODE_BUTTON_B || e.keyCode == KeyEvent.KEYCODE_BUTTON_START) {
+                if (e.action == KeyEvent.ACTION_UP) showPause(false)
+                return true
+            }
+            return super.dispatchKeyEvent(e)
+        }
+        val down = e.action == KeyEvent.ACTION_DOWN
+        val first = down && e.repeatCount == 0
+        when (e.keyCode) {
+            KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_W -> keyFwd = down
+            KeyEvent.KEYCODE_DPAD_DOWN, KeyEvent.KEYCODE_S -> keyBack = down
+            KeyEvent.KEYCODE_A -> keyLeft = down
+            KeyEvent.KEYCODE_D -> keyRight = down
+            KeyEvent.KEYCODE_DPAD_LEFT -> keyTurnL = down
+            KeyEvent.KEYCODE_DPAD_RIGHT -> keyTurnR = down
+            KeyEvent.KEYCODE_CHANNEL_UP, KeyEvent.KEYCODE_PAGE_UP, KeyEvent.KEYCODE_NUMPAD_8, KeyEvent.KEYCODE_R -> keyLookU = down
+            KeyEvent.KEYCODE_CHANNEL_DOWN, KeyEvent.KEYCODE_PAGE_DOWN, KeyEvent.KEYCODE_NUMPAD_2, KeyEvent.KEYCODE_V -> keyLookD = down
+            KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER, KeyEvent.KEYCODE_K -> {
+                // Short press: place / use / attack. Hold: mine.
+                if (first) { okDown = true; okMining = false; handler.postDelayed(okHold, 300) }
+                if (!down) {
+                    handler.removeCallbacks(okHold)
+                    if (okDown && !okMining) { input.actions.add(GameInput.Action.PLACE); swing() }
+                    okDown = false; okMining = false; input.breakHeld = false
+                }
+            }
+            KeyEvent.KEYCODE_J, KeyEvent.KEYCODE_BUTTON_R2 -> {
+                input.breakHeld = down
+                if (first) handler.post(swingLoop)
+            }
+            KeyEvent.KEYCODE_BUTTON_L2 -> if (first) { input.actions.add(GameInput.Action.PLACE); swing() }
+            KeyEvent.KEYCODE_SPACE, KeyEvent.KEYCODE_BUTTON_A -> input.jumpHeld = down
+            KeyEvent.KEYCODE_SHIFT_LEFT, KeyEvent.KEYCODE_BUTTON_THUMBL, KeyEvent.KEYCODE_C -> input.descendHeld = down
+            KeyEvent.KEYCODE_F, KeyEvent.KEYCODE_BUTTON_X -> if (first) input.actions.add(GameInput.Action.TOGGLE_FLY)
+            KeyEvent.KEYCODE_E, KeyEvent.KEYCODE_I, KeyEvent.KEYCODE_MENU, KeyEvent.KEYCODE_BUTTON_Y,
+            KeyEvent.KEYCODE_PROG_RED, KeyEvent.KEYCODE_TV_CONTENTS_MENU -> if (first) showInventory(true)
+            KeyEvent.KEYCODE_Q, KeyEvent.KEYCODE_BUTTON_L1, KeyEvent.KEYCODE_MEDIA_REWIND, KeyEvent.KEYCODE_MEDIA_PREVIOUS -> if (first) cycleSlot(-1)
+            KeyEvent.KEYCODE_TAB, KeyEvent.KEYCODE_BUTTON_R1, KeyEvent.KEYCODE_MEDIA_FAST_FORWARD, KeyEvent.KEYCODE_MEDIA_NEXT -> if (first) cycleSlot(1)
+            in KeyEvent.KEYCODE_1..KeyEvent.KEYCODE_9 -> if (first) { hotbar.selected = e.keyCode - KeyEvent.KEYCODE_1; selectSlot(hotbar.selected) }
+            KeyEvent.KEYCODE_BUTTON_B, KeyEvent.KEYCODE_BUTTON_START, KeyEvent.KEYCODE_ESCAPE, KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE ->
+                if (!down) showPause(true)
+            else -> return super.dispatchKeyEvent(e)
+        }
+        applyKeys()
+        return true
+    }
+
+    private fun axis(e: MotionEvent, a: Int): Float {
+        val v = e.getAxisValue(a)
+        return if (abs(v) < 0.18f) 0f else v
+    }
+
+    override fun dispatchGenericMotionEvent(e: MotionEvent): Boolean {
+        val isStick = e.source and InputDevice.SOURCE_JOYSTICK == InputDevice.SOURCE_JOYSTICK ||
+            e.source and InputDevice.SOURCE_GAMEPAD == InputDevice.SOURCE_GAMEPAD
+        if (!isStick || e.action != MotionEvent.ACTION_MOVE) return super.dispatchGenericMotionEvent(e)
+        if (inventory.visibility == View.VISIBLE || pauseMenu.visibility == View.VISIBLE) return true
+        val hatX = e.getAxisValue(MotionEvent.AXIS_HAT_X); val hatY = e.getAxisValue(MotionEvent.AXIS_HAT_Y)
+        input.moveStrafe = (axis(e, MotionEvent.AXIS_X) + hatX).coerceIn(-1f, 1f)
+        input.moveForward = (-axis(e, MotionEvent.AXIS_Y) - hatY).coerceIn(-1f, 1f)
+        input.lookStickX = axis(e, MotionEvent.AXIS_Z)
+        input.lookStickY = -axis(e, MotionEvent.AXIS_RZ)
+        val rt = maxOf(e.getAxisValue(MotionEvent.AXIS_RTRIGGER), e.getAxisValue(MotionEvent.AXIS_GAS))
+        val lt = maxOf(e.getAxisValue(MotionEvent.AXIS_LTRIGGER), e.getAxisValue(MotionEvent.AXIS_BRAKE))
+        val mining = rt > 0.5f
+        if (mining && !input.breakHeld) handler.post(swingLoop)
+        input.breakHeld = mining
+        if (lt > 0.5f && !triggerPlace) { input.actions.add(GameInput.Action.PLACE); swing() }
+        triggerPlace = lt > 0.5f
+        return true
     }
 
     @Deprecated("Deprecated in Java")

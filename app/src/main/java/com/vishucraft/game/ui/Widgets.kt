@@ -10,6 +10,7 @@ import android.graphics.RectF
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
+import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.View
 import android.widget.TextView
@@ -20,7 +21,10 @@ import kotlin.math.min
 fun Context.dp(v: Float) = v * resources.displayMetrics.density
 fun Context.dpi(v: Float) = (v * resources.displayMetrics.density).toInt()
 
-/** Blocky stone-style button used in menus. */
+/**
+ * Blocky stone-style button used in menus. It is focusable, so TV remotes and gamepads can move between
+ * buttons: the focused button turns blue with a yellow border, and a pressed one gets lighter.
+ */
 fun menuButton(ctx: Context, label: String, onClick: () -> Unit): TextView = TextView(ctx).apply {
     text = label
     setTextColor(Color.WHITE)
@@ -28,18 +32,19 @@ fun menuButton(ctx: Context, label: String, onClick: () -> Unit): TextView = Tex
     typeface = Typeface.DEFAULT_BOLD
     gravity = Gravity.CENTER
     setShadowLayer(0.01f, ctx.dp(2f), ctx.dp(2f), Color.rgb(40, 40, 40))
-    val normal = GradientDrawable().apply {
-        setColor(Color.rgb(112, 112, 112)); setStroke(ctx.dpi(3f), Color.rgb(30, 30, 30))
+    fun state(fill: Int, border: Int, width: Float) = GradientDrawable().apply {
+        setColor(fill); setStroke(ctx.dpi(width), border)
     }
-    background = normal
+    background = android.graphics.drawable.StateListDrawable().apply {
+        addState(intArrayOf(android.R.attr.state_pressed), state(Color.rgb(150, 170, 230), Color.rgb(255, 235, 90), 4f))
+        addState(intArrayOf(android.R.attr.state_focused), state(Color.rgb(84, 112, 196), Color.rgb(255, 235, 90), 4f))
+        addState(intArrayOf(), state(Color.rgb(112, 112, 112), Color.rgb(30, 30, 30), 3f))
+    }
     setPadding(ctx.dpi(24f), ctx.dpi(10f), ctx.dpi(24f), ctx.dpi(10f))
     isClickable = true
-    setOnTouchListener { v, e ->
-        when (e.actionMasked) {
-            MotionEvent.ACTION_DOWN -> (v.background as GradientDrawable).setColor(Color.rgb(126, 136, 190))
-            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> (v.background as GradientDrawable).setColor(Color.rgb(112, 112, 112))
-        }
-        false
+    isFocusable = true
+    setOnFocusChangeListener { v, has ->
+        v.animate().scaleX(if (has) 1.06f else 1f).scaleY(if (has) 1.06f else 1f).setDuration(120).start()
     }
     setOnClickListener { onClick() }
 }
@@ -195,6 +200,7 @@ class InventoryView(ctx: Context, private val onPick: (Int?) -> Unit) : View(ctx
     private val cellPaint = Paint().apply { color = Color.rgb(139, 139, 139) }
     private val tabPaint = Paint().apply { color = Color.rgb(160, 160, 160) }
     private val tabSel = Paint().apply { color = Color.rgb(230, 230, 230) }
+    private val cursorPaint = Paint().apply { style = Paint.Style.STROKE; strokeWidth = ctx.dp(3f); color = Color.rgb(255, 235, 90) }
     private val title = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(50, 50, 50); textSize = ctx.dp(13f); typeface = Typeface.DEFAULT_BOLD; textAlign = Paint.Align.CENTER }
     private val iconPaint = Paint().apply { isFilterBitmap = false }
     private val cols = 11
@@ -205,7 +211,43 @@ class InventoryView(ctx: Context, private val onPick: (Int?) -> Unit) : View(ctx
     private val dst = Rect()
     private var downX = 0f; private var downY = 0f; private var lastY = 0f; private var dragged = false
 
+    /** Keyboard / remote cursor; -1 until a key is used. */
+    private var cursor = -1
+
     private fun items() = tabs[tab].second
+
+    /** D-pad navigation: arrows move, OK picks, channel / shoulder buttons switch tabs, Back closes. */
+    fun handleKey(e: KeyEvent): Boolean {
+        if (e.action != KeyEvent.ACTION_DOWN) {
+            return e.keyCode != KeyEvent.KEYCODE_BACK
+        }
+        layoutPanel()
+        val n = items().size
+        if (cursor < 0) cursor = 0
+        when (e.keyCode) {
+            KeyEvent.KEYCODE_DPAD_LEFT -> if (cursor % cols > 0) cursor--
+            KeyEvent.KEYCODE_DPAD_RIGHT -> if (cursor % cols < cols - 1 && cursor + 1 < n) cursor++
+            KeyEvent.KEYCODE_DPAD_UP -> if (cursor >= cols) cursor -= cols
+            KeyEvent.KEYCODE_DPAD_DOWN -> cursor = minOf(cursor + cols, n - 1)
+            KeyEvent.KEYCODE_BUTTON_R1, KeyEvent.KEYCODE_CHANNEL_UP, KeyEvent.KEYCODE_PAGE_DOWN, KeyEvent.KEYCODE_TAB,
+            KeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> { tab = (tab + 1) % tabs.size; cursor = 0; scroll = 0f }
+            KeyEvent.KEYCODE_BUTTON_L1, KeyEvent.KEYCODE_CHANNEL_DOWN, KeyEvent.KEYCODE_PAGE_UP,
+            KeyEvent.KEYCODE_MEDIA_REWIND -> { tab = (tab + tabs.size - 1) % tabs.size; cursor = 0; scroll = 0f }
+            KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER, KeyEvent.KEYCODE_BUTTON_A -> {
+                if (cursor in 0 until n) onPick(items()[cursor]); return true
+            }
+            KeyEvent.KEYCODE_BACK, KeyEvent.KEYCODE_BUTTON_B, KeyEvent.KEYCODE_BUTTON_Y, KeyEvent.KEYCODE_MENU,
+            KeyEvent.KEYCODE_E, KeyEvent.KEYCODE_ESCAPE -> { onPick(null); return true }
+            else -> return false
+        }
+        // Keep the cursor row on screen.
+        val rowTop = (cursor / cols) * cell
+        if (rowTop < scroll) scroll = rowTop
+        if (rowTop + cell > scroll + gridRect.height()) scroll = rowTop + cell - gridRect.height()
+        scroll = scroll.coerceIn(0f, maxScroll())
+        invalidate()
+        return true
+    }
     private fun rows() = (items().size + cols - 1) / cols
 
     private fun layoutPanel() {
@@ -238,6 +280,7 @@ class InventoryView(ctx: Context, private val onPick: (Int?) -> Unit) : View(ctx
             val w = panelRect.width() / tabs.size
             tab = ((x - panelRect.left) / w).toInt().coerceIn(0, tabs.size - 1)
             scroll = 0f
+            cursor = -1
             invalidate()
             return
         }
@@ -269,6 +312,7 @@ class InventoryView(ctx: Context, private val onPick: (Int?) -> Unit) : View(ctx
             canvas.drawRect(x + 2, y + 2, x + cell - 2, y + cell - 2, cellPaint)
             dst.set((x + pad).toInt(), (y + pad).toInt(), (x + cell - pad).toInt(), (y + cell - pad).toInt())
             canvas.drawBitmap(BlockIcons.get(id), null, dst, iconPaint)
+            if (i == cursor) canvas.drawRect(x + 2, y + 2, x + cell - 2, y + cell - 2, cursorPaint)
         }
         canvas.restore()
     }
