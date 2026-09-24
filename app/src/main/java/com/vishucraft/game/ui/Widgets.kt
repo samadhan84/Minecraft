@@ -181,54 +181,96 @@ class HotbarView(ctx: Context, private val slots: IntArray, private val onSelect
     }
 }
 
-/** Creative inventory: grid of every block. */
+/** Creative inventory: tabs of blocks plus a tools tab, scrollable. */
 @SuppressLint("ViewConstructor")
 class InventoryView(ctx: Context, private val onPick: (Int?) -> Unit) : View(ctx) {
-    private val blocks = com.vishucraft.game.world.Blocks.placeable
+    private val tabs: List<Pair<String, List<Int>>> =
+        com.vishucraft.game.world.Category.values().map { it.title to com.vishucraft.game.world.Blocks.inCategory(it) } +
+            ("Tools & items" to com.vishucraft.game.world.Items.all.map { it.id })
+    private var tab = 0
+    private var scroll = 0f
     private val dim = Paint().apply { color = Color.argb(150, 0, 0, 0) }
     private val panel = Paint().apply { color = Color.rgb(198, 198, 198) }
     private val panelBorder = Paint().apply { style = Paint.Style.STROKE; strokeWidth = ctx.dp(3f); color = Color.rgb(40, 40, 40) }
     private val cellPaint = Paint().apply { color = Color.rgb(139, 139, 139) }
-    private val title = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(60, 60, 60); textSize = ctx.dp(16f); typeface = Typeface.DEFAULT_BOLD }
+    private val tabPaint = Paint().apply { color = Color.rgb(160, 160, 160) }
+    private val tabSel = Paint().apply { color = Color.rgb(230, 230, 230) }
+    private val title = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(50, 50, 50); textSize = ctx.dp(13f); typeface = Typeface.DEFAULT_BOLD; textAlign = Paint.Align.CENTER }
     private val iconPaint = Paint().apply { isFilterBitmap = false }
     private val cols = 11
-    private val cell = ctx.dp(46f)
+    private val cell = ctx.dp(44f)
+    private val tabH = ctx.dp(34f)
     private val panelRect = RectF()
+    private val gridRect = RectF()
     private val dst = Rect()
+    private var downX = 0f; private var downY = 0f; private var lastY = 0f; private var dragged = false
+
+    private fun items() = tabs[tab].second
+    private fun rows() = (items().size + cols - 1) / cols
 
     private fun layoutPanel() {
-        val rows = (blocks.size + cols - 1) / cols
         val w = cols * cell + dp(24f)
-        val h = rows * cell + dp(56f)
+        val h = (height - dp(24f)).coerceAtMost(tabH + dp(20f) + 6 * cell)
         panelRect.set((width - w) / 2, (height - h) / 2, (width + w) / 2, (height + h) / 2)
+        gridRect.set(panelRect.left + dp(12f), panelRect.top + tabH + dp(8f), panelRect.right - dp(12f), panelRect.bottom - dp(8f))
     }
+
+    private fun maxScroll() = (rows() * cell - gridRect.height()).coerceAtLeast(0f)
 
     @SuppressLint("ClickableViewAccessibility")
     override fun onTouchEvent(e: MotionEvent): Boolean {
-        if (e.actionMasked != MotionEvent.ACTION_UP) return true
         layoutPanel()
-        if (!panelRect.contains(e.x, e.y)) { onPick(null); return true }
-        val gx = ((e.x - panelRect.left - dp(12f)) / cell).toInt()
-        val gy = ((e.y - panelRect.top - dp(44f)) / cell).toInt()
-        val i = gy * cols + gx
-        if (gx in 0 until cols && gy >= 0 && i < blocks.size) onPick(blocks[i])
+        when (e.actionMasked) {
+            MotionEvent.ACTION_DOWN -> { downX = e.x; downY = e.y; lastY = e.y; dragged = false }
+            MotionEvent.ACTION_MOVE -> {
+                if (kotlin.math.abs(e.y - downY) > dp(8f)) dragged = true
+                if (dragged) { scroll = (scroll - (e.y - lastY)).coerceIn(0f, maxScroll()); invalidate() }
+                lastY = e.y
+            }
+            MotionEvent.ACTION_UP -> if (!dragged) tap(e.x, e.y)
+        }
         return true
+    }
+
+    private fun tap(x: Float, y: Float) {
+        if (!panelRect.contains(x, y)) { onPick(null); return }
+        if (y < panelRect.top + tabH) {
+            val w = panelRect.width() / tabs.size
+            tab = ((x - panelRect.left) / w).toInt().coerceIn(0, tabs.size - 1)
+            scroll = 0f
+            invalidate()
+            return
+        }
+        if (!gridRect.contains(x, y)) return
+        val gx = ((x - gridRect.left) / cell).toInt()
+        val gy = ((y - gridRect.top + scroll) / cell).toInt()
+        val i = gy * cols + gx
+        if (gx in 0 until cols && gy >= 0 && i < items().size) onPick(items()[i])
     }
 
     override fun onDraw(canvas: Canvas) {
         layoutPanel()
         canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), dim)
         canvas.drawRect(panelRect, panel)
+        val tw = panelRect.width() / tabs.size
+        for ((i, t) in tabs.withIndex()) {
+            val l = panelRect.left + i * tw
+            canvas.drawRect(l + 2, panelRect.top + 2, l + tw - 2, panelRect.top + tabH, if (i == tab) tabSel else tabPaint)
+            canvas.drawText(t.first, l + tw / 2, panelRect.top + tabH / 2 + dp(5f), title)
+        }
         canvas.drawRect(panelRect, panelBorder)
-        canvas.drawText("Blocks — tap one to put it in the selected slot", panelRect.left + dp(12f), panelRect.top + dp(28f), title)
+        canvas.save()
+        canvas.clipRect(gridRect)
         val pad = (cell * 0.14f).toInt()
-        for ((i, id) in blocks.withIndex()) {
-            val x = panelRect.left + dp(12f) + (i % cols) * cell
-            val y = panelRect.top + dp(44f) + (i / cols) * cell
+        for ((i, id) in items().withIndex()) {
+            val x = gridRect.left + (i % cols) * cell
+            val y = gridRect.top + (i / cols) * cell - scroll
+            if (y + cell < gridRect.top || y > gridRect.bottom) continue
             canvas.drawRect(x + 2, y + 2, x + cell - 2, y + cell - 2, cellPaint)
             dst.set((x + pad).toInt(), (y + pad).toInt(), (x + cell - pad).toInt(), (y + cell - pad).toInt())
             canvas.drawBitmap(BlockIcons.get(id), null, dst, iconPaint)
         }
+        canvas.restore()
     }
 
     private fun dp(v: Float) = context.dp(v)

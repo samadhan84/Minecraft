@@ -1,5 +1,7 @@
 package com.vishucraft.game.render
 
+import com.vishucraft.game.world.Blocks
+import com.vishucraft.game.world.Items
 import com.vishucraft.game.world.Tiles
 import java.util.Random
 import kotlin.math.abs
@@ -8,12 +10,12 @@ import kotlin.math.max
 import kotlin.math.min
 
 /**
- * Generates every block texture procedurally into a 256x256 ARGB atlas (16x16 tiles of 16px).
+ * Generates every block and item texture procedurally into a 512x512 ARGB atlas (32x32 tiles of 16px).
  * Pure Kotlin so it can run anywhere; the Android side wraps the pixels in a Bitmap.
  */
 object TextureAtlas {
     const val TILE = 16
-    const val TILES_PER_ROW = 16
+    const val TILES_PER_ROW = 32
     const val SIZE = TILE * TILES_PER_ROW
 
     val pixels: IntArray by lazy { build() }
@@ -427,80 +429,573 @@ object TextureAtlas {
         }
     }
 
-    // ---------------------------------------------------------------- assembly
+    // ---------------------------------------------------------------- more painters
+
+    private val DYE_COLORS = mapOf(
+        "white" to rgb(234, 236, 236), "orange" to rgb(240, 118, 19), "magenta" to rgb(189, 68, 179),
+        "light_blue" to rgb(58, 175, 217), "yellow" to rgb(248, 197, 39), "lime" to rgb(112, 185, 25),
+        "pink" to rgb(237, 141, 172), "gray" to rgb(62, 68, 71), "light_gray" to rgb(142, 142, 134),
+        "cyan" to rgb(21, 137, 145), "purple" to rgb(121, 42, 172), "blue" to rgb(53, 57, 157),
+        "brown" to rgb(114, 71, 40), "green" to rgb(84, 109, 27), "red" to rgb(161, 39, 34),
+        "black" to rgb(20, 21, 25),
+    )
+
+    private class Wood(val bark: Int, val barkDark: Int, val planks: Int, val leaves: Int)
+
+    private val WOODS = mapOf(
+        "oak" to Wood(rgb(108, 84, 52), rgb(72, 55, 34), rgb(166, 132, 80), rgb(62, 126, 42)),
+        "spruce" to Wood(rgb(62, 44, 26), rgb(40, 28, 16), rgb(116, 86, 50), rgb(52, 92, 58)),
+        "birch" to Wood(rgb(222, 220, 208), rgb(50, 50, 46), rgb(198, 178, 120), rgb(118, 160, 70)),
+        "jungle" to Wood(rgb(92, 72, 34), rgb(60, 48, 22), rgb(162, 116, 80), rgb(48, 142, 32)),
+        "acacia" to Wood(rgb(106, 100, 92), rgb(72, 68, 62), rgb(172, 92, 50), rgb(104, 132, 42)),
+        "dark_oak" to Wood(rgb(62, 48, 30), rgb(40, 30, 18), rgb(70, 46, 22), rgb(42, 92, 26)),
+    )
+
+    private fun speckled(t: Tile, base: Int, spot: Int, spots: Int, amount: Float = 0.06f) {
+        noisy(t, base, amount, 0.2f)
+        repeat(spots) { t[t.rnd.nextInt(16), t.rnd.nextInt(16)] = scale(spot, t.jitter(0.1f)) }
+    }
+
+    private fun bevel(t: Tile, light: Int, dark: Int) {
+        for (i in 0 until TILE) { t[i, 0] = light; t[0, i] = light; t[i, 15] = dark; t[15, i] = dark }
+    }
+
+    private fun logTopColored(t: Tile, w: Wood) {
+        t.fill { x, y ->
+            val d = max(abs(x - 7.5f), abs(y - 7.5f))
+            when {
+                d > 6.6f -> scale(w.bark, t.jitter(0.08f))
+                d.toInt() % 2 == 0 -> scale(w.planks, 1.08f * t.jitter(0.04f))
+                else -> scale(w.planks, 0.9f * t.jitter(0.04f))
+            }
+        }
+    }
+
+    private fun mineralBlock(t: Tile, c: Int, pattern: Int) {
+        t.fill { x, y ->
+            val edge = x == 0 || y == 0 || x == 15 || y == 15
+            val inner = x in 3..12 && y in 3..12
+            when {
+                edge -> scale(c, 0.7f)
+                x == 1 || y == 1 -> scale(c, 1.25f)
+                pattern == 1 && inner && (x + y) % 4 == 0 -> scale(c, 1.2f)
+                pattern == 2 && (x % 5 == 2 && y % 5 == 2) -> scale(c, 1.35f)
+                else -> scale(c, t.jitter(0.05f))
+            }
+        }
+    }
+
+    private fun polished(t: Tile, base: Int) {
+        noisy(t, base, 0.04f, 0.15f)
+        bevel(t, scale(base, 1.15f), scale(base, 0.7f))
+    }
+
+    private fun lamp(t: Tile, on: Boolean) {
+        val (ids, edge) = voronoi(t.rnd, 6)
+        val c = if (on) rgb(246, 200, 120) else rgb(110, 64, 34)
+        t.fill { x, y ->
+            when {
+                x == 0 || y == 0 || x == 15 || y == 15 -> if (on) rgb(150, 100, 60) else rgb(60, 36, 20)
+                edge[y][x] < 1f -> if (on) rgb(255, 240, 200) else rgb(80, 46, 24)
+                else -> scale(c, (0.85f + ids[y][x] * 0.04f) * t.jitter(0.04f))
+            }
+        }
+    }
+
+    private fun sprite(t: Tile) = t.fill { _, _ -> 0 }
+
+    private fun torchSprite(t: Tile, head: Int, glow: Int) {
+        sprite(t)
+        for (y in 6..15) { t[7, y] = rgb(120, 88, 50); t[8, y] = rgb(96, 70, 40) }
+        for (y in 3..5) for (x in 7..8) t[x, y] = head
+        t[7, 2] = glow; t[8, 2] = glow; t[6, 4] = scale(glow, 0.8f); t[9, 4] = scale(glow, 0.8f)
+    }
+
+    private fun leverSprite(t: Tile, on: Boolean) {
+        sprite(t)
+        for (y in 12..15) for (x in 4..11) t[x, y] = scale(rgb(120, 120, 122), t.jitter(0.08f))
+        for (i in 0..8) {
+            val x = if (on) 8 + i / 2 else 7 - i / 2
+            t[x, 11 - i] = rgb(120, 88, 50)
+        }
+        val tipX = if (on) 12 else 3
+        t[tipX, 3] = if (on) rgb(220, 30, 20) else rgb(110, 20, 16)
+    }
+
+    private fun dust(t: Tile, on: Boolean) {
+        sprite(t)
+        val c = if (on) rgb(255, 40, 20) else rgb(110, 12, 8)
+        for (i in 0 until 16) {
+            if (t.rnd.nextInt(5) != 0) t[i, 7 + t.rnd.nextInt(2)] = scale(c, t.jitter(0.2f))
+            if (t.rnd.nextInt(5) != 0) t[7 + t.rnd.nextInt(2), i] = scale(c, t.jitter(0.2f))
+        }
+        repeat(10) { t[5 + t.rnd.nextInt(6), 5 + t.rnd.nextInt(6)] = scale(c, t.jitter(0.25f)) }
+    }
+
+    private fun pistonSide(t: Tile) {
+        t.fill { x, y ->
+            when {
+                y < 4 -> scale(rgb(166, 132, 80), (if (y == 3) 0.7f else 1f) * t.jitter(0.05f))
+                x == 0 || x == 15 || y == 15 -> rgb(80, 80, 80)
+                else -> scale(rgb(120, 120, 120), t.jitter(0.08f))
+            }
+        }
+    }
+
+    private fun pistonFront(t: Tile, sticky: Boolean) {
+        planks(t)
+        bevel(t, rgb(190, 156, 100), rgb(110, 84, 50))
+        for (y in 6..9) for (x in 6..9) t[x, y] = rgb(120, 120, 120)
+        if (sticky) for (y in 3..12) for (x in 3..12) {
+            if (abs(x - 7.5f) + abs(y - 7.5f) < 7f) t[x, y] = scale(rgb(110, 190, 90), t.jitter(0.1f))
+        }
+    }
+
+    private fun faceOn(t: Tile, glow: Int) {
+        pumpkinSide(t)
+        // Carved triangle eyes and a zig-zag grin.
+        for (y in 0..2) for (x in 0..(2 - y) * 2) { t[3 + y + x - (2 - y), 4 + y] = glow; t[11 + y + x - (2 - y), 4 + y] = glow }
+        for (x in 3..12) { t[x, 10] = glow; t[x, 11] = glow }
+        for (x in 3..12 step 3) t[x, 12] = glow
+        for (x in 4..12 step 3) t[x, 9] = glow
+    }
+
+    private fun craftingTop(t: Tile) {
+        planks(t, rgb(150, 110, 64))
+        bevel(t, rgb(110, 80, 44), rgb(90, 64, 36))
+        for (i in 2..13) { t[i, 5] = rgb(80, 58, 30); t[i, 10] = rgb(80, 58, 30); t[5, i] = rgb(80, 58, 30); t[10, i] = rgb(80, 58, 30) }
+    }
+
+    private fun craftingSide(t: Tile, front: Boolean) {
+        planks(t)
+        for (x in 0 until TILE) for (y in 0..2) t[x, y] = scale(rgb(120, 86, 48), t.jitter(0.05f))
+        // A hammer and a saw hanging on the side.
+        val iron = rgb(170, 170, 176)
+        if (front) {
+            for (y in 5..13) t[4, y] = rgb(96, 70, 40)
+            for (x in 2..6) { t[x, 5] = iron; t[x, 6] = iron }
+            for (y in 5..12) for (x in 9..12) if (x - 9 <= (y - 5) / 2) t[x, y] = iron
+            for (y in 4..5) for (x in 9..10) t[x, y] = rgb(96, 70, 40)
+        } else {
+            for (y in 5..13) t[7, y] = rgb(96, 70, 40)
+            for (x in 5..10) { t[x, 5] = iron; t[x, 6] = iron }
+        }
+    }
+
+    private fun furnaceFront(t: Tile) {
+        stone(t, rgb(118, 118, 118))
+        bevel(t, rgb(150, 150, 150), rgb(70, 70, 70))
+        for (y in 8..13) for (x in 4..11) t[x, y] = if (y == 8 || x == 4 || x == 11) rgb(60, 60, 60) else rgb(26, 24, 24)
+        for (x in 3..12) t[x, 5] = rgb(70, 70, 70)
+    }
+
+    private fun chest(t: Tile, face: String) {
+        val wood = rgb(160, 108, 48)
+        t.fill { x, y ->
+            val edge = x == 0 || y == 0 || x == 15 || y == 15
+            when {
+                edge -> rgb(70, 44, 18)
+                face != "top" && y == 5 -> rgb(70, 44, 18)
+                else -> scale(wood, (if ((y + x / 5) % 4 == 0) 0.9f else 1f) * t.jitter(0.05f))
+            }
+        }
+        if (face == "front") for (y in 4..7) for (x in 7..8) t[x, y] = rgb(200, 200, 210)
+    }
+
+    private fun tnt(t: Tile, face: String) {
+        val red = rgb(196, 48, 36)
+        when (face) {
+            "side" -> t.fill { x, y ->
+                when {
+                    y in 5..10 -> if (y == 5 || y == 10) rgb(40, 40, 40) else if ((x / 2 + y) % 3 == 0) rgb(200, 200, 200) else rgb(236, 232, 224)
+                    x % 4 == 0 -> scale(red, 0.75f)
+                    else -> scale(red, t.jitter(0.06f))
+                }
+            }
+            "top" -> t.fill { x, y ->
+                val d = max(abs(x - 7.5f), abs(y - 7.5f))
+                when {
+                    d < 1.6f -> rgb(60, 60, 60)
+                    d < 3f -> rgb(220, 216, 200)
+                    else -> scale(red, t.jitter(0.06f))
+                }
+            }
+            "bottom" -> noisy(t, red, 0.06f, 0.2f)
+            else -> noisy(t, rgb(250, 246, 240), 0.03f, 0.1f)
+        }
+    }
+
+    // ---------------------------------------------------------------- items
+
+    private fun tool(t: Tile, kind: String, mat: Int) {
+        sprite(t)
+        val handle = rgb(137, 103, 55); val handleDark = rgb(84, 60, 30)
+        val dark = scale(mat, 0.55f); val light = scale(mat, 1.3f)
+        fun p(x: Int, y: Int, c: Int) { if (x in 0..15 && y in 0..15) t[x, y] = c }
+        if (kind == "sword") {
+            for (i in 0..9) { p(5 + i, 10 - i, light); p(6 + i, 10 - i, mat); p(5 + i, 11 - i, dark) }
+            p(15, 0, dark)
+            for (i in -2..2) p(5 + i, 10 + i, dark)
+            p(4, 11, handle); p(3, 12, handle); p(2, 13, handle); p(4, 12, handleDark); p(3, 13, handleDark)
+            p(1, 14, dark); p(2, 14, dark)
+            return
+        }
+        val mask = TOOL_MASKS.getValue(kind)
+        val dy = (16 - mask.size) / 2
+        for ((y, row) in mask.withIndex()) for ((x, ch) in row.withIndex()) {
+            when (ch) {
+                'h' -> p(x, y + dy, handle); 'k' -> p(x, y + dy, handleDark)
+                'm' -> p(x, y + dy, mat); 'd' -> p(x, y + dy, dark); 'l' -> p(x, y + dy, light)
+            }
+        }
+    }
+
+    /** Hand-made 16px tool silhouettes: h/k handle, m/d/l head (mid, dark, light). */
+    private val TOOL_MASKS = mapOf(
+        "pickaxe" to arrayOf(
+            "......dddd......",
+            "....ddmmmmdd....",
+            "...dmlllmmmmd...",
+            "....dd..kmmmmd..",
+            ".......kh.dmmmd.",
+            "......kh...dmmd.",
+            ".....kh.....dmd.",
+            "....kh......dmd.",
+            "...kh........dd.",
+            "..kh............",
+            ".kh.............",
+            "kh..............",
+        ),
+        "axe" to arrayOf(
+            "......dd........",
+            ".....dmmd.......",
+            "....dlmmmd......",
+            "....dlmmmkd.....",
+            "....dlmmkhmd....",
+            ".....dlkh.dd....",
+            "......kh........",
+            ".....kh.........",
+            "....kh..........",
+            "...kh...........",
+            "..kh............",
+            ".kh.............",
+            "kh..............",
+        ),
+        "shovel" to arrayOf(
+            "..........ddd...",
+            ".........dlmmd..",
+            "........dlmmmmd.",
+            "........dmmmmmd.",
+            ".........dmmmd..",
+            "........kh.dd...",
+            ".......kh.......",
+            "......kh........",
+            ".....kh.........",
+            "....kh..........",
+            "...kh...........",
+            "..kh............",
+            ".kh.............",
+            "kh..............",
+        ),
+        "hoe" to arrayOf(
+            ".....ddddd......",
+            "....dlmmmmd.....",
+            ".....ddddkhd....",
+            "........kh......",
+            ".......kh.......",
+            "......kh........",
+            ".....kh.........",
+            "....kh..........",
+            "...kh...........",
+            "..kh............",
+            ".kh.............",
+            "kh..............",
+        ),
+    )
+
+    private val TIER_COLORS = mapOf(
+        "wood" to rgb(160, 124, 70), "stone" to rgb(140, 140, 140), "iron" to rgb(222, 222, 226),
+        "gold" to rgb(250, 214, 64), "diamond" to rgb(80, 226, 214), "netherite" to rgb(76, 68, 72),
+    )
+
+    private fun flintAndSteel(t: Tile) {
+        sprite(t)
+        val steel = rgb(190, 190, 196)
+        for (a in 0..20) {
+            val ang = Math.PI * (0.2 + a / 20.0 * 1.3)
+            t[(10 + Math.cos(ang) * 4).toInt(), (5 + Math.sin(ang) * 4).toInt()] = steel
+        }
+        for (y in 9..14) for (x in 2..7) if (abs(x - 4.5f) + abs(y - 11.5f) < 4f) t[x, y] = scale(rgb(60, 60, 64), t.jitter(0.15f))
+    }
+
+    private fun bucket(t: Tile, water: Boolean) {
+        sprite(t)
+        val metal = rgb(196, 196, 200)
+        for (y in 5..14) {
+            val inset = (y - 5) / 4
+            for (x in 3 + inset..12 - inset) {
+                t[x, y] = if (x == 3 + inset || x == 12 - inset || y == 14) scale(metal, 0.7f) else metal
+            }
+        }
+        for (x in 3..12) t[x, 5] = scale(metal, 0.6f)
+        if (water) for (x in 4..11) { t[x, 6] = rgb(60, 110, 220); t[x, 7] = rgb(40, 84, 196) }
+        for (i in 0..8) t[3 + i, 3 - (if (i in 2..6) 1 else 0) + (if (i == 0 || i == 8) 1 else 0)] = scale(metal, 0.6f)
+    }
+
+    // ---------------------------------------------------------------- dispatch
+
+    private fun paint(name: String, t: Tile) {
+        when {
+            name.startsWith("wool_") -> return wool(t, DYE_COLORS.getValue(name.removePrefix("wool_")))
+            name.startsWith("concrete_") -> return noisy(t, DYE_COLORS.getValue(name.removePrefix("concrete_")), 0.02f, 0.05f)
+            name.startsWith("terracotta_") -> {
+                val c = mix(DYE_COLORS.getValue(name.removePrefix("terracotta_")), rgb(152, 94, 67), 0.4f)
+                return noisy(t, scale(c, 0.85f), 0.04f, 0.15f)
+            }
+            name.startsWith("stained_glass_") -> {
+                val c = DYE_COLORS.getValue(name.removePrefix("stained_glass_"))
+                return t.fill { x, y ->
+                    if (x == 0 || y == 0 || x == 15 || y == 15) withAlpha(scale(c, 1.1f), 230)
+                    else if ((x == y + 4 && x in 5..9)) withAlpha(mix(c, rgb(255, 255, 255), 0.6f), 200)
+                    else withAlpha(c, 120)
+                }
+            }
+            name.startsWith("crack_") -> return
+        }
+        for ((key, tier) in TIER_COLORS) for (kind in listOf("sword", "pickaxe", "axe", "shovel", "hoe")) {
+            if (name == "${kind}_$key") return tool(t, kind, tier)
+        }
+        for ((key, w) in WOODS) {
+            when (name) {
+                "${key}_log" -> return logSide(t, w.bark, w.barkDark, key == "birch")
+                "${key}_log_top" -> return logTopColored(t, w)
+                "${key}_planks" -> return planks(t, w.planks)
+                "${key}_leaves" -> return leaves(t, w.leaves)
+            }
+        }
+        when (name) {
+            "white" -> t.fill { _, _ -> rgb(255, 255, 255) }
+            "sun" -> sun(t)
+            "moon" -> moon(t)
+            "dirt" -> dirt(t)
+            "grass_top" -> grassTop(t)
+            "grass_side" -> { dirt(t); overlayTop(t, rgb(98, 160, 58), 4) }
+            "stone" -> stone(t)
+            "cobblestone" -> cobble(t, false)
+            "mossy_cobblestone" -> cobble(t, true)
+            "sand" -> noisy(t, rgb(220, 208, 162), 0.05f, 0.12f)
+            "gravel" -> gravel(t)
+            "glass" -> glass(t)
+            "water" -> water(t)
+            "bedrock" -> bedrock(t)
+            "coal_ore" -> ore(t, rgb(40, 40, 40), 4)
+            "iron_ore" -> ore(t, rgb(216, 176, 146), 3)
+            "gold_ore" -> ore(t, rgb(250, 214, 60), 3)
+            "diamond_ore" -> ore(t, rgb(90, 226, 222), 3)
+            "redstone_ore" -> ore(t, rgb(210, 20, 16), 4)
+            "lapis_ore" -> ore(t, rgb(34, 74, 196), 4)
+            "emerald_ore" -> ore(t, rgb(40, 206, 96), 2)
+            "copper_ore" -> ore(t, rgb(206, 116, 76), 4)
+            "bricks" -> bricks(t)
+            "stone_bricks" -> stoneBricks(t)
+            "mossy_stone_bricks" -> {
+                stoneBricks(t)
+                val vn = valueNoise(t.rnd, 8)
+                for (y in 0 until 16) for (x in 0 until 16) if (vn[y][x] > 0.58f) t[x, y] = scale(rgb(78, 122, 52), t.jitter(0.15f))
+            }
+            "cracked_stone_bricks" -> {
+                stoneBricks(t)
+                var x = 3; var y = 0
+                while (y < 16) { t[x, y] = rgb(60, 60, 62); x = (x + t.rnd.nextInt(3) - 1).coerceIn(1, 14); y++ }
+            }
+            "chiseled_stone_bricks" -> t.fill { x, y ->
+                val d = max(abs(x - 7.5f), abs(y - 7.5f)).toInt()
+                if (d == 7 || d == 4 || d == 1) rgb(84, 84, 86) else scale(rgb(124, 124, 126), t.jitter(0.06f))
+            }
+            "snow" -> noisy(t, rgb(242, 250, 252), 0.03f, 0.08f)
+            "snow_side" -> { dirt(t); overlayTop(t, rgb(242, 250, 252), 4) }
+            "cactus_side" -> cactusSide(t)
+            "cactus_top" -> cactusTop(t)
+            "flower_red" -> flower(t, rgb(220, 40, 40))
+            "flower_yellow" -> flower(t, rgb(250, 220, 50))
+            "blue_orchid" -> flower(t, rgb(60, 170, 240))
+            "tall_grass" -> tallGrass(t)
+            "fern" -> {
+                sprite(t)
+                for (y in 3..15) {
+                    t[7, y] = rgb(60, 120, 40)
+                    val w = (15 - y) / 3 + 1
+                    if (y % 2 == 0) for (i in 1..w) { t[7 - i, y - i / 2] = rgb(76, 140, 50); t[7 + i, y - i / 2] = rgb(70, 132, 46) }
+                }
+            }
+            "dead_bush" -> deadBush(t)
+            "glowstone" -> glowstone(t)
+            "obsidian" -> obsidian(t)
+            "crying_obsidian" -> { obsidian(t); repeat(10) { t[t.rnd.nextInt(16), t.rnd.nextInt(16)] = rgb(150, 60, 240) } }
+            "sandstone_side" -> sandstoneSide(t)
+            "sandstone_top" -> noisy(t, rgb(222, 206, 156), 0.04f, 0.1f)
+            "bookshelf" -> bookshelf(t)
+            "ice" -> ice(t)
+            "packed_ice" -> { noisy(t, rgb(150, 186, 246), 0.04f, 0.15f); repeat(6) { t[t.rnd.nextInt(16), t.rnd.nextInt(16)] = rgb(220, 236, 255) } }
+            "blue_ice" -> { noisy(t, rgb(110, 160, 250), 0.04f, 0.2f); for (i in 0 until 16) t[i, (i * 3) % 16] = rgb(190, 220, 255) }
+            "clay" -> noisy(t, rgb(160, 166, 180), 0.04f, 0.15f)
+            "pumpkin_side" -> pumpkinSide(t)
+            "pumpkin_top" -> pumpkinTop(t)
+            "jack_o_lantern_front" -> faceOn(t, rgb(255, 220, 90))
+            "granite" -> speckled(t, rgb(154, 106, 88), rgb(190, 140, 120), 30)
+            "polished_granite" -> polished(t, rgb(160, 110, 92))
+            "diorite" -> speckled(t, rgb(196, 196, 196), rgb(110, 110, 112), 34)
+            "polished_diorite" -> polished(t, rgb(200, 200, 202))
+            "andesite" -> speckled(t, rgb(136, 136, 138), rgb(100, 100, 102), 30)
+            "polished_andesite" -> polished(t, rgb(134, 138, 136))
+            "deepslate" -> t.fill { _, y -> scale(rgb(80, 80, 86), (if (y % 4 == 0) 0.8f else 1f) * t.jitter(0.08f)) }
+            "deepslate_top" -> noisy(t, rgb(84, 84, 90), 0.08f, 0.2f)
+            "cobbled_deepslate" -> { cobble(t, false); for (i in t.px.indices) t.px[i] = scale(t.px[i], 0.6f) }
+            "tuff" -> speckled(t, rgb(108, 108, 98), rgb(140, 138, 124), 24)
+            "calcite" -> speckled(t, rgb(224, 226, 222), rgb(196, 198, 194), 20, 0.03f)
+            "smooth_stone" -> { noisy(t, rgb(158, 158, 158), 0.03f, 0.08f); bevel(t, rgb(120, 120, 120), rgb(120, 120, 120)) }
+            "smooth_stone_side" -> t.fill { x, y ->
+                if (y == 0 || y == 15 || y == 7 || x == 0 || x == 15) rgb(120, 120, 120) else scale(rgb(160, 160, 160), t.jitter(0.03f))
+            }
+            "coal_block" -> mineralBlock(t, rgb(26, 26, 28), 0)
+            "iron_block" -> mineralBlock(t, rgb(220, 220, 222), 1)
+            "gold_block" -> mineralBlock(t, rgb(248, 206, 56), 1)
+            "diamond_block" -> mineralBlock(t, rgb(96, 226, 220), 2)
+            "emerald_block" -> mineralBlock(t, rgb(56, 208, 106), 2)
+            "lapis_block" -> mineralBlock(t, rgb(38, 76, 172), 0)
+            "redstone_block" -> mineralBlock(t, rgb(176, 20, 10), 2)
+            "copper_block" -> mineralBlock(t, rgb(194, 110, 78), 1)
+            "netherite_block" -> mineralBlock(t, rgb(68, 62, 64), 0)
+            "quartz_block" -> mineralBlock(t, rgb(236, 230, 222), 0)
+            "terracotta" -> noisy(t, rgb(152, 94, 67), 0.04f, 0.15f)
+            "netherrack" -> { noisy(t, rgb(112, 46, 46), 0.12f, 0.4f); repeat(10) { t[t.rnd.nextInt(16), t.rnd.nextInt(16)] = rgb(150, 70, 70) } }
+            "soul_sand" -> { noisy(t, rgb(84, 64, 50), 0.1f, 0.3f); repeat(5) { val x = t.rnd.nextInt(15); val y = t.rnd.nextInt(15); t[x, y] = rgb(50, 36, 28); t[x + 1, y] = rgb(50, 36, 28) } }
+            "nether_bricks" -> t.fill { x, y ->
+                val off = if ((y / 4) % 2 == 0) 0 else 4
+                if (y % 4 == 3 || (x + off) % 8 == 7) rgb(26, 12, 14) else scale(rgb(64, 30, 36), t.jitter(0.08f))
+            }
+            "magma" -> {
+                val (_, edge) = voronoi(t.rnd, 8)
+                t.fill { x, y -> if (edge[y][x] < 1.2f) rgb(255, 150, 40) else scale(rgb(120, 40, 20), t.jitter(0.1f)) }
+            }
+            "end_stone" -> speckled(t, rgb(220, 222, 160), rgb(196, 196, 130), 24)
+            "purpur" -> t.fill { x, y ->
+                if (x % 8 == 0 || y % 8 == 0) rgb(140, 96, 140) else scale(rgb(170, 122, 170), t.jitter(0.05f))
+            }
+            "prismarine" -> {
+                val vn = valueNoise(t.rnd, 4)
+                t.fill { x, y -> scale(mix(rgb(90, 150, 136), rgb(110, 176, 170), vn[y][x]), t.jitter(0.05f)) }
+            }
+            "prismarine_bricks" -> t.fill { x, y ->
+                val off = if ((y / 4) % 2 == 0) 0 else 4
+                if (y % 4 == 3 || (x + off) % 8 == 7) rgb(70, 124, 110) else scale(rgb(104, 172, 156), t.jitter(0.05f))
+            }
+            "dark_prismarine" -> t.fill { x, y ->
+                if (x % 8 == 0 || y % 8 == 0) rgb(34, 64, 52) else scale(rgb(52, 92, 76), t.jitter(0.06f))
+            }
+            "sea_lantern" -> t.fill { x, y ->
+                val d = max(abs(x - 7.5f), abs(y - 7.5f))
+                if (d > 6.6f) rgb(170, 200, 190) else if ((x + y) % 5 == 0) rgb(250, 255, 250) else rgb(214, 232, 224)
+            }
+            "sponge" -> { noisy(t, rgb(202, 192, 72), 0.06f, 0.2f); repeat(12) { t[t.rnd.nextInt(16), t.rnd.nextInt(16)] = rgb(150, 140, 40) } }
+            "wet_sponge" -> { noisy(t, rgb(168, 170, 64), 0.06f, 0.2f); repeat(12) { t[t.rnd.nextInt(16), t.rnd.nextInt(16)] = rgb(110, 116, 40) } }
+            "crafting_table_top" -> craftingTop(t)
+            "crafting_table_side" -> craftingSide(t, false)
+            "crafting_table_front" -> craftingSide(t, true)
+            "furnace_front" -> furnaceFront(t)
+            "furnace_side" -> { stone(t, rgb(118, 118, 118)); bevel(t, rgb(150, 150, 150), rgb(70, 70, 70)) }
+            "furnace_top" -> { stone(t, rgb(128, 128, 128)); bevel(t, rgb(150, 150, 150), rgb(70, 70, 70)) }
+            "chest_front" -> chest(t, "front")
+            "chest_side" -> chest(t, "side")
+            "chest_top" -> chest(t, "top")
+            "tnt_side" -> tnt(t, "side")
+            "tnt_top" -> tnt(t, "top")
+            "tnt_bottom" -> tnt(t, "bottom")
+            "tnt_flash" -> tnt(t, "flash")
+            "hay_side" -> t.fill { x, y ->
+                if (y in 3..4 || y in 11..12) rgb(150, 60, 30) else scale(rgb(214, 178, 40), (if (x % 3 == 0) 0.85f else 1f) * t.jitter(0.06f))
+            }
+            "hay_top" -> noisy(t, rgb(200, 164, 40), 0.1f, 0.25f)
+            "melon_side" -> t.fill { x, _ -> scale(if (x % 4 < 2) rgb(96, 150, 36) else rgb(140, 190, 50), t.jitter(0.06f)) }
+            "melon_top" -> { noisy(t, rgb(120, 170, 44), 0.06f, 0.2f); for (y in 6..9) for (x in 6..9) t[x, y] = rgb(100, 130, 40) }
+            "mycelium_top" -> speckled(t, rgb(112, 98, 106), rgb(150, 136, 150), 30)
+            "mycelium_side" -> { dirt(t); overlayTop(t, rgb(112, 98, 106), 3) }
+            "podzol_top" -> speckled(t, rgb(92, 64, 30), rgb(120, 84, 40), 30)
+            "podzol_side" -> { dirt(t); overlayTop(t, rgb(92, 64, 30), 3) }
+            "coarse_dirt" -> { dirt(t); repeat(24) { t[t.rnd.nextInt(16), t.rnd.nextInt(16)] = rgb(110, 100, 90) } }
+            "red_sand" -> noisy(t, rgb(190, 104, 36), 0.05f, 0.12f)
+            "red_sandstone_side" -> { sandstoneSide(t); for (i in t.px.indices) t.px[i] = mix(t.px[i], rgb(186, 100, 36), 0.6f) }
+            "red_sandstone_top" -> noisy(t, rgb(184, 98, 36), 0.04f, 0.1f)
+            "farmland" -> t.fill { _, y -> scale(rgb(94, 62, 38), (if (y % 4 == 0) 0.7f else 1f) * t.jitter(0.08f)) }
+            "dirt_path_top" -> noisy(t, rgb(150, 124, 66), 0.06f, 0.15f)
+            "dirt_path_side" -> { dirt(t); overlayTop(t, rgb(150, 124, 66), 2) }
+            "sugar_cane" -> {
+                sprite(t)
+                for (x in intArrayOf(3, 7, 11)) for (y in 0 until 16) {
+                    t[x, y] = if (y % 5 == 0) rgb(120, 170, 90) else rgb(146, 196, 104); t[x + 1, y] = rgb(110, 160, 80)
+                }
+            }
+            "brown_mushroom" -> {
+                sprite(t)
+                for (y in 10..15) for (x in 7..8) t[x, y] = rgb(220, 206, 180)
+                for (y in 6..9) for (x in 4..11) if (y > 6 || x in 5..10) t[x, y] = scale(rgb(150, 110, 80), t.jitter(0.08f))
+            }
+            "red_mushroom" -> {
+                sprite(t)
+                for (y in 10..15) for (x in 7..8) t[x, y] = rgb(220, 206, 180)
+                for (y in 4..9) for (x in 4..11) if (abs(x - 7.5f) < 2.5f + (y - 4) * 0.5f) t[x, y] = rgb(200, 30, 30)
+                t[6, 6] = rgb(250, 250, 250); t[9, 5] = rgb(250, 250, 250); t[8, 8] = rgb(250, 250, 250)
+            }
+            "cobweb" -> {
+                sprite(t)
+                val c = argb(220, 230, 230, 230)
+                for (i in 0 until 16) { t[i, i] = c; t[15 - i, i] = c; t[7, i] = c; t[i, 8] = c }
+                for (r in intArrayOf(3, 6)) for (i in -r..r) { t[7 + i, 8 - r] = c; t[7 + i, 8 + r] = c; t[7 - r, 8 + i] = c; t[7 + r, 8 + i] = c }
+            }
+            "torch" -> torchSprite(t, rgb(255, 200, 60), rgb(255, 250, 200))
+            "redstone_torch" -> torchSprite(t, rgb(255, 40, 20), rgb(255, 150, 120))
+            "redstone_torch_off" -> torchSprite(t, rgb(100, 20, 16), rgb(80, 16, 12))
+            "lever" -> leverSprite(t, false)
+            "lever_on" -> leverSprite(t, true)
+            "redstone_dust" -> dust(t, false)
+            "redstone_dust_on" -> dust(t, true)
+            "redstone_lamp" -> lamp(t, false)
+            "redstone_lamp_on" -> lamp(t, true)
+            "note_block" -> { planks(t, rgb(110, 72, 50)); bevel(t, rgb(80, 52, 34), rgb(60, 40, 26)); for (y in 5..10) for (x in 5..10) if ((x + y) % 2 == 0) t[x, y] = rgb(40, 26, 18) }
+            "jukebox_top" -> { planks(t, rgb(110, 72, 50)); bevel(t, rgb(80, 52, 34), rgb(60, 40, 26)); for (x in 3..12) { t[x, 7] = rgb(20, 20, 20); t[x, 8] = rgb(20, 20, 20) } }
+            "jukebox_side" -> { planks(t, rgb(110, 72, 50)); bevel(t, rgb(80, 52, 34), rgb(60, 40, 26)) }
+            "piston_side" -> pistonSide(t)
+            "piston_front" -> pistonFront(t, false)
+            "piston_sticky_front" -> pistonFront(t, true)
+            "piston_back" -> { stone(t, rgb(110, 110, 110)); bevel(t, rgb(140, 140, 140), rgb(70, 70, 70)); for (y in 5..10) for (x in 5..10) t[x, y] = rgb(90, 90, 90) }
+            "piston_inner" -> { stone(t, rgb(110, 110, 110)); for (y in 4..11) for (x in 4..11) t[x, y] = if (x in 6..9 && y in 6..9) rgb(166, 132, 80) else rgb(40, 40, 40) }
+            "flint_and_steel" -> flintAndSteel(t)
+            "bucket" -> bucket(t, false)
+            "water_bucket" -> bucket(t, true)
+            else -> t.fill { x, y -> if ((x / 4 + y / 4) % 2 == 0) rgb(255, 0, 255) else rgb(0, 0, 0) }
+        }
+    }
 
     private fun build(): IntArray {
+        // Make sure every block and item has allocated its tiles.
+        Blocks.COUNT.let { Blocks[0] }
+        Items.all.size
         val atlas = IntArray(SIZE * SIZE)
         val tiles = HashMap<Int, Tile>()
-        fun tile(index: Int, paint: (Tile) -> Unit) {
-            val t = Tile(Random(1000L + index * 7919L))
-            paint(t)
+        for ((name, index) in Tiles.all()) {
+            val t = Tile(Random(1000L + name.hashCode() * 7919L))
+            paint(name, t)
             tiles[index] = t
         }
-
-        tile(Tiles.DIRT) { dirt(it) }
-        tile(Tiles.GRASS_TOP) { grassTop(it) }
-        tile(Tiles.GRASS_SIDE) { dirt(it); overlayTop(it, rgb(98, 160, 58), 4) }
-        tile(Tiles.STONE) { stone(it) }
-        tile(Tiles.COBBLESTONE) { cobble(it, false) }
-        tile(Tiles.MOSSY_COBBLESTONE) { cobble(it, true) }
-        tile(Tiles.PLANKS) { planks(it) }
-        tile(Tiles.LOG_SIDE) { logSide(it, rgb(108, 84, 52), rgb(72, 55, 34), false) }
-        tile(Tiles.BIRCH_SIDE) { logSide(it, rgb(222, 220, 208), rgb(50, 50, 46), true) }
-        tile(Tiles.LOG_TOP) { logTop(it) }
-        tile(Tiles.LEAVES) { leaves(it, rgb(62, 126, 42)) }
-        tile(Tiles.BIRCH_LEAVES) { leaves(it, rgb(118, 160, 70)) }
-        tile(Tiles.SAND) { noisy(it, rgb(220, 208, 162), 0.05f, 0.12f) }
-        tile(Tiles.GRAVEL) { gravel(it) }
-        tile(Tiles.GLASS) { glass(it) }
-        tile(Tiles.WATER) { water(it) }
-        tile(Tiles.BEDROCK) { bedrock(it) }
-        tile(Tiles.COAL_ORE) { ore(it, rgb(40, 40, 40), 4) }
-        tile(Tiles.IRON_ORE) { ore(it, rgb(216, 176, 146), 3) }
-        tile(Tiles.GOLD_ORE) { ore(it, rgb(250, 214, 60), 3) }
-        tile(Tiles.DIAMOND_ORE) { ore(it, rgb(90, 226, 222), 3) }
-        tile(Tiles.BRICKS) { bricks(it) }
-        tile(Tiles.STONE_BRICKS) { stoneBricks(it) }
-        tile(Tiles.SNOW) { noisy(it, rgb(242, 250, 252), 0.03f, 0.08f) }
-        tile(Tiles.SNOW_SIDE) { dirt(it); overlayTop(it, rgb(242, 250, 252), 4) }
-        tile(Tiles.CACTUS_SIDE) { cactusSide(it) }
-        tile(Tiles.CACTUS_TOP) { cactusTop(it) }
-        tile(Tiles.FLOWER_RED) { flower(it, rgb(220, 40, 40)) }
-        tile(Tiles.FLOWER_YELLOW) { flower(it, rgb(250, 220, 50)) }
-        tile(Tiles.TALL_GRASS) { tallGrass(it) }
-        tile(Tiles.DEAD_BUSH) { deadBush(it) }
-        tile(Tiles.GLOWSTONE) { glowstone(it) }
-        tile(Tiles.OBSIDIAN) { obsidian(it) }
-        tile(Tiles.SANDSTONE_SIDE) { sandstoneSide(it) }
-        tile(Tiles.SANDSTONE_TOP) { noisy(it, rgb(222, 206, 156), 0.04f, 0.1f) }
-        tile(Tiles.BOOKSHELF) { bookshelf(it) }
-        tile(Tiles.WOOL_WHITE) { wool(it, rgb(234, 236, 236)) }
-        tile(Tiles.WOOL_RED) { wool(it, rgb(170, 40, 36)) }
-        tile(Tiles.WOOL_BLUE) { wool(it, rgb(52, 60, 160)) }
-        tile(Tiles.WOOL_GREEN) { wool(it, rgb(86, 120, 30)) }
-        tile(Tiles.WOOL_YELLOW) { wool(it, rgb(246, 196, 40)) }
-        tile(Tiles.WOOL_BLACK) { wool(it, rgb(26, 26, 30)) }
-        tile(Tiles.WOOL_ORANGE) { wool(it, rgb(236, 120, 20)) }
-        tile(Tiles.WOOL_PURPLE) { wool(it, rgb(120, 44, 160)) }
-        tile(Tiles.ICE) { ice(it) }
-        tile(Tiles.CLAY) { noisy(it, rgb(160, 166, 180), 0.04f, 0.15f) }
-        tile(Tiles.PUMPKIN_SIDE) { pumpkinSide(it) }
-        tile(Tiles.PUMPKIN_TOP) { pumpkinTop(it) }
-        tile(SUN) { sun(it) }
-        tile(MOON) { moon(it) }
-        tile(Tiles.WHITE) { t -> t.fill { _, _ -> rgb(255, 255, 255) } }
-        val crackTiles = Array(10) { Tile(Random(it.toLong())) }
+        val crackTiles = Array(10) { tiles.getValue(Tiles.CRACK_0 + it) }
         cracks(crackTiles)
-        crackTiles.forEachIndexed { i, t -> tiles[Tiles.CRACK_0 + i] = t }
 
         for ((index, t) in tiles) {
+            require(index < TILES_PER_ROW * TILES_PER_ROW) { "atlas full" }
             val ox = (index % TILES_PER_ROW) * TILE
             val oy = (index / TILES_PER_ROW) * TILE
             for (y in 0 until TILE) for (x in 0 until TILE) atlas[(oy + y) * SIZE + ox + x] = t[x, y]
         }
         return atlas
     }
-
-    const val SUN = 60
-    const val MOON = 61
 }

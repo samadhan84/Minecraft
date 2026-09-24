@@ -190,7 +190,10 @@ class WorldRenderer(private val game: Game) {
         Matrix.perspectiveM(proj, 0, 72f, width.toFloat() / height, 0.05f, 400f)
         p.lookDir(dir)
         val bobY = sin(bobbing * 2f) * 0.04f
-        val ex = p.x; val ey = p.eyeY + bobY; val ez = p.z
+        val shake = game.shake * 0.25f
+        val ex = p.x + (Math.random().toFloat() - 0.5f) * shake
+        val ey = p.eyeY + bobY + (Math.random().toFloat() - 0.5f) * shake
+        val ez = p.z + (Math.random().toFloat() - 0.5f) * shake
         Matrix.setLookAtM(view, 0, ex, ey, ez, ex + dir[0], ey + dir[1], ez + dir[2], 0f, 1f, 0f)
         Matrix.multiplyMM(viewProj, 0, proj, 0, view, 0)
         extractFrustum()
@@ -293,8 +296,8 @@ class WorldRenderer(private val game: Game) {
         dyn.size = 0
         val d = 150f
         val s = 18f
-        quad(dyn, ex + sd[0] * d, ey + sd[1] * d, ez + sd[2] * d, scaleV(ax, s), scaleV(ay, s), TextureAtlas.SUN)
-        quad(dyn, ex - sd[0] * d, ey - sd[1] * d, ez - sd[2] * d, scaleV(ax, -s * 0.8f), scaleV(ay, s * 0.8f), TextureAtlas.MOON)
+        quad(dyn, ex + sd[0] * d, ey + sd[1] * d, ez + sd[2] * d, scaleV(ax, s), scaleV(ay, s), Tiles.SUN)
+        quad(dyn, ex - sd[0] * d, ey - sd[1] * d, ez - sd[2] * d, scaleV(ax, -s * 0.8f), scaleV(ay, s * 0.8f), Tiles.MOON)
         dynamic.upload(dyn.data, dyn.size)
         simpleUniforms(floatArrayOf(1f, 1f, 1f, 1f), ex, ez, 0f, 0f)
         glDisable(GL_DEPTH_TEST)

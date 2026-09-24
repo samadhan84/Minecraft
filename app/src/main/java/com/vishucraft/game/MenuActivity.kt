@@ -30,7 +30,7 @@ class MenuActivity : Activity() {
 
         val root = FrameLayout(this)
         // Tiled, darkened dirt background generated from the texture atlas.
-        val tile = BlockIcons.tile(Tiles.DIRT)
+        val tile = BlockIcons.tile(Tiles.id("dirt"))
         val big = Bitmap.createScaledBitmap(tile, dpi(48f), dpi(48f), false)
         root.background = BitmapDrawable(resources, big).apply {
             setTileModeXY(Shader.TileMode.REPEAT, Shader.TileMode.REPEAT)

@@ -4,7 +4,7 @@ import java.util.Random
 import kotlin.math.abs
 import kotlin.math.max
 
-enum class Biome { PLAINS, FOREST, DESERT, SNOW }
+enum class Biome { PLAINS, FOREST, DESERT, SNOW, JUNGLE, SAVANNA }
 
 /** Deterministic procedural terrain: heightmap + biomes + caves + ores + vegetation. */
 class TerrainGenerator(private val seed: Long) {
@@ -39,7 +39,9 @@ class TerrainGenerator(private val seed: Long) {
         val t = tempNoise.fbm2(x * 0.0022, z * 0.0022, 3)
         val hu = humidNoise.fbm2(x * 0.0028, z * 0.0028, 3)
         return when {
-            t > 0.18 && hu < 0.05 -> Biome.DESERT
+            t > 0.18 && hu < 0.0 -> Biome.DESERT
+            t > 0.18 && hu > 0.22 -> Biome.JUNGLE
+            t > 0.18 -> Biome.SAVANNA
             t < -0.22 -> Biome.SNOW
             hu > 0.08 -> Biome.FOREST
             else -> Biome.PLAINS
@@ -98,7 +100,11 @@ class TerrainGenerator(private val seed: Long) {
                 val id = when {
                     y == 0 -> Blocks.BEDROCK
                     y <= 3 && rnd.nextInt(y + 1) == 0 -> Blocks.BEDROCK
-                    y < h - fillerDepth -> if (biome == Biome.DESERT && y >= h - fillerDepth - 3) Blocks.SANDSTONE else Blocks.STONE
+                    y < h - fillerDepth -> when {
+                        biome == Biome.DESERT && y >= h - fillerDepth - 3 -> Blocks.SANDSTONE
+                        y < 10 || (y < 14 && rnd.nextInt(14 - y + 1) == 0) -> Blocks.DEEPSLATE
+                        else -> Blocks.STONE
+                    }
                     y < h -> filler
                     y == h -> top
                     y == SEA_LEVEL && biome == Biome.SNOW -> Blocks.ICE
@@ -112,6 +118,7 @@ class TerrainGenerator(private val seed: Long) {
             for (y in 4..lidTop) {
                 val id = chunk.get(x, y, z)
                 if (id == Blocks.BEDROCK || id == Blocks.WATER || id == Blocks.ICE) continue
+                if (h <= SEA_LEVEL + 1 && y >= SEA_LEVEL - 6) continue
                 if (isCave(wx, y, wz)) chunk.set(x, y, z, Blocks.AIR)
             }
         }
@@ -121,11 +128,19 @@ class TerrainGenerator(private val seed: Long) {
     }
 
     private fun placeOres(chunk: Chunk, rnd: Random) {
+        vein(chunk, rnd, Blocks.GRANITE, count = 2, size = 40, maxY = 100)
+        vein(chunk, rnd, Blocks.DIORITE, count = 2, size = 40, maxY = 100)
+        vein(chunk, rnd, Blocks.ANDESITE, count = 2, size = 40, maxY = 100)
+        vein(chunk, rnd, Blocks.TUFF, count = 2, size = 30, maxY = 18)
+        vein(chunk, rnd, Blocks.GRAVEL, count = 4, size = 14, maxY = 90)
         vein(chunk, rnd, Blocks.COAL_ORE, count = 18, size = 10, maxY = 110)
+        vein(chunk, rnd, Blocks.COPPER_ORE, count = 8, size = 9, maxY = 90)
         vein(chunk, rnd, Blocks.IRON_ORE, count = 12, size = 7, maxY = 64)
         vein(chunk, rnd, Blocks.GOLD_ORE, count = 3, size = 6, maxY = 32)
-        vein(chunk, rnd, Blocks.DIAMOND_ORE, count = 1, size = 5, maxY = 16)
-        vein(chunk, rnd, Blocks.GRAVEL, count = 4, size = 14, maxY = 90)
+        vein(chunk, rnd, Blocks.LAPIS_ORE, count = 2, size = 6, maxY = 32)
+        vein(chunk, rnd, Blocks.REDSTONE_ORE, count = 6, size = 8, maxY = 16)
+        vein(chunk, rnd, Blocks.DIAMOND_ORE, count = 1, size = 6, maxY = 16)
+        vein(chunk, rnd, Blocks.EMERALD_ORE, count = 1, size = 1, maxY = 50)
     }
 
     private fun vein(chunk: Chunk, rnd: Random, ore: Int, count: Int, size: Int, maxY: Int) {
@@ -135,7 +150,7 @@ class TerrainGenerator(private val seed: Long) {
             var z = rnd.nextInt(Chunk.SIZE)
             repeat(size) {
                 if (x in 0 until Chunk.SIZE && z in 0 until Chunk.SIZE && y in 1 until Chunk.HEIGHT &&
-                    chunk.get(x, y, z) == Blocks.STONE
+                    chunk.get(x, y, z).let { it == Blocks.STONE || it == Blocks.DEEPSLATE }
                 ) chunk.set(x, y, z, ore)
                 when (rnd.nextInt(3)) {
                     0 -> x += rnd.nextInt(3) - 1
@@ -158,15 +173,27 @@ class TerrainGenerator(private val seed: Long) {
             val r = rnd.nextInt(1000)
             when (ground) {
                 Blocks.GRASS -> {
-                    val grassChance = if (biome == Biome.PLAINS) 140 else 60
+                    if (h <= SEA_LEVEL + 1 && r < 60 && nearWater(chunk, x, h, z)) {
+                        val height = 1 + rnd.nextInt(3)
+                        for (i in 1..height) chunk.set(x, h + i, z, Blocks.SUGAR_CANE)
+                        continue
+                    }
+                    val grassChance = when (biome) { Biome.PLAINS, Biome.SAVANNA -> 140; Biome.JUNGLE -> 180; else -> 60 }
+                    val plant = if (biome == Biome.JUNGLE) Blocks.FERN else Blocks.TALL_GRASS
                     when {
-                        r < 12 -> chunk.set(x, h + 1, z, Blocks.FLOWER_RED)
+                        r < 12 -> chunk.set(x, h + 1, z, if (biome == Biome.JUNGLE) Blocks.BLUE_ORCHID else Blocks.FLOWER_RED)
                         r < 24 -> chunk.set(x, h + 1, z, Blocks.FLOWER_YELLOW)
-                        r < 24 + grassChance -> chunk.set(x, h + 1, z, Blocks.TALL_GRASS)
-                        r < 26 + grassChance -> chunk.set(x, h + 1, z, Blocks.PUMPKIN)
+                        r < 24 + grassChance -> chunk.set(x, h + 1, z, plant)
+                        r < 26 + grassChance -> chunk.set(x, h + 1, z, if (biome == Biome.JUNGLE) Blocks.MELON else Blocks.PUMPKIN)
+                        biome == Biome.FOREST && r < 32 + grassChance ->
+                            chunk.set(x, h + 1, z, if (r % 2 == 0) Blocks.BROWN_MUSHROOM else Blocks.RED_MUSHROOM)
                     }
                 }
-                Blocks.SAND -> if (biome == Biome.DESERT && h > SEA_LEVEL + 1) {
+                Blocks.SNOW_GRASS -> if (r < 40) chunk.set(x, h + 1, z, Blocks.FERN)
+                Blocks.SAND -> if (h <= SEA_LEVEL + 1 && r < 40 && nearWater(chunk, x, h, z)) {
+                    val height = 1 + rnd.nextInt(3)
+                    for (i in 1..height) chunk.set(x, h + i, z, Blocks.SUGAR_CANE)
+                } else if (biome == Biome.DESERT && h > SEA_LEVEL + 1) {
                     if (r < 6) chunk.set(x, h + 1, z, Blocks.DEAD_BUSH)
                     else if (r < 10 && x in 1..14 && z in 1..14) {
                         val height = 1 + rnd.nextInt(3)
@@ -179,7 +206,9 @@ class TerrainGenerator(private val seed: Long) {
         // Trees are kept fully inside the chunk so generation never depends on neighbours.
         val attempts = when (biome) {
             Biome.FOREST -> 7
+            Biome.JUNGLE -> 9
             Biome.SNOW -> 2
+            Biome.SAVANNA -> if (rnd.nextInt(2) == 0) 1 else 0
             Biome.PLAINS -> if (rnd.nextInt(3) == 0) 1 else 0
             Biome.DESERT -> 0
         }
@@ -189,9 +218,12 @@ class TerrainGenerator(private val seed: Long) {
             val h = tops[z * Chunk.SIZE + x]
             val ground = chunk.get(x, h, z)
             if (ground != Blocks.GRASS && ground != Blocks.SNOW_GRASS) return@repeat
-            if (h + 12 >= Chunk.HEIGHT) return@repeat
+            if (h + 16 >= Chunk.HEIGHT) return@repeat
             when {
                 biome == Biome.SNOW -> spruce(chunk, rnd, x, h + 1, z)
+                biome == Biome.JUNGLE -> oak(chunk, rnd, x, h + 1, z, Blocks.JUNGLE_LOG, Blocks.JUNGLE_LEAVES, 4 + rnd.nextInt(6))
+                biome == Biome.SAVANNA -> acacia(chunk, rnd, x, h + 1, z)
+                biome == Biome.FOREST && rnd.nextInt(6) == 0 -> oak(chunk, rnd, x, h + 1, z, Blocks.DARK_OAK_LOG, Blocks.DARK_OAK_LEAVES)
                 rnd.nextInt(5) == 0 -> oak(chunk, rnd, x, h + 1, z, Blocks.BIRCH_LOG, Blocks.BIRCH_LEAVES)
                 else -> oak(chunk, rnd, x, h + 1, z, Blocks.LOG, Blocks.LEAVES)
             }
@@ -201,13 +233,38 @@ class TerrainGenerator(private val seed: Long) {
     private fun setIfReplaceable(chunk: Chunk, x: Int, y: Int, z: Int, id: Int) {
         if (x !in 0 until Chunk.SIZE || z !in 0 until Chunk.SIZE || y !in 0 until Chunk.HEIGHT) return
         val cur = chunk.get(x, y, z)
-        if (cur == Blocks.AIR || cur == Blocks.TALL_GRASS || cur == Blocks.FLOWER_RED || cur == Blocks.FLOWER_YELLOW) {
+        if (cur == Blocks.AIR || Blocks[cur].render == RenderType.CROSS) {
             chunk.set(x, y, z, id)
         }
     }
 
-    private fun oak(chunk: Chunk, rnd: Random, x: Int, y: Int, z: Int, log: Int, leaves: Int) {
-        val trunk = 4 + rnd.nextInt(3)
+    private fun nearWater(chunk: Chunk, x: Int, h: Int, z: Int): Boolean {
+        for ((dx, dz) in arrayOf(1 to 0, -1 to 0, 0 to 1, 0 to -1)) {
+            val nx = x + dx; val nz = z + dz
+            if (nx in 0 until Chunk.SIZE && nz in 0 until Chunk.SIZE && chunk.get(nx, h, nz) == Blocks.WATER) return true
+        }
+        return false
+    }
+
+    private fun acacia(chunk: Chunk, rnd: Random, x: Int, y: Int, z: Int) {
+        val trunk = 4 + rnd.nextInt(2)
+        val lean = if (rnd.nextBoolean()) 1 else -1
+        var tx = x
+        for (i in 0 until trunk) {
+            if (i == trunk - 2 && tx + lean in 1..14) tx += lean
+            chunk.set(tx, y + i, z, Blocks.ACACIA_LOG)
+        }
+        val top = y + trunk
+        for (dz in -2..2) for (dx in -2..2) {
+            if (abs(dx) == 2 && abs(dz) == 2) continue
+            setIfReplaceable(chunk, tx + dx, top, z + dz, Blocks.ACACIA_LEAVES)
+        }
+        for (dz in -1..1) for (dx in -1..1) setIfReplaceable(chunk, tx + dx, top + 1, z + dz, Blocks.ACACIA_LEAVES)
+        chunk.set(x, y - 1, z, Blocks.DIRT)
+    }
+
+    private fun oak(chunk: Chunk, rnd: Random, x: Int, y: Int, z: Int, log: Int, leaves: Int, extra: Int = 0) {
+        val trunk = 4 + rnd.nextInt(3) + extra
         val top = y + trunk
         for (ly in top - 3..top) {
             val radius = if (ly >= top - 1) 1 else 2
@@ -229,12 +286,12 @@ class TerrainGenerator(private val seed: Long) {
         for (ly in top downTo y + 2) {
             for (dz in -radius..radius) for (dx in -radius..radius) {
                 if (abs(dx) + abs(dz) > radius + 1) continue
-                setIfReplaceable(chunk, x + dx, ly, z + dz, Blocks.LEAVES)
+                setIfReplaceable(chunk, x + dx, ly, z + dz, Blocks.SPRUCE_LEAVES)
             }
             radius = if (radius >= 2) 1 else radius + 1
         }
-        setIfReplaceable(chunk, x, top + 1, z, Blocks.LEAVES)
-        for (i in 0 until trunk) chunk.set(x, y + i, z, Blocks.LOG)
+        setIfReplaceable(chunk, x, top + 1, z, Blocks.SPRUCE_LEAVES)
+        for (i in 0 until trunk) chunk.set(x, y + i, z, Blocks.SPRUCE_LOG)
         chunk.set(x, y - 1, z, Blocks.DIRT)
     }
 }

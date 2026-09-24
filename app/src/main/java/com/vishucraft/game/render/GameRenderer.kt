@@ -12,9 +12,6 @@ class GameRenderer(private val game: Game, private val onStats: (String) -> Unit
     private var frames = 0
     private var statTimer = 0f
 
-    init {
-        game.onBlockChanged = { cx, _, cz -> world.remeshNow(cx, cz) }
-    }
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
         world.onSurfaceCreated()
@@ -31,6 +28,10 @@ class GameRenderer(private val game: Game, private val onStats: (String) -> Unit
         lastNanos = now
 
         game.update(dt)
+        if (game.dirtyChunks.isNotEmpty()) {
+            for (key in game.dirtyChunks) world.remeshNow((key shr 32).toInt(), key.toInt())
+            game.dirtyChunks.clear()
+        }
         val p = game.player
         val bob = if (p.onGround && !p.flying) p.walkDist * 1.6f else 0f
         world.draw(bob)

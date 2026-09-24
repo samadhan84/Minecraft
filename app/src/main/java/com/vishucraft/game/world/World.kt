@@ -16,6 +16,8 @@ import kotlin.math.floor
  */
 class World(val seed: Long, private val saveDir: File?) {
     val chunks = ConcurrentHashMap<Long, Chunk>()
+    /** Positions (see [RedstoneIds.pack]) of every redstone component in loaded chunks. */
+    val components: MutableSet<Long> = ConcurrentHashMap.newKeySet()
     val generator = TerrainGenerator(seed)
 
     private val pending: MutableSet<Long> = ConcurrentHashMap.newKeySet()
@@ -34,14 +36,22 @@ class World(val seed: Long, private val saveDir: File?) {
         return c.get(x and 15, y, z and 15)
     }
 
+    fun getMeta(x: Int, y: Int, z: Int): Int {
+        if (y < 0 || y >= Chunk.HEIGHT) return 0
+        val c = getChunk(x shr 4, z shr 4) ?: return 0
+        return c.getMeta(x and 15, y, z and 15)
+    }
+
     fun isLoaded(x: Int, z: Int) = getChunk(x shr 4, z shr 4) != null
 
-    fun setBlock(x: Int, y: Int, z: Int, id: Int): Boolean {
+    fun setBlock(x: Int, y: Int, z: Int, id: Int, meta: Int = 0): Boolean {
         if (y < 0 || y >= Chunk.HEIGHT) return false
         val cx = x shr 4; val cz = z shr 4
         val c = getChunk(cx, cz) ?: return false
         val lx = x and 15; val lz = z and 15
-        c.set(lx, y, lz, id)
+        c.set(lx, y, lz, id, meta)
+        if (RedstoneIds.isComponent(id)) components.add(RedstoneIds.pack(x, y, z))
+        else components.remove(RedstoneIds.pack(x, y, z))
         c.modified = true
         c.version++
         // Neighbouring meshes sample across borders (faces, AO, light), so refresh them too.
@@ -60,7 +70,9 @@ class World(val seed: Long, private val saveDir: File?) {
         if (chunks.containsKey(key) || !pending.add(key)) return
         workers.execute {
             try {
-                val chunk = load(cx, cz) ?: Chunk(cx, cz).also { generator.generate(it) }
+                val loaded = load(cx, cz)
+                val chunk = loaded ?: Chunk(cx, cz).also { generator.generate(it) }
+                if (loaded != null) registerComponents(chunk)
                 chunk.version = 1
                 chunks[key] = chunk
             } finally {
@@ -73,9 +85,20 @@ class World(val seed: Long, private val saveDir: File?) {
 
     fun unload(chunk: Chunk) {
         chunks.remove(Chunk.key(chunk.cx, chunk.cz))
+        components.removeIf { RedstoneIds.x(it) shr 4 == chunk.cx && RedstoneIds.z(it) shr 4 == chunk.cz }
         if (chunk.modified) {
             val copy = chunk.blocks.copyOf()
-            workers.execute { writeChunk(chunk.cx, chunk.cz, copy) }
+            val meta = chunk.meta.copyOf()
+            workers.execute { writeChunk(chunk.cx, chunk.cz, copy, meta) }
+        }
+    }
+
+    private fun registerComponents(c: Chunk) {
+        for (i in c.blocks.indices) {
+            val id = c.blocks[i].toInt() and 0xFF
+            if (!RedstoneIds.isComponent(id)) continue
+            val x = i and 15; val z = (i shr 4) and 15; val y = i shr 8
+            components.add(RedstoneIds.pack(c.cx * 16 + x, y, c.cz * 16 + z))
         }
     }
 
@@ -88,18 +111,22 @@ class World(val seed: Long, private val saveDir: File?) {
         if (!f.exists()) return null
         return try {
             val c = Chunk(cx, cz)
-            DataInputStream(GZIPInputStream(f.inputStream().buffered())).use { it.readFully(c.blocks) }
+            DataInputStream(GZIPInputStream(f.inputStream().buffered())).use {
+                it.readFully(c.blocks)
+                // Older saves have no block state section.
+                try { it.readFully(c.meta) } catch (_: java.io.EOFException) { c.meta.fill(0) }
+            }
             c
         } catch (e: Exception) {
             null
         }
     }
 
-    private fun writeChunk(cx: Int, cz: Int, data: ByteArray) {
+    private fun writeChunk(cx: Int, cz: Int, data: ByteArray, meta: ByteArray) {
         val f = chunkFile(cx, cz) ?: return
         try {
             val tmp = File(f.parentFile, f.name + ".tmp")
-            GZIPOutputStream(tmp.outputStream().buffered()).use { it.write(data) }
+            GZIPOutputStream(tmp.outputStream().buffered()).use { it.write(data); it.write(meta) }
             tmp.renameTo(f)
         } catch (_: Exception) {
         }
@@ -110,7 +137,7 @@ class World(val seed: Long, private val saveDir: File?) {
         for (c in chunks.values) {
             if (c.modified) {
                 c.modified = false
-                writeChunk(c.cx, c.cz, c.blocks.copyOf())
+                writeChunk(c.cx, c.cz, c.blocks.copyOf(), c.meta.copyOf())
             }
         }
     }
@@ -142,8 +169,8 @@ class LevelData(
     var flying: Boolean = false,
     var timeOfDay: Float = 0.3f,
     var hotbar: IntArray = intArrayOf(
-        Blocks.GRASS, Blocks.DIRT, Blocks.STONE, Blocks.COBBLESTONE, Blocks.PLANKS,
-        Blocks.LOG, Blocks.GLASS, Blocks.BRICKS, Blocks.GLOWSTONE
+        Items.find("Enchanted Diamond Pickaxe"), Items.find("Diamond Sword"), Blocks.GRASS, Blocks.STONE,
+        Blocks.PLANKS, Blocks.GLASS, Blocks.TORCH, Blocks.REDSTONE_DUST, Blocks.PISTON,
     ),
     var selectedSlot: Int = 0,
     var hasPlayer: Boolean = false,
@@ -162,7 +189,7 @@ class LevelData(
                     l.yaw = d.readFloat(); l.pitch = d.readFloat()
                     l.flying = d.readBoolean()
                     l.timeOfDay = d.readFloat()
-                    l.hotbar = IntArray(9) { d.readInt().coerceIn(1, Blocks.COUNT - 1) }
+                    l.hotbar = IntArray(9) { d.readInt().let { v -> if (Items.isValidSlot(v)) v else Blocks.GRASS } }
                     l.selectedSlot = d.readInt().coerceIn(0, 8)
                     l.hasPlayer = true
                     l

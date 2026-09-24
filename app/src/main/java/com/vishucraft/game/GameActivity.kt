@@ -26,7 +26,9 @@ import com.vishucraft.game.ui.JoystickView
 import com.vishucraft.game.ui.dp
 import com.vishucraft.game.ui.dpi
 import com.vishucraft.game.ui.menuButton
-import com.vishucraft.game.world.Blocks
+import android.widget.ImageView
+import com.vishucraft.game.ui.BlockIcons
+import com.vishucraft.game.world.Items
 import com.vishucraft.game.world.LevelData
 import com.vishucraft.game.world.World
 import java.io.File
@@ -49,6 +51,7 @@ class GameActivity : Activity() {
     private lateinit var hotbar: HotbarView
     private lateinit var stats: TextView
     private lateinit var toast: TextView
+    private lateinit var hand: ImageView
     private lateinit var pauseMenu: LinearLayout
     private lateinit var inventory: InventoryView
     private lateinit var flyButton: HudButton
@@ -120,9 +123,19 @@ class GameActivity : Activity() {
         toast = TextView(this).apply {
             setTextColor(Color.WHITE); textSize = 16f
             setShadowLayer(2f, 2f, 2f, Color.BLACK)
+            gravity = Gravity.CENTER
             alpha = 0f
         }
         root.addView(toast, lp(-2f, -2f, Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL, b = 56f))
+
+        // The held block or tool, bottom right, swings when you mine or place.
+        hand = ImageView(this).apply {
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            rotation = -18f
+            pivotX = dp(110f); pivotY = dp(110f)
+        }
+        root.addView(hand, 1, lp(110f, 110f, Gravity.BOTTOM or Gravity.END, r = 150f, b = 30f))
+        updateHand()
 
         inventory = InventoryView(this) { id ->
             if (id != null) {
@@ -166,11 +179,34 @@ class GameActivity : Activity() {
         root.addView(pauseMenu, FrameLayout.LayoutParams(-1, -1))
     }
 
+    private fun updateHand() {
+        val bmp = BlockIcons.get(level.hotbar[level.selectedSlot])
+        hand.setImageDrawable(android.graphics.drawable.BitmapDrawable(resources, bmp).apply { paint.isFilterBitmap = false })
+    }
+
+    fun swing() {
+        hand.animate().cancel()
+        hand.rotation = -18f
+        hand.animate().rotation(-60f).setDuration(90).withEndAction {
+            hand.animate().rotation(-18f).setDuration(140).start()
+        }.start()
+    }
+
+    private val swingLoop = object : Runnable {
+        override fun run() {
+            if (!input.breakHeld) return
+            swing()
+            handler.postDelayed(this, 260)
+        }
+    }
+
     private fun selectSlot(slot: Int) {
         level.selectedSlot = slot
         val id = level.hotbar[slot]
         input.selectedBlock = id
-        toast.text = Blocks[id].name
+        updateHand()
+        val ench = Items[id]?.enchantments
+        toast.text = if (ench != null) "${Items.displayName(id)}\n$ench" else Items.displayName(id)
         toast.animate().cancel()
         toast.alpha = 1f
         toast.animate().alpha(0f).setStartDelay(1200).setDuration(500).start()
@@ -206,7 +242,9 @@ class GameActivity : Activity() {
         private var moved = 0f
         private var mining = false
         private val slop = dp(10f)
-        private val startMining = Runnable { if (pointer != -1) { mining = true; input.breakHeld = true } }
+        private val startMining = Runnable {
+            if (pointer != -1) { mining = true; input.breakHeld = true; handler.post(swingLoop) }
+        }
 
         @SuppressLint("ClickableViewAccessibility")
         override fun onTouch(v: View, e: MotionEvent): Boolean {
@@ -237,6 +275,7 @@ class GameActivity : Activity() {
                         val quick = SystemClock.uptimeMillis() - downTime < 260
                         if (!mining && quick && moved < slop && e.actionMasked != MotionEvent.ACTION_CANCEL) {
                             input.actions.add(GameInput.Action.PLACE)
+                            swing()
                         }
                         mining = false
                         input.breakHeld = false

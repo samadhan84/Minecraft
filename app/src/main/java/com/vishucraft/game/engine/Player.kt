@@ -140,12 +140,16 @@ class Player {
             val minY = y; val maxY = y + HEIGHT
             val minZ = z - HALF_WIDTH; val maxZ = z + HALF_WIDTH
             for (bx in floorInt(minX)..floorInt(maxX - 1e-4f))
-                for (by in floorInt(minY)..floorInt(maxY - 1e-4f))
+                for (by in floorInt(minY) - 1..floorInt(maxY - 1e-4f))
                     for (bz in floorInt(minZ)..floorInt(maxZ - 1e-4f)) {
-                        if (!Blocks.solid[world.getBlock(bx, by, bz)]) continue
+                        val id = world.getBlock(bx, by, bz)
+                        if (!Blocks.solid[id]) continue
+                        // Blocks may be shorter than a full cube (slabs).
+                        val top = by + Blocks.height[id]
+                        if (top <= minY + 1e-4f || by >= maxY) continue
                         when (axis) {
                             0 -> x = if (step > 0) bx - HALF_WIDTH - 1e-3f else bx + 1 + HALF_WIDTH + 1e-3f
-                            1 -> y = if (step > 0) by - HEIGHT - 1e-3f else by + 1f
+                            1 -> y = if (step > 0) by - HEIGHT - 1e-3f else top
                             else -> z = if (step > 0) bz - HALF_WIDTH - 1e-3f else bz + 1 + HALF_WIDTH + 1e-3f
                         }
                         return false

@@ -9,7 +9,10 @@ class RayHit(val x: Int, val y: Int, val z: Int, val nx: Int, val ny: Int, val n
 
 /** Amanatides & Woo voxel traversal. Water and air are passed through. */
 object Raycast {
-    fun cast(world: World, ox: Float, oy: Float, oz: Float, dx: Float, dy: Float, dz: Float, maxDist: Float): RayHit? {
+    fun cast(
+        world: World, ox: Float, oy: Float, oz: Float, dx: Float, dy: Float, dz: Float, maxDist: Float,
+        hitWater: Boolean = false,
+    ): RayHit? {
         var x = floor(ox).toInt(); var y = floor(oy).toInt(); var z = floor(oz).toInt()
         val stepX = if (dx > 0) 1 else -1
         val stepY = if (dy > 0) 1 else -1
@@ -24,7 +27,7 @@ object Raycast {
         var t = 0f
         while (t <= maxDist) {
             val b = world.getBlock(x, y, z)
-            if (b != Blocks.AIR && b != Blocks.WATER) return RayHit(x, y, z, nx, ny, nz, b)
+            if (b != Blocks.AIR && (hitWater || b != Blocks.WATER)) return RayHit(x, y, z, nx, ny, nz, b)
             if (tMaxX < tMaxY && tMaxX < tMaxZ) {
                 x += stepX; t = tMaxX; tMaxX += tDeltaX; nx = -stepX; ny = 0; nz = 0
             } else if (tMaxY < tMaxZ) {

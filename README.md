@@ -7,10 +7,20 @@ procedurally in code when the game starts.
 ## Features
 
 - **Infinite procedural world**: chunks (16×128×16) stream in around you on background threads.
-- **Biomes**: plains, forests (oak and birch), deserts (cacti, dead bushes, sandstone), snowy taigas (spruce trees, frozen lakes),
-  mountains with snow caps, oceans and beaches.
-- **Underground**: winding tunnel caves, large deep caverns, coal, iron, gold and diamond ore veins, gravel pockets, bedrock.
-- **44 block types**: including glass, water, ice, leaves, flowers, tall grass, glowstone, bricks, wool colours, bookshelves and pumpkins.
+- **Biomes**: plains, forests (oak, birch, dark oak), jungles, savannas (acacia), deserts, snowy taigas (spruce),
+  mountains with snow caps, oceans and beaches with sugar cane.
+- **Underground**: tunnel caves, deep caverns, deepslate layer, granite/diorite/andesite/tuff pockets, and coal, copper, iron,
+  gold, lapis, redstone, diamond and emerald ores.
+- **195 blocks**: every stone variant, 6 wood types (logs, planks, leaves), 16-colour wool, concrete, terracotta and stained
+  glass, mineral blocks, nether and end blocks, prismarine, sea lanterns, crafting table, furnace, chest, TNT, hay, melons,
+  jack o'lanterns, torches, mushrooms, cobwebs, slabs and more.
+- **Tools**: swords, pickaxes, axes, shovels and hoes in wood, stone, iron, gold, diamond and netherite. The right tool mines
+  its blocks much faster. Hoes till farmland and shovels make dirt paths. Also flint and steel, a bucket and a water bucket.
+- **Enchanted gear** (ready-made, no enchanting table): enchanted diamond and netherite swords, pickaxes, axes, shovels and
+  hoes with a purple glint. Efficiency V tools mine almost instantly.
+- **Redstone**: dust (power fades over 15 blocks and climbs steps), redstone torches (inverters and clocks), levers, stone
+  buttons, redstone blocks, redstone lamps, pistons and sticky pistons (push up to 12 blocks), and TNT that explodes with a
+  chain reaction.
 - **Rendering**: face culling, smooth sky lighting with ambient occlusion, cut-out foliage, translucent water and ice, distance fog,
   frustum culling, day/night cycle with sun, moon, sunset tint and drifting clouds, underwater fog.
 - **Gameplay**: walking with collision, auto-jump up single steps, swimming, creative flight, mining with crack
@@ -25,12 +35,12 @@ procedurally in code when the game starts.
 | --- | --- |
 | Move | Left-side joystick |
 | Look | Drag anywhere on the world |
-| Place block | Tap |
+| Place block / use item / flip lever / press button | Tap |
 | Mine block | Touch and hold |
 | Jump / swim / fly up | ▲ |
 | Fly down | ▼ (while flying) |
 | Toggle flight | FLY |
-| Pick block | Tap a hotbar slot, or ••• for all blocks |
+| Pick block or tool | Tap a hotbar slot, or ••• for the tabbed inventory |
 | Pause menu | II or the Back button |
 
 ## Building
@@ -60,6 +70,8 @@ app/src/main/java/com/vishucraft/game/
 │   └── GameInput.kt       thread-safe touch state
 ├── world/
 │   ├── Blocks.kt          block and texture-tile registry
+│   ├── Items.kt           tools, enchanted gear, buckets
+│   ├── Redstone.kt        redstone power, pistons, TNT
 │   ├── Chunk.kt           block storage
 │   ├── World.kt           chunk map, background generation, persistence
 │   ├── TerrainGenerator.kt heightmap, biomes, caves, ores, trees

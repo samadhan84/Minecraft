@@ -41,7 +41,7 @@ class ChunkMesher {
     companion object {
         private const val P = Chunk.SIZE + 2 // padded width
         private const val H = Chunk.HEIGHT
-        const val TILE_UV = 1f / 16f
+        const val TILE_UV = 1f / TextureAtlas.TILES_PER_ROW
 
         // Face order: +Y, -Y, +Z, -Z, +X, -X
         val NORMALS = arrayOf(
@@ -80,11 +80,12 @@ class ChunkMesher {
             }
         }
 
-        fun tileU(tile: Int) = (tile and 15) * TILE_UV
-        fun tileV(tile: Int) = (tile shr 4) * TILE_UV
+        fun tileU(tile: Int) = (tile % TextureAtlas.TILES_PER_ROW) * TILE_UV
+        fun tileV(tile: Int) = (tile / TextureAtlas.TILES_PER_ROW) * TILE_UV
     }
 
     private val pad = ByteArray(P * P * H)
+    private val padMeta = ByteArray(P * P * H)
     private val topY = IntArray(P * P)
     private val opaqueOut = FloatBuilder(1 shl 16)
     private val transOut = FloatBuilder(1 shl 12)
@@ -96,7 +97,7 @@ class ChunkMesher {
     private fun block(px: Int, y: Int, pz: Int): Int {
         if (y < 0) return Blocks.BEDROCK
         if (y >= H) return Blocks.AIR
-        return pad[pidx(px, y, pz)].toInt()
+        return pad[pidx(px, y, pz)].toInt() and 0xFF
     }
 
     private fun sky(px: Int, y: Int, pz: Int): Float {
@@ -119,12 +120,17 @@ class ChunkMesher {
                 val lxRaw = px - 1
                 val gx = if (lxRaw < 0) 0 else if (lxRaw >= Chunk.SIZE) 2 else 1
                 val lx = lxRaw and 15
-                val src = grid[gz * 3 + gx]!!.blocks
+                val srcChunk = grid[gz * 3 + gx]!!
+                val src = srcChunk.blocks
+                val srcMeta = srcChunk.meta
                 var top = -1
                 for (y in 0 until H) {
-                    val b = src[Chunk.index(lx, y, lz)]
-                    pad[pidx(px, y, pz)] = b
-                    if (blocksLight[b.toInt()]) top = y
+                    val si = Chunk.index(lx, y, lz)
+                    val b = src[si]
+                    val pi = pidx(px, y, pz)
+                    pad[pi] = b
+                    padMeta[pi] = srcMeta[si]
+                    if (blocksLight[b.toInt() and 0xFF]) top = y
                 }
                 topY[pz * P + px] = top
             }
@@ -139,9 +145,12 @@ class ChunkMesher {
 
         for (y in 0 until H) for (z in 0 until Chunk.SIZE) for (x in 0 until Chunk.SIZE) {
             val px = x + 1; val pz = z + 1
-            val id = pad[pidx(px, y, pz)].toInt()
+            val pi = pidx(px, y, pz)
+            val id = pad[pi].toInt() and 0xFF
             if (id == Blocks.AIR) continue
+            val meta = padMeta[pi].toInt() and 0xFF
             val def = Blocks[id]
+            val emissive = Blocks.isEmissive(id, meta)
             when (def.render) {
                 RenderType.CUBE -> {
                     val out = if (def.translucent) transOut else opaqueOut
@@ -150,9 +159,8 @@ class ChunkMesher {
                         val nb = block(px + n[0], y + n[1], pz + n[2])
                         if (opaque[nb]) continue
                         if (nb == id && def.cullSelf) continue
-                        if (def.translucent && nb != Blocks.AIR && Blocks[nb].translucent) continue
-                        val tile = when (f) { 0 -> def.top; 1 -> def.bottom; else -> def.side }
-                        emitFace(out, px, y, pz, f, tile, def.emissive, 1f)
+                        if (def.translucent && nb != Blocks.AIR && Blocks[nb].translucent && Blocks[nb].cullSelf && nb == id) continue
+                        emitFace(out, px, y, pz, f, Blocks.tile(id, meta, f), emissive, 1f)
                     }
                 }
                 RenderType.LIQUID -> {
@@ -166,7 +174,24 @@ class ChunkMesher {
                         emitFace(transOut, px, y, pz, f, def.top, false, if (surface) 0.875f else 1f)
                     }
                 }
-                RenderType.CROSS -> emitCross(opaqueOut, px, y, pz, def.top)
+                RenderType.CROSS -> emitCross(opaqueOut, px, y, pz, Blocks.tile(id, meta, 0), emissive)
+                RenderType.FLAT -> emitFlat(opaqueOut, px, y, pz, Blocks.tile(id, meta, 0))
+                RenderType.BOX -> emitBox(opaqueOut, px, y, pz, def.box!!, id, meta, emissive)
+                RenderType.PISTON_HEAD -> {
+                    val f = (meta and 7).coerceIn(0, 5)
+                    val plate = FloatArray(6); val arm = FloatArray(6)
+                    val n = NORMALS[f]
+                    for (a in 0..2) {
+                        when {
+                            n[a] > 0 -> { plate[a] = 0.75f; plate[a + 3] = 1f; arm[a] = -0.25f; arm[a + 3] = 0.75f }
+                            n[a] < 0 -> { plate[a] = 0f; plate[a + 3] = 0.25f; arm[a] = 0.25f; arm[a + 3] = 1.25f }
+                            else -> { plate[a] = 0f; plate[a + 3] = 1f; arm[a] = 0.375f; arm[a + 3] = 0.625f }
+                        }
+                    }
+                    val frontTile = if (meta and 8 != 0) Tiles.id("piston_sticky_front") else def.top
+                    emitBox(opaqueOut, px, y, pz, plate, id, meta, false, frontFace = f, frontTile = frontTile)
+                    emitBox(opaqueOut, px, y, pz, arm, id, meta, false, sideTile = def.side)
+                }
                 RenderType.NONE -> {}
             }
         }
@@ -220,8 +245,8 @@ class ChunkMesher {
         }
     }
 
-    private fun emitCross(out: FloatBuilder, px: Int, y: Int, pz: Int, tile: Int) {
-        val l = 0.9f * (0.28f + 0.72f * sky(px, y, pz))
+    private fun emitCross(out: FloatBuilder, px: Int, y: Int, pz: Int, tile: Int, emissive: Boolean) {
+        val l = if (emissive) 2f else 0.9f * (0.28f + 0.72f * sky(px, y, pz))
         val x0 = (px - 1) + 0.15f; val x1 = (px - 1) + 0.85f
         val z0 = (pz - 1) + 0.15f; val z1 = (pz - 1) + 0.85f
         val y0 = y.toFloat(); val y1 = y + 1f
@@ -233,5 +258,61 @@ class ChunkMesher {
         out.put(x1, y0, z1, u1, v1, l); out.put(x0, y0, z0, u0, v1, l); out.put(x0, y1, z0, u0, v0, l); out.put(x1, y1, z1, u1, v0, l)
         out.put(x0, y0, z1, u0, v1, l); out.put(x1, y0, z0, u1, v1, l); out.put(x1, y1, z0, u1, v0, l); out.put(x0, y1, z1, u0, v0, l)
         out.put(x1, y0, z0, u1, v1, l); out.put(x0, y0, z1, u0, v1, l); out.put(x0, y1, z1, u0, v0, l); out.put(x1, y1, z0, u1, v0, l)
+    }
+
+    /** A flat decal lying on top of the block below (redstone dust). */
+    private fun emitFlat(out: FloatBuilder, px: Int, y: Int, pz: Int, tile: Int) {
+        val l = 0.28f + 0.72f * sky(px, y, pz)
+        val x0 = (px - 1).toFloat(); val z0 = (pz - 1).toFloat(); val yy = y + 1f / 32f
+        val u0 = tileU(tile); val v0 = tileV(tile)
+        val u1 = u0 + TILE_UV; val v1 = v0 + TILE_UV
+        out.ensure(4 * FLOATS_PER_VERTEX)
+        out.put(x0, yy, z0 + 1, u0, v1, l); out.put(x0 + 1, yy, z0 + 1, u1, v1, l)
+        out.put(x0 + 1, yy, z0, u1, v0, l); out.put(x0, yy, z0, u0, v0, l)
+    }
+
+    /**
+     * An axis-aligned box inside the cell (slabs, buttons, piston heads). Texture coordinates come from the
+     * vertex position so partial faces show the matching part of the tile.
+     */
+    private fun emitBox(
+        out: FloatBuilder, px: Int, y: Int, pz: Int, b: FloatArray, id: Int, meta: Int, emissive: Boolean,
+        frontFace: Int = -1, frontTile: Int = 0, sideTile: Int = -1,
+    ) {
+        val bx = (px - 1).toFloat(); val bz = (pz - 1).toFloat(); val by = y.toFloat()
+        for (f in 0 until 6) {
+            val n = NORMALS[f]
+            // Faces flush with the cell boundary can be hidden by an opaque neighbour.
+            val onBoundary = when (f) {
+                0 -> b[4] >= 1f; 1 -> b[1] <= 0f; 2 -> b[5] >= 1f; 3 -> b[2] <= 0f; 4 -> b[3] >= 1f; else -> b[0] <= 0f
+            }
+            if (onBoundary && opaque[block(px + n[0], y + n[1], pz + n[2])]) continue
+            val tile = when {
+                f == frontFace -> frontTile
+                sideTile >= 0 -> sideTile
+                else -> Blocks.tile(id, meta, f)
+            }
+            val l = if (emissive) 2f else {
+                val s = if (onBoundary) sky(px + n[0], y + n[1], pz + n[2]) else sky(px, y, pz)
+                FACE_SHADE[f] * (0.28f + 0.72f * s)
+            }
+            val u0 = tileU(tile); val v0 = tileV(tile)
+            out.ensure(4 * FLOATS_PER_VERTEX)
+            for (cv in CORNERS[f]) {
+                val lx = if (cv[0] == 1) b[3] else b[0]
+                val ly = if (cv[1] == 1) b[4] else b[1]
+                val lz = if (cv[2] == 1) b[5] else b[2]
+                val (u, v) = when (f) {
+                    0 -> lx to lz
+                    1 -> lx to 1 - lz
+                    2 -> lx to 1 - ly
+                    3 -> 1 - lx to 1 - ly
+                    4 -> 1 - lz to 1 - ly
+                    else -> lz to 1 - ly
+                }
+                out.put(bx + lx, by + ly, bz + lz,
+                    u0 + u.coerceIn(0f, 1f) * TILE_UV, v0 + v.coerceIn(0f, 1f) * TILE_UV, l)
+            }
+        }
     }
 }
