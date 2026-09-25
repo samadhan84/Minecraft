@@ -61,6 +61,7 @@ class MenuActivity : Activity() {
 
         playButton = menuButton(this, "Play") { if (hasWorld()) showWorlds() else newWorld() }
         col.addView(playButton, LinearLayout.LayoutParams(dpi(320f), -2).apply { bottomMargin = dpi(10f) })
+        col.addView(menuButton(this, "Join Wi-Fi game") { joinGame() }, LinearLayout.LayoutParams(dpi(320f), -2).apply { bottomMargin = dpi(10f) })
         col.addView(menuButton(this, "Settings") { settingsDialog(this) }, LinearLayout.LayoutParams(dpi(320f), -2).apply { bottomMargin = dpi(10f) })
         col.addView(menuButton(this, "How to play") { help() }, LinearLayout.LayoutParams(dpi(320f), -2))
 
@@ -153,6 +154,53 @@ class MenuActivity : Activity() {
                 Unit
             }
         })
+    }
+
+    /** Looks for games on the local Wi-Fi, or lets the player type an address. */
+    private fun joinGame() {
+        val scanning = AlertDialog.Builder(this).setTitle("Join Wi-Fi game").setMessage("Looking for games on your Wi-Fi…")
+            .setNegativeButton("Cancel", null).show()
+        val wifi = applicationContext.getSystemService(WIFI_SERVICE) as? android.net.wifi.WifiManager
+        val lock = wifi?.createMulticastLock("vishucraft")?.apply { setReferenceCounted(false); acquire() }
+        Thread {
+            val hosts = com.vishucraft.game.net.Discovery.scan(2500)
+            lock?.release()
+            runOnUiThread {
+                if (!scanning.isShowing) return@runOnUiThread
+                scanning.dismiss()
+                val buttons = ArrayList<Pair<String, () -> Unit>>()
+                for (h in hosts) buttons.add("${h.name}  ·  ${h.players} playing" to { connect(h.address) })
+                buttons.add("Enter address…" to { enterAddress() })
+                buttonDialog(if (hosts.isEmpty()) "No games found" else "Games on your Wi-Fi", buttons)
+            }
+        }.start()
+    }
+
+    private fun enterAddress() {
+        val input = EditText(this).apply { hint = "e.g. 192.168.1.23"; inputType = InputType.TYPE_CLASS_PHONE }
+        AlertDialog.Builder(this).setTitle("Host address").setView(input)
+            .setPositiveButton("Join") { _, _ -> connect(input.text.toString().trim()) }
+            .setNegativeButton("Cancel", null).show()
+        input.requestFocus()
+    }
+
+    private fun connect(address: String) {
+        val wait = AlertDialog.Builder(this).setTitle("Joining…").setMessage("Connecting to $address").show()
+        val name = com.vishucraft.game.ui.Settings(this).playerName
+        Thread {
+            val result = try { com.vishucraft.game.net.ClientSession.connect(address, name) } catch (e: Exception) { null }
+            runOnUiThread {
+                wait.dismiss()
+                if (result == null) {
+                    AlertDialog.Builder(this).setTitle("Could not join")
+                        .setMessage("No game answered at $address. Make sure both devices are on the same Wi-Fi and the host chose \"Open to Wi-Fi\".")
+                        .setPositiveButton("OK", null).show()
+                } else {
+                    com.vishucraft.game.net.Net.pendingClient = result
+                    startActivity(Intent(this, GameActivity::class.java).putExtra(GameActivity.EXTRA_JOIN, true))
+                }
+            }
+        }.start()
     }
 
     private fun newWorld() {

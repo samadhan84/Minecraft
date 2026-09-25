@@ -902,6 +902,21 @@ object TextureAtlas {
             "villager_hat" -> t.fill { x, y -> scale(if ((x + y) % 3 == 0) rgb(220, 190, 110) else rgb(236, 206, 124), t.jitter(0.04f)) }
             "villager_tunic" -> { noisy(t, rgb(70, 130, 70), 0.06f, 0.15f); for (x in 0 until 16) t[x, 12] = rgb(110, 80, 40) }
             "villager_pants" -> noisy(t, rgb(100, 80, 60), 0.06f, 0.15f)
+            "explorer_hair" -> noisy(t, rgb(96, 64, 38), 0.08f, 0.2f)
+            "explorer_face" -> {
+                t.fill { _, y -> if (y < 4) scale(rgb(96, 64, 38), t.jitter(0.08f)) else scale(rgb(214, 170, 132), t.jitter(0.03f)) }
+                t[2, 4] = rgb(96, 64, 38); t[13, 4] = rgb(96, 64, 38); t[2, 5] = rgb(96, 64, 38); t[13, 5] = rgb(96, 64, 38)
+                t[4, 7] = rgb(250, 250, 250); t[5, 7] = rgb(60, 110, 60); t[10, 7] = rgb(60, 110, 60); t[11, 7] = rgb(250, 250, 250)
+                for (x in 6..9) t[x, 11] = rgb(170, 100, 90)
+            }
+            "explorer_jacket" -> { noisy(t, rgb(222, 120, 40), 0.05f, 0.15f); for (x in 0 until 16) { t[x, 0] = rgb(60, 140, 90); t[x, 1] = rgb(60, 140, 90) } }
+            "explorer_jacket_front" -> {
+                noisy(t, rgb(222, 120, 40), 0.05f, 0.15f)
+                for (x in 0 until 16) { t[x, 0] = rgb(60, 140, 90); t[x, 1] = rgb(60, 140, 90); t[x, 2] = rgb(50, 120, 80) }
+                for (y in 3..15) t[7, y] = rgb(150, 76, 24)
+                t[4, 8] = rgb(250, 220, 90); t[10, 8] = rgb(250, 220, 90)
+            }
+            "explorer_trousers" -> { noisy(t, rgb(62, 62, 72), 0.05f, 0.15f); for (x in 0 until 16) { t[x, 13] = rgb(110, 72, 40); t[x, 14] = rgb(110, 72, 40); t[x, 15] = rgb(90, 58, 32) } }
             "minecart" -> mask(t, arrayOf("dddddddddddd", "dmmmmmmmmmmd", "dmllllllllmd", "dmmmmmmmmmmd", "dmmmmmmmmmmd", ".dddddddddd.", "..aa....aa..", "..aa....aa.."), rgb(150, 150, 156), rgb(60, 60, 60))
             "cart_side" -> t.fill { x, y -> if (y < 2 || y > 13 || x == 0 || x == 15) rgb(90, 90, 96) else scale(rgb(150, 150, 156), t.jitter(0.05f)) }
             "cart_floor" -> planks(t, rgb(130, 100, 60))

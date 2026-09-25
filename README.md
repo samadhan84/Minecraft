@@ -6,6 +6,9 @@ procedurally in code when the game starts.
 
 ## Features
 
+- **Wi-Fi multiplayer**: choose "Open to Wi-Fi" in the pause menu and friends on the same network pick
+  "Join Wi-Fi game" (games are found automatically, or type the host's address). Everyone shares the terrain and
+  every block change; the host runs redstone, liquids, farms and mobs, and mobs chase whoever is nearest.
 - **Survival and Creative modes** chosen per world, with **multiple save slots** and a **settings** screen
   (look sensitivity, field of view, render distance, volume, button size).
 - **Survival**: 36-slot inventory with stacks, items drop and are picked up, tool durability, the right pickaxe tier is

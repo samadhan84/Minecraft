@@ -52,6 +52,7 @@ class GameActivity : Activity() {
         const val EXTRA_WORLD = "world"
         const val EXTRA_NAME = "name"
         const val EXTRA_MODE = "mode"
+        const val EXTRA_JOIN = "join"
 
         fun worldsRoot(activity: Activity) = File(activity.filesDir, "worlds").apply { mkdirs() }
 
@@ -102,8 +103,11 @@ class GameActivity : Activity() {
         super.onCreate(savedInstanceState)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
+        val client = if (intent.getBooleanExtra(EXTRA_JOIN, false)) com.vishucraft.game.net.Net.pendingClient else null
         val dir = File(worldsRoot(this), intent.getStringExtra(EXTRA_WORLD) ?: "world1")
-        level = LevelData.read(dir) ?: LevelData.create(
+        level = if (client != null) LevelData.create(client.seed, client.worldName, client.mode).apply {
+            hasPlayer = true; x = client.spawnX + 1.5f; y = client.spawnY + 0.5f; z = client.spawnZ + 0.5f; timeOfDay = client.time
+        } else LevelData.read(dir) ?: LevelData.create(
             intent.getLongExtra(EXTRA_SEED, System.currentTimeMillis()),
             intent.getStringExtra(EXTRA_NAME) ?: "My World",
             if (intent.getBooleanExtra(EXTRA_MODE, false)) GameMode.SURVIVAL else GameMode.CREATIVE,
@@ -114,9 +118,11 @@ class GameActivity : Activity() {
             com.vishucraft.game.world.Dimension.EMBER -> File(dir, "ember")
             com.vishucraft.game.world.Dimension.SKY -> File(dir, "sky")
         }
-        world = World(level.seed, dimDir, level.dimension)
-        game = Game(world, level, input, dir)
+        world = World(level.seed, if (client != null) null else dimDir, level.dimension)
+        if (client != null) world.remoteLoader = { cx, cz -> client.requestChunk(cx, cz) }
+        game = Game(world, level, input, if (client != null) null else dir)
         worldDirForDim = dir
+        if (client != null) { game.net = client; com.vishucraft.game.net.Net.pendingClient = null }
         settings = Settings(this)
         sounds = com.vishucraft.game.audio.Sounds(this)
         game.soundSink = { name, x, y, z, gain ->
@@ -255,6 +261,17 @@ class GameActivity : Activity() {
             b.text = "Weather: changing…"
             handler.postDelayed({ b.text = "Weather: change" }, 1500)
         }
+        addMenu(if (game.isClient) "Wi-Fi: joined" else "Open to Wi-Fi") { b ->
+            if (game.net != null) { showToast(game.net!!.status); return@addMenu }
+            val name = settings.playerName
+            glView.queueEvent {
+                val result = try {
+                    game.net = com.vishucraft.game.net.HostSession(game, level.name, name)
+                    "Open! Friends on the same Wi-Fi can join from the title screen.\nYour address: ${com.vishucraft.game.net.Net.localAddress()}"
+                } catch (e: Exception) { "Could not open the game: ${e.message}" }
+                runOnUiThread { showToast(result); b.text = if (game.net != null) "Wi-Fi: open" else "Open to Wi-Fi" }
+            }
+        }
         addMenu("Settings") { settingsDialog(this) { applySettings() } }
         addMenu("Controls") { showControls() }
         addMenu("Save and quit") { finish() }
@@ -343,6 +360,7 @@ class GameActivity : Activity() {
             com.vishucraft.game.world.Dimension.SKY -> "the Sky Isles"
             com.vishucraft.game.world.Dimension.OVERWORLD -> "the Overworld"
         }
+        if (game.net != null) { showToast("Portals are closed during Wi-Fi games"); return }
         showToast("Travelling to $name…")
         glView.queueEvent {
             game.save()
@@ -617,6 +635,8 @@ class GameActivity : Activity() {
     }
 
     override fun onDestroy() {
+        val n = game.net
+        if (n != null) Thread { n.close() }.start()
         sounds.release()
         world.shutdown()
         super.onDestroy()

@@ -40,7 +40,7 @@ class WorldRenderer(private val game: Game) {
     private var atlasTex = 0
     private val dynamic = GpuMesh(GL_DYNAMIC_DRAW)
     private val lines = GpuMesh(GL_DYNAMIC_DRAW)
-    private val mobRenderer = MobRenderer()
+    private val mobRenderer = MobRenderer().also { r -> r.skyCheck = { x, y, z -> game.mobs.skyExposed(x, y, z) } }
     private val dropRenderer = DropRenderer()
     private val dyn = FloatBuilder(4096)
     private val cloudNoise = Noise(game.world.seed + 999)
@@ -248,7 +248,8 @@ class WorldRenderer(private val game: Game) {
 
         // Mobs use the same shader (lighting, fog) with a per-mob tint for hurt / fuse flashes.
         glUniform1f(blockShader.u("uCutout"), 0.5f)
-        mobRenderer.draw(blockShader, game.mobs, ex, ez, far)
+        mobRenderer.draw(blockShader, game.mobs.list, ex, ez, far)
+        game.net?.let { n -> mobRenderer.draw(blockShader, n.players.values.map { it.proxy }, ex, ez, far) }
         dropRenderer.draw(blockShader, game.drops, ex, ez, far, game.timeOfDay, game.carts, game.projectiles)
         if (underwater) glUniform3f(blockShader.u("uTint"), 0.55f, 0.7f, 1f)
 

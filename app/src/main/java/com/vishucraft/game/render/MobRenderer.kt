@@ -101,6 +101,14 @@ object MobModels {
             box(-0.48f, 0.8f, -0.1f, -0.26f, 1.45f, 0.1f, tiles("villager_tunic"), -1, pivotY = 1.4f),
             box(0.26f, 0.8f, -0.1f, 0.48f, 1.45f, 0.1f, tiles("villager_tunic"), 1, pivotY = 1.4f),
         ),
+        MobType.EXPLORER to listOf(
+            box(-0.25f, 0f, -0.125f, 0f, 0.75f, 0.125f, tiles("explorer_trousers", top = "explorer_trousers"), 1),
+            box(0f, 0f, -0.125f, 0.25f, 0.75f, 0.125f, tiles("explorer_trousers"), -1),
+            box(-0.25f, 0.75f, -0.14f, 0.25f, 1.45f, 0.14f, tiles("explorer_jacket", front = "explorer_jacket_front")),
+            box(-0.25f, 1.45f, -0.25f, 0.25f, 1.95f, 0.25f, tiles("explorer_hair", front = "explorer_face")),
+            box(-0.45f, 0.75f, -0.11f, -0.25f, 1.45f, 0.11f, tiles("explorer_jacket"), -1, pivotY = 1.4f),
+            box(0.25f, 0.75f, -0.11f, 0.45f, 1.45f, 0.11f, tiles("explorer_jacket"), 1, pivotY = 1.4f),
+        ),
         MobType.BOOMLING to listOf(
             box(-0.4f, 0.35f, -0.4f, 0.4f, 1.1f, 0.4f, tiles("boomling_shell", front = "boomling_face")),
             box(-0.3f, 1.1f, -0.3f, 0.3f, 1.2f, 0.3f, tiles("boomling_shell")),
@@ -112,17 +120,19 @@ object MobModels {
 class MobRenderer {
     private val mesh = GpuMesh(GL_DYNAMIC_DRAW)
     private val buf = FloatBuilder(4096)
+    /** Whether a spot sees the sky (mobs are darker underground). */
+    var skyCheck: ((Int, Int, Int) -> Boolean)? = null
 
     fun invalidate() = mesh.invalidate()
 
     /** Expects the block shader to be bound with the frame's uniforms. */
-    fun draw(shader: Shader, mobs: Mobs, camX: Float, camZ: Float, maxDist: Float) {
+    fun draw(shader: Shader, mobs: List<Mob>, camX: Float, camZ: Float, maxDist: Float) {
         glUniform3f(shader.u("uOffset"), 0f, 0f, 0f)
-        for (m in mobs.list) {
+        for (m in mobs) {
             val dx = m.x - camX; val dz = m.z - camZ
             if (dx * dx + dz * dz > maxDist * maxDist) continue
             buf.size = 0
-            build(m, mobs)
+            build(m)
             mesh.upload(buf.data, buf.size)
             val (r, g, b) = tint(m)
             glUniform3f(shader.u("uTint"), r, g, b)
@@ -139,14 +149,14 @@ class MobRenderer {
         else -> Triple(1f, 1f, 1f)
     }
 
-    private fun build(m: Mob, mobs: Mobs) {
+    private fun build(m: Mob) {
         val parts = MobModels.models.getValue(m.type)
         val swingAmt = if (m.moving) sin(m.walkPhase) * 0.7f else 0f
         val roll = if (m.dead) min(m.deathTime / 0.4f, 1f) * 1.5708f else 0f
         val scale = (if (m.fuse >= 0f) 1f + m.fuse * 0.12f else 1f) * m.scale
         val cy = cos(m.yaw); val sy = sin(m.yaw)
         val cr = cos(roll); val sr = sin(roll)
-        val exposed = mobs.skyExposed(kotlin.math.floor(m.x).toInt(), kotlin.math.floor(m.y + m.height).toInt(), kotlin.math.floor(m.z).toInt())
+        val exposed = skyCheck?.invoke(kotlin.math.floor(m.x).toInt(), kotlin.math.floor(m.y + m.height).toInt(), kotlin.math.floor(m.z).toInt()) ?: true
         val sky = if (exposed) 1f else 0.3f
 
         for (p in parts) {

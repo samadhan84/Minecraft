@@ -97,6 +97,48 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
     private var lastWalk = 0f
     private var furnaceTimer = 0f
 
+    // ---------------------------------------------------------------- Wi-Fi play
+
+    /** Set while hosting or after joining a Wi-Fi game. */
+    var net: com.vishucraft.game.net.Session? = null
+    val isClient get() = net?.isClient == true
+    private var applyingRemote = false
+
+    /** The nearest player to a mob: this player or someone who joined over Wi-Fi. */
+    class Target(val x: Float, val y: Float, val z: Float, val remoteId: Int) { val eyeY get() = y + Player.EYE }
+
+    fun nearestTarget(x: Float, z: Float): Target {
+        var best = Target(player.x, player.y, player.z, -1)
+        var bestD = (player.x - x) * (player.x - x) + (player.z - z) * (player.z - z)
+        if (!playerAlive) bestD = Float.MAX_VALUE
+        net?.players?.values?.forEach { r ->
+            val d = (r.x - x) * (r.x - x) + (r.z - z) * (r.z - z)
+            if (d < bestD) { bestD = d; best = Target(r.x, r.y, r.z, r.id) }
+        }
+        return best
+    }
+
+    fun hurtTarget(t: Target, amount: Float, fromX: Float, fromZ: Float) {
+        if (t.remoteId < 0) hurtPlayer(amount, fromX, fromZ) else net?.hurtRemote(t.remoteId, amount, fromX, fromZ)
+    }
+
+    /** A block change that came from the host (not sent back). */
+    fun applyRemoteBlock(x: Int, y: Int, z: Int, id: Int, meta: Int) {
+        if (id !in 0 until Blocks.COUNT) return
+        applyingRemote = true
+        try { setBlock(x, y, z, id, meta) } finally { applyingRemote = false }
+    }
+
+    /** A block change asked for by a client (host side): applied here, then broadcast to everyone. */
+    fun remoteEdit(x: Int, y: Int, z: Int, id: Int, meta: Int) {
+        if (id !in 0 until Blocks.COUNT) return
+        if (!world.isLoaded(x, z)) { world.request(x shr 4, z shr 4); pendingEdits.add(intArrayOf(x, y, z, id, meta)); return }
+        setBlock(x, y, z, id, meta)
+    }
+    private val pendingEdits = ArrayList<IntArray>()
+
+    fun setRain(v: Float) { rain = v }
+
     fun heldStack(): ItemStack? = inventory.slots[input.selectedSlot.coerceIn(0, 8)]
     fun heldId(): Int = heldStack()?.id ?: 0
     fun heldItem(): ItemDef? = Items[heldId()]
@@ -143,7 +185,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
             for (dz in -r..r) for (dx in -r..r) add(intArrayOf(dx, dz))
         }.sortedBy { it[0] * it[0] + it[1] * it[1] }
 
-        redstone.onExplosion = { ex, ey, ez, r ->
+        redstone.onExplosion = { ex, ey, ez, r0 -> val r = r0
             val blast = r * 2.2f
             val dx = player.x - ex; val dy = player.eyeY - ey; val dz = player.z - ez
             val d = sqrt(dx * dx + dy * dy + dz * dz)
@@ -154,6 +196,10 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
             }
             if (d < 40f) shake = 0.6f
             sound("explode", ex, ey, ez, 1.4f)
+            net?.players?.values?.forEach { r ->
+                val rd = sqrt((r.x - ex) * (r.x - ex) + (r.y + 1f - ey) * (r.y + 1f - ey) + (r.z - ez) * (r.z - ez))
+                if (rd < blast) net?.hurtRemote(r.id, (1f - rd / blast) * r0 * 5.5f, ex, ez)
+            }
             for (m in mobs.list) {
                 val mx = m.x - ex; val mz = m.z - ez; val my = m.y + m.height / 2 - ey
                 val md = sqrt(mx * mx + my * my + mz * mz)
@@ -198,6 +244,12 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
     }
 
     fun update(dt: Float) {
+        net?.poll(this, dt)
+        if (pendingEdits.isNotEmpty()) {
+            val ready = pendingEdits.filter { world.isLoaded(it[0], it[2]) }
+            for (e in ready) setBlock(e[0], e[1], e[2], e[3], e[4])
+            pendingEdits.removeAll(ready.toSet())
+        }
         streamChunks()
 
         input.consumeLook(look)
@@ -243,7 +295,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
             if (player.inWater && !wasInWater && lastVy < -4f) sound("splash", player.x, player.y, player.z)
             wasInWater = player.inWater
             if (player.y < -20f) hurtPlayer(100f, player.x, player.z, knockback = false)
-            mobs.update(dt, this)
+            if (!isClient) mobs.update(dt, this)
             drops.update(dt, this)
             // Lava burns.
             val inLava = world.getBlock(player.blockX(), floorInt(player.y + 0.3f), player.blockZ()) == Blocks.LAVA ||
@@ -256,9 +308,11 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
         }
 
         if (!survival && health < 20f) health = 20f
-        fluids.tick(dt)
-        nature.tick(dt, player.blockX(), player.blockZ())
-        if (dimension == com.vishucraft.game.world.Dimension.OVERWORLD) updateWeather(dt) else rain = 0f
+        if (!isClient) {
+            fluids.tick(dt)
+            nature.tick(dt, player.blockX(), player.blockZ())
+            if (dimension == com.vishucraft.game.world.Dimension.OVERWORLD) updateWeather(dt) else rain = 0f
+        }
         projectiles.update(dt, this)
         carts.update(dt, this)
         if (bowCooldown > 0f) bowCooldown -= dt
@@ -266,7 +320,10 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
         val here = world.getBlock(player.blockX(), floorInt(player.y + 0.5f), player.blockZ())
         if (here == Blocks.EMBER_PORTAL || here == Blocks.SKY_PORTAL) {
             portalTime += dt
-            if (portalTime >= 2f) {
+            if (portalTime >= 2f && net != null) {
+                portalTime = -30f
+                uiEvents.add("toast:Portals are closed during Wi-Fi games")
+            } else if (portalTime >= 2f) {
                 portalTime = -5f
                 val target = when {
                     dimension != com.vishucraft.game.world.Dimension.OVERWORLD -> com.vishucraft.game.world.Dimension.OVERWORLD
@@ -277,13 +334,14 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
             }
         } else if (portalTime > 0f) portalTime = 0f else if (portalTime < 0f) portalTime = minOf(0f, portalTime + dt)
         furnaceTimer += dt
-        if (furnaceTimer >= 0.25f) { tickFurnaces(furnaceTimer); tickHoppers(furnaceTimer); furnaceTimer = 0f }
+        if (furnaceTimer >= 0.25f) { if (!isClient) { tickFurnaces(furnaceTimer); tickHoppers(furnaceTimer) }; furnaceTimer = 0f }
 
         player.lookDir(dir)
         target = Raycast.cast(world, player.x, player.eyeY, player.z, dir[0], dir[1], dir[2], REACH)
         updateBreaking(dt)
 
         redstoneTimer += dt
+        if (isClient) redstoneTimer = 0f // the host runs redstone and sends us the results
         while (redstoneTimer >= Redstone.TICK_SECONDS) {
             redstoneTimer -= Redstone.TICK_SECONDS
             redstone.tick()
@@ -393,7 +451,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
             MobType.GLIDER -> listOf(i("Feather") to 1 + r.nextInt(2))
             MobType.CINDER -> listOf(Blocks.MAGMA to r.nextInt(2), i("Glowstone Dust") to r.nextInt(3), i("Netherite Scrap") to (if (r.nextInt(12) == 0) 1 else 0))
             MobType.WISP -> listOf(i("Emerald") to r.nextInt(2), Blocks.PURPUR to r.nextInt(2))
-            MobType.VILLAGER -> emptyList()
+            MobType.VILLAGER, MobType.EXPLORER -> emptyList()
         }.filter { it.second > 0 }
     }
 
@@ -588,7 +646,8 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
             if (mobHit.distance <= blockDist) {
                 val dmg = (item?.attack ?: 1).toFloat()
                 val len = sqrt(dir[0] * dir[0] + dir[2] * dir[2]).coerceAtLeast(0.01f)
-                mobs.damage(mobHit.mob, dmg, dir[0] / len, dir[2] / len)
+                if (isClient) net?.attack(mobHit.mob.uid, dmg, dir[0] / len, dir[2] / len)
+                else mobs.damage(mobHit.mob, dmg, dir[0] / len, dir[2] / len)
                 sound("hurt", mobHit.mob.x, mobHit.mob.y + 1f, mobHit.mob.z, 0.6f)
                 damageHeld(if (item?.tool == ToolType.SWORD) 1 else 2)
                 exhaust(0.1f)
@@ -803,6 +862,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
     fun setBlock(x: Int, y: Int, z: Int, id: Int, meta: Int = 0) {
         val oldLight = Blocks.lightLevel(world.getBlock(x, y, z), world.getMeta(x, y, z))
         if (world.setBlock(x, y, z, id, meta)) {
+            if (!applyingRemote) net?.blockChanged(x, y, z, id, meta)
             fluids.onChange(x, y, z)
             // Light spreads up to 14 blocks, so neighbouring chunks re-mesh (asynchronously) when a light changes.
             if (oldLight != Blocks.lightLevel(id, meta)) {
@@ -831,12 +891,16 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
             if (world.getChunk(cx, cz) == null) { world.request(cx, cz); budget-- }
         }
         val unloadR = renderDistance + 3
+        val others = net?.players?.values?.map { (floorInt(it.x) shr 4) to (floorInt(it.z) shr 4) }.orEmpty()
         for (c in world.chunks.values) {
-            if (max(abs(c.cx - pcx), abs(c.cz - pcz)) > unloadR) world.unload(c)
+            if (max(abs(c.cx - pcx), abs(c.cz - pcz)) <= unloadR) continue
+            if (others.any { (ox, oz) -> max(abs(c.cx - ox), abs(c.cz - oz)) <= unloadR }) continue
+            world.unload(c)
         }
     }
 
     fun save() {
+        if (isClient) return
         level.x = player.x; level.y = player.y; level.z = player.z
         level.yaw = player.yaw; level.pitch = player.pitch
         level.flying = player.flying

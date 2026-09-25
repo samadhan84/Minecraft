@@ -44,9 +44,9 @@ class Projectiles(private val world: World) {
                         hit = true; break
                     }
                 } else {
-                    val p = game.player
-                    if (abs(p.x - a.x) < 0.45f && abs(p.z - a.z) < 0.45f && a.y >= p.y && a.y <= p.y + 1.8f) {
-                        game.hurtPlayer(a.damage, a.x - a.vx, a.z - a.vz)
+                    val t = game.nearestTarget(a.x, a.z)
+                    if (abs(t.x - a.x) < 0.45f && abs(t.z - a.z) < 0.45f && a.y >= t.y && a.y <= t.y + 1.8f) {
+                        game.hurtTarget(t, a.damage, a.x - a.vx, a.z - a.vz)
                         hit = true; break
                     }
                 }

@@ -74,10 +74,22 @@ class World(val seed: Long, private val saveDir: File?, val dimension: Dimension
         return true
     }
 
+    /** When joined to a Wi-Fi game, chunks come from the host instead of being generated. */
+    @Volatile var remoteLoader: ((Int, Int) -> Unit)? = null
+
+    /** A chunk sent by the host. */
+    fun receiveChunk(c: Chunk) {
+        val key = Chunk.key(c.cx, c.cz)
+        registerComponents(c)
+        chunks[key] = c
+        pending.remove(key)
+    }
+
     /** Asynchronously load or generate a chunk. */
     fun request(cx: Int, cz: Int) {
         val key = Chunk.key(cx, cz)
         if (chunks.containsKey(key) || !pending.add(key)) return
+        remoteLoader?.let { it(cx, cz); return }
         workers.execute {
             try {
                 val loaded = load(cx, cz)

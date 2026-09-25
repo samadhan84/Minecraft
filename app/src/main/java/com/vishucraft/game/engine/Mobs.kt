@@ -38,9 +38,12 @@ enum class MobType(
     WISP("Void Wisp", 0.35f, 0.8f, 15, true, 3.0f),
     /** Peaceful village folk. */
     VILLAGER("Villager", 0.3f, 1.9f, 20, false, 1.0f),
+    /** Other players in a Wi-Fi game (never spawned naturally). */
+    EXPLORER("Explorer", 0.3f, 1.8f, 20, false, 0f),
 }
 
-class Mob(val type: MobType, var x: Float, var y: Float, var z: Float) {
+class Mob(val type: MobType, var x: Float, var y: Float, var z: Float, val uid: Int = nextUid++) {
+    companion object { private var nextUid = 1 }
     var vx = 0f; var vy = 0f; var vz = 0f
     var yaw = 0f
     var onGround = false
@@ -157,7 +160,7 @@ class Mobs(private val world: World) {
             physics(m, dt)
             return
         }
-        val p = game.player
+        val p = game.nearestTarget(m.x, m.z)
         val dx = p.x - m.x; val dz = p.z - m.z
         val dist = sqrt(dx * dx + dz * dz)
         var wantX = 0f; var wantZ = 0f
@@ -171,7 +174,7 @@ class Mobs(private val world: World) {
                     m.attackCooldown -= dt
                     if (dist < 1.4f && abs(p.y - m.y) < 1.6f && m.attackCooldown <= 0f) {
                         m.attackCooldown = 1f
-                        game.hurtPlayer(3f, m.x, m.z)
+                        game.hurtTarget(p, 3f, m.x, m.z)
                         game.sound("zombie", m.x, m.y + 1.5f, m.z, 0.6f)
                     }
                 } else wander(m, dt).let { wantX = it.first; wantZ = it.second; speed *= 0.5f }
@@ -232,7 +235,7 @@ class Mobs(private val world: World) {
                     m.attackCooldown -= dt
                     if (dist < 1.3f + m.halfWidth && abs(p.y - m.y) < 1.6f && m.attackCooldown <= 0f) {
                         m.attackCooldown = 1f
-                        game.hurtPlayer(if (m.type == MobType.CINDER) 5f else 2.5f, m.x, m.z)
+                        game.hurtTarget(p, if (m.type == MobType.CINDER) 5f else 2.5f, m.x, m.z)
                     }
                 } else wander(m, dt).let { wantX = it.first; wantZ = it.second; speed *= 0.5f }
             }
@@ -262,7 +265,7 @@ class Mobs(private val world: World) {
 
     /** Flying mobs: hover around, then dive at the player. No gravity. */
     private fun flyer(m: Mob, dt: Float, game: Game, dist: Float, dx: Float, dz: Float) {
-        val p = game.player
+        val p = game.nearestTarget(m.x, m.z)
         m.moving = true
         m.walkPhase += dt * 8f
         var tx: Float; var ty: Float; var tz: Float
@@ -287,7 +290,7 @@ class Mobs(private val world: World) {
         val py = p.y + 1f - m.y
         if (sqrt(dx * dx + dz * dz + py * py) < 1.4f && m.attackCooldown <= 0f && game.playerAlive) {
             m.attackCooldown = 1.2f
-            game.hurtPlayer(if (m.type == MobType.WISP) 3f else 2f, m.x, m.z)
+            game.hurtTarget(p, if (m.type == MobType.WISP) 3f else 2f, m.x, m.z)
             m.swoopTime = 0f
         }
         if (m.type == MobType.GLIDER && game.daylight > 0.7f) m.deathTime = 0.9f // fades away at sunrise

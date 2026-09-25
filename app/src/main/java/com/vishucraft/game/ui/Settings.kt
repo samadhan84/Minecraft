@@ -24,6 +24,9 @@ class Settings(context: Context) {
     var musicVolume: Int
         get() = prefs.getInt("musicVolume", 50)
         set(v) = prefs.edit().putInt("musicVolume", v).apply()
+    var playerName: String
+        get() = prefs.getString("playerName", null) ?: ("Player" + (100..999).random()).also { n -> prefs.edit().putString("playerName", n).apply() }
+        set(v) = prefs.edit().putString("playerName", v).apply()
     var largeButtons: Boolean
         get() = prefs.getBoolean("largeButtons", false)
         set(v) = prefs.edit().putBoolean("largeButtons", v).apply()
@@ -56,7 +59,16 @@ fun settingsDialog(ctx: android.app.Activity, onChanged: () -> Unit = {}) {
         b = menuButton(ctx, label()) { action(); b.text = label(); onChanged() }
         col.addView(b, android.widget.LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = ctx.dpi(8f) })
     }
+    // Player name (shown to others in Wi-Fi games).
+    val nameInput = android.widget.EditText(ctx).apply {
+        setText(s.playerName); hint = "Player name"
+        inputType = android.text.InputType.TYPE_CLASS_TEXT
+        setOnFocusChangeListener { _, has -> if (!has) s.playerName = text.toString().trim().ifEmpty { s.playerName } }
+    }
+    col.addView(android.widget.TextView(ctx).apply { text = "Player name (for Wi-Fi games)" })
+    col.addView(nameInput)
     val scroll = android.widget.ScrollView(ctx).apply { addView(col) }
-    android.app.AlertDialog.Builder(ctx).setTitle("Settings").setView(scroll).setPositiveButton("Done", null).show()
+    android.app.AlertDialog.Builder(ctx).setTitle("Settings").setView(scroll)
+        .setPositiveButton("Done") { _, _ -> s.playerName = nameInput.text.toString().trim().ifEmpty { s.playerName } }.show()
     col.getChildAt(0)?.requestFocus()
 }
