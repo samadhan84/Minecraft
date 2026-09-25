@@ -64,18 +64,27 @@ jobs:
 
       - name: Check that the game starts
         shell: pwsh
+        env:
+          GALLIUM_DRIVER: llvmpipe
+          JAVA_TOOL_OPTIONS: -XX:-CreateCoredumpOnCrash -XX:ErrorFile=crash/hs_err_%p.log
         run: |
-          # Software OpenGL (Mesa) so the game can run on the runner, which has no graphics card.
+          # Software OpenGL (Mesa llvmpipe) so the game can run on the runner, which has no graphics card.
+          New-Item -ItemType Directory -Force crash, smoke | Out-Null
+          Copy-Item -Recurse dist/portable/VishuCraft smoke/
           $mesa = "https://github.com/pal1000/mesa-dist-win/releases/download/24.2.8/mesa3d-24.2.8-release-msvc.7z"
           try {
             Invoke-WebRequest $mesa -OutFile mesa.7z
             7z x mesa.7z -omesa | Out-Null
-            Copy-Item mesa/x64/opengl32.dll, mesa/x64/libgallium_wgl.dll, mesa/x64/libglapi.dll dist/portable/VishuCraft/ -ErrorAction SilentlyContinue
+            Get-ChildItem mesa/x64 | Select-Object Name
+            Copy-Item mesa/x64/*.dll smoke/VishuCraft/
           } catch { Write-Host "Could not download Mesa: $_" }
-          $p = Start-Process dist/portable/VishuCraft/VishuCraft.exe -ArgumentList '--demo', "$PWD/screenshots" -PassThru -NoNewWindow
+          $p = Start-Process smoke/VishuCraft/VishuCraft.exe -ArgumentList '--demo', "$PWD/screenshots" -PassThru -NoNewWindow `
+            -RedirectStandardOutput crash/stdout.txt -RedirectStandardError crash/stderr.txt
           if (-not $p.WaitForExit(240000)) { $p.Kill(); Write-Host "Timed out" }
+          Get-Content crash/stdout.txt, crash/stderr.txt -ErrorAction SilentlyContinue
           Get-ChildItem screenshots -ErrorAction SilentlyContinue
-          Remove-Item dist/portable/VishuCraft/opengl32.dll, dist/portable/VishuCraft/libgallium_wgl.dll, dist/portable/VishuCraft/libglapi.dll -ErrorAction SilentlyContinue
+          Copy-Item screenshots/home/crash.txt crash/ -ErrorAction SilentlyContinue
+          Get-ChildItem crash/hs_err_*.log -ErrorAction SilentlyContinue | ForEach-Object { Get-Content $_ -TotalCount 60 }
           if (-not (Test-Path screenshots/03-creative-world.png)) { Write-Host "::warning::The game did not reach the world in the smoke test" }
 
       - uses: actions/upload-artifact@v4
@@ -88,6 +97,8 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: windows-screenshots
-          path: screenshots/*.png
+          name: windows-smoke-test
+          path: |
+            screenshots/*.png
+            crash/*
           if-no-files-found: ignore
