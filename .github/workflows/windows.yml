@@ -1,0 +1,93 @@
+name: Windows build
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  windows:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Build the desktop game
+        shell: cmd
+        run: gradlew.bat --no-daemon -PdesktopOnly :desktop:installDist
+
+      - name: Prepare files for the installer
+        shell: pwsh
+        run: |
+          # Only the Windows native libraries are needed on Windows.
+          New-Item -ItemType Directory -Force build/pkg/input | Out-Null
+          Get-ChildItem desktop/build/install/VishuCraft/lib/*.jar |
+            Where-Object { $_.Name -notmatch 'natives-(linux|macos)' } |
+            Copy-Item -Destination build/pkg/input
+          java -cp "build/pkg/input/*" com.vishucraft.desktop.MainKt --make-icon build/pkg
+
+      - name: Make sure WiX (needed by jpackage for .exe installers) is available
+        shell: pwsh
+        run: |
+          if (Get-Command candle.exe -ErrorAction SilentlyContinue) { exit 0 }
+          if ($env:WIX -and (Test-Path "$env:WIX\bin\candle.exe")) { "$env:WIX\bin" | Out-File -Append -Encoding utf8 $env:GITHUB_PATH; exit 0 }
+          choco install wixtoolset -y --no-progress
+          "C:\Program Files (x86)\WiX Toolset v3.14\bin" | Out-File -Append -Encoding utf8 $env:GITHUB_PATH
+
+      - name: Build installer (VishuCraft-Setup.exe) and portable zip
+        shell: pwsh
+        run: |
+          $version = "1.0.${{ github.run_number }}"
+          $common = @(
+            '--name', 'VishuCraft',
+            '--app-version', $version,
+            '--vendor', 'VishuCraft',
+            '--description', 'VishuCraft - a block building and survival game',
+            '--input', 'build/pkg/input',
+            '--main-jar', 'desktop.jar',
+            '--main-class', 'com.vishucraft.desktop.MainKt',
+            '--icon', 'build/pkg/icon.ico',
+            '--dest', 'dist'
+          )
+          jpackage --type exe @common --win-menu --win-shortcut --win-dir-chooser --win-per-user-install `
+            --win-menu-group VishuCraft --win-upgrade-uuid 7b1d3c52-6a0e-4f4e-9d0c-5b9a2f6c1e21
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Rename-Item "dist/VishuCraft-$version.exe" "VishuCraft-Setup.exe"
+          jpackage --type app-image @common --dest dist/portable
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Compress-Archive -Path dist/portable/VishuCraft -DestinationPath dist/VishuCraft-portable.zip
+          Get-ChildItem dist
+
+      - name: Check that the game starts
+        shell: pwsh
+        run: |
+          # Software OpenGL (Mesa) so the game can run on the runner, which has no graphics card.
+          $mesa = "https://github.com/pal1000/mesa-dist-win/releases/download/24.2.8/mesa3d-24.2.8-release-msvc.7z"
+          try {
+            Invoke-WebRequest $mesa -OutFile mesa.7z
+            7z x mesa.7z -omesa | Out-Null
+            Copy-Item mesa/x64/opengl32.dll, mesa/x64/libgallium_wgl.dll, mesa/x64/libglapi.dll dist/portable/VishuCraft/ -ErrorAction SilentlyContinue
+          } catch { Write-Host "Could not download Mesa: $_" }
+          $p = Start-Process dist/portable/VishuCraft/VishuCraft.exe -ArgumentList '--demo', "$PWD/screenshots" -PassThru -NoNewWindow
+          if (-not $p.WaitForExit(240000)) { $p.Kill(); Write-Host "Timed out" }
+          Get-ChildItem screenshots -ErrorAction SilentlyContinue
+          Remove-Item dist/portable/VishuCraft/opengl32.dll, dist/portable/VishuCraft/libgallium_wgl.dll, dist/portable/VishuCraft/libglapi.dll -ErrorAction SilentlyContinue
+          if (-not (Test-Path screenshots/03-creative-world.png)) { Write-Host "::warning::The game did not reach the world in the smoke test" }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: VishuCraft-windows
+          path: |
+            dist/VishuCraft-Setup.exe
+            dist/VishuCraft-portable.zip
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: windows-screenshots
+          path: screenshots/*.png
+          if-no-files-found: ignore

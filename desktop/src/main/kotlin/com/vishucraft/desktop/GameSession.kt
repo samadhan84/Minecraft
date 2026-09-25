@@ -57,6 +57,7 @@ class GameSession(
         try { save() } catch (_: Exception) {}
         game.net?.let { n -> Thread { n.close() }.start() }
         world.shutdown()
+        renderer.release()
     }
 
     companion object {

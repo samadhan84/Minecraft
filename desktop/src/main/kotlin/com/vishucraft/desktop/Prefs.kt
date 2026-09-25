@@ -6,8 +6,9 @@ import java.util.Properties
 /** Where VishuCraft keeps worlds, settings and crash logs on this computer. */
 object Paths {
     val home: File by lazy {
+        val override = System.getProperty("vishucraft.home")
         val appData = System.getenv("APPDATA")
-        (if (appData != null) File(appData, "VishuCraft") else File(System.getProperty("user.home"), ".vishucraft")).apply { mkdirs() }
+        (if (override != null) File(override) else if (appData != null) File(appData, "VishuCraft") else File(System.getProperty("user.home"), ".vishucraft")).apply { mkdirs() }
     }
     val worlds: File get() = File(home, "worlds").apply { mkdirs() }
 }

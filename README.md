@@ -96,6 +96,28 @@ Every push is built by GitHub Actions (`.github/workflows/android.yml`). The res
 Minimum Android version: 7.0 (API 24) with OpenGL ES 2.0. Runs on phones, tablets and **Android TV**
 (it appears on the TV home screen, and every menu can be used with the remote).
 
+## Windows (laptop / PC)
+
+Every push also builds a Windows version (`.github/workflows/windows.yml`), uploaded as the `VishuCraft-windows` artifact:
+
+- **VishuCraft-Setup.exe** – installer. Installs for the current user (no administrator needed), adds a Start-menu entry
+  and a desktop shortcut. Java is bundled, nothing else to install.
+- **VishuCraft-portable.zip** – unzip anywhere and run `VishuCraft.exe`.
+
+Windows may show "Windows protected your PC" because the installer is not code-signed: click *More info* → *Run anyway*.
+Worlds and settings are kept in `%APPDATA%\VishuCraft`. Wi-Fi games work between the PC and phones/TVs on the same network.
+
+Keyboard and mouse: W A S D walk, mouse looks, left click mines / attacks, right click places / uses, Space jumps
+(double-tap to fly in Creative), Shift flies down, Ctrl sprints, 1-9 or the wheel pick a hotbar slot, middle click picks
+the block you look at, E opens the inventory, Esc pauses, F3 shows FPS, F11 fullscreen, F2 saves a screenshot.
+
+The desktop version shares the whole game engine with Android (`desktop/` only adds the window, menus, input and sound).
+Build and run it yourself with JDK 17+ (no Android SDK needed):
+
+```bash
+./gradlew -PdesktopOnly :desktop:run
+```
+
 ### TV remote, gamepad and keyboard
 
 | Action | TV remote | Gamepad | Keyboard |

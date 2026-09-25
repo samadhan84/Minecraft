@@ -280,6 +280,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
         while (true) {
             when (input.actions.poll() ?: break) {
                 GameInput.Action.PLACE -> use()
+                GameInput.Action.ATTACK -> attack()
                 GameInput.Action.TOGGLE_FLY -> if (!survival) { player.flying = !player.flying; player.vy = 0f }
             }
         }
@@ -626,6 +627,27 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
     }
 
     /** Tap: interact with levers/buttons, use the held item, or place the held block. */
+    /** Hits the mob in front if it is closer than the targeted block (left click on computers). */
+    private fun attack() {
+        val mobHit = mobs.raycast(player.x, player.eyeY, player.z, dir[0], dir[1], dir[2], 4f) ?: return
+        val blockDist = target?.let {
+            val bx = it.x + 0.5f - player.x; val by = it.y + 0.5f - player.eyeY; val bz = it.z + 0.5f - player.z
+            sqrt(bx * bx + by * by + bz * bz) - 0.5f
+        } ?: Float.MAX_VALUE
+        if (mobHit.distance <= blockDist) hit(mobHit, heldItem())
+    }
+
+    private fun hit(mobHit: MobHit, item: ItemDef?) {
+        val dmg = (item?.attack ?: 1).toFloat()
+        val len = sqrt(dir[0] * dir[0] + dir[2] * dir[2]).coerceAtLeast(0.01f)
+        if (isClient) net?.attack(mobHit.mob.uid, dmg, dir[0] / len, dir[2] / len)
+        else mobs.damage(mobHit.mob, dmg, dir[0] / len, dir[2] / len)
+        sound("hurt", mobHit.mob.x, mobHit.mob.y + 1f, mobHit.mob.z, 0.6f)
+        damageHeld(if (item?.tool == ToolType.SWORD) 1 else 2)
+        exhaust(0.1f)
+        if (mobHit.mob.dead) uiEvents.add("toast:${mobHit.mob.type.displayName} defeated")
+    }
+
     private fun use() {
         val sel = heldId()
         val item = Items[sel]
@@ -677,17 +699,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
                 sound(mobs.voice(mobHit.mob.type), mobHit.mob.x, mobHit.mob.y + 1f, mobHit.mob.z, 0.8f)
                 return
             }
-            if (mobHit.distance <= blockDist) {
-                val dmg = (item?.attack ?: 1).toFloat()
-                val len = sqrt(dir[0] * dir[0] + dir[2] * dir[2]).coerceAtLeast(0.01f)
-                if (isClient) net?.attack(mobHit.mob.uid, dmg, dir[0] / len, dir[2] / len)
-                else mobs.damage(mobHit.mob, dmg, dir[0] / len, dir[2] / len)
-                sound("hurt", mobHit.mob.x, mobHit.mob.y + 1f, mobHit.mob.z, 0.6f)
-                damageHeld(if (item?.tool == ToolType.SWORD) 1 else 2)
-                exhaust(0.1f)
-                if (mobHit.mob.dead) uiEvents.add("toast:${mobHit.mob.type.displayName} defeated")
-                return
-            }
+            if (mobHit.distance <= blockDist) { hit(mobHit, item); return }
         }
         val t = if (item?.use == ItemUse.BUCKET) {
             Raycast.cast(world, player.x, player.eyeY, player.z, dir[0], dir[1], dir[2], REACH, hitWater = true)

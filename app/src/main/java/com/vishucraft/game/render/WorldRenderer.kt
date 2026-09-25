@@ -75,6 +75,12 @@ class WorldRenderer(private val game: Game) {
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
     }
 
+    /** Frees the chunk meshes (used when a desktop window switches worlds without losing its GL context). */
+    fun release() {
+        for (m in meshes.values) m.delete()
+        meshes.clear()
+    }
+
     fun onSurfaceChanged(w: Int, h: Int) {
         width = w; height = max(1, h)
         glViewport(0, 0, w, h)

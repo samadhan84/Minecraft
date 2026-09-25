@@ -4,7 +4,7 @@ import java.util.concurrent.ConcurrentLinkedQueue
 
 /** Touch state shared between the UI thread (writer) and the game thread (reader). */
 class GameInput {
-    enum class Action { PLACE, TOGGLE_FLY }
+    enum class Action { PLACE, TOGGLE_FLY, ATTACK }
 
     @Volatile var moveForward = 0f
     @Volatile var moveStrafe = 0f

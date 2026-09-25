@@ -131,20 +131,6 @@ class Sounds(context: Context) {
 
     companion object {
         /** Sound family for a block (digging, placing, footsteps). */
-        fun material(id: Int): String {
-            val B = com.vishucraft.game.world.Blocks
-            val d = B[id]
-            return when {
-                id == B.SAND || id == B.RED_SAND || id == B.GRAVEL || id == B.SOUL_SAND -> "hit_sand"
-                id == B.GLASS || id == B.ICE || id == B.PACKED_ICE || id == B.BLUE_ICE || id == B.SEA_LANTERN || id == B.GLOWSTONE ||
-                    id in B.STAINED_GLASS_FIRST until B.STAINED_GLASS_FIRST + 16 -> "hit_glass"
-                id == B.SNOW || id == B.SNOW_GRASS -> "hit_snow"
-                d.name.endsWith("Wool") -> "hit_wool"
-                d.render == com.vishucraft.game.world.RenderType.CROSS || d.tool == com.vishucraft.game.world.ToolType.HOE || id == B.GRASS -> "hit_grass"
-                d.tool == com.vishucraft.game.world.ToolType.AXE -> "hit_wood"
-                d.tool == com.vishucraft.game.world.ToolType.SHOVEL -> "hit_dirt"
-                else -> "hit_stone"
-            }
-        }
+        fun material(id: Int): String = Synth.material(id)
     }
 }

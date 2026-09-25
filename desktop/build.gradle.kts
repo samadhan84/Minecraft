@@ -17,7 +17,10 @@ dependencies {
     testImplementation(kotlin("test"))
 }
 
-kotlin { jvmToolchain(17) }
+// Compile for Java 17 with whichever JDK (17 or newer) runs Gradle.
+java { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
+kotlin { compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) } }
+tasks.withType<JavaCompile>().configureEach { options.release.set(17) }
 
 sourceSets {
     main {
