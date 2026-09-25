@@ -7,11 +7,8 @@ import android.media.AudioTrack
 import android.media.SoundPool
 import java.io.DataOutputStream
 import java.io.File
-import java.util.Random
-import kotlin.math.PI
 import kotlin.math.atan2
 import kotlin.math.cos
-import kotlin.math.exp
 import kotlin.math.sin
 import kotlin.math.sqrt
 
@@ -118,50 +115,12 @@ class Sounds(context: Context) {
                     .build()
             } catch (e: Exception) { return }
             track.play()
-            val rnd = Random()
-            val scale = intArrayOf(0, 2, 4, 7, 9) // major pentatonic
-            val chords = listOf(intArrayOf(0, 4, 7), intArrayOf(9, 12, 16), intArrayOf(5, 9, 12), intArrayOf(7, 11, 14))
+            val gen = MusicGen(rate)
             val block = FloatArray(rate / 4)
-            val voices = ArrayList<FloatArray>() // [freq, age, amp]
-            var t = 0f
-            var nextNote = 2f
-            var phraseLeft = 0
-            var chord = 0
-            var base = 48 + rnd.nextInt(5)
             val out = ShortArray(block.size)
             while (running) {
                 if (musicVolume <= 0.01f) { Thread.sleep(300); continue }
-                java.util.Arrays.fill(block, 0f)
-                for (i in block.indices) {
-                    t += 1f / rate
-                    if (t >= nextNote) {
-                        if (phraseLeft <= 0) {
-                            // Rest between phrases, then start a new one in a (possibly) new key.
-                            phraseLeft = 6 + rnd.nextInt(10)
-                            nextNote = t + 6f + rnd.nextFloat() * 14f
-                            if (rnd.nextInt(3) == 0) base = 45 + rnd.nextInt(8)
-                            continue
-                        }
-                        phraseLeft--
-                        if (phraseLeft % 4 == 0) chord = (chord + 1 + rnd.nextInt(2)) % chords.size
-                        val note = if (rnd.nextInt(3) == 0) base + chords[chord][rnd.nextInt(3)] - 12
-                        else base + 12 + scale[rnd.nextInt(scale.size)] + 12 * rnd.nextInt(2)
-                        voices.add(floatArrayOf(440f * Math.pow(2.0, (note - 69) / 12.0).toFloat(), 0f, 0.18f + rnd.nextFloat() * 0.08f))
-                        nextNote = t + listOf(0.5f, 0.75f, 1f, 1.5f)[rnd.nextInt(4)]
-                    }
-                    var s = 0f
-                    val it = voices.iterator()
-                    while (it.hasNext()) {
-                        val v = it.next()
-                        val age = v[1]
-                        val env = minOf(1f, age / 0.01f) * exp(-age / 1.4f)
-                        if (age > 6f) { it.remove(); continue }
-                        val ph = 2 * PI * v[0] * age
-                        s += (v[2] * env * (sin(ph) + 0.35 * sin(2 * ph) * exp(-age) + 0.12 * sin(3 * ph) * exp(-age * 2))).toFloat()
-                        v[1] = age + 1f / rate
-                    }
-                    block[i] = s
-                }
+                gen.fill(block)
                 val g = musicVolume * 0.6f
                 for (i in block.indices) out[i] = (block[i] * g * 32767).toInt().coerceIn(-32768, 32767).toShort()
                 track.write(out, 0, out.size)
