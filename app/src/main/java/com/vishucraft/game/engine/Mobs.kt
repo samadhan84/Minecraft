@@ -59,6 +59,8 @@ class MobHit(val mob: Mob, val distance: Float)
 class Mobs(private val world: World) {
     val list = ArrayList<Mob>()
     var hostileEnabled = true
+    /** Called once when a mob dies (for drops). */
+    var onDeath: ((Mob) -> Unit)? = null
     private val rnd = Random()
     private var spawnTimer = 0f
 
@@ -228,7 +230,7 @@ class Mobs(private val world: World) {
         m.vx += kx * 6f; m.vz += kz * 6f
         if (kx != 0f || kz != 0f) m.vy = max(m.vy, 5f)
         if (!m.type.hostile) m.fleeTime = 5f
-        if (m.health <= 0f) { m.deathTime = 0f; m.fuse = -1f }
+        if (m.health <= 0f) { m.deathTime = 0f; m.fuse = -1f; onDeath?.invoke(m) }
     }
 
     /** Ray against every mob's box (slab test). */

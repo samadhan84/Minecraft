@@ -26,6 +26,7 @@ class World(val seed: Long, private val saveDir: File?) {
     ) { r -> Thread(r, "world-worker").apply { isDaemon = true; priority = Thread.NORM_PRIORITY - 1 } }
 
     private val chunkDir: File? = saveDir?.let { File(it, "chunks").apply { mkdirs() } }
+    val blockEntities = BlockEntities().also { be -> saveDir?.let { be.read(File(it, "blockentities.dat")) } }
 
     fun getChunk(cx: Int, cz: Int): Chunk? = chunks[Chunk.key(cx, cz)]
 
@@ -132,8 +133,9 @@ class World(val seed: Long, private val saveDir: File?) {
         }
     }
 
-    /** Synchronously writes all modified chunks. */
+    /** Synchronously writes all modified chunks and the chest / furnace contents. */
     fun saveChunks() {
+        saveDir?.let { try { blockEntities.write(File(it, "blockentities.dat")) } catch (_: Exception) {} }
         for (c in chunks.values) {
             if (c.modified) {
                 c.modified = false
@@ -161,6 +163,8 @@ class World(val seed: Long, private val saveDir: File?) {
     }
 }
 
+enum class GameMode { CREATIVE, SURVIVAL }
+
 /** Player and world metadata stored in level.dat. */
 class LevelData(
     var seed: Long,
@@ -168,29 +172,54 @@ class LevelData(
     var yaw: Float = 0f, var pitch: Float = 0f,
     var flying: Boolean = false,
     var timeOfDay: Float = 0.3f,
-    var hotbar: IntArray = intArrayOf(
-        Items.find("Enchanted Diamond Pickaxe"), Items.find("Diamond Sword"), Blocks.GRASS, Blocks.STONE,
-        Blocks.PLANKS, Blocks.GLASS, Blocks.TORCH, Blocks.REDSTONE_DUST, Blocks.PISTON,
-    ),
     var selectedSlot: Int = 0,
     var hasPlayer: Boolean = false,
+    var mode: GameMode = GameMode.CREATIVE,
+    var name: String = "My World",
+    var health: Float = 20f,
+    var food: Float = 20f,
+    var saturation: Float = 5f,
+    val inventory: Inventory = Inventory(),
 ) {
     companion object {
-        private const val VERSION = 1
+        private const val VERSION = 2
+
+        /** Creative worlds start with a useful hotbar; survival starts empty-handed. */
+        fun create(seed: Long, name: String, mode: GameMode): LevelData {
+            val l = LevelData(seed, mode = mode, name = name)
+            if (mode == GameMode.CREATIVE) {
+                val start = intArrayOf(
+                    Items.find("Enchanted Diamond Pickaxe"), Items.find("Diamond Sword"), Blocks.GRASS, Blocks.STONE,
+                    Blocks.PLANKS, Blocks.GLASS, Blocks.TORCH, Blocks.REDSTONE_DUST, Blocks.PISTON,
+                )
+                for ((i, id) in start.withIndex()) l.inventory.slots[i] = ItemStack(id, 1)
+            }
+            return l
+        }
 
         fun read(dir: File): LevelData? {
             val f = File(dir, "level.dat")
             if (!f.exists()) return null
             return try {
                 DataInputStream(f.inputStream().buffered()).use { d ->
-                    if (d.readInt() != VERSION) return null
+                    val version = d.readInt()
+                    if (version != 1 && version != VERSION) return null
                     val l = LevelData(d.readLong())
                     l.x = d.readFloat(); l.y = d.readFloat(); l.z = d.readFloat()
                     l.yaw = d.readFloat(); l.pitch = d.readFloat()
                     l.flying = d.readBoolean()
                     l.timeOfDay = d.readFloat()
-                    l.hotbar = IntArray(9) { d.readInt().let { v -> if (Items.isValidSlot(v)) v else Blocks.GRASS } }
-                    l.selectedSlot = d.readInt().coerceIn(0, 8)
+                    if (version == 1) {
+                        // Old creative-only saves: a 9-slot hotbar of ids.
+                        for (i in 0 until 9) d.readInt().let { v -> if (Items.isValidSlot(v)) l.inventory.slots[i] = ItemStack(v, 1) }
+                        l.selectedSlot = d.readInt().coerceIn(0, 8)
+                    } else {
+                        l.selectedSlot = d.readInt().coerceIn(0, 8)
+                        l.mode = GameMode.values()[d.readInt().coerceIn(0, 1)]
+                        l.name = d.readUTF()
+                        l.health = d.readFloat(); l.food = d.readFloat(); l.saturation = d.readFloat()
+                        l.inventory.read(d)
+                    }
                     l.hasPlayer = true
                     l
                 }
@@ -211,8 +240,11 @@ class LevelData(
             d.writeFloat(yaw); d.writeFloat(pitch)
             d.writeBoolean(flying)
             d.writeFloat(timeOfDay)
-            for (i in 0 until 9) d.writeInt(hotbar[i])
             d.writeInt(selectedSlot)
+            d.writeInt(mode.ordinal)
+            d.writeUTF(name)
+            d.writeFloat(health); d.writeFloat(food); d.writeFloat(saturation)
+            inventory.write(d)
         }
         tmp.renameTo(f)
     }

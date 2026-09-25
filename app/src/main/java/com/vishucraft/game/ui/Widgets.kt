@@ -150,16 +150,19 @@ class HudButton(ctx: Context, var label: String, private val onChange: (Boolean)
     private fun dp(v: Float) = context.dp(v)
 }
 
-/** The 9-slot hotbar. */
+/** The 9-slot hotbar, drawn from the first nine inventory slots. */
 @SuppressLint("ViewConstructor")
-class HotbarView(ctx: Context, private val slots: IntArray, private val onSelect: (Int) -> Unit) : View(ctx) {
+class HotbarView(
+    ctx: Context,
+    private val inv: com.vishucraft.game.world.Inventory,
+    private val showCounts: Boolean,
+    private val onSelect: (Int) -> Unit,
+) : View(ctx) {
     var selected = 0
         set(v) { field = v; invalidate() }
     private val frame = Paint().apply { color = Color.argb(150, 20, 20, 20) }
     private val slotBorder = Paint().apply { style = Paint.Style.STROKE; strokeWidth = ctx.dp(2f); color = Color.argb(200, 110, 110, 110) }
     private val selPaint = Paint().apply { style = Paint.Style.STROKE; strokeWidth = ctx.dp(3f); color = Color.WHITE }
-    private val iconPaint = Paint().apply { isFilterBitmap = false }
-    private val dst = Rect()
 
     @SuppressLint("ClickableViewAccessibility")
     override fun onTouchEvent(e: MotionEvent): Boolean {
@@ -174,15 +177,15 @@ class HotbarView(ctx: Context, private val slots: IntArray, private val onSelect
     override fun onDraw(canvas: Canvas) {
         val w = width / 9f
         canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), frame)
-        val pad = (w * 0.16f).toInt()
         for (i in 0 until 9) {
             val x0 = i * w
             canvas.drawRect(x0 + 1, 1f, x0 + w - 1, height - 1f, slotBorder)
-            dst.set((x0 + pad).toInt(), pad, (x0 + w - pad).toInt(), height - pad)
-            canvas.drawBitmap(BlockIcons.get(slots[i]), null, dst, iconPaint)
+            StackPainter.draw(canvas, inv.slots[i], x0, 0f, minOf(w, height.toFloat()), showCounts)
         }
         val x0 = selected * w
         canvas.drawRect(x0 + 1, 1f, x0 + w - 1, height - 1f, selPaint)
+        // Counts change from the game thread; keep the bar fresh.
+        postInvalidateDelayed(250)
     }
 }
 
@@ -320,14 +323,22 @@ class InventoryView(ctx: Context, private val onPick: (Int?) -> Unit) : View(ctx
     private fun dp(v: Float) = context.dp(v)
 }
 
-/** Ten hearts; each heart is two health points. */
-class HeartsView(ctx: Context) : View(ctx) {
+/** Survival status above the hotbar: hearts (left), hunger (right), armor (above the hearts). */
+class StatusView(ctx: Context) : View(ctx) {
     var health = 20f
-        set(v) { if (field != v) { field = v; invalidate() } }
-    private val full = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(220, 30, 40) }
+    var food = 20f
+    var armor = 0
+    private val red = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(220, 30, 40) }
+    private val meat = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(196, 120, 60) }
+    private val boneP = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(236, 230, 210) }
+    private val steel = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(210, 214, 222) }
     private val empty = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(150, 40, 20, 20) }
     private val outline = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = ctx.dp(1.5f); color = Color.rgb(30, 10, 10) }
     private val path = android.graphics.Path()
+
+    fun update(h: Float, f: Float, a: Int) {
+        if (h != health || f != food || a != armor) { health = h; food = f; armor = a; invalidate() }
+    }
 
     private fun heart(cx: Float, cy: Float, s: Float) {
         path.reset()
@@ -337,20 +348,46 @@ class HeartsView(ctx: Context) : View(ctx) {
         path.close()
     }
 
-    override fun onDraw(canvas: Canvas) {
-        val s = height * 0.9f
-        val step = width / 10f
+    private fun shank(cx: Float, cy: Float, s: Float) {
+        path.reset()
+        path.addCircle(cx + s * 0.12f, cy - s * 0.1f, s * 0.32f, android.graphics.Path.Direction.CW)
+    }
+
+    private fun shield(cx: Float, cy: Float, s: Float) {
+        path.reset()
+        path.moveTo(cx - s * 0.4f, cy - s * 0.4f); path.lineTo(cx + s * 0.4f, cy - s * 0.4f)
+        path.lineTo(cx + s * 0.35f, cy + s * 0.1f); path.lineTo(cx, cy + s * 0.45f); path.lineTo(cx - s * 0.35f, cy + s * 0.1f)
+        path.close()
+    }
+
+    /** Draws 10 icons for a value out of 20; half icons are clipped. */
+    private fun row(canvas: Canvas, left: Float, cy: Float, step: Float, s: Float, value: Float, fill: Paint,
+                    shape: (Float, Float, Float) -> Unit, reversed: Boolean) {
         for (i in 0 until 10) {
-            val cx = step * i + step / 2; val cy = height / 2f
-            heart(cx, cy, s)
+            val cx = if (reversed) left + step * (9 - i) + step / 2 else left + step * i + step / 2
+            shape(cx, cy, s)
             canvas.drawPath(path, empty)
-            val hp = health - i * 2
-            if (hp >= 2f) canvas.drawPath(path, full)
-            else if (hp >= 1f) {
-                canvas.save(); canvas.clipRect(cx - s, 0f, cx, height.toFloat()); canvas.drawPath(path, full); canvas.restore()
+            val v = value - i * 2
+            if (v >= 2f) canvas.drawPath(path, fill)
+            else if (v >= 1f) {
+                canvas.save()
+                if (reversed) canvas.clipRect(cx, 0f, cx + s, height.toFloat()) else canvas.clipRect(cx - s, 0f, cx, height.toFloat())
+                canvas.drawPath(path, fill); canvas.restore()
             }
             canvas.drawPath(path, outline)
+            if (fill === meat && v >= 1f) { canvas.drawRect(cx - s * 0.45f, cy + s * 0.12f, cx - s * 0.1f, cy + s * 0.25f, boneP) }
         }
+    }
+
+    override fun onDraw(canvas: Canvas) {
+        val rowH = height / 2f
+        val s = rowH * 0.85f
+        val half = width / 2f - s * 0.3f
+        val step = half / 10f
+        val cy = rowH * 1.5f
+        row(canvas, 0f, cy, step, s, health, red, ::heart, false)
+        row(canvas, width - half, cy, step, s, food, meat, ::shank, true)
+        if (armor > 0) row(canvas, 0f, rowH * 0.5f, step, s, armor.toFloat(), steel, ::shield, false)
     }
 }
 

@@ -845,10 +845,118 @@ object TextureAtlas {
         return true
     }
 
+    // ---------------------------------------------------------------- survival items (original pixel art)
+
+    /** Draws a mask: '.' clear, 'd' dark, 'm' main, 'l' light, 'a'/'b' accent colours. */
+    private fun mask(t: Tile, rows: Array<String>, main: Int, accentA: Int = main, accentB: Int = main) {
+        sprite(t)
+        val dy = (16 - rows.size) / 2
+        for ((y, row) in rows.withIndex()) {
+            val dx = (16 - row.length) / 2
+            for ((x, ch) in row.withIndex()) {
+                val c = when (ch) {
+                    'd' -> scale(main, 0.55f); 'm' -> main; 'l' -> scale(main, 1.3f)
+                    'a' -> accentA; 'b' -> accentB; else -> continue
+                }
+                t[x + dx, y + dy] = c
+            }
+        }
+    }
+
+    private val INGOT = arrayOf(
+        "....dddddd..", "...dllllmmd.", "..dlmmmmmmd.", ".dlmmmmmmmd.", "dmmmmmmmmdd.", "dmmmmmmmdd..", ".ddddddddd..",
+    )
+    private val GEM = arrayOf(
+        "...dddd...", "..dllmmd..", ".dlmmmmmd.", "dlmmmmmmmd", ".dmmmmmmd.", "..dmmmmd..", "...dmmd...", "....dd....",
+    )
+    private val LUMP = arrayOf(
+        "...dddd...", "..dmmmmdd.", ".dmlmmmmmd", "dmmmmmmlmd", "dmmmlmmmmd", ".dmmmmmmd.", "..dddddd..",
+    )
+    private val DUST = arrayOf(
+        "..m...m.", ".mlm.m..", "..m..mlm", ".m.m..m.", "mlm..m..", ".m..mlm.", "...m.m..",
+    )
+    private val MEAT = arrayOf(
+        "....dddd....", "..ddmmmmdd..", ".dmmmmmmmmd.", "dmmmlmmmmmmd", "dmmmmmmmlmmd", ".dmmmmmmmmd.", "..ddmmmmdaa.",
+        "....ddddaaa.", "..........aa",
+    )
+    private val HELMET = arrayOf(
+        "..dddddddddd..", ".dmmmmmmmmmmd.", "dmllmmmmmmmmmd", "dmmmmmmmmmmmmd", "dmmdd....ddmmd", "dmd........dmd", "dd..........dd",
+    )
+    private val CHEST = arrayOf(
+        "ddd......ddd", "dmmd....dmmd", "dmmmddddmmmd", ".dmlmmmmmmd.", ".dmmmmmmmmd.", ".dmmmmmmmmd.", ".dmmmmmmmmd.",
+        ".dmmmmmmmmd.", ".dmmmmmmmmd.", ".dddddddddd.",
+    )
+    private val LEGS = arrayOf(
+        "dddddddddd", "dmmmmmmmmd", "dmlmmmmmmd", "dmmmddmmmd", "dmmd..dmmd", "dmmd..dmmd", "dmmd..dmmd", "dmmd..dmmd",
+        "dddd..dddd",
+    )
+    private val BOOTS = arrayOf(
+        "dmmd....dmmd", "dmmd....dmmd", "dmmd....dmmd", "dmmmd...dmmmd", "dmlmmd..dmlmmd", "ddddddd.ddddddd",
+    )
+
+    private fun survivalItem(name: String, t: Tile): Boolean {
+        val armorColors = mapOf(
+            "leather" to rgb(150, 90, 50), "gold" to rgb(250, 214, 64), "iron" to rgb(214, 214, 218),
+            "diamond" to rgb(80, 226, 214), "netherite" to rgb(76, 68, 72),
+        )
+        for ((key, c) in armorColors) when (name) {
+            "helmet_$key" -> { mask(t, HELMET, c); return true }
+            "chestplate_$key" -> { mask(t, CHEST, c); return true }
+            "leggings_$key" -> { mask(t, LEGS, c); return true }
+            "boots_$key" -> { mask(t, BOOTS, c); return true }
+        }
+        when (name) {
+            "stick" -> { sprite(t); for (i in 0..10) { t[3 + i, 13 - i] = rgb(137, 103, 55); t[3 + i, 14 - i] = rgb(84, 60, 30) } }
+            "coal" -> mask(t, LUMP, rgb(46, 46, 50))
+            "charcoal" -> mask(t, LUMP, rgb(70, 58, 46))
+            "iron_ingot" -> mask(t, INGOT, rgb(214, 214, 218))
+            "gold_ingot" -> mask(t, INGOT, rgb(248, 206, 56))
+            "copper_ingot" -> mask(t, INGOT, rgb(214, 124, 84))
+            "netherite_ingot" -> mask(t, INGOT, rgb(80, 72, 76))
+            "netherite_scrap" -> mask(t, LUMP, rgb(110, 84, 72))
+            "brick_item" -> mask(t, INGOT, rgb(170, 84, 60))
+            "diamond" -> mask(t, GEM, rgb(80, 226, 214))
+            "emerald" -> mask(t, GEM, rgb(50, 210, 100))
+            "lapis" -> mask(t, LUMP, rgb(40, 80, 200))
+            "flint" -> mask(t, GEM, rgb(64, 64, 70))
+            "clay_ball" -> mask(t, LUMP, rgb(164, 170, 184))
+            "slimeball" -> mask(t, LUMP, rgb(112, 196, 90))
+            "gunpowder" -> mask(t, DUST, rgb(90, 90, 96))
+            "glowstone_dust" -> mask(t, DUST, rgb(250, 214, 110))
+            "leather" -> mask(t, arrayOf("..dddddd..", ".dmmmmmmd.", "dmmmlmmmmd", "dmmmmmmmmd", "dmmmmmmmmd", ".dmmmmmmd.", "..dd..dd.."), rgb(150, 90, 50))
+            "string" -> { sprite(t); var x = 3f; for (y in 2..13) { t[x.toInt(), y] = rgb(236, 236, 236); x += if (y % 4 < 2) 1f else -0.5f } }
+            "feather" -> mask(t, arrayOf("....ll", "...lml", "..lmm.", ".lmm..", ".mm...", "dd....", "d....."), rgb(236, 236, 236))
+            "bone" -> mask(t, arrayOf("ll......", "lml.....", ".lmm....", "..mmm...", "...mmm..", "....mml.", ".....lml", "......ll"), rgb(236, 230, 210))
+            "wheat_seeds" -> { sprite(t); repeat(7) { t[4 + t.rnd.nextInt(8), 5 + t.rnd.nextInt(7)] = rgb(90, 150, 50) } }
+            "wheat" -> { sprite(t); for (k in 0..2) for (y in 2..14) t[5 + k * 3 - (14 - y) / 6, y] = if (y < 7) rgb(214, 180, 70) else rgb(170, 140, 60) }
+            "paper" -> mask(t, arrayOf("mmmmmmmmm.", "mdddddddmm", "mmmmmmmmmm", "mdddddddmm", "mmmmmmmmmm", "mddddddmmm", "mmmmmmmmmm", ".mmmmmmmmm"), rgb(236, 232, 214))
+            "book" -> mask(t, arrayOf("ddddddddd.", "dmmmmmmmad", "dmlmmmmmad", "dmmmmmmmad", "dmmmmmmmad", "dmmmmmmmad", "ddddddddd."), rgb(130, 60, 40), rgb(236, 232, 214))
+            "arrow" -> { sprite(t); for (i in 0..9) t[3 + i, 12 - i] = rgb(137, 103, 55); t[13, 2] = rgb(120, 120, 120); t[12, 2] = rgb(120, 120, 120); t[13, 3] = rgb(120, 120, 120); t[2, 12] = rgb(236, 236, 236); t[3, 13] = rgb(236, 236, 236); t[2, 13] = rgb(236, 236, 236) }
+            "bow" -> { sprite(t); for (a in 0..24) { val ang = Math.PI * (0.75 + a / 24.0); t[(11 + Math.cos(ang) * 8).toInt().coerceIn(0, 15), (4 + Math.sin(ang) * -8 + 8).toInt().coerceIn(0, 15)] = rgb(137, 103, 55) }; for (i in 0..11) t[4 + i * 9 / 11, 12 - i] = rgb(230, 230, 230) }
+            "apple" -> mask(t, arrayOf("....a....", "...a.....", ".dmmdmmd.", "dmlmmmmmd", "dmmmmmmmd", "dmmmmmmmd", ".dmmmmmd.", "..ddddd.."), rgb(210, 36, 40), rgb(110, 76, 40))
+            "golden_apple" -> mask(t, arrayOf("....a....", "...a.....", ".dmmdmmd.", "dmlmmmmmd", "dmmmmmmmd", "dmmmmmmmd", ".dmmmmmd.", "..ddddd.."), rgb(250, 214, 64), rgb(110, 76, 40))
+            "bread" -> mask(t, arrayOf("..dddddddd..", ".dmlmlmlmmd.", "dmmmmmmmmmmd", "dmmmmmmmmmmd", ".dddddddddd."), rgb(196, 140, 70))
+            "raw_beef" -> mask(t, MEAT, rgb(200, 60, 60), rgb(236, 230, 210))
+            "steak" -> mask(t, MEAT, rgb(130, 76, 44), rgb(236, 230, 210))
+            "raw_porkchop" -> mask(t, MEAT, rgb(240, 150, 150), rgb(236, 230, 210))
+            "cooked_porkchop" -> mask(t, MEAT, rgb(196, 140, 90), rgb(236, 230, 210))
+            "raw_mutton" -> mask(t, MEAT, rgb(210, 80, 80), rgb(236, 230, 210))
+            "cooked_mutton" -> mask(t, MEAT, rgb(150, 90, 60), rgb(236, 230, 210))
+            "rotten_flesh" -> mask(t, MEAT, rgb(120, 110, 60), rgb(90, 120, 70))
+            "melon_slice" -> mask(t, arrayOf("aaaaaaaaaa", ".mmmmmmmm.", ".mmdmmdmm.", "..mmmmmm..", "...mmmm...", "....mm...."), rgb(230, 60, 60), rgb(80, 150, 40))
+            "ancient_debris" -> t.fill { x, y -> scale(if ((x + y * 3) % 7 == 0) rgb(130, 96, 84) else rgb(90, 66, 60), t.jitter(0.1f)) }
+            "ancient_debris_top" -> { noisy(t, rgb(96, 72, 66), 0.1f, 0.3f); for (d in 1..6 step 2) for (i in 7 - d..8 + d) { t[i, 7 - d] = rgb(130, 96, 84); t[i, 8 + d] = rgb(130, 96, 84) } }
+            "furnace_front_on" -> { furnaceFront(t); for (y in 9..13) for (x in 5..10) t[x, y] = if ((x + y) % 2 == 0) rgb(255, 170, 40) else rgb(250, 110, 20) }
+            else -> return false
+        }
+        return true
+    }
+
     // ---------------------------------------------------------------- dispatch
 
     private fun paint(name: String, t: Tile) {
         if (mobSkin(name, t)) return
+        if (survivalItem(name, t)) return
         when {
             name.startsWith("wool_") -> return wool(t, DYE_COLORS.getValue(name.removePrefix("wool_")))
             name.startsWith("concrete_") -> return noisy(t, DYE_COLORS.getValue(name.removePrefix("concrete_")), 0.02f, 0.05f)

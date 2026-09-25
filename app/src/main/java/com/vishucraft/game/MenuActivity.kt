@@ -19,6 +19,7 @@ import android.widget.TextView
 import com.vishucraft.game.ui.BlockIcons
 import com.vishucraft.game.ui.dpi
 import com.vishucraft.game.ui.menuButton
+import com.vishucraft.game.ui.settingsDialog
 import com.vishucraft.game.world.Tiles
 import java.io.File
 
@@ -58,9 +59,9 @@ class MenuActivity : Activity() {
         }
         col.addView(subtitle, LinearLayout.LayoutParams(-2, -2).apply { bottomMargin = dpi(24f) })
 
-        playButton = menuButton(this, "Play") { startGame(null) }
+        playButton = menuButton(this, "Play") { if (hasWorld()) showWorlds() else newWorld() }
         col.addView(playButton, LinearLayout.LayoutParams(dpi(320f), -2).apply { bottomMargin = dpi(10f) })
-        col.addView(menuButton(this, "New world") { newWorld() }, LinearLayout.LayoutParams(dpi(320f), -2).apply { bottomMargin = dpi(10f) })
+        col.addView(menuButton(this, "Settings") { settingsDialog(this) }, LinearLayout.LayoutParams(dpi(320f), -2).apply { bottomMargin = dpi(10f) })
         col.addView(menuButton(this, "How to play") { help() }, LinearLayout.LayoutParams(dpi(320f), -2))
 
         root.addView(col, FrameLayout.LayoutParams(-2, -2, Gravity.CENTER))
@@ -78,41 +79,121 @@ class MenuActivity : Activity() {
                 .setPositiveButton("OK", null)
                 .show()
         }
-        playButton.text = if (hasWorld()) "Continue world" else "Play"
+        migrateOldWorld()
+        playButton.text = if (hasWorld()) "Play" else "Create world"
         @Suppress("DEPRECATION")
         window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY or
             View.SYSTEM_UI_FLAG_FULLSCREEN or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
     }
 
-    private fun hasWorld() = File(GameActivity.worldDir(this), "level.dat").exists()
+    /** Moves the single world from older versions into the save-slot folder. */
+    private fun migrateOldWorld() {
+        val old = File(filesDir, "world")
+        if (old.exists() && File(old, "level.dat").exists()) {
+            val target = File(GameActivity.worldsRoot(this), "world1")
+            if (!target.exists()) old.renameTo(target)
+        }
+    }
 
-    private fun startGame(seed: Long?) {
+    private class WorldInfo(val dir: File, val level: com.vishucraft.game.world.LevelData)
+
+    private fun worlds(): List<WorldInfo> = GameActivity.worldsRoot(this).listFiles().orEmpty()
+        .mapNotNull { d -> com.vishucraft.game.world.LevelData.read(d)?.let { WorldInfo(d, it) } }
+        .sortedByDescending { File(it.dir, "level.dat").lastModified() }
+
+    private fun hasWorld() = worlds().isNotEmpty()
+
+    private fun startGame(dirName: String, seed: Long? = null, name: String? = null, survival: Boolean = false) {
         val i = Intent(this, GameActivity::class.java)
+        i.putExtra(GameActivity.EXTRA_WORLD, dirName)
         if (seed != null) i.putExtra(GameActivity.EXTRA_SEED, seed)
+        if (name != null) i.putExtra(GameActivity.EXTRA_NAME, name)
+        i.putExtra(GameActivity.EXTRA_MODE, survival)
         startActivity(i)
     }
 
+    /** A dialog with a vertical list of focusable buttons. */
+    private fun buttonDialog(title: String, buttons: List<Pair<String, () -> Unit>>): AlertDialog {
+        val col = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dpi(16f), dpi(12f), dpi(16f), dpi(4f))
+        }
+        lateinit var dialog: AlertDialog
+        for ((label, action) in buttons) {
+            col.addView(menuButton(this, label) { dialog.dismiss(); action() },
+                LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dpi(8f) })
+        }
+        dialog = AlertDialog.Builder(this).setTitle(title)
+            .setView(android.widget.ScrollView(this).apply { addView(col) })
+            .setNegativeButton("Back", null).create()
+        dialog.show()
+        col.getChildAt(0)?.requestFocus()
+        return dialog
+    }
+
+    private fun showWorlds() {
+        val list = worlds()
+        val buttons = ArrayList<Pair<String, () -> Unit>>()
+        buttons.add("+  Create new world" to { newWorld() })
+        for (w in list) {
+            val mode = if (w.level.mode == com.vishucraft.game.world.GameMode.SURVIVAL) "Survival" else "Creative"
+            buttons.add("${w.level.name}  ·  $mode" to { startGame(w.dir.name) })
+        }
+        if (list.isNotEmpty()) buttons.add("Delete a world…" to { deleteWorld() })
+        buttonDialog("Select world", buttons)
+    }
+
+    private fun deleteWorld() {
+        buttonDialog("Delete which world?", worlds().map { w ->
+            "Delete \"${w.level.name}\"" to {
+                AlertDialog.Builder(this).setTitle("Delete ${w.level.name}?")
+                    .setMessage("This cannot be undone.")
+                    .setPositiveButton("Delete") { _, _ -> w.dir.deleteRecursively(); onResume() }
+                    .setNegativeButton("Cancel", null).show()
+                Unit
+            }
+        })
+    }
+
     private fun newWorld() {
+        val col = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dpi(20f), dpi(8f), dpi(20f), 0)
+        }
+        val nameInput = EditText(this).apply {
+            hint = "World name"
+            setText("World ${worlds().size + 1}")
+            inputType = InputType.TYPE_CLASS_TEXT
+        }
         val seedInput = EditText(this).apply {
             hint = "Seed (leave empty for random)"
             inputType = InputType.TYPE_CLASS_TEXT
         }
-        val msg = if (hasWorld()) "This replaces your current world." else "Create a fresh world."
+        var survival = true
+        lateinit var modeButton: TextView
+        modeButton = menuButton(this, "Game mode: Survival") {
+            survival = !survival
+            modeButton.text = if (survival) "Game mode: Survival" else "Game mode: Creative"
+        }
+        col.addView(nameInput); col.addView(seedInput)
+        col.addView(modeButton, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dpi(8f) })
         AlertDialog.Builder(this)
-            .setTitle("New world")
-            .setMessage(msg)
-            .setView(seedInput)
+            .setTitle("Create new world")
+            .setView(col)
             .setPositiveButton("Create") { _, _ ->
-                GameActivity.worldDir(this).deleteRecursively()
                 val text = seedInput.text.toString().trim()
                 val seed = when {
                     text.isEmpty() -> System.nanoTime()
                     else -> text.toLongOrNull() ?: text.hashCode().toLong()
                 }
-                startGame(seed)
+                var n = 1
+                while (File(GameActivity.worldsRoot(this), "world$n").exists()) n++
+                val name = nameInput.text.toString().trim().ifEmpty { "World $n" }
+                startGame("world$n", seed, name, survival)
             }
             .setNegativeButton("Cancel", null)
             .show()
+        modeButton.requestFocus()
     }
 
     private fun help() {
@@ -125,7 +206,9 @@ class MenuActivity : Activity() {
                     "• Touch and hold to mine the block under the crosshair.\n" +
                     "• ▲ jumps / swims / flies up, ▼ flies down.\n" +
                     "• FLY toggles creative flight.\n" +
-                    "• Tap a hotbar slot to select it, ••• opens all blocks.\n" +
+                    "• Tap a hotbar slot to select it, ••• opens your inventory.\n" +
+                    "• Survival: punch trees for logs, craft planks, sticks, a crafting table and tools. " +
+                    "Smelt ore in a furnace. Eat food to refill hunger. Armor protects you.\n" +
                     "• Your world saves automatically when you leave."
             )
             .setPositiveButton("OK", null)

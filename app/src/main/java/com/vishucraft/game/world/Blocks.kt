@@ -218,7 +218,8 @@ object Blocks {
     const val PISTON = 193
     const val STICKY_PISTON = 194
     const val PISTON_HEAD = 195
-    const val COUNT = 196
+    const val ANCIENT_DEBRIS = 196
+    const val COUNT = 197
 
     /** Dye colours used for wool, concrete, terracotta and stained glass. */
     val DYES = listOf(
@@ -437,6 +438,8 @@ object Blocks {
         reg(BlockDef(STICKY_PISTON, "Sticky Piston", t("piston_side"), hardness = 0.6f, tool = P, category = R,
             facing = Facing.ALL, front = t("piston_sticky_front"), back = t("piston_back")))
         t("piston_inner")
+        t("furnace_front_on")
+        column(ANCIENT_DEBRIS, "Ancient Debris", "ancient_debris_top", "ancient_debris", "ancient_debris_top", 6f, P, N)
         reg(BlockDef(PISTON_HEAD, "Piston Head", t("piston_front"), t("oak_planks"), render = RenderType.PISTON_HEAD,
             opaque = false, blocksLight = false, hardness = 0.6f, tool = P, category = R, inInventory = false, movable = false))
     }
@@ -464,6 +467,7 @@ object Blocks {
     operator fun get(id: Int): BlockDef = all[id]
 
     fun isEmissive(id: Int, meta: Int): Boolean {
+        if (id == FURNACE) return meta and 8 != 0
         if (!all[id].emissive) return false
         return !(id == REDSTONE_TORCH && meta != 0)
     }
@@ -481,6 +485,7 @@ object Blocks {
             var f = meta and 7
             if (f > 5 || (d.facing == Facing.HORIZONTAL && f < 2)) f = 2
             if (face == f) {
+                if (id == FURNACE && meta and 8 != 0) return Tiles.id("furnace_front_on")
                 return if ((id == PISTON || id == STICKY_PISTON) && meta and 8 != 0) Tiles.id("piston_inner") else d.front
             }
             if (d.facing == Facing.ALL) return if (face == (f xor 1)) d.back else d.side

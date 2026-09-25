@@ -6,6 +6,14 @@ procedurally in code when the game starts.
 
 ## Features
 
+- **Survival and Creative modes** chosen per world, with **multiple save slots** and a **settings** screen
+  (look sensitivity, field of view, render distance, volume, button size).
+- **Survival**: 36-slot inventory with stacks, items drop and are picked up, tool durability, the right pickaxe tier is
+  needed for ores, hunger with food and eating, natural regeneration, armor (leather to netherite, plus enchanted sets),
+  and your items drop where you die.
+- **Crafting** from a recipe list (small recipes anywhere, the rest at a crafting table), a **furnace** that smelts ore,
+  sand, clay and food using coal, charcoal or wood, and **chests** with 27 slots. Mobs drop leather, meat, wool and more.
+
 - **Infinite procedural world**: chunks (16×128×16) stream in around you on background threads.
 - **Biomes**: plains, forests (oak, birch, dark oak), jungles, savannas (acacia), deserts, snowy taigas (spruce),
   mountains with snow caps, oceans and beaches with sugar cane.

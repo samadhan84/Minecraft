@@ -33,6 +33,12 @@ import android.widget.ImageView
 import com.vishucraft.game.ui.BlockIcons
 import com.vishucraft.game.world.Items
 import com.vishucraft.game.world.LevelData
+import com.vishucraft.game.world.GameMode
+import com.vishucraft.game.world.ItemStack
+import com.vishucraft.game.ui.ContainerScreen
+import com.vishucraft.game.ui.Settings
+import com.vishucraft.game.ui.StatusView
+import com.vishucraft.game.ui.settingsDialog
 import com.vishucraft.game.world.World
 import java.io.File
 import javax.microedition.khronos.egl.EGL10
@@ -43,7 +49,11 @@ import kotlin.math.abs
 class GameActivity : Activity() {
     companion object {
         const val EXTRA_SEED = "seed"
-        fun worldDir(activity: Activity) = File(activity.filesDir, "world")
+        const val EXTRA_WORLD = "world"
+        const val EXTRA_NAME = "name"
+        const val EXTRA_MODE = "mode"
+
+        fun worldsRoot(activity: Activity) = File(activity.filesDir, "worlds").apply { mkdirs() }
 
         const val CONTROLS_HELP =
             "TV remote:\n" +
@@ -75,23 +85,31 @@ class GameActivity : Activity() {
     private lateinit var stats: TextView
     private lateinit var toast: TextView
     private lateinit var hand: ImageView
-    private lateinit var hearts: com.vishucraft.game.ui.HeartsView
     private lateinit var hurtFlash: View
     private lateinit var pauseMenu: LinearLayout
     private lateinit var inventory: InventoryView
     private lateinit var flyButton: HudButton
     private lateinit var downButton: HudButton
     private lateinit var root: FrameLayout
+    private lateinit var settings: Settings
+    private lateinit var status: StatusView
+    private lateinit var screen: ContainerScreen
     private val handler = Handler(Looper.getMainLooper())
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
-        val dir = worldDir(this)
-        level = LevelData.read(dir) ?: LevelData(intent.getLongExtra(EXTRA_SEED, System.currentTimeMillis()))
+        val dir = File(worldsRoot(this), intent.getStringExtra(EXTRA_WORLD) ?: "world1")
+        level = LevelData.read(dir) ?: LevelData.create(
+            intent.getLongExtra(EXTRA_SEED, System.currentTimeMillis()),
+            intent.getStringExtra(EXTRA_NAME) ?: "My World",
+            if (intent.getBooleanExtra(EXTRA_MODE, false)) GameMode.SURVIVAL else GameMode.CREATIVE,
+        )
         world = World(level.seed, dir)
         game = Game(world, level, input, dir)
+        settings = Settings(this)
+        applySettings()
 
         glView = GLSurfaceView(this).apply {
             setEGLContextClientVersion(2)
@@ -127,13 +145,13 @@ class GameActivity : Activity() {
         downButton.visibility = View.GONE
 
         flyButton = HudButton(this, "FLY") { if (it) input.actions.add(GameInput.Action.TOGGLE_FLY) }
-        root.addView(flyButton, lp(56f, 44f, Gravity.TOP or Gravity.END, t = 12f, r = 76f))
+        if (!game.survival) root.addView(flyButton, lp(56f, 44f, Gravity.TOP or Gravity.END, t = 12f, r = 76f))
         val menu = HudButton(this, "II") { if (it) handler.post { showPause(true) } }
         root.addView(menu, lp(52f, 44f, Gravity.TOP or Gravity.END, t = 12f, r = 16f))
 
         // Hotbar + inventory button
         val bar = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        hotbar = HotbarView(this, level.hotbar) { slot -> selectSlot(slot) }
+        hotbar = HotbarView(this, game.inventory, game.survival) { slot -> selectSlot(slot) }
         hotbar.selected = level.selectedSlot
         bar.addView(hotbar, LinearLayout.LayoutParams(dpi(9 * 42f), dpi(42f)))
         val inv = HudButton(this, "•••") { if (it) handler.post { showInventory(true) } }
@@ -154,8 +172,8 @@ class GameActivity : Activity() {
         }
         root.addView(toast, lp(-2f, -2f, Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL, b = 78f))
 
-        hearts = com.vishucraft.game.ui.HeartsView(this)
-        root.addView(hearts, lp(200f, 20f, Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL, b = 52f))
+        status = StatusView(this)
+        if (game.survival) root.addView(status, lp(9 * 42f, 36f, Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL, l = 0f, r = 50f, b = 50f))
         hurtFlash = View(this).apply { setBackgroundColor(Color.argb(110, 220, 0, 0)); alpha = 0f }
         root.addView(hurtFlash, 1, FrameLayout.LayoutParams(-1, -1))
 
@@ -170,14 +188,22 @@ class GameActivity : Activity() {
 
         inventory = InventoryView(this) { id ->
             if (id != null) {
-                level.hotbar[hotbar.selected] = id
-                selectSlot(hotbar.selected)
-                hotbar.invalidate()
+                val slot = hotbar.selected
+                glView.queueEvent {
+                    game.inventory.slots[slot] = ItemStack(id, 1)
+                    runOnUiThread { selectSlot(slot); hotbar.invalidate() }
+                }
             }
             showInventory(false)
         }
         inventory.visibility = View.GONE
         root.addView(inventory, FrameLayout.LayoutParams(-1, -1))
+
+        screen = ContainerScreen(this, game, { action ->
+            glView.queueEvent { action(game); runOnUiThread { screen.invalidate(); hotbar.invalidate(); updateHand() } }
+        }) { updateHand() }
+        screen.visibility = View.GONE
+        root.addView(screen, FrameLayout.LayoutParams(-1, -1))
 
         pauseMenu = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -197,11 +223,6 @@ class GameActivity : Activity() {
             pauseMenu.addView(b, LinearLayout.LayoutParams(dpi(300f), -2).apply { bottomMargin = dpi(10f) })
         }
         addMenu("Back to game") { showPause(false) }
-        addMenu("Render distance: ${game.renderDistance}") { b ->
-            val next = when (game.renderDistance) { 4 -> 6; 6 -> 8; 8 -> 10; else -> 4 }
-            glView.queueEvent { game.renderDistance = next }
-            b.text = "Render distance: $next"
-        }
         addMenu("Skip to next morning / night") {
             glView.queueEvent { game.timeOfDay = if (game.daylight > 0.5f) 0.52f else 0.0f }
             showPause(false)
@@ -211,6 +232,7 @@ class GameActivity : Activity() {
             glView.queueEvent { game.mobs.hostileEnabled = hostile }
             b.text = if (hostile) "Mobs: Normal" else "Mobs: Peaceful (no monsters)"
         }
+        addMenu("Settings") { settingsDialog(this) { applySettings() } }
         addMenu("Controls") { showControls() }
         addMenu("Save and quit") { finish() }
         root.addView(pauseMenu, FrameLayout.LayoutParams(-1, -1))
@@ -218,7 +240,9 @@ class GameActivity : Activity() {
     }
 
     private fun updateHand() {
-        val bmp = BlockIcons.get(level.hotbar[level.selectedSlot])
+        val id = game.heldId()
+        if (id == 0) { hand.setImageDrawable(null); return }
+        val bmp = BlockIcons.get(id)
         hand.setImageDrawable(android.graphics.drawable.BitmapDrawable(resources, bmp).apply { paint.isFilterBitmap = false })
     }
 
@@ -239,10 +263,10 @@ class GameActivity : Activity() {
     }
 
     private fun selectSlot(slot: Int) {
-        level.selectedSlot = slot
-        val id = level.hotbar[slot]
-        input.selectedBlock = id
+        input.selectedSlot = slot
+        val id = game.inventory.slots[slot]?.id ?: 0
         updateHand()
+        if (id == 0) { showToast("Empty hand"); return }
         val ench = Items[id]?.enchantments
         toast.text = if (ench != null) "${Items.displayName(id)}\n$ench" else Items.displayName(id)
         toast.animate().cancel()
@@ -251,8 +275,16 @@ class GameActivity : Activity() {
     }
 
     private fun showInventory(show: Boolean) {
+        if (show && game.survival) { releaseInputs(); screen.open(ContainerScreen.Mode.INVENTORY); return }
         inventory.visibility = if (show) View.VISIBLE else View.GONE
         if (show) releaseInputs()
+    }
+
+    private fun applySettings() {
+        game.lookScale = settings.sensitivity
+        game.fov = settings.fov.toFloat()
+        game.renderDistance = settings.renderDistance
+        if (::stats.isInitialized) stats.visibility = if (settings.showDebug) View.VISIBLE else View.GONE
     }
 
     private fun showPause(show: Boolean) {
@@ -295,12 +327,21 @@ class GameActivity : Activity() {
             }
             e == "died" -> showToast("You died! Respawning…")
             e.startsWith("toast:") -> showToast(e.removePrefix("toast:"))
+            e == "open:craft" -> { releaseInputs(); screen.open(ContainerScreen.Mode.CRAFTING) }
+            e.startsWith("open:chest:") || e.startsWith("open:furnace:") -> {
+                val (x, y, z) = e.substringAfterLast(':').split(',').map { it.toInt() }
+                releaseInputs()
+                if (e.startsWith("open:chest:")) screen.open(ContainerScreen.Mode.CHEST, chestEntity = world.blockEntities.chest(x, y, z))
+                else screen.open(ContainerScreen.Mode.FURNACE, furnaceEntity = world.blockEntities.furnace(x, y, z))
+            }
+            e == "place" || e == "eat" || e == "craft" || e == "pickup" || e == "break_tool" -> updateHand()
         }
-        hearts.health = game.health
+        status.update(game.health, game.food, game.inventory.armorPoints())
     }
 
     private fun onStats(text: String) {
-        hearts.health = game.health
+        status.update(game.health, game.food, game.inventory.armorPoints())
+        updateHand()
         stats.text = text
         val flying = game.player.flying
         flyButton.toggled = flying
@@ -406,6 +447,10 @@ class GameActivity : Activity() {
     }
 
     override fun dispatchKeyEvent(e: KeyEvent): Boolean {
+        if (screen.visibility == View.VISIBLE) {
+            if (screen.handleKey(e)) return true
+            return super.dispatchKeyEvent(e)
+        }
         if (inventory.visibility == View.VISIBLE) {
             if (inventory.handleKey(e)) return true
             return super.dispatchKeyEvent(e)
@@ -486,6 +531,7 @@ class GameActivity : Activity() {
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
         when {
+            screen.visibility == View.VISIBLE -> screen.close()
             inventory.visibility == View.VISIBLE -> showInventory(false)
             pauseMenu.visibility == View.VISIBLE -> showPause(false)
             else -> showPause(true)

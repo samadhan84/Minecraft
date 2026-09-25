@@ -41,6 +41,7 @@ class WorldRenderer(private val game: Game) {
     private val dynamic = GpuMesh(GL_DYNAMIC_DRAW)
     private val lines = GpuMesh(GL_DYNAMIC_DRAW)
     private val mobRenderer = MobRenderer()
+    private val dropRenderer = DropRenderer()
     private val dyn = FloatBuilder(4096)
     private val cloudNoise = Noise(game.world.seed + 999)
 
@@ -59,7 +60,7 @@ class WorldRenderer(private val game: Game) {
         // Any previous context is gone: forget stale GL names and re-mesh everything.
         for (m in meshes.values) { m.opaque.invalidate(); m.translucent.invalidate(); m.chunk.uploadedVersion = -1; m.chunk.requestedVersion = -1 }
         meshes.clear()
-        dynamic.invalidate(); lines.invalidate(); mobRenderer.invalidate()
+        dynamic.invalidate(); lines.invalidate(); mobRenderer.invalidate(); dropRenderer.invalidate()
         QuadIndices.reset()
         for (c in game.world.chunks.values) { c.requestedVersion = -1; c.uploadedVersion = -1; c.meshing = false }
 
@@ -190,7 +191,7 @@ class WorldRenderer(private val game: Game) {
         glClear(GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT)
 
         val far = game.renderDistance * 16f + 24f
-        Matrix.perspectiveM(proj, 0, 72f, width.toFloat() / height, 0.05f, 400f)
+        Matrix.perspectiveM(proj, 0, game.fov, width.toFloat() / height, 0.05f, 400f)
         p.lookDir(dir)
         val bobY = sin(bobbing * 2f) * 0.04f
         val shake = game.shake * 0.25f
@@ -236,6 +237,7 @@ class WorldRenderer(private val game: Game) {
         // Mobs use the same shader (lighting, fog) with a per-mob tint for hurt / fuse flashes.
         glUniform1f(blockShader.u("uCutout"), 0.5f)
         mobRenderer.draw(blockShader, game.mobs, ex, ez, far)
+        dropRenderer.draw(blockShader, game.drops, ex, ez, far, game.timeOfDay)
         if (underwater) glUniform3f(blockShader.u("uTint"), 0.55f, 0.7f, 1f)
 
         drawSelection()

@@ -12,7 +12,8 @@ class GameInput {
     @Volatile var descendHeld = false
     /** True while the player is holding a finger on the world to mine. */
     @Volatile var breakHeld = false
-    @Volatile var selectedBlock = 1
+    /** Selected hotbar slot (0..8). */
+    @Volatile var selectedSlot = 0
     /** Continuous look input from gamepad sticks / remote keys, -1..1 (x: right, y: up). */
     @Volatile var lookStickX = 0f
     @Volatile var lookStickY = 0f
