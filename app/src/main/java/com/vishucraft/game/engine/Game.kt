@@ -136,8 +136,24 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
         setBlock(x, y, z, id, meta)
     }
     private val pendingEdits = ArrayList<IntArray>()
+    private val doors = (0 until Blocks.COUNT).filter { Blocks.isDoor(it) }.toSet()
+    private val trapdoors = (0 until Blocks.COUNT).filter { Blocks.isTrapdoor(it) }.toSet()
+    private val handOpenables = (0 until Blocks.COUNT).filter { Blocks.opensByHand(it) }.toSet()
 
     fun setRain(v: Float) { rain = v }
+
+    /** Items laid out in the crafting grid while the inventory / crafting table is open. */
+    val craftGrid = arrayOfNulls<ItemStack>(9)
+
+    /** Puts everything left in the crafting grid back into the inventory (or drops it). */
+    fun returnCraftGrid() {
+        for (i in craftGrid.indices) {
+            val s = craftGrid[i] ?: continue
+            val left = inventory.add(s.id, s.count, s.damage)
+            if (left > 0) drops.spawn(ItemStack(s.id, left, s.damage), player.x, player.y + 1f, player.z)
+            craftGrid[i] = null
+        }
+    }
 
     fun heldStack(): ItemStack? = inventory.slots[input.selectedSlot.coerceIn(0, 8)]
     fun heldId(): Int = heldStack()?.id ?: 0
@@ -564,7 +580,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
             exhaust(0.005f)
         }
         // Doors come in two halves.
-        if (id == Blocks.OAK_DOOR || id == Blocks.IRON_DOOR) {
+        if (Blocks.isDoor(id)) {
             val oy = if (meta and com.vishucraft.game.world.Shapes.UPPER != 0) y - 1 else y + 1
             if (world.getBlock(x, oy, z) == id) setBlock(x, oy, z, Blocks.AIR)
         }
@@ -664,7 +680,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
             Blocks.LEVER -> { redstone.toggleLever(t.x, t.y, t.z); return }
             Blocks.STONE_BUTTON -> { redstone.pressButton(t.x, t.y, t.z); return }
             Blocks.CRAFTING_TABLE -> { uiEvents.add("open:craft"); return }
-            Blocks.OAK_DOOR, Blocks.OAK_TRAPDOOR, Blocks.OAK_FENCE_GATE -> { toggleOpen(t.x, t.y, t.z); return }
+            in handOpenables -> { toggleOpen(t.x, t.y, t.z); return }
             Blocks.REPEATER -> {
                 val m = world.getMeta(t.x, t.y, t.z)
                 val delay = ((m shr 3) and 3) + 1 and 3
@@ -790,7 +806,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
         val id = world.getBlock(x, y, z)
         val m = world.getMeta(x, y, z) xor com.vishucraft.game.world.Shapes.OPEN
         setBlock(x, y, z, id, m)
-        if (id == Blocks.OAK_DOOR || id == Blocks.IRON_DOOR) {
+        if (Blocks.isDoor(id)) {
             val oy = if (m and com.vishucraft.game.world.Shapes.UPPER != 0) y - 1 else y + 1
             if (world.getBlock(x, oy, z) == id) setBlock(x, oy, z, id, world.getMeta(x, oy, z) xor com.vishucraft.game.world.Shapes.OPEN)
         }
@@ -829,12 +845,12 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
         val S = com.vishucraft.game.world.Shapes
         var meta = placementMeta(def.facing)
         when (id) {
-            Blocks.OAK_DOOR, Blocks.IRON_DOOR -> {
+            in doors -> {
                 if (y + 1 >= Chunk.HEIGHT || world.getBlock(x, y + 1, z) != Blocks.AIR || !Blocks.solid[below]) return
                 setBlock(x, y + 1, z, id, meta or S.UPPER)
             }
             Blocks.OAK_STAIRS, Blocks.COBBLESTONE_STAIRS, Blocks.STONE_BRICK_STAIRS, Blocks.BRICK_STAIRS,
-            Blocks.SANDSTONE_STAIRS, Blocks.OAK_TRAPDOOR -> if (t.ny == -1) meta = meta or S.UPPER
+            Blocks.SANDSTONE_STAIRS, in trapdoors -> if (t.ny == -1) meta = meta or S.UPPER
             Blocks.LADDER -> {
                 if (t.ny != 0 || !Blocks.opaque[t.block]) return
                 meta = if (t.nz == 1) 2 else if (t.nz == -1) 3 else if (t.nx == 1) 4 else 5

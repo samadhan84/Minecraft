@@ -7,7 +7,14 @@ class Ingredient(val ids: IntArray, val count: Int) {
     fun available(inv: Inventory) = ids.sumOf { inv.count(it) }
 }
 
-class Recipe(val result: Int, val count: Int, val ingredients: List<Ingredient>, val needsTable: Boolean) {
+/**
+ * A recipe. Shaped recipes have a [pattern] (rows of key characters, space = empty) that must be laid out in
+ * the crafting grid; the others only need the right ingredients anywhere in the grid.
+ */
+class Recipe(
+    val result: Int, val count: Int, val ingredients: List<Ingredient>, val needsTable: Boolean,
+    val pattern: List<String>? = null, val key: Map<Char, IntArray> = emptyMap(),
+) {
     fun canCraft(inv: Inventory) = ingredients.all { it.available(inv) >= it.count }
 
     /** Takes the ingredients (in the order the alternatives are listed). */
@@ -43,6 +50,13 @@ object Recipes {
                 Ingredient(if (what is IntArray) what else intArrayOf(what as Int), n)
             }, table))
         }
+        /** A shaped recipe; needs a crafting table when the pattern is wider or taller than 2. */
+        fun sh(result: Int, count: Int, pattern: List<String>, vararg keys: Pair<Char, Any>) {
+            val key = keys.associate { (c, what) -> c to (if (what is IntArray) what else intArrayOf(what as Int)) }
+            val ing = key.map { (c, ids) -> Ingredient(ids, pattern.sumOf { row -> row.count { it == c } }) }
+            val table = pattern.size > 2 || pattern.any { it.length > 2 }
+            list.add(Recipe(result, count, ing, table, pattern, key))
+        }
         val planks = intArrayOf(Blocks.PLANKS, Blocks.SPRUCE_PLANKS, Blocks.BIRCH_PLANKS, Blocks.JUNGLE_PLANKS,
             Blocks.ACACIA_PLANKS, Blocks.DARK_OAK_PLANKS)
         val cobble = intArrayOf(Blocks.COBBLESTONE, Blocks.COBBLED_DEEPSLATE)
@@ -54,11 +68,11 @@ object Recipes {
             Blocks.BIRCH_LOG to Blocks.BIRCH_PLANKS, Blocks.JUNGLE_LOG to Blocks.JUNGLE_PLANKS,
             Blocks.ACACIA_LOG to Blocks.ACACIA_PLANKS, Blocks.DARK_OAK_LOG to Blocks.DARK_OAK_PLANKS)) r(plank, 4, false, log to 1)
         r(stick, 4, false, planks to 2)
-        r(Blocks.CRAFTING_TABLE, 1, false, planks to 4)
+        sh(Blocks.CRAFTING_TABLE, 1, listOf("MM", "MM"), 'M' to planks)
         r(Blocks.TORCH, 4, false, coal to 1, stick to 1)
-        r(Blocks.CHEST, 1, true, planks to 8)
-        r(Blocks.FURNACE, 1, true, cobble to 8)
-        r(Blocks.OAK_SLAB, 6, true, planks to 3)
+        sh(Blocks.CHEST, 1, listOf("MMM", "M M", "MMM"), 'M' to planks)
+        sh(Blocks.FURNACE, 1, listOf("MMM", "M M", "MMM"), 'M' to cobble)
+        sh(Blocks.OAK_SLAB, 6, listOf("MMM"), 'M' to planks)
         r(Blocks.BOOKSHELF, 1, true, planks to 6, i("Book") to 3)
         r(i("Paper"), 3, true, Blocks.SUGAR_CANE to 3)
         r(i("Book"), 1, false, i("Paper") to 3, i("Leather") to 1)
@@ -69,11 +83,11 @@ object Recipes {
             "Diamond" to intArrayOf(diamond),
         )
         for ((name, m) in mats) {
-            r(i("$name Sword"), 1, true, m to 2, stick to 1)
-            r(i("$name Pickaxe"), 1, true, m to 3, stick to 2)
-            r(i("$name Axe"), 1, true, m to 3, stick to 2)
-            r(i("$name Shovel"), 1, true, m to 1, stick to 2)
-            r(i("$name Hoe"), 1, true, m to 2, stick to 2)
+            sh(i("$name Sword"), 1, listOf("M", "M", "S"), 'M' to m, 'S' to stick)
+            sh(i("$name Pickaxe"), 1, listOf("MMM", " S ", " S "), 'M' to m, 'S' to stick)
+            sh(i("$name Axe"), 1, listOf("MM", "MS", " S"), 'M' to m, 'S' to stick)
+            sh(i("$name Shovel"), 1, listOf("M", "S", "S"), 'M' to m, 'S' to stick)
+            sh(i("$name Hoe"), 1, listOf("MM", " S", " S"), 'M' to m, 'S' to stick)
         }
         val netherite = i("Netherite Ingot")
         for (kind in listOf("Sword", "Pickaxe", "Axe", "Shovel", "Hoe", "Helmet", "Chestplate", "Leggings", "Boots")) {
@@ -83,10 +97,10 @@ object Recipes {
 
         // Armor
         for ((name, m) in listOf("Leather" to i("Leather"), "Golden" to gold, "Iron" to iron, "Diamond" to diamond)) {
-            r(i("$name Helmet"), 1, true, m to 5)
-            r(i("$name Chestplate"), 1, true, m to 8)
-            r(i("$name Leggings"), 1, true, m to 7)
-            r(i("$name Boots"), 1, true, m to 4)
+            sh(i("$name Helmet"), 1, listOf("MMM", "M M"), 'M' to m)
+            sh(i("$name Chestplate"), 1, listOf("M M", "MMM", "MMM"), 'M' to m)
+            sh(i("$name Leggings"), 1, listOf("MMM", "M M", "M M"), 'M' to m)
+            sh(i("$name Boots"), 1, listOf("M M", "M M"), 'M' to m)
         }
 
         // Storage blocks and back
@@ -113,11 +127,11 @@ object Recipes {
         r(Blocks.POLISHED_ANDESITE, 4, false, Blocks.ANDESITE to 4)
         r(Blocks.MOSSY_COBBLESTONE, 1, false, Blocks.COBBLESTONE to 1, Blocks.TALL_GRASS to 1)
         r(Blocks.WOOL_WHITE, 1, false, i("String") to 4)
-        r(Blocks.STONE_SLAB, 6, true, Blocks.SMOOTH_STONE to 3)
-        r(Blocks.COBBLESTONE_SLAB, 6, true, Blocks.COBBLESTONE to 3)
-        r(Blocks.STONE_BRICK_SLAB, 6, true, Blocks.STONE_BRICKS to 3)
-        r(Blocks.BRICK_SLAB, 6, true, Blocks.BRICKS to 3)
-        r(Blocks.SANDSTONE_SLAB, 6, true, Blocks.SANDSTONE to 3)
+        sh(Blocks.STONE_SLAB, 6, listOf("MMM"), 'M' to Blocks.SMOOTH_STONE)
+        sh(Blocks.COBBLESTONE_SLAB, 6, listOf("MMM"), 'M' to Blocks.COBBLESTONE)
+        sh(Blocks.STONE_BRICK_SLAB, 6, listOf("MMM"), 'M' to Blocks.STONE_BRICKS)
+        sh(Blocks.BRICK_SLAB, 6, listOf("MMM"), 'M' to Blocks.BRICKS)
+        sh(Blocks.SANDSTONE_SLAB, 6, listOf("MMM"), 'M' to Blocks.SANDSTONE)
         r(Blocks.JACK_O_LANTERN, 1, false, Blocks.PUMPKIN to 1, Blocks.TORCH to 1)
         r(Blocks.MELON, 1, true, i("Melon Slice") to 9)
 
@@ -137,29 +151,37 @@ object Recipes {
         r(Blocks.NOTE_BLOCK, 1, true, planks to 8, Blocks.REDSTONE_DUST to 1)
         r(Blocks.JUKEBOX, 1, true, planks to 8, diamond to 1)
         r(i("Flint and Steel"), 1, false, iron to 1, i("Flint") to 1)
-        r(i("Bucket"), 1, true, iron to 3)
-        r(i("Minecart"), 1, true, iron to 5)
-        r(Blocks.RAIL, 16, true, iron to 6, stick to 1)
-        r(Blocks.POWERED_RAIL, 6, true, gold to 6, stick to 1, Blocks.REDSTONE_DUST to 1)
+        sh(i("Bucket"), 1, listOf("M M", " M "), 'M' to iron)
+        sh(i("Minecart"), 1, listOf("M M", "MMM"), 'M' to iron)
+        sh(Blocks.RAIL, 16, listOf("M M", "MSM", "M M"), 'M' to iron, 'S' to stick)
+        sh(Blocks.POWERED_RAIL, 6, listOf("M M", "MSM", "MRM"), 'M' to gold, 'S' to stick, 'R' to Blocks.REDSTONE_DUST)
         r(Blocks.REPEATER, 1, true, Blocks.REDSTONE_TORCH to 2, Blocks.REDSTONE_DUST to 1, Blocks.STONE to 3)
         r(Blocks.OBSERVER, 1, true, cobble to 6, Blocks.REDSTONE_DUST to 2, i("Iron Ingot") to 1)
         r(Blocks.DAYLIGHT_SENSOR, 1, true, Blocks.GLASS to 3, planks to 3, Blocks.REDSTONE_DUST to 1)
         r(Blocks.PRESSURE_PLATE, 1, false, Blocks.STONE to 2)
-        r(Blocks.HOPPER, 1, true, iron to 5, Blocks.CHEST to 1)
-        r(Blocks.OAK_DOOR, 3, true, planks to 6)
-        r(Blocks.IRON_DOOR, 3, true, iron to 6)
-        r(Blocks.OAK_TRAPDOOR, 2, true, planks to 6)
-        r(Blocks.OAK_STAIRS, 4, true, planks to 6)
-        r(Blocks.COBBLESTONE_STAIRS, 4, true, Blocks.COBBLESTONE to 6)
-        r(Blocks.STONE_BRICK_STAIRS, 4, true, Blocks.STONE_BRICKS to 6)
-        r(Blocks.BRICK_STAIRS, 4, true, Blocks.BRICKS to 6)
-        r(Blocks.SANDSTONE_STAIRS, 4, true, Blocks.SANDSTONE to 6)
-        r(Blocks.OAK_FENCE, 3, true, planks to 4, stick to 2)
-        r(Blocks.OAK_FENCE_GATE, 1, true, planks to 2, stick to 4)
-        r(Blocks.LADDER, 3, true, stick to 7)
-        r(Blocks.GLASS_PANE, 16, true, Blocks.GLASS to 6)
-        r(Blocks.IRON_BARS, 16, true, iron to 6)
-        r(i("Bow"), 1, true, stick to 3, i("String") to 3)
+        sh(Blocks.HOPPER, 1, listOf("M M", "MCM", " M "), 'M' to iron, 'C' to Blocks.CHEST)
+        sh(Blocks.IRON_DOOR, 3, listOf("MM", "MM", "MM"), 'M' to iron)
+        sh(Blocks.IRON_TRAPDOOR, 1, listOf("MM", "MM"), 'M' to iron)
+        sh(Blocks.OAK_STAIRS, 4, listOf("M  ", "MM ", "MMM"), 'M' to planks)
+        sh(Blocks.COBBLESTONE_STAIRS, 4, listOf("M  ", "MM ", "MMM"), 'M' to Blocks.COBBLESTONE)
+        sh(Blocks.STONE_BRICK_STAIRS, 4, listOf("M  ", "MM ", "MMM"), 'M' to Blocks.STONE_BRICKS)
+        sh(Blocks.BRICK_STAIRS, 4, listOf("M  ", "MM ", "MMM"), 'M' to Blocks.BRICKS)
+        sh(Blocks.SANDSTONE_STAIRS, 4, listOf("M  ", "MM ", "MMM"), 'M' to Blocks.SANDSTONE)
+        val allPlanks = listOf(Blocks.PLANKS, Blocks.SPRUCE_PLANKS, Blocks.BIRCH_PLANKS, Blocks.JUNGLE_PLANKS, Blocks.ACACIA_PLANKS, Blocks.DARK_OAK_PLANKS)
+        for ((k, pl) in allPlanks.withIndex()) {
+            val door = if (k == 0) Blocks.OAK_DOOR else Blocks.WOOD_DOOR_FIRST + k - 1
+            val trap = if (k == 0) Blocks.OAK_TRAPDOOR else Blocks.WOOD_TRAPDOOR_FIRST + k - 1
+            val fence = if (k == 0) Blocks.OAK_FENCE else Blocks.WOOD_FENCE_FIRST + k - 1
+            val gate = if (k == 0) Blocks.OAK_FENCE_GATE else Blocks.WOOD_GATE_FIRST + k - 1
+            sh(door, 3, listOf("MM", "MM", "MM"), 'M' to pl)
+            sh(trap, 2, listOf("MMM", "MMM"), 'M' to pl)
+            sh(fence, 3, listOf("MSM", "MSM"), 'M' to pl, 'S' to stick)
+            sh(gate, 1, listOf("SMS", "SMS"), 'M' to pl, 'S' to stick)
+        }
+        sh(Blocks.LADDER, 3, listOf("S S", "SSS", "S S"), 'S' to stick)
+        sh(Blocks.GLASS_PANE, 16, listOf("MMM", "MMM"), 'M' to Blocks.GLASS)
+        sh(Blocks.IRON_BARS, 16, listOf("MMM", "MMM"), 'M' to iron)
+        sh(i("Bow"), 1, listOf(" SW", "S W", " SW"), 'S' to stick, 'W' to i("String"))
         r(i("Arrow"), 4, true, i("Flint") to 1, stick to 1, i("Feather") to 1)
         crafting = list
 
@@ -188,6 +210,57 @@ object Recipes {
     }
 
     fun available(inv: Inventory, table: Boolean): List<Recipe> = crafting.filter { table || !it.needsTable }
+
+    // ---------------------------------------------------------------- crafting grid
+
+    /** The recipe matching what is laid out in a [size] x [size] grid, or null. */
+    fun match(grid: Array<ItemStack?>, size: Int): Recipe? {
+        var minR = size; var maxR = -1; var minC = size; var maxC = -1
+        for (r in 0 until size) for (c in 0 until size) if (grid[r * size + c] != null) {
+            minR = minOf(minR, r); maxR = maxOf(maxR, r); minC = minOf(minC, c); maxC = maxOf(maxC, c)
+        }
+        if (maxR < 0) return null
+        val h = maxR - minR + 1; val w = maxC - minC + 1
+        fun at(r: Int, c: Int) = grid[(minR + r) * size + minC + c]?.id
+        for (rec in crafting) {
+            val pat = rec.pattern
+            if (pat != null) {
+                val pw = pat.maxOf { it.length }
+                if (pat.size != h || pw != w) continue
+                for (mirror in listOf(false, true)) {
+                    var ok = true
+                    loop@ for (r in 0 until h) for (c in 0 until w) {
+                        val ch = pat[r].getOrElse(if (mirror) w - 1 - c else c) { ' ' }
+                        val id = at(r, c)
+                        if (ch == ' ') { if (id != null) { ok = false; break@loop } }
+                        else if (id == null || id !in rec.key.getValue(ch)) { ok = false; break@loop }
+                    }
+                    if (ok) return rec
+                }
+            } else {
+                // Shapeless: every item must belong to an ingredient and the counts must match exactly.
+                val counts = IntArray(rec.ingredients.size)
+                var ok = true
+                for (s in grid) {
+                    if (s == null) continue
+                    val k = rec.ingredients.indexOfFirst { s.id in it.ids }
+                    if (k < 0) { ok = false; break }
+                    counts[k]++
+                }
+                if (ok && rec.ingredients.withIndex().all { (k, ing) -> counts[k] == ing.count }) return rec
+            }
+        }
+        return null
+    }
+
+    /** Uses one item from every filled grid cell. */
+    fun consumeGrid(grid: Array<ItemStack?>) {
+        for (i in grid.indices) {
+            val s = grid[i] ?: continue
+            s.count--
+            if (s.count <= 0) grid[i] = null
+        }
+    }
 }
 
 /** What a block drops when mined in survival. */

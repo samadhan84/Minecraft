@@ -77,6 +77,17 @@ class ContainerScreen(
     private var recipeScroll = 0f
     private var recipes: List<Recipe> = emptyList()
     private val recipeArea = RectF()
+    private val arrowRect = RectF()
+
+    private fun gridSize() = if (mode == Mode.CRAFTING) 3 else 2
+
+    /** Items in the grid, packed into a size x size array for recipe matching. */
+    private fun gridArray(g: Game): Array<ItemStack?> {
+        val n = gridSize()
+        return Array(n * n) { g.craftGrid[it] }
+    }
+
+    private fun gridResult(g: Game): ItemStack? = Recipes.match(gridArray(g), gridSize())?.let { ItemStack(it.result, it.count) }
 
     private val dim = Paint().apply { color = Color.argb(160, 0, 0, 0) }
     private val panel = Paint().apply { color = Color.rgb(198, 198, 198) }
@@ -94,6 +105,7 @@ class ContainerScreen(
 
     companion object {
         const val INV = 0; const val ARMOR = 1; const val CHEST_SLOT = 2; const val FURNACE_SLOT = 3; const val RECIPE = 4
+        const val GRID = 5; const val OUTPUT = 6
     }
 
     fun open(m: Mode, chestEntity: ChestEntity? = null, furnaceEntity: FurnaceEntity? = null) {
@@ -115,7 +127,7 @@ class ContainerScreen(
         val rightW = if (showRecipes) cell * 7.5f else if (mode == Mode.FURNACE) cell * 5f else 0f
         val w = leftW + rightW + dp(24f)
         val rows = if (mode == Mode.CHEST) 7.6f else 4.6f + if (mode == Mode.INVENTORY) 0f else 0f
-        val h = dp(40f) + cell * maxOf(rows, if (showRecipes) 6f else 4.6f) + dp(26f)
+        val h = dp(40f) + cell * maxOf(rows, if (showRecipes) 7.2f else 4.6f) + dp(26f)
         val p = RectF((width - w) / 2, (height - h) / 2, (width + w) / 2, (height + h) / 2)
         var y = p.top + dp(34f)
         val x0 = p.left + dp(12f) + cell * 1.2f
@@ -140,7 +152,17 @@ class ContainerScreen(
         val rx = p.left + dp(12f) + leftW + dp(6f)
         if (showRecipes) {
             recipes = Recipes.available(game.inventory, mode == Mode.CRAFTING).sortedByDescending { it.canCraft(game.inventory) }
-            recipeArea.set(rx, p.top + dp(34f), p.right - dp(10f), p.bottom - dp(24f))
+            // Crafting grid (2x2 in the inventory, 3x3 at a crafting table) with its output slot.
+            val gs = gridSize()
+            val gy = p.top + dp(34f)
+            for (i in 0 until gs * gs) {
+                val gx = rx + (i % gs) * cell; val gyy = gy + (i / gs) * cell
+                cells.add(Cell(GRID, i, RectF(gx, gyy, gx + cell, gyy + cell)))
+            }
+            val ox = rx + (gs + 1.2f) * cell; val oy = gy + (gs - 1) * cell / 2
+            cells.add(Cell(OUTPUT, 0, RectF(ox, oy, ox + cell, oy + cell)))
+            arrowRect.set(rx + gs * cell + dp(4f), oy + cell * 0.4f, ox - dp(4f), oy + cell * 0.6f)
+            recipeArea.set(rx, gy + gs * cell + dp(22f), p.right - dp(10f), p.bottom - dp(24f))
             val rh = cell * 0.95f
             for ((i, _) in recipes.withIndex()) {
                 val top = recipeArea.top + i * rh - recipeScroll
@@ -158,6 +180,8 @@ class ContainerScreen(
     // ---------------------------------------------------------------- slot access (game thread)
 
     private fun get(g: Game, kind: Int, i: Int): ItemStack? = when (kind) {
+        GRID -> g.craftGrid[i]
+        OUTPUT -> gridResult(g)
         INV -> g.inventory.slots[i]
         ARMOR -> g.inventory.armor[i]
         CHEST_SLOT -> chest?.slots?.get(i)
@@ -168,6 +192,7 @@ class ContainerScreen(
     private fun set(g: Game, kind: Int, i: Int, s: ItemStack?) {
         val v = if (s != null && s.count <= 0) null else s
         when (kind) {
+            GRID -> g.craftGrid[i] = v
             INV -> g.inventory.slots[i] = v
             ARMOR -> g.inventory.armor[i] = v
             CHEST_SLOT -> chest?.slots?.set(i, v)
@@ -178,6 +203,7 @@ class ContainerScreen(
     private fun accepts(kind: Int, i: Int, s: ItemStack?): Boolean {
         if (s == null) return true
         return when (kind) {
+            OUTPUT -> false
             ARMOR -> Items[s.id]?.armorSlot == i
             FURNACE_SLOT -> when (i) { 0 -> Recipes.smelting.containsKey(s.id); 1 -> Items.fuel(s.id) > 0f; else -> false }
             else -> true
@@ -229,6 +255,7 @@ class ContainerScreen(
                 g.inventory.armor[slot] = s; g.inventory.slots[c.index] = old
             }
             c.kind == ARMOR -> if (g.inventory.add(s.id, 1, s.damage) == 0) g.inventory.armor[c.index] = null
+            c.kind == GRID -> { s.count = g.inventory.add(s.id, s.count, s.damage); if (s.count <= 0) g.craftGrid[c.index] = null }
         }
     }
 
@@ -240,7 +267,39 @@ class ContainerScreen(
         g.uiEvents.add("craft")
     }
 
+    /** Takes the grid's result: one of each ingredient is used up. */
+    private fun craftFromGrid() = act { g ->
+        val size = gridSize()
+        val grid = gridArray(g)
+        val r = Recipes.match(grid, size) ?: return@act
+        Recipes.consumeGrid(grid)
+        for (i in grid.indices) g.craftGrid[i] = grid[i]
+        val left = g.inventory.add(r.result, r.count)
+        if (left > 0) g.drops.spawn(ItemStack(r.result, left), g.player.x, g.player.y + 1f, g.player.z)
+        g.uiEvents.add("craft")
+    }
+
+    /**
+     * Moves a stack into a grid cell. Tapping a grid cell with a selected stack places ONE item,
+     * so a whole stack can be spread over the grid by tapping cell after cell.
+     */
+    private fun placeOne(from: Cell, to: Cell) = act { g ->
+        val src = get(g, from.kind, from.index) ?: return@act
+        val dst = g.craftGrid[to.index]
+        if (dst == null) g.craftGrid[to.index] = ItemStack(src.id, 1, src.damage)
+        else if (dst.id == src.id && dst.count < dst.maxStack) dst.count++
+        else return@act
+        src.count--
+        if (src.count <= 0) set(g, from.kind, from.index, null)
+    }
+
     private fun tap(c: Cell) {
+        if (c.kind == OUTPUT) { craftFromGrid(); refresh(); return }
+        val sel0 = selected
+        if (c.kind == GRID && sel0 != null && sel0.kind != GRID) {
+            // Keep the selection so the player can keep dropping items into the grid.
+            placeOne(sel0, c); refresh(); return
+        }
         if (c.kind == RECIPE) { craft(c.index); selected = null; refresh(); return }
         val sel = selected
         val quick = mode == Mode.CHEST || mode == Mode.FURNACE || c.kind == ARMOR
@@ -288,7 +347,11 @@ class ContainerScreen(
         return (recipes.size * rh - recipeArea.height()).coerceAtLeast(0f)
     }
 
-    fun close() { visibility = GONE; selected = null; onClose() }
+    fun close() {
+        visibility = GONE; selected = null
+        act { g -> g.returnCraftGrid() }
+        onClose()
+    }
 
     fun handleKey(e: KeyEvent): Boolean {
         if (e.action != KeyEvent.ACTION_DOWN) return e.keyCode != KeyEvent.KEYCODE_BACK
@@ -349,7 +412,7 @@ class ContainerScreen(
         canvas.drawText(name, p.left + dp(12f), p.top + dp(24f), title)
         val hint = when (mode) {
             Mode.CHEST, Mode.FURNACE -> "Tap an item to move it across"
-            else -> "Tap an item, then where to put it · tap a recipe to craft"
+            else -> "Pick an item, tap grid squares to lay it out, then tap the result · or tap a recipe"
         }
         canvas.drawText(hint, p.left + dp(12f), p.bottom - dp(8f), small)
 
@@ -362,7 +425,11 @@ class ContainerScreen(
             if (i == cursor) canvas.drawRect(r, curPaint)
         }
 
-        if (mode == Mode.INVENTORY || mode == Mode.CRAFTING) drawRecipes(canvas)
+        if (mode == Mode.INVENTORY || mode == Mode.CRAFTING) {
+            canvas.drawRect(arrowRect, slotDark)
+            canvas.drawText("Recipes (tap to craft):", recipeArea.left, recipeArea.top - dp(6f), small)
+            drawRecipes(canvas)
+        }
         if (mode == Mode.FURNACE) furnace?.let { f ->
             val out = cells.first { it.kind == FURNACE_SLOT && it.index == 2 }.rect
             val inp = cells.first { it.kind == FURNACE_SLOT && it.index == 0 }.rect

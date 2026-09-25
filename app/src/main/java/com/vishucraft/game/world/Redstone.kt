@@ -25,6 +25,7 @@ class Redstone(private val world: World, private val set: (Int, Int, Int, Int, I
     }
 
     private val buttons = HashMap<Long, Int>()
+    private val openables = (0 until Blocks.COUNT).filter { Blocks.isDoor(it) || Blocks.isTrapdoor(it) || Blocks.isGate(it) }.toSet()
     /** Repeaters waiting to switch: position -> ticks left (their target state is the opposite of now). */
     private val repeaterDelay = HashMap<Long, Int>()
     /** Observers: what they last saw in front, and how long their pulse lasts. */
@@ -247,10 +248,10 @@ class Redstone(private val world: World, private val set: (Int, Int, Int, Int, I
                     else if (!on && extended) retract(p, id, facing)
                 }
                 Blocks.TNT -> if (activated(p)) prime(RedstoneIds.x(p), RedstoneIds.y(p), RedstoneIds.z(p))
-                Blocks.OAK_DOOR, Blocks.IRON_DOOR, Blocks.OAK_TRAPDOOR, Blocks.OAK_FENCE_GATE -> {
+                in openables -> {
                     // Opens on a rising edge, closes on a falling edge; players can still use wooden ones.
                     var on = activated(p)
-                    if (id == Blocks.OAK_DOOR || id == Blocks.IRON_DOOR) {
+                    if (Blocks.isDoor(id)) {
                         val other = dir(p, if (meta and Shapes.UPPER != 0) 1 else 0)
                         if (other >= 0 && id(other) == id && activated(other)) on = true
                     }

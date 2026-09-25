@@ -27,8 +27,10 @@ object Shapes {
     /** Which side a door panel moves to when opened (a quarter turn). */
     private fun openSide(f: Int) = when (f) { 2 -> 5; 3 -> 4; 4 -> 2; else -> 3 }
 
+    private val FENCES = (0 until Blocks.COUNT).filter { Blocks.isFence(it) }.toSet()
+
     fun connects(id: Int, neighbour: Int): Boolean = when (id) {
-        Blocks.OAK_FENCE -> neighbour == Blocks.OAK_FENCE || neighbour == Blocks.OAK_FENCE_GATE || Blocks.opaque[neighbour]
+        in FENCES -> Blocks.isFence(neighbour) || Blocks.isGate(neighbour) || Blocks.opaque[neighbour]
         Blocks.GLASS_PANE, Blocks.IRON_BARS -> neighbour == Blocks.GLASS_PANE || neighbour == Blocks.IRON_BARS ||
             Blocks.opaque[neighbour] || neighbour == Blocks.GLASS
         else -> false
@@ -42,8 +44,15 @@ object Shapes {
         val f = facing(meta)
         val open = meta and OPEN != 0
         val upper = meta and UPPER != 0
-        return when (id) {
-            Blocks.OAK_DOOR, Blocks.IRON_DOOR -> listOf(panel(if (open) openSide(f) else f, 3 * P))
+        val kind = when {
+            Blocks.isDoor(id) -> Blocks.OAK_DOOR
+            Blocks.isTrapdoor(id) -> Blocks.OAK_TRAPDOOR
+            Blocks.isFence(id) -> Blocks.OAK_FENCE
+            Blocks.isGate(id) -> Blocks.OAK_FENCE_GATE
+            else -> id
+        }
+        return when (kind) {
+            Blocks.OAK_DOOR -> listOf(panel(if (open) openSide(f) else f, 3 * P))
             Blocks.OAK_TRAPDOOR -> listOf(if (open) panel(f, 3 * P) else if (upper) b(0f, 13 * P, 0f, 1f, 1f, 1f) else b(0f, 0f, 0f, 1f, 3 * P, 1f))
             Blocks.OAK_STAIRS, Blocks.COBBLESTONE_STAIRS, Blocks.STONE_BRICK_STAIRS, Blocks.BRICK_STAIRS, Blocks.SANDSTONE_STAIRS -> {
                 // The low step faces the player who placed it; the tall half is on the far side.

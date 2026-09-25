@@ -29,11 +29,13 @@ procedurally in code when the game starts.
   clusters, ancient debris), or a quartz frame for the floating **Sky Isles**. A portal home is built where you arrive.
 - **New creatures** (original designs): Rattlers (thornwood archers), Crawlers (wall-climbing rock beetles), Night
   Gliders (swooping moth-wings), Cinder Brutes in the Ember Realm, Void Wisps in the Sky Isles, and villagers.
-- **Building pieces**: doors (wood and iron), trapdoors, five kinds of stairs, fences and gates, ladders, glass panes
+- **Building pieces**: doors and trapdoors for every wood type plus iron, fences and gates for every wood, five kinds of stairs, fences and gates, ladders, glass panes
   and iron bars, all with proper collision.
 - **More redstone**: repeaters (1-4 tick delay), observers, daylight sensors, pressure plates, hoppers, rails,
   powered rails and rideable minecarts; doors react to redstone. Bows and arrows too.
-- **Crafting** from a recipe list (small recipes anywhere, the rest at a crafting table), a **furnace** that smelts ore,
+- **Crafting grid**: lay items out yourself in a 2x2 grid (inventory) or 3x3 grid (crafting table); tools, armor,
+  doors, stairs and more need the right pattern, other recipes just the right ingredients. A recipe list is there too
+  (small recipes anywhere, the rest at a crafting table), a **furnace** that smelts ore,
   sand, clay and food using coal, charcoal or wood, and **chests** with 27 slots. Mobs drop leather, meat, wool and more.
 
 - **Infinite procedural world**: chunks (16×128×16) stream in around you on background threads.

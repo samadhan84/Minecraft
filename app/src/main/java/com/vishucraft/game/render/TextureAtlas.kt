@@ -1041,8 +1041,8 @@ object TextureAtlas {
         return true
     }
 
-    private fun door(t: Tile, wood: Boolean, top: Boolean) {
-        val base = if (wood) rgb(150, 112, 62) else rgb(196, 196, 200)
+    private fun door(t: Tile, wood: Boolean, top: Boolean, woodColor: Int = rgb(150, 112, 62)) {
+        val base = if (wood) woodColor else rgb(196, 196, 200)
         val dark = scale(base, 0.62f)
         t.fill { x, y ->
             val frame = x == 0 || x == 15 || (top && y == 0) || (!top && y == 15)
@@ -1061,8 +1061,24 @@ object TextureAtlas {
         }
     }
 
+    private fun trapdoor(t: Tile, base: Int, metal: Boolean) = t.fill { x, y ->
+        when {
+            x == 0 || y == 0 || x == 15 || y == 15 || x == 7 || x == 8 -> scale(base, 0.62f)
+            (x in 2..5 || x in 10..13) && (y in 2..5 || y in 10..13) -> if (metal) scale(base, 0.8f) else 0
+            else -> scale(base, t.jitter(0.05f))
+        }
+    }
+
     private fun buildingAndRedstone(name: String, t: Tile): Boolean {
+        for ((key, w) in WOODS) {
+            when (name) {
+                "${key}_door_bottom" -> { door(t, true, false, w.planks); return true }
+                "${key}_door_top" -> { door(t, true, true, w.planks); return true }
+                "${key}_trapdoor" -> { trapdoor(t, w.planks, false); return true }
+            }
+        }
         when (name) {
+            "iron_trapdoor" -> trapdoor(t, rgb(196, 196, 200), true)
             "oak_door_bottom" -> door(t, true, false)
             "oak_door_top" -> door(t, true, true)
             "iron_door_bottom" -> door(t, false, false)

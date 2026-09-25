@@ -249,7 +249,23 @@ object Blocks {
     // Portals to the other dimensions
     const val EMBER_PORTAL = 227
     const val SKY_PORTAL = 228
-    const val COUNT = 229
+    // Door pack: one of each for every other wood type (spruce, birch, jungle, acacia, dark oak).
+    const val WOOD_DOOR_FIRST = 229
+    const val IRON_TRAPDOOR = 234
+    const val WOOD_TRAPDOOR_FIRST = 235
+    const val WOOD_FENCE_FIRST = 240
+    const val WOOD_GATE_FIRST = 245
+    const val COUNT = 250
+
+    /** The five extra wood types, in id order for the door pack. */
+    val EXTRA_WOODS = listOf("spruce", "birch", "jungle", "acacia", "dark_oak")
+
+    fun isDoor(id: Int) = id == OAK_DOOR || id == IRON_DOOR || id in WOOD_DOOR_FIRST until WOOD_DOOR_FIRST + 5
+    fun isTrapdoor(id: Int) = id == OAK_TRAPDOOR || id == IRON_TRAPDOOR || id in WOOD_TRAPDOOR_FIRST until WOOD_TRAPDOOR_FIRST + 5
+    fun isFence(id: Int) = id == OAK_FENCE || id in WOOD_FENCE_FIRST until WOOD_FENCE_FIRST + 5
+    fun isGate(id: Int) = id == OAK_FENCE_GATE || id in WOOD_GATE_FIRST until WOOD_GATE_FIRST + 5
+    /** Doors, trapdoors and gates a player can open by hand (iron ones need redstone). */
+    fun opensByHand(id: Int) = (isDoor(id) || isTrapdoor(id) || isGate(id)) && id != IRON_DOOR && id != IRON_TRAPDOOR
 
     /** Dye colours used for wool, concrete, terracotta and stained glass. */
     val DYES = listOf(
@@ -530,6 +546,15 @@ object Blocks {
             translucent = true, blocksLight = false, breakable = false, emissive = true, inInventory = false, movable = false))
         reg(BlockDef(SKY_PORTAL, "Sky Portal", t("sky_portal"), render = RenderType.PORTAL, opaque = false, solid = false,
             translucent = true, blocksLight = false, breakable = false, emissive = true, inInventory = false, movable = false))
+        for ((i, w) in EXTRA_WOODS.withIndex()) {
+            val nice = pretty(w)
+            shape(WOOD_DOOR_FIRST + i, "$nice Door", "${w}_door_bottom", hardness = 0.8f, tool = A)
+            t("${w}_door_top")
+            shape(WOOD_TRAPDOOR_FIRST + i, "$nice Trapdoor", "${w}_trapdoor", hardness = 0.8f, tool = A)
+            shape(WOOD_FENCE_FIRST + i, "$nice Fence", "${w}_planks", hardness = 0.8f, tool = A, facing = Facing.NONE)
+            shape(WOOD_GATE_FIRST + i, "$nice Fence Gate", "${w}_planks", hardness = 0.8f, tool = A)
+        }
+        shape(IRON_TRAPDOOR, "Iron Trapdoor", "iron_trapdoor", hardness = 1.5f, tool = P, cat = Category.REDSTONE)
         extraLight[EMBER_PORTAL] = 11
         extraLight[SKY_PORTAL] = 11
         reg(BlockDef(PISTON_HEAD, "Piston Head", t("piston_front"), t("oak_planks"), render = RenderType.PISTON_HEAD,
@@ -593,6 +618,10 @@ object Blocks {
             POTATOES -> return Tiles.id("potatoes_stage_${(meta.coerceIn(0, 7)) / 2}")
             OAK_DOOR -> return Tiles.id(if (meta and Shapes.UPPER != 0) "oak_door_top" else "oak_door_bottom")
             IRON_DOOR -> return Tiles.id(if (meta and Shapes.UPPER != 0) "iron_door_top" else "iron_door_bottom")
+            in WOOD_DOOR_FIRST until WOOD_DOOR_FIRST + 5 -> {
+                val w = EXTRA_WOODS[id - WOOD_DOOR_FIRST]
+                return Tiles.id(if (meta and Shapes.UPPER != 0) "${w}_door_top" else "${w}_door_bottom")
+            }
             REPEATER -> if (face == 0) return Tiles.id(if (meta and Shapes.POWERED != 0) "repeater_on" else "repeater")
             OBSERVER -> if (meta and 8 != 0 && face == ((meta and 7) xor 1)) return Tiles.id("observer_back_on")
             POWERED_RAIL -> return Tiles.id(if (meta and 8 != 0) "powered_rail_on" else "powered_rail")
