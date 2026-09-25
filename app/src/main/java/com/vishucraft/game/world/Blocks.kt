@@ -257,7 +257,16 @@ object Blocks {
     const val WOOD_GATE_FIRST = 245
     /** Beds in the 16 dye colours (DYES order). Two blocks: foot and head (meta has Shapes.UPPER). */
     const val BED_FIRST = 250
-    const val COUNT = 266
+    /** Buttons and pressure plates for each wood (oak, then EXTRA_WOODS order). */
+    const val WOOD_BUTTON_FIRST = 266
+    const val WOOD_PLATE_FIRST = 272
+    /** Weighted pressure plates: the more things stand on them, the stronger the signal. */
+    const val GOLD_PLATE = 278
+    const val IRON_PLATE = 279
+    const val COUNT = 280
+
+    fun isButton(id: Int) = id == STONE_BUTTON || id in WOOD_BUTTON_FIRST until WOOD_BUTTON_FIRST + 6
+    fun isPlate(id: Int) = id == PRESSURE_PLATE || id in WOOD_PLATE_FIRST until WOOD_PLATE_FIRST + 6 || id == GOLD_PLATE || id == IRON_PLATE
 
     fun isBed(id: Int) = id in BED_FIRST until BED_FIRST + 16
 
@@ -558,6 +567,18 @@ object Blocks {
             shape(WOOD_FENCE_FIRST + i, "$nice Fence", "${w}_planks", hardness = 0.8f, tool = A, facing = Facing.NONE)
             shape(WOOD_GATE_FIRST + i, "$nice Fence Gate", "${w}_planks", hardness = 0.8f, tool = A)
         }
+        for ((i, w) in (listOf("oak") + EXTRA_WOODS).withIndex()) {
+            val nice = pretty(w)
+            reg(BlockDef(WOOD_BUTTON_FIRST + i, "$nice Button", t("${w}_planks"), render = RenderType.BOX, opaque = false, solid = false,
+                blocksLight = false, hardness = 0.2f, tool = A, category = Category.REDSTONE, needsSupport = true, movable = false,
+                box = floatArrayOf(5 / 16f, 0f, 6 / 16f, 11 / 16f, 2 / 16f, 10 / 16f)))
+            shape(WOOD_PLATE_FIRST + i, "$nice Pressure Plate", "${w}_planks", hardness = 0.4f, tool = A, cat = Category.REDSTONE,
+                facing = Facing.NONE, solid = false)
+        }
+        shape(GOLD_PLATE, "Light Weighted Pressure Plate", "gold_block", hardness = 0.4f, tool = P, cat = Category.REDSTONE,
+            facing = Facing.NONE, solid = false)
+        shape(IRON_PLATE, "Heavy Weighted Pressure Plate", "iron_block", hardness = 0.4f, tool = P, cat = Category.REDSTONE,
+            facing = Facing.NONE, solid = false)
         shape(IRON_TRAPDOOR, "Iron Trapdoor", "iron_trapdoor", hardness = 1.5f, tool = P, cat = Category.REDSTONE)
         for ((i, c) in DYES.withIndex()) {
             shape(BED_FIRST + i, "${pretty(c)} Bed", "bed_foot_$c", "bed_side_$c", "oak_planks", hardness = 0.2f,

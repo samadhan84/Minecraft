@@ -17,7 +17,7 @@
         android:icon="@drawable/ic_launcher"
         android:banner="@drawable/banner"
         android:isGame="true"
-        android:label="VishuCraft"
+        android:label="DhruvilCraft"
         android:theme="@android:style/Theme.Black.NoTitleBar.Fullscreen">
 
         <activity

@@ -179,6 +179,21 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
     /** Messages for the UI thread: "hurt", "died", or "toast:<text>". */
     val uiEvents = java.util.concurrent.ConcurrentLinkedQueue<String>()
 
+    /** Active potion effects: key (see Items.POTIONS) -> seconds left. */
+    val effects = HashMap<String, Float>()
+    fun hasEffect(key: String) = (effects[key] ?: 0f) > 0f
+    /** Looking through a spyglass. */
+    var zoomed = false
+    /** Flying with an Elytra. */
+    var gliding = false
+    private var rocketBoost = 0f
+    private var potionRegen = 0f
+    private var fishTimer = -1f
+    private var fishSlot = -1
+    private var clockSeconds = 0f
+    /** Sheep that were sheared (uid -> time when their wool grows back). */
+    private val sheared = HashMap<Int, Float>()
+
     init {
         if (level.hasPlayer) {
             player.x = level.x; player.y = level.y; player.z = level.z
@@ -195,6 +210,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
         redstone.onDoor = { x, y, z -> sound("door", x + 0.5f, y + 0.5f, z + 0.5f) }
         redstone.daylight = { daylight }
         redstone.occupied = { x, y, z -> occupied(x, y, z) }
+        redstone.plateLoad = { x, y, z, items -> plateLoad(x, y, z, items) }
         mobs.onDeath = { m -> if (survival) for ((id, n) in mobDrops(m)) drops.spawn(ItemStack(id, n), m.x, m.y + 0.5f, m.z) }
         // Chunk offsets sorted nearest first, so the area around the player streams in first.
         val r = 16
@@ -298,9 +314,12 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
                 spawned = true
             }
             lastVy = player.vy
+            player.speedMul = (if (input.sprint && !player.flying) 1.3f else 1f) * (if (hasEffect("swiftness")) 1.4f else 1f)
+            player.jumpMul = if (hasEffect("leaping")) 1.22f else 1f
             if (carts.riding == null) player.update(dt, world, input.moveForward, input.moveStrafe, input.jumpHeld, input.descendHeld)
+            updateFlight(dt)
             // Fall damage when landing hard (not while flying or in water).
-            if (player.onGround && !wasOnGround && !player.flying && !player.inWater && lastVy < -14f) {
+            if (player.onGround && !wasOnGround && !player.flying && !player.inWater && lastVy < -14f && !hasEffect("slow_falling")) {
                 hurtPlayer((-lastVy - 13f) * 0.9f, player.x, player.z, knockback = false)
             }
             wasOnGround = player.onGround
@@ -318,13 +337,14 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
             // Lava burns.
             val inLava = world.getBlock(player.blockX(), floorInt(player.y + 0.3f), player.blockZ()) == Blocks.LAVA ||
                 world.getBlock(player.blockX(), floorInt(player.eyeY), player.blockZ()) == Blocks.LAVA
-            if (inLava) {
+            if (inLava && !hasEffect("fire_resistance")) {
                 lavaTimer -= dt
                 if (lavaTimer <= 0f) { lavaTimer = 0.5f; hurtPlayer(4f, player.x, player.z, knockback = false) }
             } else lavaTimer = 0f
             if (survival) hunger(dt)
         }
 
+        updateEffects(dt)
         if (!survival && health < 20f) health = 20f
         if (!isClient) {
             fluids.tick(dt)
@@ -372,7 +392,10 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
     fun hurtPlayer(amount: Float, fromX: Float, fromZ: Float, knockback: Boolean = true, ignoreArmor: Boolean = false) {
         if (!playerAlive || amount <= 0f || !survival) return
         val armor = if (ignoreArmor) 0 else inventory.armorPoints().coerceAtMost(20)
-        health -= amount * (1f - armor * 0.04f)
+        var dmg = amount * (1f - armor * 0.04f)
+        // Holding a shield blocks half of the damage from hits.
+        if (knockback && heldItem()?.name == "Shield") { dmg *= 0.5f; damageHeld(1) }
+        health -= dmg
         if (knockback) {
             val dx = player.x - fromX; val dz = player.z - fromZ
             val d = sqrt(dx * dx + dz * dz).coerceAtLeast(0.1f)
@@ -380,7 +403,18 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
         }
         uiEvents.add("hurt")
         sound("hurt", player.x, player.y + 1f, player.z)
-        if (health <= 0f) respawn()
+        if (health <= 0f) {
+            // A Totem of Undying anywhere in the inventory saves you once.
+            val totem = Items.find("Totem of Undying")
+            if (inventory.remove(totem, 1)) {
+                health = 2f
+                effects["regeneration"] = 40f
+                uiEvents.add("toast:Your Totem of Undying saved you!")
+                sound("pop", player.x, player.y + 1f, player.z)
+                return
+            }
+            respawn()
+        }
     }
 
     private fun respawn() {
@@ -433,10 +467,12 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
 
     private fun eat(item: ItemDef): Boolean {
         if (!survival) return false
-        if (food >= 20f && item.name != "Golden Apple") return false
+        if (food >= 20f && !item.name.contains("Golden Apple") && item.name != "Chorus Fruit") return false
         food = minOf(20f, food + item.food)
         saturation = minOf(food, saturation + item.food * 1.2f)
         if (item.name == "Golden Apple") health = minOf(20f, health + 8f)
+        if (item.name == "Enchanted Golden Apple") { health = 20f; effects["regeneration"] = 20f; effects["fire_resistance"] = 300f }
+        if (item.name == "Chorus Fruit") chorusTeleport()
         uiEvents.add("eat")
         sound("eat", player.x, player.y + 1.5f, player.z)
         return true
@@ -472,18 +508,30 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
             MobType.COW -> listOf(i("Leather") to r.nextInt(3), i("Raw Beef") to 1 + r.nextInt(3))
             MobType.PIG -> listOf(i("Raw Porkchop") to 1 + r.nextInt(3))
             MobType.SHEEP -> listOf(Blocks.WOOL_WHITE to 1, i("Raw Mutton") to 1 + r.nextInt(2))
-            MobType.ZOMBIE -> listOf(i("Rotten Flesh") to r.nextInt(3)) + (if (r.nextInt(30) == 0) listOf(i("Iron Ingot") to 1) else emptyList())
-            MobType.BOOMLING -> emptyList() // it blew itself up
-            MobType.RATTLER -> listOf(i("Bone") to r.nextInt(3), i("Arrow") to r.nextInt(3))
-            MobType.CRAWLER -> listOf(i("String") to r.nextInt(3), i("Slimeball") to (if (r.nextInt(4) == 0) 1 else 0))
-            MobType.GLIDER -> listOf(i("Feather") to 1 + r.nextInt(2))
-            MobType.CINDER -> listOf(Blocks.MAGMA to r.nextInt(2), i("Glowstone Dust") to r.nextInt(3), i("Netherite Scrap") to (if (r.nextInt(12) == 0) 1 else 0))
-            MobType.WISP -> listOf(i("Emerald") to r.nextInt(2), Blocks.PURPUR to r.nextInt(2))
+            MobType.ZOMBIE -> listOf(i("Rotten Flesh") to r.nextInt(3)) + (if (r.nextInt(30) == 0) listOf(i("Iron Ingot") to 1) else emptyList()) +
+                (if (r.nextInt(20) == 0) listOf(i("Poisonous Potato") to 1) else emptyList())
+            MobType.BOOMLING -> listOf(i("Gunpowder") to r.nextInt(3)) // only when defeated before it blows up
+            MobType.RATTLER -> listOf(i("Bone") to r.nextInt(3), i("Arrow") to r.nextInt(3), i("Rabbit's Foot") to (if (r.nextInt(10) == 0) 1 else 0))
+            MobType.CRAWLER -> listOf(i("String") to r.nextInt(3), i("Slimeball") to (if (r.nextInt(4) == 0) 1 else 0),
+                i("Spider Eye") to (if (r.nextInt(3) == 0) 1 else 0))
+            MobType.GLIDER -> listOf(i("Feather") to 1 + r.nextInt(2), i("Phantom Membrane") to r.nextInt(2))
+            MobType.CINDER -> listOf(Blocks.MAGMA to r.nextInt(2), i("Glowstone Dust") to r.nextInt(3), i("Netherite Scrap") to (if (r.nextInt(12) == 0) 1 else 0),
+                i("Blaze Rod") to r.nextInt(2), i("Magma Cream") to (if (r.nextInt(3) == 0) 1 else 0), i("Ghast Tear") to (if (r.nextInt(6) == 0) 1 else 0))
+            MobType.WISP -> listOf(i("Emerald") to r.nextInt(2), Blocks.PURPUR to r.nextInt(2), i("Ender Pearl") to r.nextInt(2),
+                i("Amethyst Shard") to r.nextInt(2))
             MobType.VILLAGER, MobType.EXPLORER -> emptyList()
         }.filter { it.second > 0 }
     }
 
     /** Is a player, mob or dropped item standing in this block? (pressure plates) */
+    private fun plateLoad(x: Int, y: Int, z: Int, items: Boolean): Int {
+        fun inside(px: Float, py: Float, pz: Float) = floorInt(px) == x && floorInt(pz) == z && py >= y && py < y + 0.5f
+        var n = if (inside(player.x, player.y, player.z)) 1 else 0
+        n += mobs.list.count { !it.dead && inside(it.x, it.y, it.z) }
+        if (items) n += drops.list.count { inside(it.x, it.y, it.z) }
+        return n
+    }
+
     private fun occupied(x: Int, y: Int, z: Int): Boolean {
         fun inside(px: Float, py: Float, pz: Float) = floorInt(px) == x && floorInt(pz) == z && py >= y && py < y + 0.5f
         if (inside(player.x, player.y, player.z)) return true
@@ -549,7 +597,9 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
         var time = def.hardness * 1.2f
         val rightTool = item != null && item.tool != ToolType.NONE &&
             (item.tool == def.tool || (item.tool == ToolType.SWORD && (block == Blocks.COBWEB || def.tool == ToolType.HOE)))
-        if (rightTool) {
+        if (item?.use == ItemUse.SHEAR && (def.name.endsWith("Leaves") || def.name.endsWith("Wool") || block == Blocks.COBWEB)) {
+            time /= 8f
+        } else if (rightTool) {
             time /= if (item!!.tool == ToolType.SWORD) (if (block == Blocks.COBWEB) 15f else 1.5f) else item.speed
         } else if (def.tool == ToolType.PICKAXE) {
             time *= 1.6f
@@ -638,7 +688,10 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
     }
 
     private fun hit(mobHit: MobHit, item: ItemDef?) {
-        val dmg = (item?.attack ?: 1).toFloat()
+        var dmg = (item?.attack ?: 1).toFloat()
+        if (hasEffect("strength")) dmg += 3f
+        // A mace hits harder the further you fall onto the target.
+        if (item?.name == "Mace" && player.vy < -6f) dmg += (-player.vy - 6f) * 1.5f
         val len = sqrt(dir[0] * dir[0] + dir[2] * dir[2]).coerceAtLeast(0.01f)
         if (isClient) net?.attack(mobHit.mob.uid, dmg, dir[0] / len, dir[2] / len)
         else mobs.damage(mobHit.mob, dmg, dir[0] / len, dir[2] / len)
@@ -646,6 +699,170 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
         damageHeld(if (item?.tool == ToolType.SWORD) 1 else 2)
         exhaust(0.1f)
         if (mobHit.mob.dead) uiEvents.add("toast:${mobHit.mob.type.displayName} defeated")
+    }
+
+    // ---------------------------------------------------------------- item pack 2
+
+    /** Slow falling, Elytra gliding and firework boosts (after the normal player physics). */
+    private fun updateFlight(dt: Float) {
+        val p = player
+        if (hasEffect("slow_falling") && p.vy < -2f) p.vy = -2f
+        val elytra = inventory.armor[1]?.let { Items[it.id]?.name == "Elytra" } == true
+        gliding = elytra && !p.onGround && !p.flying && !p.inWater && carts.riding == null && (gliding || p.vy < -4f)
+        if (!gliding) { rocketBoost = 0f; return }
+        val boost = rocketBoost > 0f
+        if (boost) rocketBoost -= dt
+        val speed = if (boost) 22f else 11f + max(0f, -dir[1]) * 10f
+        p.vx = dir[0] * speed; p.vz = dir[2] * speed
+        p.vy = if (boost) dir[1] * speed else max(p.vy, -2.5f + dir[1] * 6f)
+    }
+
+    private fun updateEffects(dt: Float) {
+        clockSeconds += dt
+        if (effects.isNotEmpty()) {
+            val it = effects.entries.iterator()
+            while (it.hasNext()) { val e = it.next(); e.setValue(e.value - dt); if (e.value <= 0f) it.remove() }
+        }
+        if (hasEffect("regeneration")) {
+            potionRegen += dt
+            if (potionRegen >= 2.5f) { potionRegen = 0f; health = minOf(20f, health + 1f) }
+        }
+        if (zoomed && heldItem()?.use != ItemUse.SPYGLASS) zoomed = false
+        // Fishing: a fish bites after a few seconds if you keep holding the rod.
+        if (fishTimer >= 0f) {
+            if (input.selectedSlot != fishSlot || heldItem()?.use != ItemUse.FISH) { fishTimer = -1f; return }
+            fishTimer -= dt
+            if (fishTimer < 0f) {
+                val r = java.util.Random().nextInt(100)
+                val catch = Items.find(when { r < 55 -> "Raw Cod"; r < 80 -> "Raw Salmon"; r < 92 -> "Pufferfish"; r < 97 -> "Tropical Fish"; else -> "Nautilus Shell" })
+                if (inventory.add(catch, 1) > 0) drops.spawn(ItemStack(catch), player.x, player.y + 1f, player.z)
+                damageHeld(1)
+                sound("splash", player.x, player.y, player.z, 0.7f)
+                uiEvents.add("toast:You caught a ${Items.displayName(catch)}!")
+                uiEvents.add("pickup")
+            }
+        }
+    }
+
+    /** Puts a container (bowl, bottle, bucket) back after using up the held item. */
+    private fun giveBack(name: String) {
+        if (!survival) return
+        val id = Items.find(name)
+        val s = heldStack()
+        if (s == null) inventory.slots[input.selectedSlot] = ItemStack(id, 1)
+        else if (inventory.add(id, 1) > 0) drops.spawn(ItemStack(id), player.x, player.y + 1f, player.z)
+    }
+
+    private fun drink(item: ItemDef) {
+        when {
+            item.name == "Milk Bucket" -> { effects.clear(); uiEvents.add("toast:All effects cleared") }
+            item.name.startsWith("Potion of ") -> {
+                val key = Items.POTIONS.first { "Potion of ${it.first}" == item.name }.second
+                if (key == "healing") health = minOf(20f, health + 8f)
+                else {
+                    val seconds = if (key == "regeneration") 45f else 180f
+                    effects[key] = seconds
+                    uiEvents.add("toast:${item.name.removePrefix("Potion of ")} for ${(seconds / 60).toInt()}:${"%02d".format((seconds % 60).toInt())}")
+                }
+            }
+        }
+        sound("eat", player.x, player.y + 1.5f, player.z)
+        consumeHeld()
+        giveBack(if (item.name == "Milk Bucket") "Bucket" else "Glass Bottle")
+        uiEvents.add("eat")
+    }
+
+    /** Uses that don't need a block under the crosshair. Returns true when the item was used. */
+    private fun useItem(item: ItemDef): Boolean {
+        when (item.use) {
+            ItemUse.DRINK -> { drink(item); return true }
+            ItemUse.THROW -> {
+                val speed = 24f
+                val kind = when (item.name) { "Ender Pearl" -> Projectile.PEARL; "Egg" -> Projectile.EGG; else -> Projectile.SNOWBALL }
+                projectiles.shoot(player.x, player.eyeY - 0.1f, player.z, dir[0] * speed, dir[1] * speed + 1f, dir[2] * speed, true, 0f, kind)
+                sound("bow", player.x, player.eyeY, player.z, 0.6f)
+                consumeHeld()
+                return true
+            }
+            ItemUse.FISH -> {
+                if (fishTimer >= 0f) { fishTimer = -1f; uiEvents.add("toast:You reeled in"); return true }
+                val t = Raycast.cast(world, player.x, player.eyeY, player.z, dir[0], dir[1], dir[2], 16f, hitWater = true)
+                if (t == null || t.block != Blocks.WATER) { uiEvents.add("toast:Look at water to fish"); return true }
+                fishTimer = 3f + java.util.Random().nextFloat() * 6f
+                fishSlot = input.selectedSlot
+                sound("splash", t.x + 0.5f, t.y + 1f, t.z + 0.5f, 0.4f)
+                uiEvents.add("toast:Fishing… keep holding the rod")
+                return true
+            }
+            ItemUse.COMPASS -> {
+                val (sx, _, sz) = if (level.hasBedSpawn) Triple(level.bedX.toFloat(), 0f, level.bedZ.toFloat()) else world.findSpawn()
+                val dx = sx - player.x; val dz = sz - player.z
+                val dist = sqrt(dx * dx + dz * dz).toInt()
+                val ns = if (dz < -0.4f * kotlin.math.abs(dx)) "north" else if (dz > 0.4f * kotlin.math.abs(dx)) "south" else ""
+                val ew = if (dx > 0.4f * kotlin.math.abs(dz)) "east" else if (dx < -0.4f * kotlin.math.abs(dz)) "west" else ""
+                val way = listOf(ns, ew).filter { it.isNotEmpty() }.joinToString("-").ifEmpty { "here" }
+                uiEvents.add("toast:" + (if (dist < 3) "You are at your spawn point" else "Spawn is $dist blocks $way"))
+                return true
+            }
+            ItemUse.CLOCK -> {
+                val h = ((timeOfDay * 24 + 6) % 24).toInt(); val m = (((timeOfDay * 24 + 6) % 1) * 60).toInt()
+                uiEvents.add("toast:%02d:%02d · %s".format(h, m, if (daylight > 0.5f) "day" else "night"))
+                return true
+            }
+            ItemUse.SPYGLASS -> { zoomed = !zoomed; return true }
+            ItemUse.ROCKET -> {
+                if (gliding) { rocketBoost = 1.6f; consumeHeld(); sound("fuse", player.x, player.y, player.z, 0.6f) }
+                else uiEvents.add("toast:Use rockets while flying with an Elytra")
+                return true
+            }
+            else -> return false
+        }
+    }
+
+    /** Shears on a sheep and a bucket on a cow. Returns true when used. */
+    private fun useOnMob(item: ItemDef, mob: Mob): Boolean {
+        if (item.use == ItemUse.SHEAR && mob.type == MobType.SHEEP) {
+            if ((sheared[mob.uid] ?: 0f) > clockSeconds) { uiEvents.add("toast:Its wool hasn't grown back yet"); return true }
+            sheared[mob.uid] = clockSeconds + 120f
+            drops.spawn(ItemStack(Blocks.WOOL_WHITE, 1 + java.util.Random().nextInt(3)), mob.x, mob.y + 1f, mob.z)
+            sound("hit_wool", mob.x, mob.y + 1f, mob.z)
+            damageHeld(1)
+            return true
+        }
+        if (item.name == "Bucket" && mob.type == MobType.COW) {
+            consumeHeld()
+            giveBack("Milk Bucket")
+            sound("splash", mob.x, mob.y + 1f, mob.z, 0.4f)
+            return true
+        }
+        return false
+    }
+
+    /** Chorus fruit: a random hop to a safe spot nearby. */
+    private fun chorusTeleport() {
+        val r = java.util.Random()
+        repeat(16) {
+            val x = floorInt(player.x) + r.nextInt(17) - 8; val z = floorInt(player.z) + r.nextInt(17) - 8
+            if (!world.isLoaded(x, z)) return@repeat
+            for (y in minOf(Chunk.HEIGHT - 3, floorInt(player.y) + 8) downTo maxOf(1, floorInt(player.y) - 8)) {
+                if (Blocks.solid[world.getBlock(x, y - 1, z)] && !Blocks.solid[world.getBlock(x, y, z)] && !Blocks.solid[world.getBlock(x, y + 1, z)]) {
+                    player.x = x + 0.5f; player.y = y.toFloat(); player.z = z + 0.5f; player.vy = 0f
+                    sound("pop", player.x, player.y, player.z)
+                    return
+                }
+            }
+        }
+    }
+
+    /** Flint and steel wears out; a fire charge is used up. */
+    private fun ignited(item: ItemDef) { if (item.name == "Fire Charge") consumeHeld() else damageHeld(1) }
+
+    /** An ender pearl landed: teleport there (it stings a little). */
+    fun pearlLanded(x: Float, y: Float, z: Float) {
+        player.x = x; player.y = y; player.z = z
+        player.vx = 0f; player.vy = 0f; player.vz = 0f
+        hurtPlayer(2f, x, z, knockback = false, ignoreArmor = true)
+        sound("pop", x, y, z)
     }
 
     private fun use() {
@@ -660,9 +877,19 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
             blockSound(Blocks.GRASS, tgt.x, tgt.y + 1, tgt.z, 0.7f)
             return
         }
+        if (item != null && useItem(item)) return
+        mobs.raycast(player.x, player.eyeY, player.z, dir[0], dir[1], dir[2], 4f)?.let { m ->
+            if (item != null && useOnMob(item, m.mob)) return
+        }
         // Eating works without looking at anything.
         if (item != null && item.use == ItemUse.EAT && mobs.raycast(player.x, player.eyeY, player.z, dir[0], dir[1], dir[2], 4f)?.let { mobs.wantsFood(it.mob, sel) } != true) {
-            if (eat(item)) consumeHeld()
+            if (eat(item)) {
+                consumeHeld()
+                when {
+                    item.name.endsWith("Stew") || item.name.endsWith("Soup") -> giveBack("Bowl")
+                    item.name == "Honey Bottle" -> giveBack("Glass Bottle")
+                }
+            }
             return
         }
         // Minecarts: tap to get in or out; hitting an empty one picks it up.
@@ -679,10 +906,11 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
             if (bowCooldown > 0f) return
             val arrow = Items.find("Arrow")
             if (survival && !inventory.remove(arrow, 1)) { uiEvents.add("toast:You need arrows"); return }
-            bowCooldown = 0.6f
-            val speed = 32f
+            val crossbow = item.name == "Crossbow"
+            bowCooldown = if (crossbow) 1.1f else 0.6f
+            val speed = if (crossbow) 40f else 32f
             projectiles.shoot(player.x, player.eyeY - 0.1f, player.z, dir[0] * speed, dir[1] * speed + 0.6f, dir[2] * speed, true,
-                if (item.name.contains("Enchanted")) 9f else 6f)
+                if (crossbow || item.name.contains("Enchanted")) 9f else 6f)
             damageHeld(1)
             sound("bow", player.x, player.eyeY, player.z)
             return
@@ -708,7 +936,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
 
         when (t.block) {
             Blocks.LEVER -> { redstone.toggleLever(t.x, t.y, t.z); return }
-            Blocks.STONE_BUTTON -> { redstone.pressButton(t.x, t.y, t.z); return }
+            in Blocks.WOOD_BUTTON_FIRST until Blocks.WOOD_BUTTON_FIRST + 6, Blocks.STONE_BUTTON -> { redstone.pressButton(t.x, t.y, t.z); return }
             Blocks.CRAFTING_TABLE -> { uiEvents.add("open:craft"); return }
             in handOpenables -> { toggleOpen(t.x, t.y, t.z); return }
             in beds -> { useBed(t.x, t.y, t.z); return }
@@ -734,11 +962,11 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
                     setBlock(t.x, t.y, t.z, Blocks.DIRT_PATH); damageHeld(1)
                 }
                 ItemUse.IGNITE -> when {
-                    t.block == Blocks.TNT -> { redstone.prime(t.x, t.y, t.z); damageHeld(1) }
+                    t.block == Blocks.TNT -> { redstone.prime(t.x, t.y, t.z); ignited(item) }
                     t.block == Blocks.OBSIDIAN || t.block == Blocks.QUARTZ_BLOCK -> {
                         val portal = if (t.block == Blocks.OBSIDIAN) Blocks.EMBER_PORTAL else Blocks.SKY_PORTAL
                         if (lightPortal(t.x + t.nx, t.y + t.ny, t.z + t.nz, t.block, portal)) {
-                            damageHeld(1); uiEvents.add("toast:The portal opens!")
+                            ignited(item); uiEvents.add("toast:The portal opens!")
                         } else uiEvents.add("toast:Build a frame (at least 4 wide, 5 tall) to make a portal")
                     }
                 }

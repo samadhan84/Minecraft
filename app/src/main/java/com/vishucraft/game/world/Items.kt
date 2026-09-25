@@ -1,6 +1,10 @@
 package com.vishucraft.game.world
 
-enum class ItemUse { NONE, TILL, PATH, IGNITE, BUCKET, WATER_BUCKET, EAT, BOW, GROW, LAVA_BUCKET, CART }
+enum class ItemUse {
+    NONE, TILL, PATH, IGNITE, BUCKET, WATER_BUCKET, EAT, BOW, GROW, LAVA_BUCKET, CART,
+    /** Snowballs, eggs and ender pearls. */
+    THROW, DRINK, FISH, SHEAR, COMPASS, CLOCK, SPYGLASS, ROCKET,
+}
 
 /** 0 helmet, 1 chestplate, 2 leggings, 3 boots; -1 when not armor. */
 typealias ArmorSlot = Int
@@ -48,6 +52,12 @@ object Items {
         Tier("Golden", "gold", 12f, 0, 32, 0),
         Tier("Diamond", "diamond", 8f, 3, 1561, 3),
         Tier("Netherite", "netherite", 9f, 4, 2031, 4),
+    )
+
+    /** Potion display names and their effect keys (see Game.effects). Declared before init, which uses it. */
+    val POTIONS = listOf(
+        "Healing" to "healing", "Regeneration" to "regeneration", "Swiftness" to "swiftness", "Leaping" to "leaping",
+        "Fire Resistance" to "fire_resistance", "Strength" to "strength", "Slow Falling" to "slow_falling",
     )
 
     val all: List<ItemDef>
@@ -163,6 +173,97 @@ object Items {
         add("Bone Meal", "bone_meal", use = ItemUse.GROW)
         add("Lava Bucket", "lava_bucket", use = ItemUse.LAVA_BUCKET, maxStack = 1, fuel = 100f)
         add("Minecart", "minecart", use = ItemUse.CART, maxStack = 1)
+
+        // ---- Item pack 2: more of the classic items (appended so older saves keep their ids)
+        // Materials
+        add("Raw Iron", "raw_iron")
+        add("Raw Gold", "raw_gold")
+        add("Raw Copper", "raw_copper")
+        add("Iron Nugget", "iron_nugget")
+        add("Gold Nugget", "gold_nugget")
+        add("Nether Quartz", "quartz")
+        add("Amethyst Shard", "amethyst_shard")
+        add("Blaze Rod", "blaze_rod", fuel = 120f)
+        add("Blaze Powder", "blaze_powder")
+        add("Ender Pearl", "ender_pearl", use = ItemUse.THROW, maxStack = 16)
+        add("Eye of Ender", "ender_eye")
+        add("Ghast Tear", "ghast_tear")
+        add("Spider Eye", "spider_eye", food = 2)
+        add("Fermented Spider Eye", "fermented_spider_eye")
+        add("Magma Cream", "magma_cream")
+        add("Ink Sac", "ink_sac")
+        add("Glow Ink Sac", "glow_ink_sac")
+        add("Cocoa Beans", "cocoa_beans")
+        add("Sugar", "sugar")
+        add("Egg", "egg", use = ItemUse.THROW, maxStack = 16)
+        add("Snowball", "snowball", use = ItemUse.THROW, maxStack = 16)
+        add("Prismarine Shard", "prismarine_shard")
+        add("Prismarine Crystals", "prismarine_crystals")
+        add("Nautilus Shell", "nautilus_shell")
+        add("Heart of the Sea", "heart_of_the_sea")
+        add("Phantom Membrane", "phantom_membrane")
+        add("Rabbit Hide", "rabbit_hide")
+        add("Rabbit's Foot", "rabbit_foot")
+        add("Turtle Scute", "scute")
+        add("Honeycomb", "honeycomb")
+        add("Nether Star", "nether_star")
+        add("Echo Shard", "echo_shard")
+        add("Bowl", "bowl", fuel = 2f)
+        add("Glass Bottle", "glass_bottle")
+        add("Name Tag", "name_tag")
+        add("Lead", "lead")
+        add("Saddle", "saddle", maxStack = 1)
+        add("Firework Rocket", "firework_rocket", use = ItemUse.ROCKET)
+        add("Fire Charge", "fire_charge", use = ItemUse.IGNITE)
+        add("Empty Map", "map")
+        add("Book and Quill", "book_and_quill", maxStack = 1)
+        add("Enchanted Book", "enchanted_book", ench = "Mending", maxStack = 1)
+        // Tools and gear
+        add("Shears", "shears", use = ItemUse.SHEAR, maxStack = 1, durability = 238)
+        add("Fishing Rod", "fishing_rod", use = ItemUse.FISH, maxStack = 1, durability = 64, fuel = 15f)
+        add("Shield", "shield", maxStack = 1, durability = 336)
+        add("Trident", "trident", ToolType.SWORD, 1.5f, attack = 9, maxStack = 1, durability = 250)
+        add("Crossbow", "crossbow", use = ItemUse.BOW, maxStack = 1, durability = 465)
+        add("Mace", "mace", attack = 6, maxStack = 1, durability = 500)
+        add("Compass", "compass", use = ItemUse.COMPASS)
+        add("Clock", "clock", use = ItemUse.CLOCK)
+        add("Spyglass", "spyglass", use = ItemUse.SPYGLASS, maxStack = 1)
+        add("Elytra", "elytra", maxStack = 1, durability = 432, armorSlot = 1)
+        add("Turtle Shell", "turtle_helmet", maxStack = 1, armorSlot = 0, armorPoints = 2)
+        for ((i, piece) in pieces.withIndex()) {
+            add("Chainmail ${piece.first}", "${piece.second}_chainmail", maxStack = 1, armorSlot = i, armorPoints = intArrayOf(2, 5, 4, 1)[i])
+        }
+        add("Totem of Undying", "totem", maxStack = 1)
+        add("Milk Bucket", "milk_bucket", use = ItemUse.DRINK, maxStack = 1)
+        // Food
+        add("Cookie", "cookie", food = 2)
+        add("Pumpkin Pie", "pumpkin_pie", food = 8)
+        add("Mushroom Stew", "mushroom_stew", food = 6, maxStack = 1)
+        add("Beetroot", "beetroot", food = 1)
+        add("Beetroot Soup", "beetroot_soup", food = 6, maxStack = 1)
+        add("Rabbit Stew", "rabbit_stew", food = 10, maxStack = 1)
+        add("Raw Chicken", "raw_chicken", food = 2)
+        add("Cooked Chicken", "cooked_chicken", food = 6)
+        add("Raw Cod", "raw_cod", food = 2)
+        add("Cooked Cod", "cooked_cod", food = 5)
+        add("Raw Salmon", "raw_salmon", food = 2)
+        add("Cooked Salmon", "cooked_salmon", food = 6)
+        add("Tropical Fish", "tropical_fish", food = 1)
+        add("Pufferfish", "pufferfish", food = 1)
+        add("Raw Rabbit", "raw_rabbit", food = 3)
+        add("Cooked Rabbit", "cooked_rabbit", food = 5)
+        add("Sweet Berries", "sweet_berries", food = 2)
+        add("Glow Berries", "glow_berries", food = 2)
+        add("Honey Bottle", "honey_bottle", food = 6, maxStack = 16)
+        add("Dried Kelp", "dried_kelp", food = 1)
+        add("Golden Carrot", "golden_carrot", food = 6)
+        add("Enchanted Golden Apple", "golden_apple", food = 4, ench = "Regeneration II · Absorption IV")
+        add("Chorus Fruit", "chorus_fruit", food = 4)
+        add("Poisonous Potato", "poisonous_potato", food = 2)
+        // Ready-made potions (there is no brewing stand; they can also be mixed at a crafting table).
+        for ((name, key) in POTIONS) add("Potion of $name", "potion_$key", use = ItemUse.DRINK, maxStack = 1)
+        // Dyes, in the same order as the wool colours.
+        for (c in Blocks.DYES) add("${c.split('_').joinToString(" ") { it.replaceFirstChar { ch -> ch.uppercase() } }} Dye", "dye_$c")
 
         all = list
         for (i in all) { byId[i.id] = i; byName[i.name] = i.id }

@@ -50,6 +50,7 @@ object Shapes {
             Blocks.isFence(id) -> Blocks.OAK_FENCE
             Blocks.isGate(id) -> Blocks.OAK_FENCE_GATE
             Blocks.isBed(id) -> Blocks.BED_FIRST
+            Blocks.isPlate(id) -> Blocks.PRESSURE_PLATE
             else -> id
         }
         return when (kind) {

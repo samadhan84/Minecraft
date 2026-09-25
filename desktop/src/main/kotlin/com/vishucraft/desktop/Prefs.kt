@@ -3,12 +3,17 @@ package com.vishucraft.desktop
 import java.io.File
 import java.util.Properties
 
-/** Where VishuCraft keeps worlds, settings and crash logs on this computer. */
+/** Where DhruvilCraft keeps worlds, settings and crash logs on this computer. */
 object Paths {
     val home: File by lazy {
         val override = System.getProperty("vishucraft.home")
         val appData = System.getenv("APPDATA")
-        (if (override != null) File(override) else if (appData != null) File(appData, "VishuCraft") else File(System.getProperty("user.home"), ".vishucraft")).apply { mkdirs() }
+        val base = if (appData != null) File(appData) else File(System.getProperty("user.home"))
+        val dir = override?.let { File(it) } ?: File(base, if (appData != null) "DhruvilCraft" else ".dhruvilcraft")
+        // The game used to be called VishuCraft: keep the worlds made before the rename.
+        val old = File(base, if (appData != null) "VishuCraft" else ".vishucraft")
+        if (override == null && !dir.exists() && old.isDirectory) old.renameTo(dir)
+        dir.apply { mkdirs() }
     }
     val worlds: File get() = File(home, "worlds").apply { mkdirs() }
 }
@@ -18,7 +23,7 @@ class Prefs {
     private val file = File(Paths.home, "settings.properties")
     private val p = Properties().apply { if (file.exists()) file.inputStream().use { load(it) } }
 
-    private fun save() = file.outputStream().use { p.store(it, "VishuCraft settings") }
+    private fun save() = file.outputStream().use { p.store(it, "DhruvilCraft settings") }
     private fun f(k: String, d: Float) = p.getProperty(k)?.toFloatOrNull() ?: d
     private fun i(k: String, d: Int) = p.getProperty(k)?.toIntOrNull() ?: d
     private fun b(k: String, d: Boolean) = p.getProperty(k)?.toBooleanStrictOrNull() ?: d

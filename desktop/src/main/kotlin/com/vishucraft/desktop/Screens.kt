@@ -115,6 +115,17 @@ class Hud(private val game: Game) {
                 y -= 24f
             }
         }
+        // Active potion effects, top right.
+        if (game.effects.isNotEmpty()) {
+            var y = 10f
+            for ((key, left) in game.effects.toSortedMap()) {
+                val name = com.vishucraft.game.world.Items.POTIONS.firstOrNull { it.second == key }?.first ?: key
+                val secs = left.toInt()
+                ui.text("$name ${secs / 60}:${"%02d".format(secs % 60)}", w - 12, y, 16f, rgba(200, 230, 255), 2)
+                y += 20f
+            }
+        }
+        if (game.gliding) ui.text("Gliding", w / 2, 40f, 18f, rgba(220, 220, 255), 1)
         if (debug != null) {
             var y = 8f
             for (line in debug.split('\n')) { ui.text(line, 10f, y, 16f); y += 20f }
@@ -128,7 +139,7 @@ class Hud(private val game: Game) {
 class CreativeScreen(private val game: Game) {
     private val tabs: List<Pair<String, List<Int>>> =
         Category.values().map { it.title to Blocks.inCategory(it) } + ("Tools & items" to Items.all.map { it.id })
-    private var tab = 0
+    var tab = 0
     private var scroll = 0f
     private val search = Ui.Field("", "Search…", 24)
 

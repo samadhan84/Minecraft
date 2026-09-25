@@ -60,7 +60,11 @@ object BlockIcons {
         val c = Canvas(out)
         val paint = Paint().apply { isFilterBitmap = false; isAntiAlias = false }
         val t = TextureAtlas.TILE.toFloat()
-        val h = if (def.render == RenderType.BOX) (def.box!![4]).coerceAtLeast(0.25f) else 1f
+        val h = when {
+            def.render == RenderType.BOX -> (def.box!![4]).coerceAtLeast(0.25f)
+            com.vishucraft.game.world.Blocks.isPlate(id) -> 0.2f
+            else -> 1f
+        }
         val s = S.toFloat()
         val drop = (1f - h) * s * 0.5f
         fun face(tileIndex: Int, src: FloatArray, dst: FloatArray, shade: Int) {

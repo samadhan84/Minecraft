@@ -1,8 +1,10 @@
-# VishuCraft
+# DhruvilCraft
 
 An open-world voxel sandbox game for Android (building and exploring with blocks), written from scratch in
 Kotlin and OpenGL ES 3.0. It has no third-party game engine and no image assets: every texture is generated
-procedurally in code when the game starts.
+procedurally in code when the game starts. It runs on Android phones, tablets and TVs, and on Windows.
+
+(The game used to be called VishuCraft; the Android package id is unchanged, so updating keeps your worlds.)
 
 ## Features
 
@@ -31,6 +33,17 @@ procedurally in code when the game starts.
   Gliders (swooping moth-wings), Cinder Brutes in the Ember Realm, Void Wisps in the Sky Isles, and villagers.
 - **Building pieces**: doors and trapdoors for every wood type plus iron, fences and gates for every wood, five kinds of stairs, fences and gates, ladders, glass panes
   and iron bars, all with proper collision.
+- **Buttons and pressure plates**: stone and wooden buttons (wooden ones stay pressed longer) in every wood; stone
+  pressure plates (players and mobs), wooden ones (also dropped items) and light / heavy weighted plates whose signal
+  gets stronger the more stands on them.
+- **More items**: raw ores and nuggets, quartz, amethyst, blaze rods and powder, ender pearls (throw to teleport),
+  eyes of ender, snowballs, eggs, dyes in 16 colours (dye wool at a crafting table), bowls, bottles, name tags, leads,
+  saddles, maps, books and quills; shears (shear sheep, cut leaves), fishing rods (fish in any water), shields (block
+  half the damage), tridents, crossbows, maces (hit harder when falling), compasses, clocks, spyglasses (zoom),
+  **Elytra** (glide, boost with firework rockets), turtle shells, chainmail armor and the **Totem of Undying**;
+  cookies, pies, stews, fish, chicken, rabbit, berries, golden carrots, chorus fruit and more; and **potions**
+  (healing, regeneration, swiftness, leaping, fire resistance, strength, slow falling) mixed at a crafting table
+  from a glass bottle and one ingredient. A bucket on a cow gives milk, which clears potion effects.
 - **More redstone**: repeaters (1-4 tick delay), observers, daylight sensors, pressure plates, hoppers, rails,
   powered rails and rideable minecarts; doors react to redstone. Bows and arrows too.
 - **Beds** in 16 colours: tap to set your respawn point; at night (or in a storm) you sleep until morning.
@@ -45,7 +58,7 @@ procedurally in code when the game starts.
   mountains with snow caps, oceans and beaches with sugar cane.
 - **Underground**: tunnel caves, deep caverns, deepslate layer, granite/diorite/andesite/tuff pockets, and coal, copper, iron,
   gold, lapis, redstone, diamond and emerald ores.
-- **195 blocks**: every stone variant, 6 wood types (logs, planks, leaves), 16-colour wool, concrete, terracotta and stained
+- **270+ blocks**: every stone variant, 6 wood types (logs, planks, leaves), 16-colour wool, concrete, terracotta and stained
   glass, mineral blocks, nether and end blocks, prismarine, sea lanterns, crafting table, furnace, chest, TNT, hay, melons,
   jack o'lanterns, torches, mushrooms, cobwebs, slabs and more.
 - **Tools**: swords, pickaxes, axes, shovels and hoes in wood, stone, iron, gold, diamond and netherite. The right tool mines
@@ -91,21 +104,21 @@ adb install app/build/outputs/apk/debug/app-debug.apk
 ```
 
 Every push is built by GitHub Actions (`.github/workflows/android.yml`). The resulting debug and release APKs are uploaded as the
-`VishuCraft-apk` workflow artifact, so you can download and sideload them without building locally.
+`DhruvilCraft-apk` workflow artifact, so you can download and sideload them without building locally.
 
 Minimum Android version: 7.0 (API 24) with OpenGL ES 2.0. Runs on phones, tablets and **Android TV**
 (it appears on the TV home screen, and every menu can be used with the remote).
 
 ## Windows (laptop / PC)
 
-Every push also builds a Windows version (`.github/workflows/windows.yml`), uploaded as the `VishuCraft-windows` artifact:
+Every push also builds a Windows version (`.github/workflows/windows.yml`), uploaded as the `DhruvilCraft-windows` artifact:
 
-- **VishuCraft-Setup.exe** – installer. Installs for the current user (no administrator needed), adds a Start-menu entry
+- **DhruvilCraft-Setup.exe** – installer. Installs for the current user (no administrator needed), adds a Start-menu entry
   and a desktop shortcut. Java is bundled, nothing else to install.
-- **VishuCraft-portable.zip** – unzip anywhere and run `VishuCraft.exe`.
+- **DhruvilCraft-portable.zip** – unzip anywhere and run `DhruvilCraft.exe`.
 
 Windows may show "Windows protected your PC" because the installer is not code-signed: click *More info* → *Run anyway*.
-Worlds and settings are kept in `%APPDATA%\VishuCraft`. Wi-Fi games work between the PC and phones/TVs on the same network.
+Worlds and settings are kept in `%APPDATA%\DhruvilCraft`. Wi-Fi games work between the PC and phones/TVs on the same network.
 
 Keyboard and mouse: W A S D walk, mouse looks, left click mines / attacks, right click places / uses, Space jumps
 (double-tap to fly in Creative), Shift flies down, Ctrl sprints, 1-9 or the wheel pick a hotbar slot, middle click picks

@@ -18,7 +18,7 @@ dependencyResolutionManagement {
         mavenCentral()
     }
 }
-rootProject.name = "VishuCraft"
+rootProject.name = "DhruvilCraft"
 // "-PdesktopOnly" builds just the Windows / desktop version (no Android SDK needed).
 if (!providers.gradleProperty("desktopOnly").isPresent) include(":app")
 // The desktop module is built separately (Windows workflow) so the Android build does not load it.

@@ -974,7 +974,151 @@ object TextureAtlas {
         "dmmd....dmmd", "dmmd....dmmd", "dmmd....dmmd", "dmmmd...dmmmd", "dmlmmd..dmlmmd", "ddddddd.ddddddd",
     )
 
+
+    // ---------------------------------------------------------------- item pack 2 (original pixel art)
+
+    private fun line(t: Tile, x0: Int, y0: Int, x1: Int, y1: Int, c: Int, shade: Boolean = true) {
+        val n = maxOf(abs(x1 - x0), abs(y1 - y0)).coerceAtLeast(1)
+        for (i in 0..n) {
+            val x = x0 + (x1 - x0) * i / n; val y = y0 + (y1 - y0) * i / n
+            t[x, y] = c
+            if (shade && y + 1 < 16) t[x, y + 1] = scale(c, 0.6f)
+        }
+    }
+
+    private fun disc(t: Tile, cx: Float, cy: Float, r: Float, c: Int, rim: Boolean = true) {
+        for (y in 0 until 16) for (x in 0 until 16) {
+            val d = kotlin.math.sqrt((x + 0.5f - cx) * (x + 0.5f - cx) + (y + 0.5f - cy) * (y + 0.5f - cy))
+            if (d <= r) t[x, y] = if (rim && d > r - 1.2f) scale(c, 0.55f) else if (x < cx - 1 && y < cy - 1 && d < r * 0.5f) scale(c, 1.25f) else c
+        }
+    }
+
+    private val NUGGET = arrayOf("..dd..", ".dmld.", "dmmmmd", ".dmmd.", "..dd..")
+    private val ORB = arrayOf("..dddd..", ".dmmmmd.", "dmllmmmd", "dmlmmmmd", "dmmmmmmd", "dmmmmmmd", ".dmmmmd.", "..dddd..")
+    private val EYE = arrayOf("..dddd..", ".dmmmmd.", "dmmaammd", "dmabbamd", "dmabbamd", "dmmaammd", ".dmmmmd.", "..dddd..")
+    private val STAR = arrayOf("....l....", "....m....", "...mmm...", "lmmmlmmml", "..mmmmm..", "..mm.mm..", ".mm...mm.", ".m.....m.")
+    private val TEAR = arrayOf("...d...", "..dmd..", "..dmd..", ".dmlmd.", "dmlmmmd", "dmmmmmd", ".dmmmd.", "..ddd..")
+    private val SHELL = arrayOf("...dddd...", ".ddmmmmdd.", "dmmaaammmd", "dmaammammd", "dmaamaammd", "dmmaaaammd", ".dmmmmmmd.", "..dddddd..")
+    private val HEX = arrayOf("..dddddd..", ".dmmaammd.", "dmmaaaammd", "dmmmmmmmmd", "dmaammaamd", ".dmmmmmmd.", "..dddddd..")
+    private val BEANS = arrayOf(".dd...dd.", "dmmd.dmmd", "dmlmddmlm", ".dmmd.dmmd", "..dd...dd", "...dd....", "..dmmd...", "..dmlm...", "...dd....")
+    private val EGG = arrayOf("..ddd..", ".dmmmd.", "dmlmmmd", "dmmmmmd", "dmmmmmd", "dmmmmmd", ".dmmmd.", "..ddd..")
+    private val BOWL = arrayOf("dddddddddddd", "dmaaaaaaaamd", "dmmmmmmmmmmd", ".dmmmmmmmmd.", "..dmmmmmmd..", "...dddddd...")
+    private val BOTTLE = arrayOf("..dddd..", "...ld...", "...ld...", "..d..d..", ".d....d.", "d.aaaa.d", "daaaaaad", "daaaaaad", ".dddddd.")
+    private val TAG = arrayOf("dddddddd..", "dmmmmmmmd.", "dmaaaaamdd", "dmmmmmmm.d", "dmaaaamdd.", "dmmmmmmd..", "ddddddd...")
+    private val SADDLE = arrayOf("...dddd...", "..dmmmmd..", ".dmmlmmmd.", "dmmmmmmmmd", "dmmmmmmmmd", ".dd.aa.dd.", "....aa....", "....aa....")
+    private val SHEARS = arrayOf("d......d", "dm....md", ".dm..md.", "..dmmd..", "..daad..", ".bb..bb.", "bb....bb", "b......b")
+    private val SHIELD = arrayOf("dddddddddd", "dmmmaammmd", "dmmmaammmd", "daaaaaaaad", "dmmmaammmd", "dmmmaammmd", ".dmmaammd.", "..dmmmmd..", "...dddd...")
+    private val WINGS = arrayOf("dd......dd", "dmd....dmd", "dmmd..dmmd", "dmmmddmmmd", "dmmmmmmmmd", "dmlm..mlmd", "dmm....mmd", ".dm....md.", "..d....d..")
+    private val TOTEM = arrayOf("..dddd..", ".dmmmmd.", ".dammad.", ".dmmmmd.", "dmmllmmd", "d.dmmd.d", "..dmmd..", "..dmmd..", "...dd...")
+    private val DYE = arrayOf("...dd...", "..dmmd..", ".dmlmmd.", "dmmmmmmd", "dmmmmmmd", "dmmmmmmd", ".dmmmmd.", "..dddd..")
+    private val COOKIE = arrayOf("..dddd..", ".dmmmmd.", "dmammamd", "dmmmmmmd", "dmmammad", "dammmmmd", ".dmmamd.", "..dddd..")
+    private val PIE = arrayOf("...dddd...", ".ddmmmmdd.", "dmmmmmmmmd", "dmmllmmmmd", "aaaaaaaaaa", ".aaaaaaaa.")
+    private val FISH = arrayOf("....dd.....", "..ddmmdd.dd", ".dmmmmmmdmd", "dmbmlmmmmmd", ".dmmmmmmdmd", "..ddmmdd.dd", "....dd.....")
+    private val BERRIES = arrayOf("...a..a..", "....aa...", ".dd.dd...", "dmld.dmld", "dmmd.dmmd", ".dd.dd...", "...dmld..", "...dmmd..", "....dd...")
+    private val ROOT = arrayOf("...aa...", "..a..a..", "..dmmd..", ".dmlmmd.", "dmmmmmmd", "dmmmmmmd", ".dmmmmd.", "..dmmd..", "...dd...")
+    private val SCROLL = arrayOf("mmmmmmmmmm", "maaaaaaaam", "mabbbaaaam", "maabbbaaam", "maaaabbbam", "maaaaaaaam", "mmmmmmmmmm")
+
+    private fun itemPack2(name: String, t: Tile): Boolean {
+        val gold = rgb(250, 214, 64); val iron = rgb(214, 214, 218); val wood = rgb(137, 103, 55)
+        if (name.startsWith("dye_")) { mask(t, DYE, DYE_COLORS.getValue(name.removePrefix("dye_"))); return true }
+        if (name.startsWith("potion_")) {
+            val c = when (name.removePrefix("potion_")) {
+                "healing" -> rgb(248, 36, 35); "regeneration" -> rgb(205, 92, 171); "swiftness" -> rgb(124, 175, 198)
+                "leaping" -> rgb(60, 230, 90); "fire_resistance" -> rgb(228, 154, 58); "strength" -> rgb(150, 36, 40)
+                else -> rgb(240, 232, 214)
+            }
+            mask(t, BOTTLE, rgb(210, 226, 236), c); return true
+        }
+        when (name) {
+            "raw_iron" -> mask(t, LUMP, rgb(216, 176, 148), iron)
+            "raw_gold" -> mask(t, LUMP, rgb(236, 190, 60))
+            "raw_copper" -> mask(t, LUMP, rgb(200, 110, 70))
+            "iron_nugget" -> mask(t, NUGGET, iron)
+            "gold_nugget" -> mask(t, NUGGET, gold)
+            "quartz" -> mask(t, GEM, rgb(236, 230, 224))
+            "amethyst_shard" -> mask(t, GEM, rgb(170, 116, 226))
+            "prismarine_shard" -> mask(t, GEM, rgb(96, 168, 150))
+            "prismarine_crystals" -> mask(t, DUST, rgb(180, 236, 214))
+            "echo_shard" -> mask(t, GEM, rgb(20, 80, 92))
+            "heart_of_the_sea" -> mask(t, EYE, rgb(40, 110, 200), rgb(120, 220, 240), rgb(230, 250, 255))
+            "nether_star" -> mask(t, STAR, rgb(236, 240, 250))
+            "nautilus_shell" -> mask(t, SHELL, rgb(236, 206, 186), rgb(190, 120, 110))
+            "honeycomb" -> mask(t, HEX, rgb(236, 176, 50), rgb(250, 214, 110))
+            "scute" -> mask(t, GEM, rgb(70, 170, 70))
+            "rabbit_hide" -> mask(t, arrayOf("..dddddd..", ".dmmmmmmd.", "dmmmlmmmmd", "dmmmmmmmmd", ".dmmmmmmd.", "..dd..dd.."), rgb(190, 150, 110))
+            "rabbit_foot" -> mask(t, arrayOf("...dd...", "..dmmd..", "..dmmd..", "..dmmd..", ".dmmmmd.", "dmmlmmmd", "dmmmmmmd", ".dmmmmd.", "..a..a.."), rgb(200, 170, 130), rgb(240, 230, 210))
+            "phantom_membrane" -> mask(t, WINGS, rgb(206, 200, 176))
+            "ghast_tear" -> mask(t, TEAR, rgb(200, 236, 240))
+            "blaze_rod" -> { sprite(t); line(t, 3, 13, 12, 3, rgb(250, 190, 40)); t[12, 3] = rgb(255, 240, 150); t[3, 13] = rgb(200, 120, 20) }
+            "blaze_powder" -> mask(t, DUST, rgb(250, 170, 40))
+            "ender_pearl" -> mask(t, ORB, rgb(30, 120, 110))
+            "ender_eye" -> mask(t, EYE, rgb(50, 140, 90), rgb(180, 220, 120), rgb(20, 40, 30))
+            "spider_eye" -> mask(t, ORB, rgb(170, 40, 60))
+            "fermented_spider_eye" -> mask(t, ORB, rgb(170, 90, 120))
+            "magma_cream" -> mask(t, LUMP, rgb(220, 120, 40))
+            "ink_sac" -> mask(t, LUMP, rgb(46, 44, 56))
+            "glow_ink_sac" -> mask(t, LUMP, rgb(60, 180, 170))
+            "cocoa_beans" -> mask(t, BEANS, rgb(120, 76, 40))
+            "sugar" -> mask(t, DUST, rgb(246, 246, 246))
+            "egg" -> mask(t, EGG, rgb(236, 222, 190))
+            "snowball" -> mask(t, ORB, rgb(246, 250, 255))
+            "bowl" -> mask(t, BOWL, rgb(150, 110, 60), rgb(90, 64, 34))
+            "glass_bottle" -> mask(t, BOTTLE, rgb(210, 226, 236), 0x40FFFFFF)
+            "honey_bottle" -> mask(t, BOTTLE, rgb(210, 226, 236), rgb(240, 170, 40))
+            "milk_bucket" -> { bucket(t, false); for (x in 4..11) { t[x, 6] = rgb(250, 250, 250); t[x, 7] = rgb(226, 226, 230) } }
+            "name_tag" -> mask(t, TAG, rgb(214, 196, 150), rgb(120, 100, 70))
+            "lead" -> { sprite(t); for (a in 0..30) { val ang = a / 30.0 * Math.PI * 2; t[(7 + Math.cos(ang) * 4).toInt(), (6 + Math.sin(ang) * 4).toInt()] = rgb(160, 120, 80) }; line(t, 9, 9, 13, 14, rgb(160, 120, 80), false); t[13, 14] = rgb(112, 196, 90) }
+            "saddle" -> mask(t, SADDLE, rgb(130, 76, 40), iron)
+            "firework_rocket" -> { sprite(t); line(t, 4, 12, 9, 7, rgb(200, 40, 40)); line(t, 5, 12, 10, 7, rgb(220, 60, 60)); line(t, 10, 6, 12, 4, rgb(236, 236, 236), false); line(t, 3, 13, 1, 15, wood, false) }
+            "fire_charge" -> mask(t, ORB, rgb(90, 30, 20), rgb(250, 150, 40)).also { t[7, 7] = rgb(250, 150, 40); t[8, 8] = rgb(250, 200, 60); t[6, 9] = rgb(250, 120, 30) }
+            "map" -> mask(t, SCROLL, rgb(236, 226, 190), rgb(214, 200, 150), rgb(90, 150, 70))
+            "book_and_quill" -> { mask(t, arrayOf("ddddddddd.", "dmmmmmmmad", "dmlmmmmmad", "dmmmmmmmad", "dmmmmmmmad", "dmmmmmmmad", "ddddddddd."), rgb(130, 60, 40), rgb(236, 232, 214)); line(t, 9, 2, 14, 0, rgb(240, 240, 240), false) }
+            "enchanted_book" -> mask(t, arrayOf("ddddddddd.", "dmmmmmmmad", "dmlmmlmmad", "dmmmmmmmad", "dmmlmmlmad", "dmmmmmmmad", "ddddddddd."), rgb(120, 60, 170), rgb(236, 232, 214))
+            "shears" -> mask(t, SHEARS, iron, rgb(120, 120, 124), rgb(190, 50, 50))
+            "fishing_rod" -> { sprite(t); line(t, 2, 14, 12, 2, wood); for (y in 3..12) t[13, y] = rgb(230, 230, 230); t[13, 13] = rgb(180, 180, 186) }
+            "shield" -> mask(t, SHIELD, rgb(150, 112, 62), rgb(180, 180, 186))
+            "trident" -> { sprite(t); line(t, 3, 14, 11, 6, rgb(70, 150, 140)); for ((x, y) in listOf(11 to 2, 13 to 4, 14 to 1)) line(t, 11, 6, x, y, rgb(110, 200, 180), false) }
+            "crossbow" -> { sprite(t); line(t, 3, 13, 12, 4, wood); for (a in 0..16) { val ang = Math.PI * (-0.25 + a / 16.0); t[(8 + Math.cos(ang) * 6).toInt().coerceIn(0, 15), (8 - Math.sin(ang) * 6).toInt().coerceIn(0, 15)] = rgb(90, 90, 96) }; line(t, 5, 3, 13, 11, rgb(230, 230, 230), false) }
+            "mace" -> { sprite(t); line(t, 3, 14, 9, 8, wood); disc(t, 11f, 5f, 3.6f, rgb(120, 120, 130)); t[11, 1] = rgb(160, 160, 170); t[15, 5] = rgb(160, 160, 170); t[7, 5] = rgb(160, 160, 170) }
+            "compass" -> { sprite(t); disc(t, 8f, 8f, 6.5f, rgb(170, 170, 176)); disc(t, 8f, 8f, 5f, rgb(236, 232, 214), false); line(t, 8, 8, 8, 4, rgb(210, 40, 40), false); line(t, 8, 9, 8, 12, rgb(60, 60, 70), false) }
+            "clock" -> { sprite(t); disc(t, 8f, 8f, 6.5f, gold); disc(t, 8f, 8f, 5f, rgb(120, 170, 230), false); for (x in 3..12) for (y in 8..12) if (t[x, y] == rgb(120, 170, 230)) t[x, y] = rgb(60, 90, 40); line(t, 8, 8, 8, 4, rgb(40, 40, 40), false) }
+            "spyglass" -> { sprite(t); line(t, 3, 13, 12, 4, rgb(200, 120, 70)); line(t, 4, 13, 13, 4, rgb(170, 100, 60)); t[12, 3] = rgb(170, 116, 226); t[13, 3] = rgb(170, 116, 226) }
+            "elytra" -> mask(t, WINGS, rgb(150, 140, 176))
+            "turtle_helmet" -> mask(t, HELMET, rgb(70, 170, 70))
+            "helmet_chainmail" -> mask(t, HELMET, rgb(150, 150, 156))
+            "chestplate_chainmail" -> mask(t, CHEST, rgb(150, 150, 156))
+            "leggings_chainmail" -> mask(t, LEGS, rgb(150, 150, 156))
+            "boots_chainmail" -> mask(t, BOOTS, rgb(150, 150, 156))
+            "totem" -> mask(t, TOTEM, gold, rgb(40, 180, 90))
+            "cookie" -> mask(t, COOKIE, rgb(200, 140, 70), rgb(90, 50, 24))
+            "pumpkin_pie" -> mask(t, PIE, rgb(230, 140, 50), rgb(200, 160, 90))
+            "mushroom_stew" -> mask(t, BOWL, rgb(150, 110, 60), rgb(180, 130, 90))
+            "beetroot_soup" -> mask(t, BOWL, rgb(150, 110, 60), rgb(160, 30, 50))
+            "rabbit_stew" -> mask(t, BOWL, rgb(150, 110, 60), rgb(190, 120, 60))
+            "beetroot" -> mask(t, ROOT, rgb(150, 30, 50), rgb(80, 160, 50))
+            "raw_chicken" -> mask(t, MEAT, rgb(240, 196, 170), rgb(236, 230, 210))
+            "cooked_chicken" -> mask(t, MEAT, rgb(200, 140, 80), rgb(236, 230, 210))
+            "raw_rabbit" -> mask(t, MEAT, rgb(230, 160, 150), rgb(236, 230, 210))
+            "cooked_rabbit" -> mask(t, MEAT, rgb(180, 110, 60), rgb(236, 230, 210))
+            "raw_cod" -> mask(t, FISH, rgb(190, 170, 130), rgb(20, 20, 20), rgb(20, 20, 20))
+            "cooked_cod" -> mask(t, FISH, rgb(210, 170, 110), rgb(20, 20, 20), rgb(20, 20, 20))
+            "raw_salmon" -> mask(t, FISH, rgb(200, 90, 70), rgb(20, 20, 20), rgb(20, 20, 20))
+            "cooked_salmon" -> mask(t, FISH, rgb(200, 120, 70), rgb(20, 20, 20), rgb(20, 20, 20))
+            "tropical_fish" -> mask(t, FISH, rgb(240, 130, 40), rgb(20, 20, 20), rgb(20, 20, 20)).also { for (y in 2..4) t[8, y + 3] = rgb(250, 250, 250) }
+            "pufferfish" -> mask(t, ORB, rgb(230, 200, 60)).also { t[5, 6] = rgb(20, 20, 20); t[10, 6] = rgb(20, 20, 20); t[4, 4] = rgb(120, 110, 40); t[11, 4] = rgb(120, 110, 40) }
+            "sweet_berries" -> mask(t, BERRIES, rgb(200, 30, 50), rgb(60, 130, 50))
+            "glow_berries" -> mask(t, BERRIES, rgb(250, 170, 40), rgb(60, 130, 50))
+            "dried_kelp" -> { sprite(t); for (k in 0..2) line(t, 4 + k * 3, 13, 6 + k * 3, 3, rgb(60, 80, 40), false) }
+            "golden_carrot" -> mask(t, arrayOf("....aa.a", ".....aa.", "....dmd.", "...dmmd.", "..dmld..", ".dmmd...", "dmmd....", "dd......"), gold, rgb(80, 160, 50))
+            "chorus_fruit" -> mask(t, LUMP, rgb(150, 100, 160), rgb(200, 160, 210))
+            "poisonous_potato" -> mask(t, LUMP, rgb(170, 190, 80))
+            else -> return false
+        }
+        return true
+    }
+
     private fun survivalItem(name: String, t: Tile): Boolean {
+        if (itemPack2(name, t)) return true
         val armorColors = mapOf(
             "leather" to rgb(150, 90, 50), "gold" to rgb(250, 214, 64), "iron" to rgb(214, 214, 218),
             "diamond" to rgb(80, 226, 214), "netherite" to rgb(76, 68, 72),

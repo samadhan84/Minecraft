@@ -25,7 +25,7 @@ jobs:
         run: |
           # Only the Windows native libraries are needed on Windows.
           New-Item -ItemType Directory -Force build/pkg/input | Out-Null
-          Get-ChildItem desktop/build/install/VishuCraft/lib/*.jar |
+          Get-ChildItem desktop/build/install/DhruvilCraft/lib/*.jar |
             Where-Object { $_.Name -notmatch 'natives-(linux|macos)' } |
             Copy-Item -Destination build/pkg/input
           java -cp "build/pkg/input/*" com.vishucraft.desktop.MainKt --make-icon build/pkg
@@ -38,15 +38,15 @@ jobs:
           choco install wixtoolset -y --no-progress
           "C:\Program Files (x86)\WiX Toolset v3.14\bin" | Out-File -Append -Encoding utf8 $env:GITHUB_PATH
 
-      - name: Build installer (VishuCraft-Setup.exe) and portable zip
+      - name: Build installer (DhruvilCraft-Setup.exe) and portable zip
         shell: pwsh
         run: |
           $version = "1.0.${{ github.run_number }}"
           $common = @(
-            '--name', 'VishuCraft',
+            '--name', 'DhruvilCraft',
             '--app-version', $version,
-            '--vendor', 'VishuCraft',
-            '--description', 'VishuCraft - a block building and survival game',
+            '--vendor', 'DhruvilCraft',
+            '--description', 'DhruvilCraft - a block building and survival game',
             '--input', 'build/pkg/input',
             '--main-jar', 'desktop.jar',
             '--main-class', 'com.vishucraft.desktop.MainKt',
@@ -54,12 +54,12 @@ jobs:
             '--dest', 'dist'
           )
           jpackage --type exe @common --win-menu --win-shortcut --win-dir-chooser --win-per-user-install `
-            --win-menu-group VishuCraft --win-upgrade-uuid 7b1d3c52-6a0e-4f4e-9d0c-5b9a2f6c1e21
+            --win-menu-group DhruvilCraft --win-upgrade-uuid 7b1d3c52-6a0e-4f4e-9d0c-5b9a2f6c1e21
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          Rename-Item "dist/VishuCraft-$version.exe" "VishuCraft-Setup.exe"
+          Rename-Item "dist/DhruvilCraft-$version.exe" "DhruvilCraft-Setup.exe"
           jpackage --type app-image @common --dest dist/portable
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          Compress-Archive -Path dist/portable/VishuCraft -DestinationPath dist/VishuCraft-portable.zip
+          Compress-Archive -Path dist/portable/DhruvilCraft -DestinationPath dist/DhruvilCraft-portable.zip
           Get-ChildItem dist
 
       - name: Check that the game starts
@@ -70,15 +70,15 @@ jobs:
         run: |
           # Software OpenGL (Mesa llvmpipe) so the game can run on the runner, which has no graphics card.
           New-Item -ItemType Directory -Force crash, smoke | Out-Null
-          Copy-Item -Recurse dist/portable/VishuCraft smoke/
+          Copy-Item -Recurse dist/portable/DhruvilCraft smoke/
           $mesa = "https://github.com/pal1000/mesa-dist-win/releases/download/24.2.8/mesa3d-24.2.8-release-msvc.7z"
           try {
             Invoke-WebRequest $mesa -OutFile mesa.7z
             7z x mesa.7z -omesa | Out-Null
             Get-ChildItem mesa/x64 | Select-Object Name
-            Copy-Item mesa/x64/*.dll smoke/VishuCraft/
+            Copy-Item mesa/x64/*.dll smoke/DhruvilCraft/
           } catch { Write-Host "Could not download Mesa: $_" }
-          $p = Start-Process smoke/VishuCraft/VishuCraft.exe -ArgumentList '--demo', "$PWD/screenshots" -PassThru -NoNewWindow `
+          $p = Start-Process smoke/DhruvilCraft/DhruvilCraft.exe -ArgumentList '--demo', "$PWD/screenshots" -PassThru -NoNewWindow `
             -RedirectStandardOutput crash/stdout.txt -RedirectStandardError crash/stderr.txt
           if (-not $p.WaitForExit(240000)) { $p.Kill(); Write-Host "Timed out" }
           Get-Content crash/stdout.txt, crash/stderr.txt -ErrorAction SilentlyContinue
@@ -89,10 +89,10 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: VishuCraft-windows
+          name: DhruvilCraft-windows
           path: |
-            dist/VishuCraft-Setup.exe
-            dist/VishuCraft-portable.zip
+            dist/DhruvilCraft-Setup.exe
+            dist/DhruvilCraft-portable.zip
 
       - uses: actions/upload-artifact@v4
         if: always()

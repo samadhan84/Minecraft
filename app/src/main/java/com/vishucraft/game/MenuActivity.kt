@@ -43,7 +43,7 @@ class MenuActivity : Activity() {
             gravity = Gravity.CENTER_HORIZONTAL
         }
         val title = TextView(this).apply {
-            text = "VishuCraft"
+            text = "DhruvilCraft"
             textSize = 54f
             typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
             setTextColor(Color.rgb(230, 230, 230))

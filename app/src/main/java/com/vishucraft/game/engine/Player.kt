@@ -23,6 +23,9 @@ class Player {
 
     var x = 0f; var y = 0f; var z = 0f
     var vx = 0f; var vy = 0f; var vz = 0f
+    /** Walking speed and jump height multipliers (sprinting, potions). */
+    var speedMul = 1f
+    var jumpMul = 1f
     var yaw = 0f
     var pitch = 0f
     var onGround = false
@@ -79,13 +82,13 @@ class Player {
             if (jump) vy = approach(vy, 4f, 30f * dt)
             vy = vy.coerceIn(-3f, 5f)
         } else {
-            val speed = WALK_SPEED
+            val speed = WALK_SPEED * speedMul
             val accel = if (onGround) 50f else 12f
             vx = approach(vx, wx * speed, accel * dt)
             vz = approach(vz, wz * speed, accel * dt)
             vy -= GRAVITY * dt
             if (vy < -55f) vy = -55f
-            if (jump && onGround) vy = JUMP_VELOCITY
+            if (jump && onGround) vy = JUMP_VELOCITY * jumpMul
         }
 
         // Ladders: climb when pushing forward or jumping, otherwise slide down slowly.

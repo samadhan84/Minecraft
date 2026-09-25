@@ -333,9 +333,16 @@ class IconAtlas {
                 } else {
                     val top = if (d.facing == Facing.ALL) d.front else d.top
                     val left = if (d.facing == Facing.HORIZONTAL) d.front else d.side
-                    face(g, tile(top), floatArrayOf(0f, s * 0.25f, s * 0.5f, 0f, s * 0.5f, s * 0.5f), 1f, ox, oy)
-                    face(g, tile(left), floatArrayOf(0f, s * 0.25f, s * 0.5f, s * 0.5f, 0f, s * 0.75f), 0.8f, ox, oy)
-                    face(g, tile(d.side), floatArrayOf(s * 0.5f, s * 0.5f, s, s * 0.25f, s * 0.5f, s), 0.6f, ox, oy)
+                    // Buttons and pressure plates are drawn as thin slabs.
+                    val h = when {
+                        d.render == RenderType.BOX && d.box != null -> d.box!![4].coerceAtLeast(0.25f)
+                        Blocks.isPlate(slot) -> 0.2f
+                        else -> 1f
+                    }
+                    val o = (1f - h) * s * 0.5f
+                    face(g, tile(top), floatArrayOf(0f, s * 0.25f + o, s * 0.5f, o, s * 0.5f, s * 0.5f + o), 1f, ox, oy)
+                    face(g, tile(left), floatArrayOf(0f, s * 0.25f + o, s * 0.5f, s * 0.5f + o, 0f, s * 0.75f), 0.8f, ox, oy)
+                    face(g, tile(d.side), floatArrayOf(s * 0.5f, s * 0.5f + o, s, s * 0.25f + o, s * 0.5f, s), 0.6f, ox, oy)
                 }
             }
         }

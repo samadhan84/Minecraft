@@ -9,17 +9,25 @@ import kotlin.math.abs
 import kotlin.math.sqrt
 
 class Projectile(var x: Float, var y: Float, var z: Float, var vx: Float, var vy: Float, var vz: Float,
-                 val fromPlayer: Boolean, val damage: Float) {
+                 val fromPlayer: Boolean, val damage: Float, val kind: Int = ARROW) {
     var age = 0f
     var stuck = false
+
+    companion object {
+        const val ARROW = 0
+        const val SNOWBALL = 1
+        const val EGG = 2
+        const val PEARL = 3
+    }
 }
 
 /** Arrows from the player's bow and thorns from Rattlers. */
 class Projectiles(private val world: World) {
     val list = ArrayList<Projectile>()
 
-    fun shoot(x: Float, y: Float, z: Float, vx: Float, vy: Float, vz: Float, fromPlayer: Boolean, damage: Float) {
-        list.add(Projectile(x, y, z, vx, vy, vz, fromPlayer, damage))
+    fun shoot(x: Float, y: Float, z: Float, vx: Float, vy: Float, vz: Float, fromPlayer: Boolean, damage: Float,
+              kind: Int = Projectile.ARROW) {
+        list.add(Projectile(x, y, z, vx, vy, vz, fromPlayer, damage, kind))
     }
 
     fun update(dt: Float, game: Game) {
@@ -39,8 +47,10 @@ class Projectiles(private val world: World) {
                     val m = game.mobs.list.firstOrNull { !it.dead && abs(it.x - a.x) < it.halfWidth + 0.3f && abs(it.z - a.z) < it.halfWidth + 0.3f && a.y >= it.y - 0.1f && a.y <= it.y + it.height + 0.25f }
                     if (m != null) {
                         val len = sqrt(a.vx * a.vx + a.vz * a.vz).coerceAtLeast(0.1f)
+                        // Snowballs and eggs only knock back; they do no damage.
                         game.mobs.damage(m, a.damage, a.vx / len * 0.6f, a.vz / len * 0.6f)
                         game.sound("arrow_hit", a.x, a.y, a.z, 0.8f)
+                        if (a.kind == Projectile.PEARL) game.pearlLanded(a.x, m.y, a.z)
                         hit = true; break
                     }
                 } else {
@@ -53,8 +63,15 @@ class Projectiles(private val world: World) {
                 val b = world.getBlock(floorInt(a.x), floorInt(a.y), floorInt(a.z))
                 if (Blocks.solid[b]) {
                     game.sound("arrow_hit", a.x, a.y, a.z, 0.5f)
+                    if (a.kind == Projectile.PEARL) {
+                        // Land on top of (or just in front of) the block that was hit.
+                        val bx = a.x - a.vx * 0.03f; val bz = a.z - a.vz * 0.03f
+                        var by = a.y - a.vy * 0.03f
+                        while (Blocks.solid[world.getBlock(floorInt(bx), floorInt(by), floorInt(bz))] && by < 127f) by += 1f
+                        game.pearlLanded(bx, floorInt(by).toFloat(), bz)
+                    }
                     // Player arrows can be picked up again (survival).
-                    if (a.fromPlayer && game.survival) {
+                    if (a.kind == Projectile.ARROW && a.fromPlayer && game.survival) {
                         game.drops.spawn(ItemStack(Items.find("Arrow")), a.x - a.vx * 0.02f, a.y - a.vy * 0.02f, a.z - a.vz * 0.02f)
                     }
                     hit = true; break

@@ -34,8 +34,8 @@ fun main(args: Array<String>) {
         try { File(Paths.home, "crash.txt").writeText(sw.toString()) } catch (_: Exception) {}
         System.err.println(sw)
         try {
-            javax.swing.JOptionPane.showMessageDialog(null, "VishuCraft stopped because of an error:\n\n${e}\n\nDetails were saved to ${File(Paths.home, "crash.txt")}",
-                "VishuCraft", javax.swing.JOptionPane.ERROR_MESSAGE)
+            javax.swing.JOptionPane.showMessageDialog(null, "DhruvilCraft stopped because of an error:\n\n${e}\n\nDetails were saved to ${File(Paths.home, "crash.txt")}",
+                "DhruvilCraft", javax.swing.JOptionPane.ERROR_MESSAGE)
         } catch (_: Throwable) {}
         kotlin.system.exitProcess(1)
     }
@@ -122,7 +122,7 @@ class App(private val demo: File?) {
         glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 1)
         glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE)
         glfwWindowHint(GLFW_DEPTH_BITS, 24)
-        window = glfwCreateWindow(1280, 720, "VishuCraft", NULL, NULL)
+        window = glfwCreateWindow(1280, 720, "DhruvilCraft", NULL, NULL)
         if (window == NULL) error("Could not open a window. Please update your graphics driver (OpenGL 2.1 is needed).")
         glfwMakeContextCurrent(window)
         GL.createCapabilities()
@@ -219,8 +219,7 @@ class App(private val demo: File?) {
         fun k(vararg codes: Int) = codes.any { keys[it] }
         input.moveForward = (if (k(GLFW_KEY_W, GLFW_KEY_UP)) 1f else 0f) - (if (k(GLFW_KEY_S, GLFW_KEY_DOWN)) 1f else 0f)
         input.moveStrafe = (if (k(GLFW_KEY_D, GLFW_KEY_RIGHT)) 1f else 0f) - (if (k(GLFW_KEY_A, GLFW_KEY_LEFT)) 1f else 0f)
-        // Sprint: a little faster walking by pushing the stick "further".
-        if (k(GLFW_KEY_LEFT_CONTROL, GLFW_KEY_RIGHT_CONTROL) && input.moveForward > 0f) input.moveForward = 1.3f
+        input.sprint = k(GLFW_KEY_LEFT_CONTROL, GLFW_KEY_RIGHT_CONTROL) && input.moveForward > 0f
         input.jumpHeld = k(GLFW_KEY_SPACE)
         input.descendHeld = k(GLFW_KEY_LEFT_SHIFT, GLFW_KEY_RIGHT_SHIFT, GLFW_KEY_C)
         input.breakHeld = leftDown
@@ -234,7 +233,7 @@ class App(private val demo: File?) {
 
     private fun releaseInputs(input: GameInput) {
         input.moveForward = 0f; input.moveStrafe = 0f
-        input.jumpHeld = false; input.descendHeld = false; input.breakHeld = false
+        input.jumpHeld = false; input.descendHeld = false; input.breakHeld = false; input.sprint = false
         leftDown = false; rightDown = false
     }
 
@@ -355,7 +354,7 @@ class App(private val demo: File?) {
         val bw = 400f
         when (menu) {
             Menu.TITLE -> {
-                ui.text("VishuCraft", cx, ui.height * 0.16f, 72f, rgba(255, 220, 90), 1)
+                ui.text("DhruvilCraft", cx, ui.height * 0.16f, 72f, rgba(255, 220, 90), 1)
                 ui.text("Build, explore and survive", cx, ui.height * 0.16f + 84, 20f, rgba(220, 220, 220), 1)
                 var y = ui.height * 0.42f
                 if (ui.button("Play", cx - bw / 2, y, bw, 44f)) menu = Menu.WORLDS
@@ -725,10 +724,14 @@ class App(private val demo: File?) {
             f == 400 -> shot("03-creative-world")
             f == 402 -> overlay = Overlay.CREATIVE
             f == 406 -> shot("04-creative-inventory")
-            f == 408 -> overlay = Overlay.PAUSE
-            f == 412 -> shot("05-pause")
-            f == 414 -> { leaveWorld(); menu = Menu.CREATE; nameField.text = "Demo survival"; seedField.text = "777"; survival = true }
-            f == 416 -> demoCreate = true
+            f == 407 -> creative?.tab = 4
+            f == 409 -> shot("04b-creative-items")
+            f == 410 -> creative?.tab = 3
+            f == 412 -> shot("04c-creative-redstone")
+            f == 413 -> overlay = Overlay.PAUSE
+            f == 415 -> shot("05-pause")
+            f == 417 -> { leaveWorld(); menu = Menu.CREATE; nameField.text = "Demo survival"; seedField.text = "777"; survival = true }
+            f == 419 -> demoCreate = true
             f == 800 -> shot("06-survival-world")
             f == 802 -> session?.let {
                 it.game.inventory.add(com.vishucraft.game.world.Items.find("Minecart"), 1)

@@ -204,7 +204,7 @@ class WorldRenderer(private val game: Game) {
         glClear(GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT)
 
         val far = game.renderDistance * 16f + 24f
-        Matrix.perspectiveM(proj, 0, game.fov, width.toFloat() / height, 0.05f, 400f)
+        Matrix.perspectiveM(proj, 0, if (game.zoomed) 18f else game.fov, width.toFloat() / height, 0.05f, 400f)
         p.lookDir(dir)
         val bobY = sin(bobbing * 2f) * 0.04f
         val shake = game.shake * 0.25f

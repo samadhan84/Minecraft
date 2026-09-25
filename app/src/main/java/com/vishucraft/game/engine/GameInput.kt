@@ -10,6 +10,8 @@ class GameInput {
     @Volatile var moveStrafe = 0f
     @Volatile var jumpHeld = false
     @Volatile var descendHeld = false
+    /** Run a little faster (Ctrl on computers). */
+    @Volatile var sprint = false
     /** True while the player is holding a finger on the world to mine. */
     @Volatile var breakHeld = false
     /** Selected hotbar slot (0..8). */

@@ -35,6 +35,8 @@ class Redstone(private val world: World, private val set: (Int, Int, Int, Int, I
     /** Supplied by the game: sun brightness and whether something stands on a block. */
     var daylight: () -> Float = { 1f }
     var occupied: (Int, Int, Int) -> Boolean = { _, _, _ -> false }
+    /** How many things stand on a pressure plate (players and mobs; also dropped items when [items]). */
+    var plateLoad: (Int, Int, Int, Boolean) -> Int = { x, y, z, _ -> if (occupied(x, y, z)) 1 else 0 }
     private val fuses = HashMap<Long, Int>()
     private val rnd = Random()
 
@@ -52,10 +54,13 @@ class Redstone(private val world: World, private val set: (Int, Int, Int, Int, I
     private fun setAt(p: Long, id: Int, meta: Int = 0) = set(RedstoneIds.x(p), RedstoneIds.y(p), RedstoneIds.z(p), id, meta)
     private fun opaqueAt(p: Long) = p >= 0 && Blocks.opaque[id(p)]
 
+    /** Stone buttons stay pressed for 1 second, wooden ones for 1.5 seconds. */
     fun pressButton(x: Int, y: Int, z: Int) {
+        val id = world.getBlock(x, y, z)
+        if (!Blocks.isButton(id)) return
         onClick?.invoke(x, y, z)
-        set(x, y, z, Blocks.STONE_BUTTON, 1)
-        buttons[RedstoneIds.pack(x, y, z)] = 10
+        set(x, y, z, id, 1)
+        buttons[RedstoneIds.pack(x, y, z)] = if (id == Blocks.STONE_BUTTON) 10 else 15
     }
 
     fun toggleLever(x: Int, y: Int, z: Int) {
@@ -81,7 +86,8 @@ class Redstone(private val world: World, private val set: (Int, Int, Int, Int, I
                 val e = it.next()
                 e.setValue(e.value - 1)
                 if (e.value <= 0) {
-                    if (id(e.key) == Blocks.STONE_BUTTON) setAt(e.key, Blocks.STONE_BUTTON, 0)
+                    val b = id(e.key)
+                    if (Blocks.isButton(b)) setAt(e.key, b, 0)
                     it.remove()
                 }
             }
@@ -111,10 +117,21 @@ class Redstone(private val world: World, private val set: (Int, Int, Int, Int, I
         val strong = HashSet<Long>()
         /** Cells fed directly by a repeater or observer (dust there gets full power). */
         val directed = HashSet<Long>()
-        // Pressure plates notice players, mobs and items standing on them.
-        for (p in comps) if (id(p) == Blocks.PRESSURE_PLATE) {
-            val pressed = if (occupied(RedstoneIds.x(p), RedstoneIds.y(p), RedstoneIds.z(p))) 1 else 0
-            if (pressed != meta(p)) setAt(p, Blocks.PRESSURE_PLATE, pressed)
+        // Pressure plates notice what stands on them. Stone: players and mobs. Wood: dropped items too.
+        // Weighted plates give a stronger signal the more there is (gold: 1 per thing, iron: 1 per 10).
+        // The plate's meta is its signal strength (0 = not pressed).
+        val levels = HashMap<Long, Int>()
+        for (p in comps) {
+            val pid = id(p)
+            if (!Blocks.isPlate(pid)) continue
+            val n = plateLoad(RedstoneIds.x(p), RedstoneIds.y(p), RedstoneIds.z(p), pid != Blocks.PRESSURE_PLATE)
+            val level = when (pid) {
+                Blocks.GOLD_PLATE -> minOf(15, n)
+                Blocks.IRON_PLATE -> minOf(15, (n + 9) / 10)
+                else -> if (n > 0) 15 else 0
+            }
+            if (level != meta(p)) setAt(p, pid, level)
+            if (level > 0) levels[p] = level
         }
         // Observers pulse when the block in front of them changes.
         for (p in comps) if (id(p) == Blocks.OBSERVER) {
@@ -131,8 +148,13 @@ class Redstone(private val world: World, private val set: (Int, Int, Int, Int, I
             }
         }
         for (p in comps) {
-            when (id(p)) {
-                Blocks.LEVER, Blocks.STONE_BUTTON -> if (meta(p) != 0) {
+            val pid = id(p)
+            if ((Blocks.isButton(pid) || Blocks.isPlate(pid)) && meta(p) != 0) {
+                sources.add(p); dir(p, 1).let { if (it >= 0) strong.add(it) }
+                continue
+            }
+            when (pid) {
+                Blocks.LEVER -> if (meta(p) != 0) {
                     sources.add(p); dir(p, 1).let { if (it >= 0) strong.add(it) }
                 }
                 Blocks.REDSTONE_BLOCK -> sources.add(p)
@@ -140,7 +162,6 @@ class Redstone(private val world: World, private val set: (Int, Int, Int, Int, I
                     sources.add(p); dir(p, 0).let { if (it >= 0) strong.add(it) }
                 }
                 Blocks.DAYLIGHT_SENSOR -> if (daylight() > 0.5f) sources.add(p)
-                Blocks.PRESSURE_PLATE -> if (meta(p) != 0) { sources.add(p); dir(p, 1).let { if (it >= 0) strong.add(it) } }
                 // Directional outputs: they only power what is in front (repeater) or behind (observer).
                 Blocks.REPEATER -> if (meta(p) and Shapes.POWERED != 0) {
                     val front = dir(p, (meta(p) and 7).coerceIn(2, 5))
@@ -162,7 +183,7 @@ class Redstone(private val world: World, private val set: (Int, Int, Int, Int, I
             dust[q] = level
             queue.add(q)
         }
-        for (s in sources) for (f in 0 until 6) seed(dir(s, f), 15)
+        for (s in sources) for (f in 0 until 6) seed(dir(s, f), levels[s] ?: 15)
         for (d in directed) seed(d, 15)
         for (b in strong) if (opaqueAt(b)) for (f in 0 until 6) seed(dir(b, f), 15)
         while (queue.isNotEmpty()) {

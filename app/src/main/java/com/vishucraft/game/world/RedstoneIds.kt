@@ -16,7 +16,8 @@ object RedstoneIds {
             Blocks.OAK_DOOR, Blocks.IRON_DOOR, Blocks.OAK_TRAPDOOR, Blocks.OAK_FENCE_GATE, Blocks.REPEATER, Blocks.OBSERVER,
             Blocks.DAYLIGHT_SENSOR, Blocks.PRESSURE_PLATE, Blocks.POWERED_RAIL,
         )) it[id] = true
-        for (id in 0 until Blocks.COUNT) if (Blocks.isDoor(id) || Blocks.isTrapdoor(id) || Blocks.isGate(id)) it[id] = true
+        for (id in 0 until Blocks.COUNT) if (Blocks.isDoor(id) || Blocks.isTrapdoor(id) || Blocks.isGate(id) ||
+            Blocks.isButton(id) || Blocks.isPlate(id)) it[id] = true
     }
 
     fun isComponent(id: Int) = component[id]
