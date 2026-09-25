@@ -61,6 +61,11 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
     val mobs = Mobs(world)
 
     val drops = ItemEntities(world)
+    val projectiles = Projectiles(world)
+    val carts = Carts(world)
+    val dimension get() = world.dimension
+    private var portalTime = 0f
+    private var bowCooldown = 0f
     val fluids = com.vishucraft.game.world.Fluids(world) { x, y, z, id, meta -> setBlock(x, y, z, id, meta) }
     val nature = Nature(world) { x, y, z, id, meta -> setBlock(x, y, z, id, meta) }
 
@@ -128,6 +133,9 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
         if (survival) player.flying = false
         redstone.onPrime = { x, y, z -> sound("fuse", x + 0.5f, y + 0.5f, z + 0.5f) }
         redstone.onClick = { x, y, z -> sound("click", x + 0.5f, y + 0.5f, z + 0.5f) }
+        redstone.onDoor = { x, y, z -> sound("door", x + 0.5f, y + 0.5f, z + 0.5f) }
+        redstone.daylight = { daylight }
+        redstone.occupied = { x, y, z -> occupied(x, y, z) }
         mobs.onDeath = { m -> if (survival) for ((id, n) in mobDrops(m)) drops.spawn(ItemStack(id, n), m.x, m.y + 0.5f, m.z) }
         // Chunk offsets sorted nearest first, so the area around the player streams in first.
         val r = 16
@@ -157,6 +165,8 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
     /** Sun brightness 0..1, dimmed by rain and brightened by lightning. */
     val daylight: Float
         get() {
+            if (dimension == com.vishucraft.game.world.Dimension.EMBER) return 0.12f
+            if (dimension == com.vishucraft.game.world.Dimension.SKY) return 0.55f
             val s = kotlin.math.sin(timeOfDay * 2 * Math.PI).toFloat()
             val t = ((s + 0.2f) / 0.5f).coerceIn(0f, 1f)
             val sun = t * t * (3 - 2 * t) * (1f - 0.45f * rain)
@@ -194,6 +204,9 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
         player.rotate(look[0] * LOOK_SENSITIVITY * lookScale, -look[1] * LOOK_SENSITIVITY * lookScale)
         // Sticks and remote keys turn at up to 2.4 rad/s.
         player.rotate(input.lookStickX * 2.4f * dt, input.lookStickY * 1.8f * dt)
+        // Aim with this frame's view before handling taps.
+        player.lookDir(dir)
+        target = Raycast.cast(world, player.x, player.eyeY, player.z, dir[0], dir[1], dir[2], REACH)
 
         while (true) {
             when (input.actions.poll() ?: break) {
@@ -204,15 +217,18 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
 
         val loaded = world.isLoaded(player.blockX(), player.blockZ())
         if (loaded) {
-            if (!spawned) {
-                // Drop the player onto the actual generated surface.
-                var y = Chunk.HEIGHT - 2
-                while (y > 1 && !Blocks.solid[world.getBlock(player.blockX(), y, player.blockZ())]) y--
-                player.y = y + 1f
+            if (!spawned || level.arriving) {
+                if (level.arriving) arrive()
+                else {
+                    // Drop the player onto the actual generated surface.
+                    var y = Chunk.HEIGHT - 2
+                    while (y > 1 && !Blocks.solid[world.getBlock(player.blockX(), y, player.blockZ())]) y--
+                    player.y = y + 1f
+                }
                 spawned = true
             }
             lastVy = player.vy
-            player.update(dt, world, input.moveForward, input.moveStrafe, input.jumpHeld, input.descendHeld)
+            if (carts.riding == null) player.update(dt, world, input.moveForward, input.moveStrafe, input.jumpHeld, input.descendHeld)
             // Fall damage when landing hard (not while flying or in water).
             if (player.onGround && !wasOnGround && !player.flying && !player.inWater && lastVy < -14f) {
                 hurtPlayer((-lastVy - 13f) * 0.9f, player.x, player.z, knockback = false)
@@ -242,9 +258,26 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
         if (!survival && health < 20f) health = 20f
         fluids.tick(dt)
         nature.tick(dt, player.blockX(), player.blockZ())
-        updateWeather(dt)
+        if (dimension == com.vishucraft.game.world.Dimension.OVERWORLD) updateWeather(dt) else rain = 0f
+        projectiles.update(dt, this)
+        carts.update(dt, this)
+        if (bowCooldown > 0f) bowCooldown -= dt
+        // Standing in a portal for two seconds travels to the other world.
+        val here = world.getBlock(player.blockX(), floorInt(player.y + 0.5f), player.blockZ())
+        if (here == Blocks.EMBER_PORTAL || here == Blocks.SKY_PORTAL) {
+            portalTime += dt
+            if (portalTime >= 2f) {
+                portalTime = -5f
+                val target = when {
+                    dimension != com.vishucraft.game.world.Dimension.OVERWORLD -> com.vishucraft.game.world.Dimension.OVERWORLD
+                    here == Blocks.EMBER_PORTAL -> com.vishucraft.game.world.Dimension.EMBER
+                    else -> com.vishucraft.game.world.Dimension.SKY
+                }
+                uiEvents.add("dimension:${target.name}")
+            }
+        } else if (portalTime > 0f) portalTime = 0f else if (portalTime < 0f) portalTime = minOf(0f, portalTime + dt)
         furnaceTimer += dt
-        if (furnaceTimer >= 0.25f) { tickFurnaces(furnaceTimer); furnaceTimer = 0f }
+        if (furnaceTimer >= 0.25f) { tickFurnaces(furnaceTimer); tickHoppers(furnaceTimer); furnaceTimer = 0f }
 
         player.lookDir(dir)
         target = Raycast.cast(world, player.x, player.eyeY, player.z, dir[0], dir[1], dir[2], REACH)
@@ -355,7 +388,59 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
             MobType.SHEEP -> listOf(Blocks.WOOL_WHITE to 1, i("Raw Mutton") to 1 + r.nextInt(2))
             MobType.ZOMBIE -> listOf(i("Rotten Flesh") to r.nextInt(3)) + (if (r.nextInt(30) == 0) listOf(i("Iron Ingot") to 1) else emptyList())
             MobType.BOOMLING -> emptyList() // it blew itself up
+            MobType.RATTLER -> listOf(i("Bone") to r.nextInt(3), i("Arrow") to r.nextInt(3))
+            MobType.CRAWLER -> listOf(i("String") to r.nextInt(3), i("Slimeball") to (if (r.nextInt(4) == 0) 1 else 0))
+            MobType.GLIDER -> listOf(i("Feather") to 1 + r.nextInt(2))
+            MobType.CINDER -> listOf(Blocks.MAGMA to r.nextInt(2), i("Glowstone Dust") to r.nextInt(3), i("Netherite Scrap") to (if (r.nextInt(12) == 0) 1 else 0))
+            MobType.WISP -> listOf(i("Emerald") to r.nextInt(2), Blocks.PURPUR to r.nextInt(2))
+            MobType.VILLAGER -> emptyList()
         }.filter { it.second > 0 }
+    }
+
+    /** Is a player, mob or dropped item standing in this block? (pressure plates) */
+    private fun occupied(x: Int, y: Int, z: Int): Boolean {
+        fun inside(px: Float, py: Float, pz: Float) = floorInt(px) == x && floorInt(pz) == z && py >= y && py < y + 0.5f
+        if (inside(player.x, player.y, player.z)) return true
+        if (mobs.list.any { !it.dead && inside(it.x, it.y, it.z) }) return true
+        return drops.list.any { inside(it.x, it.y, it.z) }
+    }
+
+    /** Hoppers pull from the container above (and items lying on top) and push into the one below. */
+    private fun tickHoppers(dt: Float) {
+        for ((pos, e) in world.blockEntities.map) {
+            if (e !is com.vishucraft.game.world.HopperEntity) continue
+            val x = RedstoneIds.x(pos); val y = RedstoneIds.y(pos); val z = RedstoneIds.z(pos)
+            if (!world.isLoaded(x, z) || world.getBlock(x, y, z) != Blocks.HOPPER) continue
+            e.cooldown -= dt
+            if (e.cooldown > 0f) continue
+            e.cooldown = 0.4f
+            // Push one item down.
+            when (val below = world.blockEntities.get(x, y - 1, z)) {
+                is ChestEntity -> e.slots.firstOrNull { it != null }?.let { s -> if (below.insert(s.id, 1, s.damage) == 0) e.takeOne() }
+                is FurnaceEntity -> e.slots.firstOrNull { it != null }?.let { s ->
+                    val smelt = com.vishucraft.game.world.Recipes.smelting.containsKey(s.id)
+                    val target = if (smelt) below.input else below.fuel
+                    val ok = (smelt || Items.fuel(s.id) > 0f) && (target == null || (target.id == s.id && target.count < target.maxStack))
+                    if (ok) {
+                        e.takeOne()
+                        if (target == null) { if (smelt) below.input = ItemStack(s.id, 1) else below.fuel = ItemStack(s.id, 1) } else target.count++
+                    }
+                }
+                else -> {}
+            }
+            // Pull one item from above.
+            when (val above = world.blockEntities.get(x, y + 1, z)) {
+                is FurnaceEntity -> above.output?.let { o -> if (e.insert(o.id, 1) == 0) { o.count--; if (o.count <= 0) above.output = null } }
+                is ChestEntity -> above.slots.firstOrNull { it != null }?.let { s -> if (e.insert(s.id, 1, s.damage) == 0) above.takeOne() }
+                else -> {}
+            }
+            // Swallow items lying on top.
+            for (d in drops.list) {
+                if (floorInt(d.x) == x && floorInt(d.z) == z && d.y >= y + 0.5f && d.y < y + 1.6f && d.stack.count > 0) {
+                    d.stack.count = e.insert(d.stack.id, d.stack.count, d.stack.damage)
+                }
+            }
+        }
     }
 
     private fun tickFurnaces(dt: Float) {
@@ -415,10 +500,15 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
             when (be) {
                 is ChestEntity -> be.slots.forEach { s -> if (s != null) drops.spawn(s, x + 0.5f, y + 0.5f, z + 0.5f) }
                 is FurnaceEntity -> be.contents().forEach { s -> drops.spawn(s, x + 0.5f, y + 0.5f, z + 0.5f) }
-                null -> {}
+                else -> {}
             }
             if (Blocks[id].hardness > 0f) damageHeld(if (heldItem()?.tool == ToolType.SWORD) 2 else 1)
             exhaust(0.005f)
+        }
+        // Doors come in two halves.
+        if (id == Blocks.OAK_DOOR || id == Blocks.IRON_DOOR) {
+            val oy = if (meta and com.vishucraft.game.world.Shapes.UPPER != 0) y - 1 else y + 1
+            if (world.getBlock(x, oy, z) == id) setBlock(x, oy, z, Blocks.AIR)
         }
         // Keep pistons consistent when one half is mined.
         val n = ChunkMesher.NORMALS
@@ -461,6 +551,28 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
             if (eat(item)) consumeHeld()
             return
         }
+        // Minecarts: tap to get in or out; hitting an empty one picks it up.
+        if (carts.riding != null) { carts.riding = null; player.y += 0.6f; return }
+        carts.raycast(player.x, player.eyeY, player.z, dir[0], dir[1], dir[2], 4f)?.let { c ->
+            if (item?.tool == ToolType.SWORD || item?.tool == ToolType.AXE) {
+                carts.list.remove(c)
+                if (survival) drops.spawn(ItemStack(Items.find("Minecart")), c.x, c.y + 0.5f, c.z)
+            } else carts.riding = c
+            return
+        }
+        // Bows shoot where you look (arrows are used up in survival).
+        if (item?.use == ItemUse.BOW) {
+            if (bowCooldown > 0f) return
+            val arrow = Items.find("Arrow")
+            if (survival && !inventory.remove(arrow, 1)) { uiEvents.add("toast:You need arrows"); return }
+            bowCooldown = 0.6f
+            val speed = 32f
+            projectiles.shoot(player.x, player.eyeY - 0.1f, player.z, dir[0] * speed, dir[1] * speed + 0.6f, dir[2] * speed, true,
+                if (item.name.contains("Enchanted")) 9f else 6f)
+            damageHeld(1)
+            sound("bow", player.x, player.eyeY, player.z)
+            return
+        }
         // Tapping a mob attacks it if it is closer than the targeted block.
         val mobHit = mobs.raycast(player.x, player.eyeY, player.z, dir[0], dir[1], dir[2], 4f)
         if (mobHit != null) {
@@ -493,6 +605,16 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
             Blocks.LEVER -> { redstone.toggleLever(t.x, t.y, t.z); return }
             Blocks.STONE_BUTTON -> { redstone.pressButton(t.x, t.y, t.z); return }
             Blocks.CRAFTING_TABLE -> { uiEvents.add("open:craft"); return }
+            Blocks.OAK_DOOR, Blocks.OAK_TRAPDOOR, Blocks.OAK_FENCE_GATE -> { toggleOpen(t.x, t.y, t.z); return }
+            Blocks.REPEATER -> {
+                val m = world.getMeta(t.x, t.y, t.z)
+                val delay = ((m shr 3) and 3) + 1 and 3
+                setBlock(t.x, t.y, t.z, Blocks.REPEATER, (m and (7 or com.vishucraft.game.world.Shapes.POWERED)) or (delay shl 3))
+                sound("click", t.x + 0.5f, t.y + 0.5f, t.z + 0.5f)
+                uiEvents.add("toast:Repeater delay: ${delay + 1}")
+                return
+            }
+            Blocks.HOPPER -> { world.blockEntities.hopper(t.x, t.y, t.z); uiEvents.add("open:hopper:${t.x},${t.y},${t.z}"); return }
             Blocks.FURNACE -> { world.blockEntities.furnace(t.x, t.y, t.z); uiEvents.add("open:furnace:${t.x},${t.y},${t.z}"); return }
             Blocks.CHEST -> { world.blockEntities.chest(t.x, t.y, t.z); uiEvents.add("open:chest:${t.x},${t.y},${t.z}"); return }
             Blocks.NOTE_BLOCK, Blocks.JUKEBOX -> if (item == null) return
@@ -505,7 +627,19 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
                 ItemUse.PATH -> if (t.block == Blocks.GRASS && world.getBlock(t.x, t.y + 1, t.z) == Blocks.AIR) {
                     setBlock(t.x, t.y, t.z, Blocks.DIRT_PATH); damageHeld(1)
                 }
-                ItemUse.IGNITE -> if (t.block == Blocks.TNT) { redstone.prime(t.x, t.y, t.z); damageHeld(1) }
+                ItemUse.IGNITE -> when {
+                    t.block == Blocks.TNT -> { redstone.prime(t.x, t.y, t.z); damageHeld(1) }
+                    t.block == Blocks.OBSIDIAN || t.block == Blocks.QUARTZ_BLOCK -> {
+                        val portal = if (t.block == Blocks.OBSIDIAN) Blocks.EMBER_PORTAL else Blocks.SKY_PORTAL
+                        if (lightPortal(t.x + t.nx, t.y + t.ny, t.z + t.nz, t.block, portal)) {
+                            damageHeld(1); uiEvents.add("toast:The portal opens!")
+                        } else uiEvents.add("toast:Build a frame (at least 4 wide, 5 tall) to make a portal")
+                    }
+                }
+                ItemUse.CART -> if (com.vishucraft.game.world.Rails.isRail(t.block)) {
+                    carts.list.add(Cart(t.x + 0.5f, t.y.toFloat(), t.z + 0.5f))
+                    consumeHeld()
+                }
                 ItemUse.BUCKET -> if (Blocks.isLiquid(t.block) && world.getMeta(t.x, t.y, t.z) == 0) {
                     val full = Items.find(if (t.block == Blocks.LAVA) "Lava Bucket" else "Water Bucket")
                     setBlock(t.x, t.y, t.z, Blocks.AIR)
@@ -534,6 +668,84 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
         place(t, sel)
     }
 
+    /**
+     * Fills a vertical rectangular frame of [frame] blocks around (x, y, z) with portal blocks.
+     * The inside may be 2..21 wide and 3..21 tall.
+     */
+    private fun lightPortal(x: Int, y: Int, z: Int, frame: Int, portal: Int): Boolean {
+        if (world.getBlock(x, y, z) != Blocks.AIR) return false
+        for (axis in 0..1) {
+            val ax = if (axis == 0) 1 else 0; val az = 1 - ax
+            // Find the frame's bottom-left inner corner.
+            var by = y
+            while (by > y - 22 && world.getBlock(x, by - 1, z) == Blocks.AIR) by--
+            if (world.getBlock(x, by - 1, z) != frame) continue
+            var left = 0
+            while (left < 22 && world.getBlock(x - ax * (left + 1), by, z - az * (left + 1)) == Blocks.AIR) left++
+            val lx = x - ax * left; val lz = z - az * left
+            if (world.getBlock(lx - ax, by, lz - az) != frame) continue
+            var w = 0
+            while (w < 22 && world.getBlock(lx + ax * w, by, lz + az * w) == Blocks.AIR) w++
+            var h = 0
+            while (h < 22 && world.getBlock(lx, by + h, lz) == Blocks.AIR) h++
+            if (w !in 2..21 || h !in 3..21) continue
+            var ok = true
+            for (i in 0 until w) for (j in 0 until h) if (world.getBlock(lx + ax * i, by + j, lz + az * i) != Blocks.AIR) ok = false
+            for (i in 0 until w) { if (world.getBlock(lx + ax * i, by - 1, lz + az * i) != frame || world.getBlock(lx + ax * i, by + h, lz + az * i) != frame) ok = false }
+            for (j in 0 until h) { if (world.getBlock(lx - ax, by + j, lz - az) != frame || world.getBlock(lx + ax * w, by + j, lz + az * w) != frame) ok = false }
+            if (!ok) continue
+            for (i in 0 until w) for (j in 0 until h) setBlock(lx + ax * i, by + j, lz + az * i, portal, 0)
+            sound("fuse", x + 0.5f, y + 0.5f, z + 0.5f)
+            return true
+        }
+        return false
+    }
+
+    /** After travelling: stand somewhere safe and build a portal home right here. */
+    private fun arrive() {
+        level.arriving = false
+        val x = player.blockX(); val z = player.blockZ()
+        val y = world.generator.surfaceHeight(x, z).coerceIn(8, Chunk.HEIGHT - 12) + 1
+        val (frame, portal) = when (dimension) {
+            com.vishucraft.game.world.Dimension.SKY -> Blocks.QUARTZ_BLOCK to Blocks.SKY_PORTAL
+            com.vishucraft.game.world.Dimension.EMBER -> Blocks.OBSIDIAN to Blocks.EMBER_PORTAL
+            com.vishucraft.game.world.Dimension.OVERWORLD -> Blocks.OBSIDIAN to Blocks.EMBER_PORTAL
+        }
+        // A small platform and a 4x5 frame beside the player.
+        for (dx in -2..3) for (dz in -2..2) {
+            setBlock(x + dx, y - 1, z + dz, if (dimension == com.vishucraft.game.world.Dimension.SKY) Blocks.END_STONE else frame, 0)
+            for (dy in 0..4) setBlock(x + dx, y + dy, z + dz, Blocks.AIR, 0)
+        }
+        val fz = z + 2
+        for (i in -1..2) for (j in -1..3) {
+            val edge = i == -1 || i == 2 || j == -1 || j == 3
+            setBlock(x + i, y + j, fz, if (edge) frame else portal, 0)
+        }
+        player.x = x + 0.5f; player.y = y.toFloat(); player.z = z + 0.5f
+        player.vx = 0f; player.vy = 0f; player.vz = 0f
+        portalTime = -5f
+    }
+
+    /** Opens or closes a door (both halves), trapdoor or fence gate. */
+    fun toggleOpen(x: Int, y: Int, z: Int) {
+        val id = world.getBlock(x, y, z)
+        val m = world.getMeta(x, y, z) xor com.vishucraft.game.world.Shapes.OPEN
+        setBlock(x, y, z, id, m)
+        if (id == Blocks.OAK_DOOR || id == Blocks.IRON_DOOR) {
+            val oy = if (m and com.vishucraft.game.world.Shapes.UPPER != 0) y - 1 else y + 1
+            if (world.getBlock(x, oy, z) == id) setBlock(x, oy, z, id, world.getMeta(x, oy, z) xor com.vishucraft.game.world.Shapes.OPEN)
+        }
+        sound("door", x + 0.5f, y + 0.5f, z + 0.5f)
+    }
+
+    private fun updateRail(x: Int, y: Int, z: Int) {
+        val id = world.getBlock(x, y, z)
+        if (!com.vishucraft.game.world.Rails.isRail(id)) return
+        val m = world.getMeta(x, y, z)
+        val shape = com.vishucraft.game.world.Rails.shapeFor(world, x, y, z, id == Blocks.POWERED_RAIL)
+        if (shape != (m and 15)) setBlock(x, y, z, id, (m and 15.inv()) or shape)
+    }
+
     private fun place(t: RayHit, id: Int) {
         if (id <= Blocks.AIR || id >= Blocks.COUNT) return
         val def = Blocks[id]
@@ -555,7 +767,26 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
             if (!soil) return
         }
         if (def.needsSupport && !Blocks.solid[below] && id != Blocks.SUGAR_CANE) return
-        setBlock(x, y, z, id, placementMeta(def.facing))
+        val S = com.vishucraft.game.world.Shapes
+        var meta = placementMeta(def.facing)
+        when (id) {
+            Blocks.OAK_DOOR, Blocks.IRON_DOOR -> {
+                if (y + 1 >= Chunk.HEIGHT || world.getBlock(x, y + 1, z) != Blocks.AIR || !Blocks.solid[below]) return
+                setBlock(x, y + 1, z, id, meta or S.UPPER)
+            }
+            Blocks.OAK_STAIRS, Blocks.COBBLESTONE_STAIRS, Blocks.STONE_BRICK_STAIRS, Blocks.BRICK_STAIRS,
+            Blocks.SANDSTONE_STAIRS, Blocks.OAK_TRAPDOOR -> if (t.ny == -1) meta = meta or S.UPPER
+            Blocks.LADDER -> {
+                if (t.ny != 0 || !Blocks.opaque[t.block]) return
+                meta = if (t.nz == 1) 2 else if (t.nz == -1) 3 else if (t.nx == 1) 4 else 5
+            }
+            Blocks.REPEATER, Blocks.OBSERVER -> meta = meta xor 1
+        }
+        setBlock(x, y, z, id, meta)
+        if (com.vishucraft.game.world.Rails.isRail(id)) {
+            updateRail(x, y, z)
+            for ((dx, dz) in arrayOf(1 to 0, -1 to 0, 0 to 1, 0 to -1)) for (dy in -1..1) updateRail(x + dx, y + dy, z + dz)
+        }
         consumeHeld()
         blockSound(id, x, y, z, 0.8f)
         uiEvents.add("place")

@@ -13,6 +13,8 @@ object RedstoneIds {
         for (id in intArrayOf(
             Blocks.REDSTONE_DUST, Blocks.REDSTONE_TORCH, Blocks.LEVER, Blocks.STONE_BUTTON, Blocks.REDSTONE_LAMP,
             Blocks.REDSTONE_LAMP_ON, Blocks.PISTON, Blocks.STICKY_PISTON, Blocks.REDSTONE_BLOCK, Blocks.TNT,
+            Blocks.OAK_DOOR, Blocks.IRON_DOOR, Blocks.OAK_TRAPDOOR, Blocks.OAK_FENCE_GATE, Blocks.REPEATER, Blocks.OBSERVER,
+            Blocks.DAYLIGHT_SENSOR, Blocks.PRESSURE_PLATE, Blocks.POWERED_RAIL,
         )) it[id] = true
     }
 

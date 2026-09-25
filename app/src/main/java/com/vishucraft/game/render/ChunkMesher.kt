@@ -258,6 +258,21 @@ class ChunkMesher {
                     emitBox(opaqueOut, px, y, pz, plate, id, meta, false, frontFace = f, frontTile = frontTile)
                     emitBox(opaqueOut, px, y, pz, arm, id, meta, false, sideTile = def.side)
                 }
+                RenderType.SHAPE -> {
+                    val boxes = com.vishucraft.game.world.Shapes.boxes(id, meta, false) { side ->
+                        val n = NORMALS[side]; block(px + n[0], y, pz + n[2])
+                    }
+                    for (b in boxes) emitBox(opaqueOut, px, y, pz, b, id, meta, emissive)
+                }
+                RenderType.RAIL -> emitRail(opaqueOut, px, y, pz, id, meta)
+                RenderType.PORTAL -> {
+                    for (f in 0 until 6) {
+                        val n = NORMALS[f]
+                        val nb = block(px + n[0], y + n[1], pz + n[2])
+                        if (nb == id || opaque[nb]) continue
+                        emitFace(transOut, px, y, pz, f, def.top, true, 1f)
+                    }
+                }
                 RenderType.NONE -> {}
             }
         }
@@ -387,6 +402,38 @@ class ChunkMesher {
                 out.put(bx + lx, by + ly, bz + lz,
                     u0 + u.coerceIn(0f, 1f) * TILE_UV, v0 + v.coerceIn(0f, 1f) * TILE_UV, l, boxLight)
             }
+        }
+    }
+
+    /**
+     * Rails lie flat (or slope for ascending pieces). Shape in meta bits 0..3:
+     * 0 N-S, 1 E-W, 2..5 ascending towards +X, -X, -Z, +Z, 6..9 curves (SE, SW, NW, NE).
+     */
+    private fun emitRail(out: FloatBuilder, px: Int, y: Int, pz: Int, id: Int, meta: Int) {
+        val shape = meta and 15
+        val tile = Blocks.tile(id, meta, 0)
+        val l = CAVE + (1f - CAVE) * sky(px, y, pz)
+        val bl = lightCurve(blockLight(px, y, pz).toFloat())
+        val x0 = (px - 1).toFloat(); val z0 = (pz - 1).toFloat()
+        val base = y + 1f / 16f
+        // Corner heights for slopes: order (x0,z1), (x1,z1), (x1,z0), (x0,z0).
+        val h = floatArrayOf(0f, 0f, 0f, 0f)
+        when (shape) {
+            2 -> { h[1] = 1f; h[2] = 1f }
+            3 -> { h[0] = 1f; h[3] = 1f }
+            4 -> { h[2] = 1f; h[3] = 1f }
+            5 -> { h[0] = 1f; h[1] = 1f }
+        }
+        // Rotate the texture so the track follows the shape.
+        val rot = when (shape) { 1, 2, 3 -> 1; 6 -> 0; 7 -> 1; 8 -> 2; 9 -> 3; else -> 0 }
+        val u0 = tileU(tile); val v0 = tileV(tile)
+        val uv = arrayOf(floatArrayOf(0f, 1f), floatArrayOf(1f, 1f), floatArrayOf(1f, 0f), floatArrayOf(0f, 0f))
+        val cx = floatArrayOf(x0, x0 + 1, x0 + 1, x0); val cz = floatArrayOf(z0 + 1, z0 + 1, z0, z0)
+        out.ensure(8 * FLOATS_PER_VERTEX)
+        for (pass in 0..1) for (k in 0 until 4) {
+            val c = if (pass == 0) k else 3 - k // second pass: underside, so slopes are visible from below
+            val t = uv[(c + rot) and 3]
+            out.put(cx[c], base + h[c], cz[c], u0 + t[0] * TILE_UV, v0 + t[1] * TILE_UV, l, bl)
         }
     }
 }

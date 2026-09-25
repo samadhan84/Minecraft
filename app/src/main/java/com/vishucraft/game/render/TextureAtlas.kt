@@ -840,6 +840,71 @@ object TextureAtlas {
                     else -> scale(rgb(172, 142, 92), t.jitter(0.05f))
                 }
             }
+            else -> return newMobSkin(name, t)
+        }
+        return true
+    }
+
+    /** Skins for the Stage 3 creatures (all original designs). */
+    private fun newMobSkin(name: String, t: Tile): Boolean {
+        when (name) {
+            "rattler_bark" -> { logSide(t, rgb(92, 70, 46), rgb(60, 44, 28), false); repeat(6) { t[t.rnd.nextInt(16), t.rnd.nextInt(16)] = rgb(80, 120, 50) } }
+            "rattler_chest" -> { logSide(t, rgb(92, 70, 46), rgb(60, 44, 28), false); for (y in 3..12) t[7, y] = rgb(60, 150, 140); t[6, 6] = rgb(60, 150, 140); t[8, 9] = rgb(60, 150, 140) }
+            "rattler_hood" -> leaves(t, rgb(56, 104, 44))
+            "rattler_face" -> {
+                t.fill { x, y -> if (y < 3 || x < 2 || x > 13) scale(rgb(56, 104, 44), t.jitter(0.15f)) else scale(rgb(40, 30, 24), t.jitter(0.1f)) }
+                for (x in 4..5) t[x, 7] = rgb(90, 250, 220); for (x in 10..11) t[x, 7] = rgb(90, 250, 220)
+            }
+            "crawler_shell" -> {
+                val (ids, edge) = voronoi(t.rnd, 6)
+                t.fill { x, y -> if (edge[y][x] < 0.9f) rgb(40, 48, 70) else scale(rgb(78, 94, 130), (0.85f + ids[y][x] * 0.04f) * t.jitter(0.05f)) }
+            }
+            "crawler_face" -> {
+                noisy(t, rgb(70, 84, 118), 0.06f, 0.2f)
+                for ((x, y) in listOf(3 to 5, 5 to 4, 10 to 4, 12 to 5)) { t[x, y] = rgb(255, 190, 60); t[x + 1, y] = rgb(255, 190, 60) }
+                for (x in 5..10) t[x, 11] = rgb(30, 30, 40)
+            }
+            "crawler_leg" -> noisy(t, rgb(50, 58, 84), 0.1f, 0.2f)
+            "glider_body" -> noisy(t, rgb(80, 60, 110), 0.08f, 0.2f)
+            "glider_wing" -> {
+                noisy(t, rgb(96, 70, 140), 0.06f, 0.2f)
+                repeat(7) { val x = t.rnd.nextInt(15); val y = t.rnd.nextInt(15); t[x, y] = rgb(220, 210, 240); t[x + 1, y] = rgb(200, 190, 230) }
+                for (x in 0 until 16) t[x, 15] = rgb(50, 36, 70)
+            }
+            "cinder_skin" -> {
+                val (_, edge) = voronoi(t.rnd, 8)
+                t.fill { x, y -> if (edge[y][x] < 1f) rgb(255, 150, 30) else scale(rgb(70, 30, 22), t.jitter(0.12f)) }
+            }
+            "cinder_face" -> {
+                t.fill { _, _ -> scale(rgb(70, 30, 22), t.jitter(0.1f)) }
+                for (x in 3..5) { t[x, 6] = rgb(255, 230, 90); t[x, 7] = rgb(255, 180, 40) }
+                for (x in 10..12) { t[x, 6] = rgb(255, 230, 90); t[x, 7] = rgb(255, 180, 40) }
+                for (x in 4..11) t[x, 11] = if (x % 2 == 0) rgb(255, 150, 30) else rgb(40, 16, 10)
+            }
+            "wisp_core" -> {
+                val vn = valueNoise(t.rnd, 4)
+                t.fill { x, y -> mix(rgb(120, 60, 200), rgb(220, 180, 255), vn[y][x]) }
+            }
+            "wisp_face" -> {
+                val vn = valueNoise(t.rnd, 4)
+                t.fill { x, y -> mix(rgb(120, 60, 200), rgb(220, 180, 255), vn[y][x]) }
+                for (y in 5..8) { t[5, y] = rgb(20, 10, 40); t[10, y] = rgb(20, 10, 40) }
+            }
+            "wisp_ring" -> t.fill { x, y -> if ((x + y) % 3 == 0) rgb(250, 240, 180) else rgb(200, 180, 110) }
+            "villager_skin" -> noisy(t, rgb(224, 176, 140), 0.03f, 0.08f)
+            "villager_face" -> {
+                noisy(t, rgb(224, 176, 140), 0.03f, 0.08f)
+                for (x in 0 until 16) { t[x, 0] = rgb(110, 70, 40); t[x, 1] = rgb(110, 70, 40) }
+                t[4, 6] = rgb(40, 60, 90); t[11, 6] = rgb(40, 60, 90)
+                t[3, 9] = rgb(236, 150, 140); t[12, 9] = rgb(236, 150, 140)
+                for (x in 6..9) t[x, 11] = rgb(150, 80, 70)
+            }
+            "villager_hat" -> t.fill { x, y -> scale(if ((x + y) % 3 == 0) rgb(220, 190, 110) else rgb(236, 206, 124), t.jitter(0.04f)) }
+            "villager_tunic" -> { noisy(t, rgb(70, 130, 70), 0.06f, 0.15f); for (x in 0 until 16) t[x, 12] = rgb(110, 80, 40) }
+            "villager_pants" -> noisy(t, rgb(100, 80, 60), 0.06f, 0.15f)
+            "minecart" -> mask(t, arrayOf("dddddddddddd", "dmmmmmmmmmmd", "dmllllllllmd", "dmmmmmmmmmmd", "dmmmmmmmmmmd", ".dddddddddd.", "..aa....aa..", "..aa....aa.."), rgb(150, 150, 156), rgb(60, 60, 60))
+            "cart_side" -> t.fill { x, y -> if (y < 2 || y > 13 || x == 0 || x == 15) rgb(90, 90, 96) else scale(rgb(150, 150, 156), t.jitter(0.05f)) }
+            "cart_floor" -> planks(t, rgb(130, 100, 60))
             else -> return false
         }
         return true
@@ -961,6 +1026,107 @@ object TextureAtlas {
         return true
     }
 
+    private fun door(t: Tile, wood: Boolean, top: Boolean) {
+        val base = if (wood) rgb(150, 112, 62) else rgb(196, 196, 200)
+        val dark = scale(base, 0.62f)
+        t.fill { x, y ->
+            val frame = x == 0 || x == 15 || (top && y == 0) || (!top && y == 15)
+            when {
+                frame -> dark
+                wood && (x == 5 || x == 10) -> scale(base, 0.8f)
+                !wood && (y % 5 == 2) -> scale(base, 0.85f)
+                else -> scale(base, t.jitter(0.05f))
+            }
+        }
+        if (top) {
+            // A window in the upper half.
+            for (y in 3..10) for (x in 3..12) t[x, y] = if (x == 7 || x == 8 || y == 6) dark else withAlpha(rgb(200, 226, 240), if (wood) 255 else 255)
+        } else {
+            t[12, 2] = if (wood) rgb(60, 60, 60) else rgb(90, 90, 90); t[12, 3] = t[12, 2]
+        }
+    }
+
+    private fun buildingAndRedstone(name: String, t: Tile): Boolean {
+        when (name) {
+            "oak_door_bottom" -> door(t, true, false)
+            "oak_door_top" -> door(t, true, true)
+            "iron_door_bottom" -> door(t, false, false)
+            "iron_door_top" -> door(t, false, true)
+            "oak_trapdoor" -> t.fill { x, y ->
+                when {
+                    x == 0 || y == 0 || x == 15 || y == 15 || x == 7 || x == 8 -> rgb(96, 72, 40)
+                    (x in 2..5 || x in 10..13) && (y in 2..5 || y in 10..13) -> 0
+                    else -> scale(rgb(150, 112, 62), t.jitter(0.05f))
+                }
+            }
+            "ladder" -> t.fill { x, y ->
+                when {
+                    x in 2..3 || x in 12..13 -> scale(rgb(140, 104, 58), t.jitter(0.05f))
+                    y % 4 == 1 && x in 4..11 -> rgb(160, 122, 70)
+                    else -> 0
+                }
+            }
+            "iron_bars" -> t.fill { x, y -> if (x % 4 == 1 || y == 1 || y == 14) scale(rgb(120, 122, 126), t.jitter(0.05f)) else 0 }
+            "repeater", "repeater_on" -> {
+                noisy(t, rgb(160, 160, 160), 0.03f, 0.08f)
+                val on = name.endsWith("on")
+                val c = if (on) rgb(255, 50, 20) else rgb(110, 20, 16)
+                for (y in 2..13) t[7, y] = c
+                for (i in 0..2) { t[7 - i, 3 + i] = c; t[8 + i, 3 + i] = c }
+                for (y in listOf(4, 10)) { t[6, y] = rgb(120, 88, 50); t[8, y] = rgb(120, 88, 50); t[7, y - 1] = c }
+            }
+            "observer_top", "observer_side" -> t.fill { x, y ->
+                if (y % 5 == 0 || x == 0 || x == 15) rgb(70, 70, 72) else scale(rgb(104, 104, 108), t.jitter(0.05f))
+            }
+            "observer_front" -> {
+                noisy(t, rgb(100, 100, 104), 0.05f, 0.1f)
+                for (x in 2..13) { t[x, 4] = rgb(40, 40, 44); t[x, 11] = rgb(40, 40, 44) }
+                for (y in 5..10) for (x in 3..12) t[x, y] = if ((x + y) % 3 == 0) rgb(60, 60, 64) else rgb(80, 80, 84)
+            }
+            "observer_back", "observer_back_on" -> {
+                noisy(t, rgb(100, 100, 104), 0.05f, 0.1f)
+                val c = if (name.endsWith("on")) rgb(255, 60, 30) else rgb(90, 20, 16)
+                for (y in 6..9) for (x in 6..9) t[x, y] = c
+            }
+            "daylight_sensor" -> {
+                planks(t, rgb(150, 112, 62))
+                for (y in 2..13) for (x in 2..13) t[x, y] = if ((x + y) % 4 == 0) rgb(170, 200, 230) else rgb(110, 140, 180)
+            }
+            "daylight_sensor_side" -> planks(t, rgb(150, 112, 62))
+            "hopper_top" -> t.fill { x, y ->
+                val d = maxOf(abs(x - 7.5f), abs(y - 7.5f))
+                if (d > 5.5f) rgb(80, 80, 84) else if (d > 4.5f) rgb(60, 60, 64) else rgb(30, 30, 32)
+            }
+            "hopper_side" -> t.fill { x, y -> scale(if (y < 3) rgb(90, 90, 94) else rgb(70, 70, 74), t.jitter(0.06f)) }
+            "rail", "powered_rail", "powered_rail_on" -> {
+                sprite(t)
+                val tie = rgb(110, 80, 44)
+                for (y in 0 until 16 step 4) for (x in 2..13) { t[x, y + 1] = tie; t[x, y + 2] = scale(tie, 0.85f) }
+                val railC = when (name) { "rail" -> rgb(170, 170, 176); "powered_rail" -> rgb(200, 170, 60); else -> rgb(250, 210, 70) }
+                for (y in 0 until 16) { t[3, y] = railC; t[12, y] = railC }
+                if (name != "rail") for (y in 0 until 16 step 4) { t[7, y + 1] = if (name == "powered_rail_on") rgb(255, 50, 20) else rgb(110, 20, 16); t[8, y + 1] = t[7, y + 1] }
+            }
+            "rail_curve" -> {
+                sprite(t)
+                val railC = rgb(170, 170, 176)
+                for (a in 0..40) {
+                    val ang = a / 40.0 * Math.PI / 2
+                    for ((r, c) in listOf(4.5 to railC, 13.0 to railC, 8.5 to rgb(110, 80, 44))) {
+                        val x = (16 - r * Math.cos(ang)).toInt(); val y = (16 - r * Math.sin(ang)).toInt()
+                        if (x in 0..15 && y in 0..15 && (c == railC || a % 6 < 3)) t[x, y] = c
+                    }
+                }
+            }
+            "ember_portal", "sky_portal" -> {
+                val (a, b) = if (name == "ember_portal") rgb(190, 60, 20) to rgb(255, 170, 60) else rgb(40, 150, 200) to rgb(180, 240, 255)
+                val vn = valueNoise(t.rnd, 4)
+                t.fill { x, y -> withAlpha(mix(a, b, (vn[y][x] + ((x * 3 + y * 5) % 7) / 14f).coerceIn(0f, 1f)), 190) }
+            }
+            else -> return false
+        }
+        return true
+    }
+
     /** Crop growth stages and saplings. */
     private fun farming(name: String, t: Tile): Boolean {
         val stem = rgb(80, 150, 50)
@@ -997,7 +1163,7 @@ object TextureAtlas {
                     if (abs(x - 7.5f) + abs(y - 6f) * 1.2f < 5.5f && t.rnd.nextInt(5) != 0) t[x, y] = scale(leaves, t.jitter(0.15f))
                 }
             }
-            else -> return false
+            else -> return buildingAndRedstone(name, t)
         }
         return true
     }

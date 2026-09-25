@@ -1,6 +1,6 @@
 package com.vishucraft.game.world
 
-enum class ItemUse { NONE, TILL, PATH, IGNITE, BUCKET, WATER_BUCKET, EAT, BOW, GROW, LAVA_BUCKET }
+enum class ItemUse { NONE, TILL, PATH, IGNITE, BUCKET, WATER_BUCKET, EAT, BOW, GROW, LAVA_BUCKET, CART }
 
 /** 0 helmet, 1 chestplate, 2 leggings, 3 boots; -1 when not armor. */
 typealias ArmorSlot = Int
@@ -162,6 +162,7 @@ object Items {
         add("Baked Potato", "baked_potato", food = 5)
         add("Bone Meal", "bone_meal", use = ItemUse.GROW)
         add("Lava Bucket", "lava_bucket", use = ItemUse.LAVA_BUCKET, maxStack = 1, fuel = 100f)
+        add("Minecart", "minecart", use = ItemUse.CART, maxStack = 1)
 
         all = list
         for (i in all) { byId[i.id] = i; byName[i.name] = i.id }

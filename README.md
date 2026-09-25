@@ -20,6 +20,16 @@ procedurally in code when the game starts.
 - **Weather**: rain, snow in cold biomes, and thunderstorms with lightning flashes.
 - **Farming**: till soil, plant wheat, carrots and potatoes, grow saplings into trees, use bone meal, and breed
   cows, sheep and pigs.
+- **Structures**: villages (houses with doors and glass panes, farms, a well and villagers), desert temples with a
+  trapped treasure room, and underground dungeons with loot chests (sometimes holding enchanted gear).
+- **Two more worlds**: light an obsidian frame to reach the fiery **Ember Realm** (lava seas, ember rock, glowing
+  clusters, ancient debris), or a quartz frame for the floating **Sky Isles**. A portal home is built where you arrive.
+- **New creatures** (original designs): Rattlers (thornwood archers), Crawlers (wall-climbing rock beetles), Night
+  Gliders (swooping moth-wings), Cinder Brutes in the Ember Realm, Void Wisps in the Sky Isles, and villagers.
+- **Building pieces**: doors (wood and iron), trapdoors, five kinds of stairs, fences and gates, ladders, glass panes
+  and iron bars, all with proper collision.
+- **More redstone**: repeaters (1-4 tick delay), observers, daylight sensors, pressure plates, hoppers, rails,
+  powered rails and rideable minecarts; doors react to redstone. Bows and arrows too.
 - **Crafting** from a recipe list (small recipes anywhere, the rest at a crafting table), a **furnace** that smelts ore,
   sand, clay and food using coal, charcoal or wood, and **chests** with 27 slots. Mobs drop leather, meat, wool and more.
 

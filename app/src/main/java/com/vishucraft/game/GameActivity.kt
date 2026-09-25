@@ -92,6 +92,7 @@ class GameActivity : Activity() {
     private lateinit var downButton: HudButton
     private lateinit var root: FrameLayout
     private lateinit var settings: Settings
+    private lateinit var worldDirForDim: File
     private lateinit var sounds: com.vishucraft.game.audio.Sounds
     private lateinit var status: StatusView
     private lateinit var screen: ContainerScreen
@@ -107,8 +108,15 @@ class GameActivity : Activity() {
             intent.getStringExtra(EXTRA_NAME) ?: "My World",
             if (intent.getBooleanExtra(EXTRA_MODE, false)) GameMode.SURVIVAL else GameMode.CREATIVE,
         )
-        world = World(level.seed, dir)
+        // Each dimension keeps its own chunks in a sub-folder of the world.
+        val dimDir = when (level.dimension) {
+            com.vishucraft.game.world.Dimension.OVERWORLD -> dir
+            com.vishucraft.game.world.Dimension.EMBER -> File(dir, "ember")
+            com.vishucraft.game.world.Dimension.SKY -> File(dir, "sky")
+        }
+        world = World(level.seed, dimDir, level.dimension)
         game = Game(world, level, input, dir)
+        worldDirForDim = dir
         settings = Settings(this)
         sounds = com.vishucraft.game.audio.Sounds(this)
         game.soundSink = { name, x, y, z, gain ->
@@ -328,6 +336,23 @@ class GameActivity : Activity() {
             .show()
     }
 
+    /** Saves, switches dimension and reloads the game screen in the new world. */
+    private fun travel(target: com.vishucraft.game.world.Dimension) {
+        val name = when (target) {
+            com.vishucraft.game.world.Dimension.EMBER -> "the Ember Realm"
+            com.vishucraft.game.world.Dimension.SKY -> "the Sky Isles"
+            com.vishucraft.game.world.Dimension.OVERWORLD -> "the Overworld"
+        }
+        showToast("Travelling to $name…")
+        glView.queueEvent {
+            game.save()
+            level.dimension = target
+            level.arriving = true
+            level.write(worldDirForDim)
+            runOnUiThread { recreate() }
+        }
+    }
+
     private fun showToast(text: String) {
         toast.text = text
         toast.animate().cancel()
@@ -345,6 +370,12 @@ class GameActivity : Activity() {
             e == "died" -> showToast("You died! Respawning…")
             e.startsWith("toast:") -> showToast(e.removePrefix("toast:"))
             e == "open:craft" -> { releaseInputs(); screen.open(ContainerScreen.Mode.CRAFTING) }
+            e.startsWith("dimension:") -> travel(com.vishucraft.game.world.Dimension.valueOf(e.removePrefix("dimension:")))
+            e.startsWith("open:hopper:") -> {
+                val (x, y, z) = e.substringAfterLast(':').split(',').map { it.toInt() }
+                releaseInputs()
+                screen.open(ContainerScreen.Mode.CHEST, chestEntity = world.blockEntities.hopper(x, y, z))
+            }
             e.startsWith("open:chest:") || e.startsWith("open:furnace:") -> {
                 val (x, y, z) = e.substringAfterLast(':').split(',').map { it.toInt() }
                 releaseInputs()

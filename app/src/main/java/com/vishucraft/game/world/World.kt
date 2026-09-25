@@ -14,11 +14,20 @@ import kotlin.math.floor
  * Chunk storage, background generation and persistence.
  * Block edits happen on the game (GL) thread; generation runs on worker threads.
  */
-class World(val seed: Long, private val saveDir: File?) {
+enum class Dimension { OVERWORLD, EMBER, SKY }
+
+class World(val seed: Long, private val saveDir: File?, val dimension: Dimension = Dimension.OVERWORLD) {
+    /** Villagers placed by structure generation, waiting to be spawned on the game thread. */
+    val pendingVillagers = java.util.concurrent.ConcurrentLinkedQueue<Triple<Int, Int, Int>>()
+
     val chunks = ConcurrentHashMap<Long, Chunk>()
     /** Positions (see [RedstoneIds.pack]) of every redstone component in loaded chunks. */
     val components: MutableSet<Long> = ConcurrentHashMap.newKeySet()
-    val generator = TerrainGenerator(seed)
+    val generator: WorldGenerator = when (dimension) {
+        Dimension.OVERWORLD -> TerrainGenerator(seed, this)
+        Dimension.EMBER -> EmberGenerator(seed)
+        Dimension.SKY -> SkyGenerator(seed)
+    }
 
     private val pending: MutableSet<Long> = ConcurrentHashMap.newKeySet()
     val workers: ExecutorService = Executors.newFixedThreadPool(
@@ -180,9 +189,12 @@ class LevelData(
     var food: Float = 20f,
     var saturation: Float = 5f,
     val inventory: Inventory = Inventory(),
+    var dimension: Dimension = Dimension.OVERWORLD,
+    /** True right after travelling through a portal: find a safe spot and build a return portal. */
+    var arriving: Boolean = false,
 ) {
     companion object {
-        private const val VERSION = 2
+        private const val VERSION = 3
 
         /** Creative worlds start with a useful hotbar; survival starts empty-handed. */
         fun create(seed: Long, name: String, mode: GameMode): LevelData {
@@ -203,7 +215,7 @@ class LevelData(
             return try {
                 DataInputStream(f.inputStream().buffered()).use { d ->
                     val version = d.readInt()
-                    if (version != 1 && version != VERSION) return null
+                    if (version !in 1..VERSION) return null
                     val l = LevelData(d.readLong())
                     l.x = d.readFloat(); l.y = d.readFloat(); l.z = d.readFloat()
                     l.yaw = d.readFloat(); l.pitch = d.readFloat()
@@ -219,6 +231,10 @@ class LevelData(
                         l.name = d.readUTF()
                         l.health = d.readFloat(); l.food = d.readFloat(); l.saturation = d.readFloat()
                         l.inventory.read(d)
+                        if (version >= 3) {
+                            l.dimension = Dimension.values()[d.readInt().coerceIn(0, 2)]
+                            l.arriving = d.readBoolean()
+                        }
                     }
                     l.hasPlayer = true
                     l
@@ -245,6 +261,8 @@ class LevelData(
             d.writeUTF(name)
             d.writeFloat(health); d.writeFloat(food); d.writeFloat(saturation)
             inventory.write(d)
+            d.writeInt(dimension.ordinal)
+            d.writeBoolean(arriving)
         }
         tmp.renameTo(f)
     }

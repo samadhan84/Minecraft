@@ -120,7 +120,8 @@ class ContainerScreen(
         var y = p.top + dp(34f)
         val x0 = p.left + dp(12f) + cell * 1.2f
         if (mode == Mode.CHEST) {
-            for (i in 0 until 27) cells.add(Cell(CHEST_SLOT, i, RectF(x0 + (i % 9) * cell, y + (i / 9) * cell, x0 + (i % 9 + 1) * cell, y + (i / 9 + 1) * cell)))
+            val n = chest?.slots?.size ?: 27
+            for (i in 0 until n) cells.add(Cell(CHEST_SLOT, i, RectF(x0 + (i % 9) * cell, y + (i / 9) * cell, x0 + (i % 9 + 1) * cell, y + (i / 9 + 1) * cell)))
             y += cell * 3.3f
         }
         // Armor column on the left.
@@ -341,7 +342,10 @@ class ContainerScreen(
         val p = layoutCells()
         canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), dim)
         canvas.drawRect(p, panel); canvas.drawRect(p, border)
-        val name = when (mode) { Mode.INVENTORY -> "Inventory"; Mode.CRAFTING -> "Crafting Table"; Mode.CHEST -> "Chest"; Mode.FURNACE -> "Furnace" }
+        val name = when (mode) {
+            Mode.INVENTORY -> "Inventory"; Mode.CRAFTING -> "Crafting Table"; Mode.FURNACE -> "Furnace"
+            Mode.CHEST -> if (chest is com.vishucraft.game.world.HopperEntity) "Hopper" else "Chest"
+        }
         canvas.drawText(name, p.left + dp(12f), p.top + dp(24f), title)
         val hint = when (mode) {
             Mode.CHEST, Mode.FURNACE -> "Tap an item to move it across"

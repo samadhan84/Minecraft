@@ -57,6 +57,50 @@ object MobModels {
             box(-0.5f, 0.75f, -0.125f, -0.25f, 1.45f, 0.125f, tiles("zombie_skin", top = "zombie_shirt"), 2, pivotY = 1.35f),
             box(0.25f, 0.75f, -0.125f, 0.5f, 1.45f, 0.125f, tiles("zombie_skin", top = "zombie_shirt"), 2, pivotY = 1.35f),
         ),
+        MobType.RATTLER to listOf(
+            box(-0.2f, 0f, -0.1f, -0.02f, 0.8f, 0.1f, tiles("rattler_bark"), 1),
+            box(0.02f, 0f, -0.1f, 0.2f, 0.8f, 0.1f, tiles("rattler_bark"), -1),
+            box(-0.24f, 0.8f, -0.13f, 0.24f, 1.45f, 0.13f, tiles("rattler_bark", front = "rattler_chest")),
+            box(-0.27f, 1.45f, -0.27f, 0.27f, 1.95f, 0.27f, tiles("rattler_hood", front = "rattler_face")),
+            box(-0.42f, 0.85f, -0.08f, -0.26f, 1.45f, 0.08f, tiles("rattler_bark"), 2, pivotY = 1.4f),
+            box(0.26f, 0.85f, -0.08f, 0.42f, 1.45f, 0.08f, tiles("rattler_bark"), 2, pivotY = 1.4f),
+        ),
+        MobType.CRAWLER to listOf(
+            box(-0.55f, 0.25f, -0.6f, 0.55f, 0.7f, 0.55f, tiles("crawler_shell")),
+            box(-0.3f, 0.2f, -0.9f, 0.3f, 0.55f, -0.6f, tiles("crawler_shell", front = "crawler_face")),
+        ) + listOf(-0.35f, 0f, 0.35f).flatMap { z ->
+            listOf(
+                box(-0.95f, 0.05f, z - 0.06f, -0.55f, 0.18f, z + 0.06f, tiles("crawler_leg"), if (z == 0f) 1 else -1, pivotY = 0.12f),
+                box(0.55f, 0.05f, z - 0.06f, 0.95f, 0.18f, z + 0.06f, tiles("crawler_leg"), if (z == 0f) -1 else 1, pivotY = 0.12f),
+            )
+        },
+        MobType.GLIDER to listOf(
+            box(-0.18f, 0.1f, -0.5f, 0.18f, 0.3f, 0.45f, tiles("glider_body")),
+            box(-1.1f, 0.2f, -0.3f, -0.18f, 0.24f, 0.35f, tiles("glider_wing")),
+            box(0.18f, 0.2f, -0.3f, 1.1f, 0.24f, 0.35f, tiles("glider_wing")),
+            box(-0.12f, 0.15f, 0.45f, 0.12f, 0.25f, 0.9f, tiles("glider_body")),
+        ),
+        MobType.CINDER to listOf(
+            box(-0.3f, 0f, -0.15f, -0.02f, 0.85f, 0.15f, tiles("cinder_skin"), 1),
+            box(0.02f, 0f, -0.15f, 0.3f, 0.85f, 0.15f, tiles("cinder_skin"), -1),
+            box(-0.4f, 0.85f, -0.25f, 0.4f, 1.6f, 0.25f, tiles("cinder_skin")),
+            box(-0.25f, 1.6f, -0.22f, 0.25f, 2.0f, 0.22f, tiles("cinder_skin", front = "cinder_face")),
+            box(-0.62f, 0.7f, -0.14f, -0.4f, 1.55f, 0.14f, tiles("cinder_skin"), 1, pivotY = 1.5f),
+            box(0.4f, 0.7f, -0.14f, 0.62f, 1.55f, 0.14f, tiles("cinder_skin"), -1, pivotY = 1.5f),
+        ),
+        MobType.WISP to listOf(
+            box(-0.3f, 0.2f, -0.3f, 0.3f, 0.8f, 0.3f, tiles("wisp_core", front = "wisp_face")),
+            box(-0.55f, 0.47f, -0.55f, 0.55f, 0.53f, 0.55f, tiles("wisp_ring")),
+        ),
+        MobType.VILLAGER to listOf(
+            box(-0.25f, 0f, -0.125f, 0f, 0.75f, 0.125f, tiles("villager_pants"), 1),
+            box(0f, 0f, -0.125f, 0.25f, 0.75f, 0.125f, tiles("villager_pants"), -1),
+            box(-0.26f, 0.75f, -0.15f, 0.26f, 1.45f, 0.15f, tiles("villager_tunic")),
+            box(-0.25f, 1.45f, -0.25f, 0.25f, 1.95f, 0.25f, tiles("villager_skin", front = "villager_face", top = "villager_hat")),
+            box(-0.4f, 1.9f, -0.4f, 0.4f, 1.96f, 0.4f, tiles("villager_hat")),
+            box(-0.48f, 0.8f, -0.1f, -0.26f, 1.45f, 0.1f, tiles("villager_tunic"), -1, pivotY = 1.4f),
+            box(0.26f, 0.8f, -0.1f, 0.48f, 1.45f, 0.1f, tiles("villager_tunic"), 1, pivotY = 1.4f),
+        ),
         MobType.BOOMLING to listOf(
             box(-0.4f, 0.35f, -0.4f, 0.4f, 1.1f, 0.4f, tiles("boomling_shell", front = "boomling_face")),
             box(-0.3f, 1.1f, -0.3f, 0.3f, 1.2f, 0.3f, tiles("boomling_shell")),

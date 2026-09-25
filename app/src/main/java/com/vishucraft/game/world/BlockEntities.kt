@@ -8,8 +8,35 @@ import java.util.concurrent.ConcurrentHashMap
 /** Extra state for chests and furnaces, keyed by packed block position. */
 sealed class BlockEntity
 
-class ChestEntity : BlockEntity() {
-    val slots = arrayOfNulls<ItemStack>(27)
+open class ChestEntity(size: Int = 27) : BlockEntity() {
+    val slots = arrayOfNulls<ItemStack>(size)
+
+    /** Adds as much as fits; returns what is left. */
+    fun insert(id: Int, count: Int, damage: Int = 0): Int {
+        var left = count
+        val max = Items.maxStack(id)
+        for (s in slots) if (left > 0 && s != null && s.id == id && s.damage == damage && s.count < max) {
+            val n = minOf(left, max - s.count); s.count += n; left -= n
+        }
+        for (i in slots.indices) if (left > 0 && slots[i] == null) { val n = minOf(left, max); slots[i] = ItemStack(id, n, damage); left -= n }
+        return left
+    }
+
+    /** Removes one item from the first non-empty slot. */
+    fun takeOne(): ItemStack? {
+        for (i in slots.indices) {
+            val s = slots[i] ?: continue
+            s.count--
+            if (s.count <= 0) slots[i] = null
+            return ItemStack(s.id, 1, s.damage)
+        }
+        return null
+    }
+}
+
+/** A hopper holds 5 stacks and passes items downwards. */
+class HopperEntity : ChestEntity(5) {
+    var cooldown = 0f
 }
 
 class FurnaceEntity : BlockEntity() {
@@ -59,6 +86,7 @@ class BlockEntities {
 
     fun get(x: Int, y: Int, z: Int) = map[RedstoneIds.pack(x, y, z)]
     fun chest(x: Int, y: Int, z: Int) = map.getOrPut(RedstoneIds.pack(x, y, z)) { ChestEntity() } as? ChestEntity
+    fun hopper(x: Int, y: Int, z: Int) = map.getOrPut(RedstoneIds.pack(x, y, z)) { HopperEntity() } as? HopperEntity
     fun furnace(x: Int, y: Int, z: Int) = map.getOrPut(RedstoneIds.pack(x, y, z)) { FurnaceEntity() } as? FurnaceEntity
     fun remove(x: Int, y: Int, z: Int) = map.remove(RedstoneIds.pack(x, y, z))
 
@@ -71,6 +99,7 @@ class BlockEntities {
             for ((pos, e) in entries) {
                 d.writeLong(pos)
                 when (e) {
+                    is HopperEntity -> { d.writeByte(2); for (s in e.slots) Inventory.writeStack(d, s) }
                     is ChestEntity -> { d.writeByte(0); for (s in e.slots) Inventory.writeStack(d, s) }
                     is FurnaceEntity -> {
                         d.writeByte(1)
@@ -92,6 +121,7 @@ class BlockEntities {
                     val pos = d.readLong()
                     when (d.readByte().toInt()) {
                         0 -> map[pos] = ChestEntity().also { c -> for (i in c.slots.indices) c.slots[i] = Inventory.readStack(d) }
+                        2 -> map[pos] = HopperEntity().also { c -> for (i in c.slots.indices) c.slots[i] = Inventory.readStack(d) }
                         else -> map[pos] = FurnaceEntity().also { f ->
                             f.input = Inventory.readStack(d); f.fuel = Inventory.readStack(d); f.output = Inventory.readStack(d)
                             f.burnLeft = d.readFloat(); f.burnTotal = d.readFloat(); f.progress = d.readFloat()

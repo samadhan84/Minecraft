@@ -15,8 +15,13 @@ class DropRenderer {
 
     fun invalidate() = mesh.invalidate()
 
-    fun draw(shader: Shader, drops: ItemEntities, camX: Float, camZ: Float, maxDist: Float, time: Float) {
+    /** Draws minecarts and flying arrows too (they share this batch). */
+    fun draw(shader: Shader, drops: ItemEntities, camX: Float, camZ: Float, maxDist: Float, time: Float,
+             carts: com.vishucraft.game.engine.Carts? = null, arrows: com.vishucraft.game.engine.Projectiles? = null) {
         buf.size = 0
+        carts?.list?.forEach { c -> cart(c.x, c.y, c.z, c.yaw) }
+        val arrowTile = Items[Items.find("Arrow")]!!.icon
+        arrows?.list?.forEach { a -> sprite(a.x, a.y - 0.2f, a.z, 0.2f, kotlin.math.atan2(a.vz, a.vx), arrowTile) }
         for (e in drops.list) {
             val dx = e.x - camX; val dz = e.z - camZ
             if (dx * dx + dz * dz > maxDist * maxDist) continue
@@ -55,6 +60,30 @@ class DropRenderer {
                 val uv = ChunkMesher.UVS[k]
                 buf.put(cx + lx * c - lz * s, cy + h + ly, cz + lx * s + lz * c,
                     u0 + uv[0] * ChunkMesher.TILE_UV, v0 + uv[1] * ChunkMesher.TILE_UV, light)
+            }
+        }
+    }
+
+    /** An open-topped box on wheels. */
+    private fun cart(cx: Float, cy: Float, cz: Float, yaw: Float) {
+        val c = cos(yaw); val s = sin(yaw)
+        val side = com.vishucraft.game.world.Tiles.id("cart_side")
+        val floor = com.vishucraft.game.world.Tiles.id("cart_floor")
+        val boxes = listOf(
+            floatArrayOf(-0.45f, 0.1f, -0.6f, 0.45f, 0.2f, 0.6f) to floor,
+            floatArrayOf(-0.45f, 0.1f, -0.6f, -0.37f, 0.65f, 0.6f) to side,
+            floatArrayOf(0.37f, 0.1f, -0.6f, 0.45f, 0.65f, 0.6f) to side,
+            floatArrayOf(-0.45f, 0.1f, -0.6f, 0.45f, 0.65f, -0.52f) to side,
+            floatArrayOf(-0.45f, 0.1f, 0.52f, 0.45f, 0.65f, 0.6f) to side,
+        )
+        for ((b, tile) in boxes) for (f in 0 until 6) {
+            val u0 = ChunkMesher.tileU(tile); val v0 = ChunkMesher.tileV(tile)
+            buf.ensure(4 * FLOATS_PER_VERTEX)
+            for ((k, cv) in ChunkMesher.CORNERS[f].withIndex()) {
+                val lx = if (cv[0] == 1) b[3] else b[0]; val ly = if (cv[1] == 1) b[4] else b[1]; val lz = if (cv[2] == 1) b[5] else b[2]
+                val uv = ChunkMesher.UVS[k]
+                buf.put(cx + lx * c - lz * s, cy + ly, cz + lx * s + lz * c,
+                    u0 + uv[0] * ChunkMesher.TILE_UV, v0 + uv[1] * ChunkMesher.TILE_UV, ChunkMesher.FACE_SHADE[f])
             }
         }
     }

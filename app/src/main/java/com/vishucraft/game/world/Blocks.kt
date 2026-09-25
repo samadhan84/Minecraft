@@ -16,7 +16,7 @@ object Tiles {
     val CRACK_0 = id("crack_0").also { for (i in 1..9) id("crack_$i") }
 }
 
-enum class RenderType { NONE, CUBE, CROSS, LIQUID, FLAT, BOX, PISTON_HEAD }
+enum class RenderType { NONE, CUBE, CROSS, LIQUID, FLAT, BOX, PISTON_HEAD, SHAPE, RAIL, PORTAL }
 enum class ToolType { NONE, PICKAXE, AXE, SHOVEL, HOE, SWORD }
 enum class Facing { NONE, HORIZONTAL, ALL }
 enum class Category(val title: String) { BUILDING("Building"), COLORED("Colored"), NATURE("Nature"), REDSTONE("Redstone") }
@@ -224,7 +224,32 @@ object Blocks {
     const val CARROTS = 199
     const val POTATOES = 200
     const val SAPLING_FIRST = 201 // oak, spruce, birch, jungle, acacia, dark oak
-    const val COUNT = 207
+    // Building pieces (SHAPE render type, see Shapes)
+    const val OAK_DOOR = 207
+    const val IRON_DOOR = 208
+    const val OAK_TRAPDOOR = 209
+    const val OAK_STAIRS = 210
+    const val COBBLESTONE_STAIRS = 211
+    const val STONE_BRICK_STAIRS = 212
+    const val BRICK_STAIRS = 213
+    const val SANDSTONE_STAIRS = 214
+    const val OAK_FENCE = 215
+    const val OAK_FENCE_GATE = 216
+    const val LADDER = 217
+    const val GLASS_PANE = 218
+    const val IRON_BARS = 219
+    // More redstone
+    const val REPEATER = 220
+    const val OBSERVER = 221
+    const val DAYLIGHT_SENSOR = 222
+    const val PRESSURE_PLATE = 223
+    const val HOPPER = 224
+    const val RAIL = 225
+    const val POWERED_RAIL = 226
+    // Portals to the other dimensions
+    const val EMBER_PORTAL = 227
+    const val SKY_PORTAL = 228
+    const val COUNT = 229
 
     /** Dye colours used for wool, concrete, terracotta and stained glass. */
     val DYES = listOf(
@@ -373,12 +398,12 @@ object Blocks {
         }
         cube(TERRACOTTA, "Terracotta", "terracotta", 0.9f, P, C)
 
-        cube(NETHERRACK, "Netherrack", "netherrack", 0.4f, P, N)
-        cube(SOUL_SAND, "Soul Sand", "soul_sand", 0.5f, S, N)
-        cube(NETHER_BRICKS, "Nether Bricks", "nether_bricks", 1.0f, P)
+        cube(NETHERRACK, "Ember Rock", "netherrack", 0.4f, P, N)
+        cube(SOUL_SAND, "Ash Sand", "soul_sand", 0.5f, S, N)
+        cube(NETHER_BRICKS, "Ember Bricks", "nether_bricks", 1.0f, P)
         cube(MAGMA, "Magma Block", "magma", 0.5f, P, N, emissive = true)
-        cube(END_STONE, "End Stone", "end_stone", 1.2f, P, N)
-        cube(PURPUR, "Purpur Block", "purpur", 1.0f, P)
+        cube(END_STONE, "Pale Stone", "end_stone", 1.2f, P, N)
+        cube(PURPUR, "Sky Stone", "purpur", 1.0f, P)
         reg(BlockDef(CRYING_OBSIDIAN, "Crying Obsidian", t("crying_obsidian"), hardness = 6f, tool = P, emissive = true, movable = false))
 
         cube(PRISMARINE, "Prismarine", "prismarine", 1.0f, P)
@@ -462,6 +487,51 @@ object Blocks {
         for ((i, w) in listOf("Oak", "Spruce", "Birch", "Jungle", "Acacia", "Dark Oak").withIndex()) {
             plant(SAPLING_FIRST + i, "$w Sapling", "sapling_${w.lowercase().replace(' ', '_')}")
         }
+
+        fun shape(id: Int, name: String, top: String, side: String = top, bottom: String = top, hardness: Float, tool: ToolType,
+                  cat: Category = Category.BUILDING, facing: Facing = Facing.HORIZONTAL, solid: Boolean = true,
+                  blocksLight: Boolean = false, front: String = side) =
+            reg(BlockDef(id, name, t(top), t(side), t(bottom), render = RenderType.SHAPE, opaque = false, solid = solid,
+                blocksLight = blocksLight, hardness = hardness, tool = tool, category = cat, facing = facing, front = t(front),
+                movable = false))
+        shape(OAK_DOOR, "Oak Door", "oak_door_bottom", hardness = 0.8f, tool = A)
+        t("oak_door_top")
+        shape(IRON_DOOR, "Iron Door", "iron_door_bottom", hardness = 1.5f, tool = P, cat = Category.REDSTONE)
+        t("iron_door_top")
+        shape(OAK_TRAPDOOR, "Oak Trapdoor", "oak_trapdoor", hardness = 0.8f, tool = A)
+        shape(OAK_STAIRS, "Oak Stairs", "oak_planks", hardness = 0.8f, tool = A, blocksLight = true)
+        shape(COBBLESTONE_STAIRS, "Cobblestone Stairs", "cobblestone", hardness = 1f, tool = P, blocksLight = true)
+        shape(STONE_BRICK_STAIRS, "Stone Brick Stairs", "stone_bricks", hardness = 1f, tool = P, blocksLight = true)
+        shape(BRICK_STAIRS, "Brick Stairs", "bricks", hardness = 1f, tool = P, blocksLight = true)
+        shape(SANDSTONE_STAIRS, "Sandstone Stairs", "sandstone_top", "sandstone_side", hardness = 0.8f, tool = P, blocksLight = true)
+        shape(OAK_FENCE, "Oak Fence", "oak_planks", hardness = 0.8f, tool = A, facing = Facing.NONE)
+        shape(OAK_FENCE_GATE, "Oak Fence Gate", "oak_planks", hardness = 0.8f, tool = A)
+        shape(LADDER, "Ladder", "ladder", hardness = 0.3f, tool = A)
+        shape(GLASS_PANE, "Glass Pane", "glass", hardness = 0.3f, tool = ToolType.NONE, facing = Facing.NONE)
+        shape(IRON_BARS, "Iron Bars", "iron_bars", hardness = 1.5f, tool = P, facing = Facing.NONE)
+
+        val R2 = Category.REDSTONE
+        shape(REPEATER, "Redstone Repeater", "repeater", "smooth_stone_side", "smooth_stone", hardness = 0f, tool = ToolType.NONE, cat = R2)
+        t("repeater_on")
+        reg(BlockDef(OBSERVER, "Observer", t("observer_top"), t("observer_side"), t("observer_top"), hardness = 1f, tool = P,
+            category = R2, facing = Facing.ALL, front = t("observer_front"), back = t("observer_back")))
+        t("observer_back_on")
+        shape(DAYLIGHT_SENSOR, "Daylight Sensor", "daylight_sensor", "daylight_sensor_side", "oak_planks", hardness = 0.3f,
+            tool = A, cat = R2, facing = Facing.NONE)
+        shape(PRESSURE_PLATE, "Stone Pressure Plate", "stone", hardness = 0.4f, tool = P, cat = R2, facing = Facing.NONE, solid = false)
+        shape(HOPPER, "Hopper", "hopper_top", "hopper_side", "hopper_side", hardness = 1.5f, tool = P, cat = R2, facing = Facing.NONE)
+        reg(BlockDef(RAIL, "Rail", t("rail"), render = RenderType.RAIL, opaque = false, solid = false, hardness = 0.4f,
+            tool = P, category = R2, needsSupport = true, movable = false))
+        t("rail_curve")
+        reg(BlockDef(POWERED_RAIL, "Powered Rail", t("powered_rail"), render = RenderType.RAIL, opaque = false, solid = false,
+            hardness = 0.4f, tool = P, category = R2, needsSupport = true, movable = false))
+        t("powered_rail_on")
+        reg(BlockDef(EMBER_PORTAL, "Ember Portal", t("ember_portal"), render = RenderType.PORTAL, opaque = false, solid = false,
+            translucent = true, blocksLight = false, breakable = false, emissive = true, inInventory = false, movable = false))
+        reg(BlockDef(SKY_PORTAL, "Sky Portal", t("sky_portal"), render = RenderType.PORTAL, opaque = false, solid = false,
+            translucent = true, blocksLight = false, breakable = false, emissive = true, inInventory = false, movable = false))
+        extraLight[EMBER_PORTAL] = 11
+        extraLight[SKY_PORTAL] = 11
         reg(BlockDef(PISTON_HEAD, "Piston Head", t("piston_front"), t("oak_planks"), render = RenderType.PISTON_HEAD,
             opaque = false, blocksLight = false, hardness = 0.6f, tool = P, category = R, inInventory = false, movable = false))
     }
@@ -521,7 +591,14 @@ object Blocks {
             WHEAT_CROP -> return Tiles.id("wheat_stage_${meta.coerceIn(0, 7)}")
             CARROTS -> return Tiles.id("carrots_stage_${(meta.coerceIn(0, 7)) / 2}")
             POTATOES -> return Tiles.id("potatoes_stage_${(meta.coerceIn(0, 7)) / 2}")
+            OAK_DOOR -> return Tiles.id(if (meta and Shapes.UPPER != 0) "oak_door_top" else "oak_door_bottom")
+            IRON_DOOR -> return Tiles.id(if (meta and Shapes.UPPER != 0) "iron_door_top" else "iron_door_bottom")
+            REPEATER -> if (face == 0) return Tiles.id(if (meta and Shapes.POWERED != 0) "repeater_on" else "repeater")
+            OBSERVER -> if (meta and 8 != 0 && face == ((meta and 7) xor 1)) return Tiles.id("observer_back_on")
+            POWERED_RAIL -> return Tiles.id(if (meta and 8 != 0) "powered_rail_on" else "powered_rail")
+            RAIL -> return Tiles.id(if ((meta and 15) >= 6) "rail_curve" else "rail")
         }
+        if (d.render == RenderType.SHAPE) return when (face) { 0 -> d.top; 1 -> d.bottom; else -> d.side }
         if (d.facing != Facing.NONE) {
             var f = meta and 7
             if (f > 5 || (d.facing == Facing.HORIZONTAL && f < 2)) f = 2

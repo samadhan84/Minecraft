@@ -186,8 +186,11 @@ class WorldRenderer(private val game: Game) {
         val daylight = game.daylight
         val underwater = p.headInWater || p.headInLava
         val sky = skyColor(daylight)
+        val dim = game.dimension
         val fog = when {
             p.headInLava -> floatArrayOf(0.8f, 0.25f, 0.02f)
+            dim == com.vishucraft.game.world.Dimension.EMBER -> floatArrayOf(0.32f, 0.07f, 0.04f)
+            dim == com.vishucraft.game.world.Dimension.SKY -> floatArrayOf(0.12f, 0.08f, 0.2f)
             p.headInWater -> floatArrayOf(0.05f, 0.14f, 0.38f)
             else -> sky
         }
@@ -206,13 +209,18 @@ class WorldRenderer(private val game: Game) {
         Matrix.multiplyMM(viewProj, 0, proj, 0, view, 0)
         extractFrustum()
 
-        val fogEnd = if (p.headInLava) 3f else if (underwater) 14f else (far - 20f) * (1f - 0.3f * game.rain)
+        val fogEnd = when {
+            p.headInLava -> 3f
+            underwater -> 14f
+            dim == com.vishucraft.game.world.Dimension.EMBER -> minOf(far - 20f, 70f)
+            else -> (far - 20f) * (1f - 0.3f * game.rain)
+        }
         val fogStart = if (underwater) 0f else fogEnd * 0.55f
 
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, atlasTex)
 
-        if (!underwater) drawSky(ex, ey, ez, daylight)
+        if (!underwater && dim == com.vishucraft.game.world.Dimension.OVERWORLD) drawSky(ex, ey, ez, daylight)
 
         // Opaque + cutout pass.
         blockShader.use()
@@ -241,12 +249,14 @@ class WorldRenderer(private val game: Game) {
         // Mobs use the same shader (lighting, fog) with a per-mob tint for hurt / fuse flashes.
         glUniform1f(blockShader.u("uCutout"), 0.5f)
         mobRenderer.draw(blockShader, game.mobs, ex, ez, far)
-        dropRenderer.draw(blockShader, game.drops, ex, ez, far, game.timeOfDay)
+        dropRenderer.draw(blockShader, game.drops, ex, ez, far, game.timeOfDay, game.carts, game.projectiles)
         if (underwater) glUniform3f(blockShader.u("uTint"), 0.55f, 0.7f, 1f)
 
         drawSelection()
-        drawClouds(ex, ez, daylight, far)
-        drawWeather(ex, ey, ez)
+        if (dim == com.vishucraft.game.world.Dimension.OVERWORLD) {
+            drawClouds(ex, ez, daylight, far)
+            drawWeather(ex, ey, ez)
+        }
 
         // Translucent pass, back to front.
         blockShader.use()

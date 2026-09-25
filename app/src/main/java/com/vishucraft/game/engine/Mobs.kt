@@ -26,6 +26,18 @@ enum class MobType(
     ZOMBIE("Zombie", 0.3f, 1.95f, 20, true, 2.4f),
     /** Original exploding mob: a squat stone creature with glowing cracks. */
     BOOMLING("Boomling", 0.4f, 1.3f, 20, true, 2.2f),
+    /** Hooded thornwood archer that keeps its distance and shoots thorns. */
+    RATTLER("Rattler", 0.3f, 1.9f, 20, true, 2.2f),
+    /** Six-legged rock beetle that climbs walls; only hunts at night unless provoked. */
+    CRAWLER("Crawler", 0.6f, 0.8f, 16, true, 3.0f),
+    /** Moth-winged flyer that circles high up and swoops at night. */
+    GLIDER("Night Glider", 0.45f, 0.4f, 12, true, 5.0f),
+    /** Magma golem of the Ember Realm. */
+    CINDER("Cinder Brute", 0.4f, 2.0f, 30, true, 2.0f),
+    /** Floating ringed orb of the Sky Isles; blinks away when hit. */
+    WISP("Void Wisp", 0.35f, 0.8f, 15, true, 3.0f),
+    /** Peaceful village folk. */
+    VILLAGER("Villager", 0.3f, 1.9f, 20, false, 1.0f),
 }
 
 class Mob(val type: MobType, var x: Float, var y: Float, var z: Float) {
@@ -55,6 +67,10 @@ class Mob(val type: MobType, var x: Float, var y: Float, var z: Float) {
     internal var attackCooldown = 0f
     internal var burnTimer = 0f
     internal var fleeTime = 0f
+    internal var shootTimer = 0f
+    /** Crawlers become aggressive when hit. */
+    internal var angry = false
+    internal var swoopTime = 0f
 
     val dead get() = deathTime >= 0f
 }
@@ -187,6 +203,43 @@ class Mobs(private val world: World) {
                     }
                 } else { m.fuse = -1f; wander(m, dt).let { wantX = it.first; wantZ = it.second; speed *= 0.5f } }
             }
+            MobType.RATTLER -> {
+                val burning = game.daylight > 0.6f && skyExposed(floorInt(m.x), floorInt(m.y + 1.7f), floorInt(m.z))
+                m.burning = burning
+                if (burning) { m.burnTimer += dt; if (m.burnTimer >= 1f) { m.burnTimer = 0f; damage(m, 1f, 0f, 0f) } }
+                if (dist < 18f && game.playerAlive) {
+                    m.yaw = atan2(dx, -dz)
+                    // Keep 6..11 blocks away, then shoot.
+                    if (dist < 6f) { wantX = -dx / dist; wantZ = -dz / dist }
+                    else if (dist > 11f) { wantX = dx / dist; wantZ = dz / dist }
+                    m.shootTimer -= dt
+                    if (m.shootTimer <= 0f && dist < 16f) {
+                        m.shootTimer = 2f + rnd.nextFloat()
+                        val sx = m.x; val sy = m.y + 1.5f; val sz = m.z
+                        val tx = p.x - sx; val ty = p.eyeY - 0.3f - sy; val tz = p.z - sz
+                        val len = sqrt(tx * tx + ty * ty + tz * tz)
+                        val speed = 20f
+                        game.projectiles.shoot(sx, sy, sz, tx / len * speed, ty / len * speed + len * 0.28f, tz / len * speed, false, 3f)
+                        game.sound("bow", sx, sy, sz, 0.7f)
+                    }
+                } else wander(m, dt).let { wantX = it.first; wantZ = it.second; speed *= 0.5f }
+            }
+            MobType.CRAWLER, MobType.CINDER -> {
+                val hunts = m.type == MobType.CINDER || m.angry || game.daylight < 0.4f
+                if (hunts && dist < 20f && game.playerAlive) {
+                    m.yaw = atan2(dx, -dz)
+                    if (dist > 0.9f) { wantX = dx / dist; wantZ = dz / dist }
+                    m.attackCooldown -= dt
+                    if (dist < 1.3f + m.halfWidth && abs(p.y - m.y) < 1.6f && m.attackCooldown <= 0f) {
+                        m.attackCooldown = 1f
+                        game.hurtPlayer(if (m.type == MobType.CINDER) 5f else 2.5f, m.x, m.z)
+                    }
+                } else wander(m, dt).let { wantX = it.first; wantZ = it.second; speed *= 0.5f }
+            }
+            MobType.GLIDER, MobType.WISP -> {
+                flyer(m, dt, game, dist, dx, dz)
+                return
+            }
             else -> {
                 if (m.fleeTime > 0f) {
                     m.fleeTime -= dt
@@ -201,9 +254,43 @@ class Mobs(private val world: World) {
         m.vz = approach(m.vz, wantZ * speed, accel * dt)
         m.moving = abs(wantX) + abs(wantZ) > 0.01f
         val hit = physics(m, dt)
-        // Hop up single blocks.
-        if (hit && m.onGround && m.moving) m.vy = 8.4f
+        // Hop up single blocks; crawlers simply climb.
+        if (hit && m.type == MobType.CRAWLER && m.moving) m.vy = 3.5f
+        else if (hit && m.onGround && m.moving) m.vy = 8.4f
         if (m.moving && m.onGround) m.walkPhase += sqrt(m.vx * m.vx + m.vz * m.vz) * dt * 3.2f
+    }
+
+    /** Flying mobs: hover around, then dive at the player. No gravity. */
+    private fun flyer(m: Mob, dt: Float, game: Game, dist: Float, dx: Float, dz: Float) {
+        val p = game.player
+        m.moving = true
+        m.walkPhase += dt * 8f
+        var tx: Float; var ty: Float; var tz: Float
+        if (m.swoopTime > 0f) {
+            m.swoopTime -= dt
+            tx = p.x; ty = p.y + 1f; tz = p.z
+        } else {
+            // Circle above the player.
+            val a = m.walkPhase * 0.1f
+            tx = p.x + cos(a) * 7f; ty = p.y + (if (m.type == MobType.GLIDER) 9f else 3f); tz = p.z + sin(a) * 7f
+            if (dist < 24f && rnd.nextFloat() < dt / 5f) m.swoopTime = 2.5f
+        }
+        val ex = tx - m.x; val ey = ty - m.y; val ez = tz - m.z
+        val len = sqrt(ex * ex + ey * ey + ez * ez).coerceAtLeast(0.1f)
+        val sp = m.type.speed
+        m.vx = approach(m.vx, ex / len * sp, 10f * dt)
+        m.vy = approach(m.vy, ey / len * sp, 10f * dt)
+        m.vz = approach(m.vz, ez / len * sp, 10f * dt)
+        m.yaw = atan2(m.vx, -m.vz)
+        move(m, 0, m.vx * dt); move(m, 1, m.vy * dt); move(m, 2, m.vz * dt)
+        m.attackCooldown -= dt
+        val py = p.y + 1f - m.y
+        if (sqrt(dx * dx + dz * dz + py * py) < 1.4f && m.attackCooldown <= 0f && game.playerAlive) {
+            m.attackCooldown = 1.2f
+            game.hurtPlayer(if (m.type == MobType.WISP) 3f else 2f, m.x, m.z)
+            m.swoopTime = 0f
+        }
+        if (m.type == MobType.GLIDER && game.daylight > 0.7f) m.deathTime = 0.9f // fades away at sunrise
     }
 
     private fun wander(m: Mob, dt: Float): Pair<Float, Float> {
@@ -241,30 +328,13 @@ class Mobs(private val world: World) {
         return hx || hz
     }
 
+    private val posBuf = FloatArray(3)
+
     private fun move(m: Mob, axis: Int, delta: Float): Boolean {
-        if (delta == 0f) return true
-        var remaining = delta
-        val hw = m.halfWidth; val h = m.height
-        while (remaining != 0f) {
-            val step = remaining.coerceIn(-0.45f, 0.45f)
-            remaining -= step
-            when (axis) { 0 -> m.x += step; 1 -> m.y += step; else -> m.z += step }
-            for (bx in floorInt(m.x - hw)..floorInt(m.x + hw - 1e-4f))
-                for (by in floorInt(m.y) - 1..floorInt(m.y + h - 1e-4f))
-                    for (bz in floorInt(m.z - hw)..floorInt(m.z + hw - 1e-4f)) {
-                        val id = world.getBlock(bx, by, bz)
-                        if (!Blocks.solid[id]) continue
-                        val top = by + Blocks.height[id]
-                        if (top <= m.y + 1e-4f || by >= m.y + h) continue
-                        when (axis) {
-                            0 -> m.x = if (step > 0) bx - hw - 1e-3f else bx + 1 + hw + 1e-3f
-                            1 -> m.y = if (step > 0) by - h - 1e-3f else top
-                            else -> m.z = if (step > 0) bz - hw - 1e-3f else bz + 1 + hw + 1e-3f
-                        }
-                        return false
-                    }
-        }
-        return true
+        posBuf[0] = m.x; posBuf[1] = m.y; posBuf[2] = m.z
+        val ok = com.vishucraft.game.world.Collision.sweep(world, posBuf, m.halfWidth, m.height, axis, delta)
+        m.x = posBuf[0]; m.y = posBuf[1]; m.z = posBuf[2]
+        return ok
     }
 
     fun voice(t: MobType) = t.name.lowercase()
@@ -282,6 +352,11 @@ class Mobs(private val world: World) {
         m.vx += kx * 6f; m.vz += kz * 6f
         if (kx != 0f || kz != 0f) m.vy = max(m.vy, 5f)
         if (!m.type.hostile) m.fleeTime = 5f
+        if (m.type == MobType.CRAWLER) m.angry = true
+        if (m.type == MobType.WISP && m.health > 0f) {
+            // Blink a few blocks away.
+            m.x += (rnd.nextFloat() - 0.5f) * 8f; m.y += rnd.nextFloat() * 3f; m.z += (rnd.nextFloat() - 0.5f) * 8f
+        }
         if (m.health <= 0f) { m.deathTime = 0f; m.fuse = -1f; onDeath?.invoke(m) }
     }
 
@@ -329,8 +404,24 @@ class Mobs(private val world: World) {
 
     private fun trySpawn(game: Game) {
         val p = game.player
-        val passive = list.count { !it.type.hostile }
+        val passive = list.count { !it.type.hostile && it.type != MobType.VILLAGER }
         val hostile = list.count { it.type.hostile }
+
+        // Villagers waiting from world generation.
+        while (true) {
+            val (x, y, z) = world.pendingVillagers.poll() ?: break
+            list.add(Mob(MobType.VILLAGER, x + 0.5f, y.toFloat(), z + 0.5f))
+        }
+
+        if (game.dimension != com.vishucraft.game.world.Dimension.OVERWORLD) {
+            if (!hostileEnabled || hostile >= 8) return
+            val (x, z) = ringPoint(p.x, p.z, 14f, 40f)
+            if (!world.isLoaded(x, z)) return
+            val type = if (game.dimension == com.vishucraft.game.world.Dimension.EMBER) MobType.CINDER else MobType.WISP
+            val y = surfaceY(x, z)
+            if (y > 0 && roomAt(x, y + 1, z, 2)) list.add(Mob(type, x + 0.5f, y + 1f, z + 0.5f))
+            return
+        }
 
         if (passive < 10) {
             val (x, z) = ringPoint(p.x, p.z, 24f, 64f)
@@ -351,7 +442,14 @@ class Mobs(private val world: World) {
         if (hostileEnabled && hostile < 8) {
             val (x, z) = ringPoint(p.x, p.z, 18f, 48f)
             if (!world.isLoaded(x, z)) return
-            val type = if (rnd.nextInt(3) == 0) MobType.BOOMLING else MobType.ZOMBIE
+            val type = when (rnd.nextInt(8)) {
+                0, 1 -> MobType.BOOMLING; 2, 3 -> MobType.RATTLER; 4 -> MobType.CRAWLER; else -> MobType.ZOMBIE
+            }
+            if (game.daylight < 0.3f && rnd.nextInt(6) == 0 && list.count { it.type == MobType.GLIDER } < 2) {
+                val y = surfaceY(x, z)
+                if (y > 0) list.add(Mob(MobType.GLIDER, x + 0.5f, y + 12f, z + 0.5f))
+                return
+            }
             if (game.daylight < 0.3f) {
                 // Night: anywhere on the surface.
                 val y = surfaceY(x, z)

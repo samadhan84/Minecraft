@@ -25,6 +25,15 @@ class Redstone(private val world: World, private val set: (Int, Int, Int, Int, I
     }
 
     private val buttons = HashMap<Long, Int>()
+    /** Repeaters waiting to switch: position -> ticks left (their target state is the opposite of now). */
+    private val repeaterDelay = HashMap<Long, Int>()
+    /** Observers: what they last saw in front, and how long their pulse lasts. */
+    private val observed = HashMap<Long, Int>()
+    private val observerPulse = HashMap<Long, Int>()
+
+    /** Supplied by the game: sun brightness and whether something stands on a block. */
+    var daylight: () -> Float = { 1f }
+    var occupied: (Int, Int, Int) -> Boolean = { _, _, _ -> false }
     private val fuses = HashMap<Long, Int>()
     private val rnd = Random()
 
@@ -56,6 +65,7 @@ class Redstone(private val world: World, private val set: (Int, Int, Int, Int, I
     /** Called when TNT is lit, and when a lever / button is used (for sounds). */
     var onPrime: ((Int, Int, Int) -> Unit)? = null
     var onClick: ((Int, Int, Int) -> Unit)? = null
+    var onDoor: ((Int, Int, Int) -> Unit)? = null
 
     fun prime(x: Int, y: Int, z: Int, ticks: Int = 40) {
         val p = RedstoneIds.pack(x, y, z)
@@ -98,6 +108,27 @@ class Redstone(private val world: World, private val set: (Int, Int, Int, Int, I
     private fun simulate(comps: List<Long>) {
         val sources = HashSet<Long>()
         val strong = HashSet<Long>()
+        /** Cells fed directly by a repeater or observer (dust there gets full power). */
+        val directed = HashSet<Long>()
+        // Pressure plates notice players, mobs and items standing on them.
+        for (p in comps) if (id(p) == Blocks.PRESSURE_PLATE) {
+            val pressed = if (occupied(RedstoneIds.x(p), RedstoneIds.y(p), RedstoneIds.z(p))) 1 else 0
+            if (pressed != meta(p)) setAt(p, Blocks.PRESSURE_PLATE, pressed)
+        }
+        // Observers pulse when the block in front of them changes.
+        for (p in comps) if (id(p) == Blocks.OBSERVER) {
+            val front = dir(p, (meta(p) and 7).coerceIn(0, 5))
+            val seen = if (front < 0) 0 else id(front) * 256 + meta(front)
+            val before = observed.put(p, seen)
+            if (before != null && before != seen && !observerPulse.containsKey(p)) observerPulse[p] = 2
+        }
+        for ((p, t) in observerPulse.toList()) {
+            if (id(p) != Blocks.OBSERVER || t <= 0) observerPulse.remove(p) else observerPulse[p] = t - 1
+            if (id(p) == Blocks.OBSERVER) {
+                val lit = if (observerPulse.containsKey(p)) 8 else 0
+                if (meta(p) and 8 != lit) setAt(p, Blocks.OBSERVER, (meta(p) and 7) or lit)
+            }
+        }
         for (p in comps) {
             when (id(p)) {
                 Blocks.LEVER, Blocks.STONE_BUTTON -> if (meta(p) != 0) {
@@ -106,6 +137,17 @@ class Redstone(private val world: World, private val set: (Int, Int, Int, Int, I
                 Blocks.REDSTONE_BLOCK -> sources.add(p)
                 Blocks.REDSTONE_TORCH -> if (meta(p) == 0) {
                     sources.add(p); dir(p, 0).let { if (it >= 0) strong.add(it) }
+                }
+                Blocks.DAYLIGHT_SENSOR -> if (daylight() > 0.5f) sources.add(p)
+                Blocks.PRESSURE_PLATE -> if (meta(p) != 0) { sources.add(p); dir(p, 1).let { if (it >= 0) strong.add(it) } }
+                // Directional outputs: they only power what is in front (repeater) or behind (observer).
+                Blocks.REPEATER -> if (meta(p) and Shapes.POWERED != 0) {
+                    val front = dir(p, (meta(p) and 7).coerceIn(2, 5))
+                    if (front >= 0) { strong.add(front); directed.add(front) }
+                }
+                Blocks.OBSERVER -> if (observerPulse.containsKey(p)) {
+                    val back = dir(p, (meta(p) and 7).coerceIn(0, 5) xor 1)
+                    if (back >= 0) { strong.add(back); directed.add(back) }
                 }
             }
         }
@@ -120,6 +162,7 @@ class Redstone(private val world: World, private val set: (Int, Int, Int, Int, I
             queue.add(q)
         }
         for (s in sources) for (f in 0 until 6) seed(dir(s, f), 15)
+        for (d in directed) seed(d, 15)
         for (b in strong) if (opaqueAt(b)) for (f in 0 until 6) seed(dir(b, f), 15)
         while (queue.isNotEmpty()) {
             val q = queue.poll()
@@ -144,6 +187,7 @@ class Redstone(private val world: World, private val set: (Int, Int, Int, Int, I
         }
 
         fun activated(p: Long, ignoreFace: Int = -1): Boolean {
+            if (p in directed) return true
             for (f in 0 until 6) {
                 if (f == ignoreFace) continue
                 val n = dir(p, f)
@@ -154,6 +198,29 @@ class Redstone(private val world: World, private val set: (Int, Int, Int, Int, I
                 if (n in sources && !(id(n) == Blocks.REDSTONE_TORCH && f == 0)) return true
             }
             return false
+        }
+
+        // Powered rails pass power along connected powered rails, up to 8 blocks from the source.
+        val railPower = HashMap<Long, Int>()
+        val railQueue = ArrayDeque<Long>()
+        for (p in comps) if (id(p) == Blocks.POWERED_RAIL && activated(p)) { railPower[p] = 8; railQueue.add(p) }
+        while (railQueue.isNotEmpty()) {
+            val p = railQueue.poll()
+            val left = railPower[p] ?: continue
+            if (left <= 0) continue
+            val shape = meta(p) and 7
+            for (e in Rails.exits(shape)) for (dy in -1..1) {
+                val n = offset(p, e[0], dy, e[1])
+                if (n < 0 || id(n) != Blocks.POWERED_RAIL) continue
+                if ((railPower[n] ?: -1) >= left - 1) continue
+                railPower[n] = left - 1
+                railQueue.add(n)
+            }
+        }
+        for (p in comps) if (id(p) == Blocks.POWERED_RAIL) {
+            val on = if (railPower.containsKey(p)) 8 else 0
+            val meta = meta(p)
+            if (meta and 8 != on) setAt(p, Blocks.POWERED_RAIL, (meta and 8.inv()) or on)
         }
 
         for (p in comps) {
@@ -180,6 +247,35 @@ class Redstone(private val world: World, private val set: (Int, Int, Int, Int, I
                     else if (!on && extended) retract(p, id, facing)
                 }
                 Blocks.TNT -> if (activated(p)) prime(RedstoneIds.x(p), RedstoneIds.y(p), RedstoneIds.z(p))
+                Blocks.OAK_DOOR, Blocks.IRON_DOOR, Blocks.OAK_TRAPDOOR, Blocks.OAK_FENCE_GATE -> {
+                    // Opens on a rising edge, closes on a falling edge; players can still use wooden ones.
+                    var on = activated(p)
+                    if (id == Blocks.OAK_DOOR || id == Blocks.IRON_DOOR) {
+                        val other = dir(p, if (meta and Shapes.UPPER != 0) 1 else 0)
+                        if (other >= 0 && id(other) == id && activated(other)) on = true
+                    }
+                    val was = meta and Shapes.POWERED != 0
+                    if (on != was) {
+                        val m = (meta and (Shapes.POWERED or Shapes.OPEN).inv()) or (if (on) Shapes.POWERED or Shapes.OPEN else 0)
+                        setAt(p, id, m)
+                        onDoor?.invoke(RedstoneIds.x(p), RedstoneIds.y(p), RedstoneIds.z(p))
+                    }
+                }
+                Blocks.REPEATER -> {
+                    val facing = (meta and 7).coerceIn(2, 5)
+                    val back = dir(p, facing xor 1)
+                    val input = back >= 0 && ((dust[back] ?: 0) > 0 || back in powered || back in sources || back in directed)
+                    val lit = meta and Shapes.POWERED != 0
+                    if (input != lit) {
+                        val left = repeaterDelay[p]
+                        when {
+                            left == null -> repeaterDelay[p] = ((meta shr 3) and 3) + 1
+                            left <= 1 -> { repeaterDelay.remove(p); setAt(p, id, if (input) meta or Shapes.POWERED else meta and Shapes.POWERED.inv()) }
+                            else -> repeaterDelay[p] = left - 1
+                        }
+                    } else repeaterDelay.remove(p)
+                }
+                Blocks.POWERED_RAIL -> {} // handled below: power travels along the track
             }
         }
     }

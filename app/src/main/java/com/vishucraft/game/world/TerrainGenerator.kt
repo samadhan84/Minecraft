@@ -4,10 +4,17 @@ import java.util.Random
 import kotlin.math.abs
 import kotlin.math.max
 
-enum class Biome { PLAINS, FOREST, DESERT, SNOW, JUNGLE, SAVANNA }
+enum class Biome { PLAINS, FOREST, DESERT, SNOW, JUNGLE, SAVANNA, EMBER, SKY }
+
+/** Terrain for one dimension. */
+interface WorldGenerator {
+    fun generate(chunk: Chunk)
+    fun surfaceHeight(x: Int, z: Int): Int
+    fun biomeAt(x: Int, z: Int): Biome
+}
 
 /** Deterministic procedural terrain: heightmap + biomes + caves + ores + vegetation. */
-class TerrainGenerator(private val seed: Long) {
+class TerrainGenerator(private val seed: Long, private val world: World? = null) : WorldGenerator {
     companion object {
         const val SEA_LEVEL = 62
     }
@@ -27,7 +34,7 @@ class TerrainGenerator(private val seed: Long) {
         return t * t * (3 - 2 * t)
     }
 
-    fun surfaceHeight(x: Int, z: Int): Int {
+    override fun surfaceHeight(x: Int, z: Int): Int {
         val base = heightNoise.fbm2(x * 0.0055, z * 0.0055, 5)
         val detail = detailNoise.fbm2(x * 0.03, z * 0.03, 3)
         val m = smoothstep(0.05, 0.55, mountainNoise.fbm2(x * 0.0035, z * 0.0035, 4))
@@ -35,7 +42,7 @@ class TerrainGenerator(private val seed: Long) {
         return h.toInt().coerceIn(6, Chunk.HEIGHT - 12)
     }
 
-    fun biomeAt(x: Int, z: Int): Biome {
+    override fun biomeAt(x: Int, z: Int): Biome {
         val t = tempNoise.fbm2(x * 0.0022, z * 0.0022, 3)
         val hu = humidNoise.fbm2(x * 0.0028, z * 0.0028, 3)
         return when {
@@ -60,7 +67,7 @@ class TerrainGenerator(private val seed: Long) {
         return false
     }
 
-    fun generate(chunk: Chunk) {
+    override fun generate(chunk: Chunk) {
         val rnd = Random(seed xor (chunk.cx * 341873128712L) xor (chunk.cz * 132897987541L))
         val bx = chunk.cx * Chunk.SIZE
         val bz = chunk.cz * Chunk.SIZE
@@ -126,6 +133,7 @@ class TerrainGenerator(private val seed: Long) {
 
         placeOres(chunk, rnd)
         decorate(chunk, rnd, tops)
+        world?.let { Structures(seed, this, it).place(chunk) }
     }
 
     private fun placeOres(chunk: Chunk, rnd: Random) {
@@ -212,6 +220,7 @@ class TerrainGenerator(private val seed: Long) {
             Biome.SAVANNA -> if (rnd.nextInt(2) == 0) 1 else 0
             Biome.PLAINS -> if (rnd.nextInt(3) == 0) 1 else 0
             Biome.DESERT -> 0
+            else -> 0
         }
         repeat(attempts) {
             val x = 2 + rnd.nextInt(Chunk.SIZE - 4)

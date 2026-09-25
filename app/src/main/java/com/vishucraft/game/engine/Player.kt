@@ -30,6 +30,7 @@ class Player {
     var inWater = false
     var headInWater = false
     var headInLava = false
+    var onLadder = false
     /** Distance walked, drives view bobbing. */
     var walkDist = 0f
 
@@ -87,6 +88,14 @@ class Player {
             if (jump && onGround) vy = JUMP_VELOCITY
         }
 
+        // Ladders: climb when pushing forward or jumping, otherwise slide down slowly.
+        val ladder = world.getBlock(floorInt(x), floorInt(y + 0.1f), floorInt(z)) == Blocks.LADDER ||
+            world.getBlock(floorInt(x), floorInt(y + 1f), floorInt(z)) == Blocks.LADDER
+        onLadder = ladder && !flying
+        if (onLadder) {
+            vy = if (jump || moveF > 0.3f) 3.2f else if (descend) -3f else maxOf(vy, -1.2f)
+        }
+
         val startX = x; val startZ = z
         val wantX = vx * dt; val wantZ = vz * dt
         val hitX = !moveAxis(world, 0, wantX)
@@ -100,7 +109,7 @@ class Player {
         if (hitZ) vz = 0f
 
         // Auto-jump onto single-block steps when walking into them (mobile friendly).
-        if (!flying && onGround && (hitX || hitZ) && len > 0.1f && canStepUp(world, wantX, wantZ)) {
+        if (!flying && !onLadder && onGround && (hitX || hitZ) && len > 0.1f && canStepUp(world, wantX, wantZ)) {
             vy = JUMP_VELOCITY
         }
 
@@ -125,39 +134,14 @@ class Player {
             !Blocks.solid[world.getBlock(floorInt(x), by + 2, floorInt(z))]
     }
 
-    /** Moves along one axis, stopping at solid blocks. Returns false if blocked. */
+    private val posBuf = FloatArray(3)
+
+    /** Moves along one axis, stopping at blocks (using their real shapes). Returns false if blocked. */
     private fun moveAxis(world: World, axis: Int, delta: Float): Boolean {
-        if (delta == 0f) return true
-        var remaining = delta
-        // Sub-step so fast movement cannot tunnel through blocks.
-        while (remaining != 0f) {
-            val step = remaining.coerceIn(-0.45f, 0.45f)
-            remaining -= step
-            when (axis) {
-                0 -> x += step
-                1 -> y += step
-                else -> z += step
-            }
-            val minX = x - HALF_WIDTH; val maxX = x + HALF_WIDTH
-            val minY = y; val maxY = y + HEIGHT
-            val minZ = z - HALF_WIDTH; val maxZ = z + HALF_WIDTH
-            for (bx in floorInt(minX)..floorInt(maxX - 1e-4f))
-                for (by in floorInt(minY) - 1..floorInt(maxY - 1e-4f))
-                    for (bz in floorInt(minZ)..floorInt(maxZ - 1e-4f)) {
-                        val id = world.getBlock(bx, by, bz)
-                        if (!Blocks.solid[id]) continue
-                        // Blocks may be shorter than a full cube (slabs).
-                        val top = by + Blocks.height[id]
-                        if (top <= minY + 1e-4f || by >= maxY) continue
-                        when (axis) {
-                            0 -> x = if (step > 0) bx - HALF_WIDTH - 1e-3f else bx + 1 + HALF_WIDTH + 1e-3f
-                            1 -> y = if (step > 0) by - HEIGHT - 1e-3f else top
-                            else -> z = if (step > 0) bz - HALF_WIDTH - 1e-3f else bz + 1 + HALF_WIDTH + 1e-3f
-                        }
-                        return false
-                    }
-        }
-        return true
+        posBuf[0] = x; posBuf[1] = y; posBuf[2] = z
+        val ok = com.vishucraft.game.world.Collision.sweep(world, posBuf, HALF_WIDTH, HEIGHT, axis, delta)
+        x = posBuf[0]; y = posBuf[1]; z = posBuf[2]
+        return ok
     }
 
     /** True if a block at (bx, by, bz) would overlap the player's body. */
