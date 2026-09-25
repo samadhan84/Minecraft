@@ -178,6 +178,15 @@ object Recipes {
             sh(fence, 3, listOf("MSM", "MSM"), 'M' to pl, 'S' to stick)
             sh(gate, 1, listOf("SMS", "SMS"), 'M' to pl, 'S' to stick)
         }
+        // Beds: three wool of one colour over three planks (any wood).
+        val woolIds = mapOf(
+            "white" to Blocks.WOOL_WHITE, "orange" to Blocks.WOOL_ORANGE, "magenta" to Blocks.WOOL_MAGENTA,
+            "light_blue" to Blocks.WOOL_LIGHT_BLUE, "yellow" to Blocks.WOOL_YELLOW, "lime" to Blocks.WOOL_LIME,
+            "pink" to Blocks.WOOL_PINK, "gray" to Blocks.WOOL_GRAY, "light_gray" to Blocks.WOOL_LIGHT_GRAY,
+            "cyan" to Blocks.WOOL_CYAN, "purple" to Blocks.WOOL_PURPLE, "blue" to Blocks.WOOL_BLUE,
+            "brown" to Blocks.WOOL_BROWN, "green" to Blocks.WOOL_GREEN, "red" to Blocks.WOOL_RED, "black" to Blocks.WOOL_BLACK,
+        )
+        for ((k, c) in Blocks.DYES.withIndex()) sh(Blocks.BED_FIRST + k, 1, listOf("WWW", "PPP"), 'W' to woolIds.getValue(c), 'P' to planks)
         sh(Blocks.LADDER, 3, listOf("S S", "SSS", "S S"), 'S' to stick)
         sh(Blocks.GLASS_PANE, 16, listOf("MMM", "MMM"), 'M' to Blocks.GLASS)
         sh(Blocks.IRON_BARS, 16, listOf("MMM", "MMM"), 'M' to iron)

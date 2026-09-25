@@ -88,7 +88,7 @@ class ChunkMesher {
         fun tileV(tile: Int) = (tile / TextureAtlas.TILES_PER_ROW) * TILE_UV
     }
 
-    private val pad = ByteArray(P * P * H)
+    private val pad = ShortArray(P * P * H)
     private val light = ByteArray(LW * LW * H)
     private var lightQueue = IntArray(4096)
     private val grid = arrayOfNulls<Chunk>(9)
@@ -104,7 +104,7 @@ class ChunkMesher {
     private fun block(px: Int, y: Int, pz: Int): Int {
         if (y < 0) return Blocks.BEDROCK
         if (y >= H) return Blocks.AIR
-        return pad[pidx(px, y, pz)].toInt() and 0xFF
+        return pad[pidx(px, y, pz)].toInt() and 0xFFFF
     }
 
     private fun sky(px: Int, y: Int, pz: Int): Float {
@@ -136,7 +136,7 @@ class ChunkMesher {
                     val pi = pidx(px, y, pz)
                     pad[pi] = b
                     padMeta[pi] = srcMeta[si]
-                    if (blocksLight[b.toInt() and 0xFF]) top = y
+                    if (blocksLight[b.toInt() and 0xFFFF]) top = y
                 }
                 topY[pz * P + px] = top
             }
@@ -147,7 +147,7 @@ class ChunkMesher {
     private fun lidx(lx: Int, y: Int, lz: Int) = (y * LW + lz) * LW + lx
 
     private fun blockAtL(lx: Int, y: Int, lz: Int): Int =
-        grid[(lz shr 4) * 3 + (lx shr 4)]!!.blocks[Chunk.index(lx and 15, y, lz and 15)].toInt() and 0xFF
+        grid[(lz shr 4) * 3 + (lx shr 4)]!!.blocks[Chunk.index(lx and 15, y, lz and 15)].toInt() and 0xFFFF
 
     /** Flood-fills block light from every emitter in the 3x3 chunk area (light travels at most 14 blocks). */
     private fun computeLight() {
@@ -162,7 +162,7 @@ class ChunkMesher {
             val ox = (g % 3) * 16; val oz = (g / 3) * 16
             val b = c.blocks
             for (i in b.indices) {
-                val id = b[i].toInt() and 0xFF
+                val id = b[i].toInt() and 0xFFFF
                 if (id == 0) continue
                 val level = Blocks.lightLevel(id, c.meta[i].toInt() and 0xFF)
                 if (level <= 0) continue
@@ -209,7 +209,7 @@ class ChunkMesher {
         for (y in 0 until H) for (z in 0 until Chunk.SIZE) for (x in 0 until Chunk.SIZE) {
             val px = x + 1; val pz = z + 1
             val pi = pidx(px, y, pz)
-            val id = pad[pi].toInt() and 0xFF
+            val id = pad[pi].toInt() and 0xFFFF
             if (id == Blocks.AIR) continue
             val meta = padMeta[pi].toInt() and 0xFF
             val def = Blocks[id]

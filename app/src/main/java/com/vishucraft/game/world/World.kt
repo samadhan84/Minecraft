@@ -109,15 +109,14 @@ class World(val seed: Long, private val saveDir: File?, val dimension: Dimension
         chunks.remove(Chunk.key(chunk.cx, chunk.cz))
         components.removeIf { RedstoneIds.x(it) shr 4 == chunk.cx && RedstoneIds.z(it) shr 4 == chunk.cz }
         if (chunk.modified) {
-            val copy = chunk.blocks.copyOf()
-            val meta = chunk.meta.copyOf()
-            workers.execute { writeChunk(chunk.cx, chunk.cz, copy, meta) }
+            val data = chunk.toBytes()
+            workers.execute { writeChunk(chunk.cx, chunk.cz, data) }
         }
     }
 
     private fun registerComponents(c: Chunk) {
         for (i in c.blocks.indices) {
-            val id = c.blocks[i].toInt() and 0xFF
+            val id = c.blocks[i].toInt() and 0xFFFF
             if (!RedstoneIds.isComponent(id)) continue
             val x = i and 15; val z = (i shr 4) and 15; val y = i shr 8
             components.add(RedstoneIds.pack(c.cx * 16 + x, y, c.cz * 16 + z))
@@ -133,22 +132,18 @@ class World(val seed: Long, private val saveDir: File?, val dimension: Dimension
         if (!f.exists()) return null
         return try {
             val c = Chunk(cx, cz)
-            DataInputStream(GZIPInputStream(f.inputStream().buffered())).use {
-                it.readFully(c.blocks)
-                // Older saves have no block state section.
-                try { it.readFully(c.meta) } catch (_: java.io.EOFException) { c.meta.fill(0) }
-            }
+            c.fromBytes(GZIPInputStream(f.inputStream().buffered()).use { it.readBytes() })
             c
         } catch (e: Exception) {
             null
         }
     }
 
-    private fun writeChunk(cx: Int, cz: Int, data: ByteArray, meta: ByteArray) {
+    private fun writeChunk(cx: Int, cz: Int, data: ByteArray) {
         val f = chunkFile(cx, cz) ?: return
         try {
             val tmp = File(f.parentFile, f.name + ".tmp")
-            GZIPOutputStream(tmp.outputStream().buffered()).use { it.write(data); it.write(meta) }
+            GZIPOutputStream(tmp.outputStream().buffered()).use { it.write(data) }
             tmp.renameTo(f)
         } catch (_: Exception) {
         }
@@ -160,7 +155,7 @@ class World(val seed: Long, private val saveDir: File?, val dimension: Dimension
         for (c in chunks.values) {
             if (c.modified) {
                 c.modified = false
-                writeChunk(c.cx, c.cz, c.blocks.copyOf(), c.meta.copyOf())
+                writeChunk(c.cx, c.cz, c.toBytes())
             }
         }
     }
@@ -204,9 +199,12 @@ class LevelData(
     var dimension: Dimension = Dimension.OVERWORLD,
     /** True right after travelling through a portal: find a safe spot and build a return portal. */
     var arriving: Boolean = false,
+    /** Respawn point set by sleeping in a bed (Overworld only). */
+    var hasBedSpawn: Boolean = false,
+    var bedX: Int = 0, var bedY: Int = 0, var bedZ: Int = 0,
 ) {
     companion object {
-        private const val VERSION = 3
+        private const val VERSION = 4
 
         /** Creative worlds start with a useful hotbar; survival starts empty-handed. */
         fun create(seed: Long, name: String, mode: GameMode): LevelData {
@@ -247,6 +245,10 @@ class LevelData(
                             l.dimension = Dimension.values()[d.readInt().coerceIn(0, 2)]
                             l.arriving = d.readBoolean()
                         }
+                        if (version >= 4) {
+                            l.hasBedSpawn = d.readBoolean()
+                            l.bedX = d.readInt(); l.bedY = d.readInt(); l.bedZ = d.readInt()
+                        }
                     }
                     l.hasPlayer = true
                     l
@@ -275,6 +277,8 @@ class LevelData(
             inventory.write(d)
             d.writeInt(dimension.ordinal)
             d.writeBoolean(arriving)
+            d.writeBoolean(hasBedSpawn)
+            d.writeInt(bedX); d.writeInt(bedY); d.writeInt(bedZ)
         }
         tmp.renameTo(f)
     }

@@ -289,6 +289,11 @@ class Structures(private val seed: Long, private val gen: TerrainGenerator, priv
         set(p, hx + ddx, y0 + 1, hz + ddz, Blocks.OAK_DOOR, doorSide)
         set(p, hx + ddx, y0 + 2, hz + ddz, Blocks.OAK_DOOR, doorSide or Shapes.UPPER)
         set(p, hx, y0 + 3, hz, Blocks.TORCH)
+        // Bigger houses get a red bed in a corner, clear of every possible doorway.
+        if (w == 3) {
+            set(p, hx - 2, y0 + 1, hz + 2, Blocks.BED_FIRST + 14, 4)
+            set(p, hx - 1, y0 + 1, hz + 2, Blocks.BED_FIRST + 14, 4 or Shapes.UPPER)
+        }
         set(p, hx - w + 1, y0 + 1, hz - w + 1, Blocks.CRAFTING_TABLE, 2)
         lootChest(p, hx + w - 1, y0 + 1, hz - w + 1, rnd, listOf(
             Items.find("Bread") to 1..4, Items.find("Apple") to 0..3, Items.find("Wheat") to 0..6,

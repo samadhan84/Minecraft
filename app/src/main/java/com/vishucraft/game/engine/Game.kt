@@ -137,6 +137,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
     }
     private val pendingEdits = ArrayList<IntArray>()
     private val doors = (0 until Blocks.COUNT).filter { Blocks.isDoor(it) }.toSet()
+    private val beds = (0 until Blocks.COUNT).filter { Blocks.isBed(it) }.toSet()
     private val trapdoors = (0 until Blocks.COUNT).filter { Blocks.isTrapdoor(it) }.toSet()
     private val handOpenables = (0 until Blocks.COUNT).filter { Blocks.opensByHand(it) }.toSet()
 
@@ -387,11 +388,21 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
         for (s in inventory.armor) if (s != null) drops.spawn(s, player.x, player.y + 1f, player.z)
         inventory.clear()
         food = 20f; saturation = 5f; exhaustion = 0f
-        val (sx, sy, sz) = world.findSpawn()
-        player.x = sx; player.y = sy; player.z = sz
+        val bed = level.hasBedSpawn && dimension == com.vishucraft.game.world.Dimension.OVERWORLD &&
+            world.isLoaded(level.bedX, level.bedZ) && Blocks.isBed(world.getBlock(level.bedX, level.bedY, level.bedZ))
+        if (bed) {
+            player.x = level.bedX + 0.5f; player.y = level.bedY + 0.6f; player.z = level.bedZ + 0.5f
+        } else {
+            if (level.hasBedSpawn && dimension == com.vishucraft.game.world.Dimension.OVERWORLD) {
+                level.hasBedSpawn = false
+                uiEvents.add("toast:Your bed was missing, so you woke up at the world spawn")
+            }
+            val (sx, sy, sz) = world.findSpawn()
+            player.x = sx; player.y = sy; player.z = sz
+        }
         player.vx = 0f; player.vy = 0f; player.vz = 0f
         health = 20f
-        spawned = false // drop onto the real surface once the chunk is loaded
+        spawned = bed // drop onto the real surface once the chunk is loaded (unless waking in bed)
         uiEvents.add("died")
     }
 
@@ -579,6 +590,13 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
             if (Blocks[id].hardness > 0f) damageHeld(if (heldItem()?.tool == ToolType.SWORD) 2 else 1)
             exhaust(0.005f)
         }
+        // Beds are two blocks long.
+        if (Blocks.isBed(id)) {
+            val n = ChunkMesher.NORMALS[(meta and 7).coerceIn(2, 5)]
+            val head = meta and com.vishucraft.game.world.Shapes.UPPER != 0
+            val ox = if (head) x - n[0] else x + n[0]; val oz = if (head) z - n[2] else z + n[2]
+            if (world.getBlock(ox, y, oz) == id) setBlock(ox, y, oz, Blocks.AIR)
+        }
         // Doors come in two halves.
         if (Blocks.isDoor(id)) {
             val oy = if (meta and com.vishucraft.game.world.Shapes.UPPER != 0) y - 1 else y + 1
@@ -681,6 +699,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
             Blocks.STONE_BUTTON -> { redstone.pressButton(t.x, t.y, t.z); return }
             Blocks.CRAFTING_TABLE -> { uiEvents.add("open:craft"); return }
             in handOpenables -> { toggleOpen(t.x, t.y, t.z); return }
+            in beds -> { useBed(t.x, t.y, t.z); return }
             Blocks.REPEATER -> {
                 val m = world.getMeta(t.x, t.y, t.z)
                 val delay = ((m shr 3) and 3) + 1 and 3
@@ -801,6 +820,38 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
         portalTime = -5f
     }
 
+    /**
+     * Tapping a bed sets your respawn point there; at night (or in a thunderstorm) you sleep until morning.
+     * Beds do not work in the other worlds: they explode.
+     */
+    fun useBed(x: Int, y: Int, z: Int) {
+        if (dimension != com.vishucraft.game.world.Dimension.OVERWORLD) {
+            setBlock(x, y, z, Blocks.AIR)
+            explode(x + 0.5f, y + 0.5f, z + 0.5f, 3.5f)
+            uiEvents.add("toast:Beds don't work in this world!")
+            return
+        }
+        // Remember the foot of the bed as the respawn point.
+        val meta = world.getMeta(x, y, z)
+        val n = ChunkMesher.NORMALS[(meta and 7).coerceIn(2, 5)]
+        val (fx, fz) = if (meta and com.vishucraft.game.world.Shapes.UPPER != 0) (x - n[0]) to (z - n[2]) else x to z
+        level.hasBedSpawn = true; level.bedX = fx; level.bedY = y; level.bedZ = fz
+        val night = daylight < 0.3f || thunder
+        when {
+            isClient -> uiEvents.add("toast:Respawn point set (the host controls the time)")
+            !night -> uiEvents.add("toast:Respawn point set. You can only sleep at night")
+            mobs.list.any { it.type.hostile && !it.dead && (it.x - x) * (it.x - x) + (it.z - z) * (it.z - z) + (it.y - y) * (it.y - y) < 64f } ->
+                uiEvents.add("toast:You may not rest now, there are monsters nearby")
+            else -> {
+                uiEvents.add("sleep")
+                timeOfDay = 0.02f // sunrise
+                setWeather(false, false); rain = 0f
+                if (health < 20f && survival) health = minOf(20f, health + 4f)
+                uiEvents.add("toast:Good morning! Respawn point set")
+            }
+        }
+    }
+
     /** Opens or closes a door (both halves), trapdoor or fence gate. */
     fun toggleOpen(x: Int, y: Int, z: Int) {
         val id = world.getBlock(x, y, z)
@@ -845,6 +896,14 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
         val S = com.vishucraft.game.world.Shapes
         var meta = placementMeta(def.facing)
         when (id) {
+            in beds -> {
+                val headDir = meta xor 1 // placementMeta faces the player; the head points away from them
+                val n = ChunkMesher.NORMALS[headDir]
+                val hx = x + n[0]; val hz = z + n[2]
+                if (world.getBlock(hx, y, hz) != Blocks.AIR || !Blocks.solid[world.getBlock(hx, y - 1, hz)] || !Blocks.solid[below]) return
+                meta = headDir
+                setBlock(hx, y, hz, id, headDir or S.UPPER)
+            }
             in doors -> {
                 if (y + 1 >= Chunk.HEIGHT || world.getBlock(x, y + 1, z) != Blocks.AIR || !Blocks.solid[below]) return
                 setBlock(x, y + 1, z, id, meta or S.UPPER)

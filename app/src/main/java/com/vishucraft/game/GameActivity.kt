@@ -386,6 +386,17 @@ class GameActivity : Activity() {
                 hurtFlash.animate().alpha(0f).setDuration(350).start()
             }
             e == "died" -> showToast("You died! Respawning…")
+            e == "sleep" -> {
+                // Fade to black and back while the night passes.
+                hurtFlash.animate().cancel()
+                hurtFlash.setBackgroundColor(Color.BLACK)
+                hurtFlash.alpha = 0f
+                hurtFlash.animate().alpha(1f).setDuration(700).withEndAction {
+                    hurtFlash.animate().alpha(0f).setStartDelay(500).setDuration(900).withEndAction {
+                        hurtFlash.setBackgroundColor(Color.argb(110, 220, 0, 0))
+                    }.start()
+                }.start()
+            }
             e.startsWith("toast:") -> showToast(e.removePrefix("toast:"))
             e == "open:craft" -> { releaseInputs(); screen.open(ContainerScreen.Mode.CRAFTING) }
             e.startsWith("dimension:") -> travel(com.vishucraft.game.world.Dimension.valueOf(e.removePrefix("dimension:")))

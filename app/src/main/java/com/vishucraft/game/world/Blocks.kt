@@ -255,7 +255,11 @@ object Blocks {
     const val WOOD_TRAPDOOR_FIRST = 235
     const val WOOD_FENCE_FIRST = 240
     const val WOOD_GATE_FIRST = 245
-    const val COUNT = 250
+    /** Beds in the 16 dye colours (DYES order). Two blocks: foot and head (meta has Shapes.UPPER). */
+    const val BED_FIRST = 250
+    const val COUNT = 266
+
+    fun isBed(id: Int) = id in BED_FIRST until BED_FIRST + 16
 
     /** The five extra wood types, in id order for the door pack. */
     val EXTRA_WOODS = listOf("spruce", "birch", "jungle", "acacia", "dark_oak")
@@ -276,7 +280,7 @@ object Blocks {
     private val defs = arrayOfNulls<BlockDef>(COUNT)
 
     /** Light for blocks without a rule in [lightLevel] (lava...). Declared before init so it exists there. */
-    @JvmField val extraLight = IntArray(256)
+    @JvmField val extraLight = IntArray(COUNT)
     private fun t(name: String) = Tiles.id(name)
     private fun reg(d: BlockDef) {
         check(defs[d.id] == null) { "duplicate block id ${d.id}" }
@@ -555,6 +559,11 @@ object Blocks {
             shape(WOOD_GATE_FIRST + i, "$nice Fence Gate", "${w}_planks", hardness = 0.8f, tool = A)
         }
         shape(IRON_TRAPDOOR, "Iron Trapdoor", "iron_trapdoor", hardness = 1.5f, tool = P, cat = Category.REDSTONE)
+        for ((i, c) in DYES.withIndex()) {
+            shape(BED_FIRST + i, "${pretty(c)} Bed", "bed_foot_$c", "bed_side_$c", "oak_planks", hardness = 0.2f,
+                tool = A, cat = Category.COLORED)
+            t("bed_head_$c")
+        }
         extraLight[EMBER_PORTAL] = 11
         extraLight[SKY_PORTAL] = 11
         reg(BlockDef(PISTON_HEAD, "Piston Head", t("piston_front"), t("oak_planks"), render = RenderType.PISTON_HEAD,
@@ -618,6 +627,7 @@ object Blocks {
             POTATOES -> return Tiles.id("potatoes_stage_${(meta.coerceIn(0, 7)) / 2}")
             OAK_DOOR -> return Tiles.id(if (meta and Shapes.UPPER != 0) "oak_door_top" else "oak_door_bottom")
             IRON_DOOR -> return Tiles.id(if (meta and Shapes.UPPER != 0) "iron_door_top" else "iron_door_bottom")
+            in BED_FIRST until BED_FIRST + 16 -> if (face == 0 && meta and Shapes.UPPER != 0) return Tiles.id("bed_head_${DYES[id - BED_FIRST]}")
             in WOOD_DOOR_FIRST until WOOD_DOOR_FIRST + 5 -> {
                 val w = EXTRA_WOODS[id - WOOD_DOOR_FIRST]
                 return Tiles.id(if (meta and Shapes.UPPER != 0) "${w}_door_top" else "${w}_door_bottom")

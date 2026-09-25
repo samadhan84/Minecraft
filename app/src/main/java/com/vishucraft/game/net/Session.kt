@@ -44,7 +44,7 @@ abstract class Session {
 
     protected fun chunkBytes(c: Chunk): ByteArray {
         val bytes = ByteArrayOutputStream()
-        GZIPOutputStream(bytes).use { it.write(c.blocks); it.write(c.meta) }
+        GZIPOutputStream(bytes).use { it.write(c.toBytes()) }
         return bytes.toByteArray()
     }
 }
@@ -257,7 +257,7 @@ class ClientSession private constructor(private val conn: Connection) : Session(
                     val cx = d.readInt(); val cz = d.readInt(); val len = d.readInt()
                     val data = ByteArray(len); d.readFully(data)
                     val c = Chunk(cx, cz)
-                    java.io.DataInputStream(GZIPInputStream(data.inputStream())).use { it.readFully(c.blocks); it.readFully(c.meta) }
+                    c.fromBytes(GZIPInputStream(data.inputStream()).use { it.readBytes() })
                     c.version = 1
                     pendingChunks.remove(Chunk.key(cx, cz))
                     game.world.receiveChunk(c)

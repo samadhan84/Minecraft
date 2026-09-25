@@ -1069,7 +1069,28 @@ object TextureAtlas {
         }
     }
 
+    /** Bed tops: the foot is all blanket, the head has a pillow; the sides show blanket over a wooden frame. */
+    private fun bed(t: Tile, part: String, color: Int) {
+        val blanket = { x: Int, y: Int -> scale(color, (if ((x + y) % 4 == 0) 0.9f else 1f) * t.jitter(0.04f)) }
+        when (part) {
+            "foot" -> t.fill { x, y -> if (y == 0 || y == 15) scale(color, 0.7f) else blanket(x, y) }
+            "head" -> t.fill { x, y ->
+                when {
+                    x in 2..13 && y in 2..9 -> if (x == 2 || x == 13 || y == 2 || y == 9) rgb(210, 210, 214) else rgb(240, 240, 244)
+                    y == 12 -> scale(color, 0.7f)
+                    else -> blanket(x, y)
+                }
+            }
+            else -> t.fill { x, y -> if (y < 10) blanket(x, y) else scale(rgb(150, 112, 62), t.jitter(0.05f)) }
+        }
+    }
+
     private fun buildingAndRedstone(name: String, t: Tile): Boolean {
+        if (name.startsWith("bed_")) {
+            val part = name.removePrefix("bed_").substringBefore('_')
+            val color = DYE_COLORS[name.removePrefix("bed_$part" + "_")] ?: return false
+            bed(t, part, color); return true
+        }
         for ((key, w) in WOODS) {
             when (name) {
                 "${key}_door_bottom" -> { door(t, true, false, w.planks); return true }

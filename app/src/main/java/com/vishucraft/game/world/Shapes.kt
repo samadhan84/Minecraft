@@ -49,6 +49,7 @@ object Shapes {
             Blocks.isTrapdoor(id) -> Blocks.OAK_TRAPDOOR
             Blocks.isFence(id) -> Blocks.OAK_FENCE
             Blocks.isGate(id) -> Blocks.OAK_FENCE_GATE
+            Blocks.isBed(id) -> Blocks.BED_FIRST
             else -> id
         }
         return when (kind) {
@@ -93,6 +94,18 @@ object Shapes {
                 var any = false
                 for (side in 2..5) if (connects(id, neighbour(side))) { any = true; out.add(arm(side, 0f, 1f, 7 * P, 9 * P)) }
                 if (!any) for (side in 2..5) out.add(arm(side, 0f, 1f, 7 * P, 9 * P))
+                out
+            }
+            Blocks.BED_FIRST -> if (collision) listOf(b(0f, 0f, 0f, 1f, 9 * P, 1f)) else {
+                // Mattress on four short legs; the legs sit at the outer end of each half.
+                val out = arrayListOf(b(0f, 3 * P, 0f, 1f, 9 * P, 1f))
+                val end = if (upper) f else f xor 1
+                for (side in listOf(0f, 13 * P)) when (end) {
+                    2 -> out.add(b(side, 0f, 13 * P, side + 3 * P, 3 * P, 1f))
+                    3 -> out.add(b(side, 0f, 0f, side + 3 * P, 3 * P, 3 * P))
+                    4 -> out.add(b(13 * P, 0f, side, 1f, 3 * P, side + 3 * P))
+                    else -> out.add(b(0f, 0f, side, 3 * P, 3 * P, side + 3 * P))
+                }
                 out
             }
             Blocks.REPEATER -> listOf(b(0f, 0f, 0f, 1f, 2 * P, 1f))

@@ -33,6 +33,8 @@ procedurally in code when the game starts.
   and iron bars, all with proper collision.
 - **More redstone**: repeaters (1-4 tick delay), observers, daylight sensors, pressure plates, hoppers, rails,
   powered rails and rideable minecarts; doors react to redstone. Bows and arrows too.
+- **Beds** in 16 colours: tap to set your respawn point; at night (or in a storm) you sleep until morning.
+  Not with monsters nearby, and never in the other worlds (they explode). Bigger village houses have one.
 - **Crafting grid**: lay items out yourself in a 2x2 grid (inventory) or 3x3 grid (crafting table); tools, armor,
   doors, stairs and more need the right pattern, other recipes just the right ingredients. A recipe list is there too
   (small recipes anywhere, the rest at a crafting table), a **furnace** that smelts ore,
