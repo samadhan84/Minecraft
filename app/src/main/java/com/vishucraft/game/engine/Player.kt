@@ -29,6 +29,7 @@ class Player {
     var flying = false
     var inWater = false
     var headInWater = false
+    var headInLava = false
     /** Distance walked, drives view bobbing. */
     var walkDist = 0f
 
@@ -52,8 +53,9 @@ class Player {
     fun update(dt: Float, world: World, moveF: Float, moveS: Float, jump: Boolean, descend: Boolean) {
         val feet = world.getBlock(floorInt(x), floorInt(y + 0.1f), floorInt(z))
         val head = world.getBlock(floorInt(x), floorInt(eyeY), floorInt(z))
-        inWater = feet == Blocks.WATER
+        inWater = feet == Blocks.WATER || feet == Blocks.LAVA
         headInWater = head == Blocks.WATER
+        headInLava = head == Blocks.LAVA
 
         val sy = sin(yaw); val cy = cos(yaw)
         // forward = (sin yaw, 0, -cos yaw), right = (cos yaw, 0, sin yaw)
@@ -166,4 +168,5 @@ class Player {
 
     fun blockX() = floor(x).toInt()
     fun blockZ() = floor(z).toInt()
+    fun blockY() = floor(eyeY).toInt()
 }

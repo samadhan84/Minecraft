@@ -32,6 +32,7 @@ class GameRenderer(
         lastNanos = now
 
         game.update(dt)
+        game.listener?.invoke(game.player.x, game.player.eyeY, game.player.z, game.player.yaw)
         while (true) onEvent(game.uiEvents.poll() ?: break)
         if (game.dirtyChunks.isNotEmpty()) {
             for (key in game.dirtyChunks) world.remeshNow((key shr 32).toInt(), key.toInt())

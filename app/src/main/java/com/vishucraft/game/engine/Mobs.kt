@@ -42,6 +42,13 @@ class Mob(val type: MobType, var x: Float, var y: Float, var z: Float) {
     var walkPhase = 0f
     var moving = false
     var burning = false
+    /** Negative while a baby (seconds until grown up). */
+    var age = 0f
+    var loveTime = 0f
+    internal var breedCooldown = 0f
+    val scale get() = if (age < 0f) 0.55f else 1f
+    val halfWidth get() = type.halfWidth * scale
+    val height get() = type.height * scale
     internal var aiTimer = 0f
     internal var wanderYaw = 0f
     internal var wandering = false
@@ -70,6 +77,7 @@ class Mobs(private val world: World) {
             spawnTimer = 1f
             trySpawn(game)
         }
+        breed(dt)
         val p = game.player
         val it = list.iterator()
         while (it.hasNext()) {
@@ -84,8 +92,49 @@ class Mobs(private val world: World) {
         }
     }
 
+    /** Breeding foods: wheat for cows and sheep, carrots or potatoes for pigs. */
+    fun wantsFood(m: Mob, slot: Int): Boolean {
+        val name = com.vishucraft.game.world.Items[slot]?.name ?: return false
+        return when (m.type) {
+            MobType.COW, MobType.SHEEP -> name == "Wheat"
+            MobType.PIG -> name == "Carrot" || name == "Potato"
+            else -> false
+        }
+    }
+
+    /** Feeds an animal so it looks for a partner. Returns true if the food was used. */
+    fun feed(m: Mob, slot: Int): Boolean {
+        if (m.dead || !wantsFood(m, slot) || m.age < 0f || m.breedCooldown > 0f || m.loveTime > 0f) return false
+        m.loveTime = 30f
+        return true
+    }
+
+    private fun breed(dt: Float) {
+        for (m in list) {
+            if (m.age < 0f) m.age += dt
+            if (m.breedCooldown > 0f) m.breedCooldown -= dt
+            if (m.loveTime <= 0f) continue
+            m.loveTime -= dt
+            val mate = list.firstOrNull { o ->
+                o !== m && o.type == m.type && o.loveTime > 0f && !o.dead &&
+                    (o.x - m.x) * (o.x - m.x) + (o.z - m.z) * (o.z - m.z) < 64f
+            } ?: continue
+            // Walk towards each other; when close enough, a baby appears.
+            val dx = mate.x - m.x; val dz = mate.z - m.z
+            val d = sqrt(dx * dx + dz * dz)
+            if (d > 1.2f) { m.yaw = atan2(dx, -dz); m.vx += dx / d * 4f * dt; m.vz += dz / d * 4f * dt; continue }
+            m.loveTime = 0f; mate.loveTime = 0f
+            m.breedCooldown = 120f; mate.breedCooldown = 120f
+            list.add(Mob(m.type, (m.x + mate.x) / 2, m.y + 0.2f, (m.z + mate.z) / 2).also { it.age = -600f })
+            return
+        }
+    }
+
     private fun tick(m: Mob, dt: Float, game: Game) {
+        if (world.getBlock(floorInt(m.x), floorInt(m.y + 0.3f), floorInt(m.z)) == Blocks.LAVA && !m.dead &&
+            rnd.nextFloat() < dt * 2f) damage(m, 2f, 0f, 0f)
         if (m.hurtTime > 0f) m.hurtTime -= dt
+        if (!m.dead && rnd.nextFloat() < dt / 10f) game.sound(voice(m.type), m.x, m.y + 1f, m.z, 0.8f)
         if (m.dead) {
             m.deathTime += dt
             m.vx *= 0.8f; m.vz *= 0.8f
@@ -107,6 +156,7 @@ class Mobs(private val world: World) {
                     if (dist < 1.4f && abs(p.y - m.y) < 1.6f && m.attackCooldown <= 0f) {
                         m.attackCooldown = 1f
                         game.hurtPlayer(3f, m.x, m.z)
+                        game.sound("zombie", m.x, m.y + 1.5f, m.z, 0.6f)
                     }
                 } else wander(m, dt).let { wantX = it.first; wantZ = it.second; speed *= 0.5f }
                 // Zombies burn in direct sunlight.
@@ -132,7 +182,7 @@ class Mobs(private val world: World) {
                             }
                         }
                     } else {
-                        if (dist < 2.6f && abs(p.y - m.y) < 2f) m.fuse = 0f
+                        if (dist < 2.6f && abs(p.y - m.y) < 2f) { m.fuse = 0f; game.sound("fuse", m.x, m.y + 1f, m.z, 1f) }
                         else { wantX = dx / dist; wantZ = dz / dist }
                     }
                 } else { m.fuse = -1f; wander(m, dt).let { wantX = it.first; wantZ = it.second; speed *= 0.5f } }
@@ -194,7 +244,7 @@ class Mobs(private val world: World) {
     private fun move(m: Mob, axis: Int, delta: Float): Boolean {
         if (delta == 0f) return true
         var remaining = delta
-        val hw = m.type.halfWidth; val h = m.type.height
+        val hw = m.halfWidth; val h = m.height
         while (remaining != 0f) {
             val step = remaining.coerceIn(-0.45f, 0.45f)
             remaining -= step
@@ -217,6 +267,8 @@ class Mobs(private val world: World) {
         return true
     }
 
+    fun voice(t: MobType) = t.name.lowercase()
+
     fun skyExposed(x: Int, y: Int, z: Int): Boolean {
         for (yy in max(y, 0) until Chunk.HEIGHT) if (Blocks.blocksLight[world.getBlock(x, yy, z)]) return false
         return true
@@ -238,8 +290,8 @@ class Mobs(private val world: World) {
         var best: MobHit? = null
         for (m in list) {
             if (m.dead) continue
-            val hw = m.type.halfWidth + 0.1f
-            val t = rayBox(ox, oy, oz, dx, dy, dz, m.x - hw, m.y, m.z - hw, m.x + hw, m.y + m.type.height, m.z + hw)
+            val hw = m.halfWidth + 0.1f
+            val t = rayBox(ox, oy, oz, dx, dy, dz, m.x - hw, m.y, m.z - hw, m.x + hw, m.y + m.height, m.z + hw)
             if (t in 0f..maxDist && (best == null || t < best.distance)) best = MobHit(m, t)
         }
         return best

@@ -946,7 +946,57 @@ object TextureAtlas {
             "melon_slice" -> mask(t, arrayOf("aaaaaaaaaa", ".mmmmmmmm.", ".mmdmmdmm.", "..mmmmmm..", "...mmmm...", "....mm...."), rgb(230, 60, 60), rgb(80, 150, 40))
             "ancient_debris" -> t.fill { x, y -> scale(if ((x + y * 3) % 7 == 0) rgb(130, 96, 84) else rgb(90, 66, 60), t.jitter(0.1f)) }
             "ancient_debris_top" -> { noisy(t, rgb(96, 72, 66), 0.1f, 0.3f); for (d in 1..6 step 2) for (i in 7 - d..8 + d) { t[i, 7 - d] = rgb(130, 96, 84); t[i, 8 + d] = rgb(130, 96, 84) } }
+            "lava" -> {
+                val vn = valueNoise(t.rnd, 4)
+                t.fill { x, y -> val w = vn[y][x]; if ((x + y * 2) % 7 == 0 && w > 0.55f) rgb(255, 230, 120) else mix(rgb(200, 60, 10), rgb(255, 150, 30), w) }
+            }
+            "carrot" -> mask(t, arrayOf("....aa.a", ".....aa.", "....dmd.", "...dmmd.", "..dmmd..", ".dmmd...", "dmmd....", "dd......"), rgb(240, 130, 30), rgb(80, 160, 50))
+            "potato" -> mask(t, LUMP, rgb(200, 160, 90))
+            "baked_potato" -> mask(t, LUMP, rgb(214, 170, 80), rgb(250, 230, 140))
+            "bone_meal" -> mask(t, DUST, rgb(236, 236, 226))
+            "lava_bucket" -> { bucket(t, false); for (x in 4..11) { t[x, 6] = rgb(250, 130, 20); t[x, 7] = rgb(220, 80, 10) } }
             "furnace_front_on" -> { furnaceFront(t); for (y in 9..13) for (x in 5..10) t[x, y] = if ((x + y) % 2 == 0) rgb(255, 170, 40) else rgb(250, 110, 20) }
+            else -> return farming(name, t)
+        }
+        return true
+    }
+
+    /** Crop growth stages and saplings. */
+    private fun farming(name: String, t: Tile): Boolean {
+        val stem = rgb(80, 150, 50)
+        when {
+            name.startsWith("wheat_stage_") -> {
+                val s = name.removePrefix("wheat_stage_").toInt()
+                sprite(t)
+                val h = 3 + s * 12 / 7
+                val ripe = s >= 7
+                for (k in 0..4) {
+                    val x = 2 + k * 3
+                    for (i in 0 until h) t[x, 15 - i] = if (ripe) rgb(200, 170, 70) else if (s >= 5) rgb(150, 160, 60) else stem
+                    if (s >= 4) { t[x + 1, 16 - h] = if (ripe) rgb(220, 190, 90) else rgb(170, 180, 70); t[x, 15 - h] = if (ripe) rgb(230, 200, 100) else rgb(160, 170, 70) }
+                }
+            }
+            name.startsWith("carrots_stage_") || name.startsWith("potatoes_stage_") -> {
+                val s = name.substringAfterLast('_').toInt()
+                sprite(t)
+                val h = 3 + s * 3
+                for (k in 0..3) {
+                    val x = 3 + k * 3
+                    for (i in 0 until h) t[x + (if (i % 3 == 1) 1 else 0), 15 - i] = if (i >= h - 2) rgb(96, 170, 60) else stem
+                }
+                if (s == 3) {
+                    val c = if (name.startsWith("carrots")) rgb(240, 130, 30) else rgb(200, 160, 90)
+                    for (k in 0..3) { t[3 + k * 3, 15] = c; t[4 + k * 3, 15] = c }
+                }
+            }
+            name.startsWith("sapling_") -> {
+                val leaves = WOODS[name.removePrefix("sapling_")]?.leaves ?: rgb(62, 126, 42)
+                sprite(t)
+                for (y in 8..15) t[7, y] = rgb(110, 80, 50)
+                for (y in 2..10) for (x in 3..12) {
+                    if (abs(x - 7.5f) + abs(y - 6f) * 1.2f < 5.5f && t.rnd.nextInt(5) != 0) t[x, y] = scale(leaves, t.jitter(0.15f))
+                }
+            }
             else -> return false
         }
         return true

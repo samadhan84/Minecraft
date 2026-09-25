@@ -92,6 +92,7 @@ class GameActivity : Activity() {
     private lateinit var downButton: HudButton
     private lateinit var root: FrameLayout
     private lateinit var settings: Settings
+    private lateinit var sounds: com.vishucraft.game.audio.Sounds
     private lateinit var status: StatusView
     private lateinit var screen: ContainerScreen
     private val handler = Handler(Looper.getMainLooper())
@@ -109,6 +110,12 @@ class GameActivity : Activity() {
         world = World(level.seed, dir)
         game = Game(world, level, input, dir)
         settings = Settings(this)
+        sounds = com.vishucraft.game.audio.Sounds(this)
+        game.soundSink = { name, x, y, z, gain ->
+            if (name.startsWith("mat:")) sounds.play(com.vishucraft.game.audio.Sounds.material(name.substring(4).toInt()), x, y, z, gain, 0.9f + Math.random().toFloat() * 0.2f)
+            else sounds.play(name, x, y, z, gain)
+        }
+        game.listener = { x, y, z, yaw -> sounds.setListener(x, y, z, yaw) }
         applySettings()
 
         glView = GLSurfaceView(this).apply {
@@ -232,6 +239,14 @@ class GameActivity : Activity() {
             glView.queueEvent { game.mobs.hostileEnabled = hostile }
             b.text = if (hostile) "Mobs: Normal" else "Mobs: Peaceful (no monsters)"
         }
+        addMenu("Weather: change") { b ->
+            glView.queueEvent {
+                val next = when { game.rain < 0.5f -> 1; !game.thunder -> 2; else -> 0 }
+                game.setWeather(next > 0, next == 2)
+            }
+            b.text = "Weather: changing…"
+            handler.postDelayed({ b.text = "Weather: change" }, 1500)
+        }
         addMenu("Settings") { settingsDialog(this) { applySettings() } }
         addMenu("Controls") { showControls() }
         addMenu("Save and quit") { finish() }
@@ -284,6 +299,8 @@ class GameActivity : Activity() {
         game.lookScale = settings.sensitivity
         game.fov = settings.fov.toFloat()
         game.renderDistance = settings.renderDistance
+        sounds.volume = settings.soundVolume / 100f
+        sounds.musicVolume = settings.musicVolume / 100f
         if (::stats.isInitialized) stats.visibility = if (settings.showDebug) View.VISIBLE else View.GONE
     }
 
@@ -334,12 +351,15 @@ class GameActivity : Activity() {
                 if (e.startsWith("open:chest:")) screen.open(ContainerScreen.Mode.CHEST, chestEntity = world.blockEntities.chest(x, y, z))
                 else screen.open(ContainerScreen.Mode.FURNACE, furnaceEntity = world.blockEntities.furnace(x, y, z))
             }
-            e == "place" || e == "eat" || e == "craft" || e == "pickup" || e == "break_tool" -> updateHand()
+            e == "craft" -> { sounds.play("craft"); updateHand() }
+            e == "place" || e == "eat" || e == "pickup" || e == "break_tool" -> updateHand()
         }
         status.update(game.health, game.food, game.inventory.armorPoints())
     }
 
     private fun onStats(text: String) {
+        val exposed = game.mobs.skyExposed(game.player.blockX(), game.player.blockY(), game.player.blockZ())
+        sounds.setRain(game.rain > 0.05f, game.rain * (if (exposed) 1f else 0.3f))
         status.update(game.health, game.food, game.inventory.armorPoints())
         updateHand()
         stats.text = text
@@ -554,9 +574,11 @@ class GameActivity : Activity() {
     override fun onResume() {
         super.onResume()
         glView.onResume()
+        sounds.resume()
     }
 
     override fun onPause() {
+        sounds.pause()
         releaseInputs()
         glView.onPause() // blocks until the GL thread has paused, so saving below is safe
         game.save()
@@ -564,6 +586,7 @@ class GameActivity : Activity() {
     }
 
     override fun onDestroy() {
+        sounds.release()
         world.shutdown()
         super.onDestroy()
     }

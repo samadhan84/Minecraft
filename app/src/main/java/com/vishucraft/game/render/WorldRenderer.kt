@@ -184,9 +184,13 @@ class WorldRenderer(private val game: Game) {
 
         val p = game.player
         val daylight = game.daylight
-        val underwater = p.headInWater
+        val underwater = p.headInWater || p.headInLava
         val sky = skyColor(daylight)
-        val fog = if (underwater) floatArrayOf(0.05f, 0.14f, 0.38f) else sky
+        val fog = when {
+            p.headInLava -> floatArrayOf(0.8f, 0.25f, 0.02f)
+            p.headInWater -> floatArrayOf(0.05f, 0.14f, 0.38f)
+            else -> sky
+        }
         glClearColor(fog[0], fog[1], fog[2], 1f)
         glClear(GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT)
 
@@ -202,7 +206,7 @@ class WorldRenderer(private val game: Game) {
         Matrix.multiplyMM(viewProj, 0, proj, 0, view, 0)
         extractFrustum()
 
-        val fogEnd = if (underwater) 14f else far - 20f
+        val fogEnd = if (p.headInLava) 3f else if (underwater) 14f else (far - 20f) * (1f - 0.3f * game.rain)
         val fogStart = if (underwater) 0f else fogEnd * 0.55f
 
         glActiveTexture(GL_TEXTURE0)
@@ -242,6 +246,7 @@ class WorldRenderer(private val game: Game) {
 
         drawSelection()
         drawClouds(ex, ez, daylight, far)
+        drawWeather(ex, ey, ez)
 
         // Translucent pass, back to front.
         blockShader.use()
@@ -264,6 +269,9 @@ class WorldRenderer(private val game: Game) {
         val day = floatArrayOf(0.53f, 0.74f, 1.0f)
         val night = floatArrayOf(0.02f, 0.03f, 0.08f)
         val out = FloatArray(3) { night[it] + (day[it] - night[it]) * daylight }
+        // Overcast: pull the sky towards grey while it rains.
+        val grey = floatArrayOf(0.42f, 0.45f, 0.5f)
+        for (i in 0..2) out[i] += (grey[i] * daylight + 0.02f - out[i]) * game.rain * 0.75f
         // Warm tint around sunrise and sunset.
         val s = sin(game.timeOfDay * 2 * Math.PI).toFloat()
         val dusk = (1f - abs(s) * 4f).coerceIn(0f, 1f) * 0.6f
@@ -340,6 +348,71 @@ class WorldRenderer(private val game: Game) {
         dynamic.upload(dyn.data, dyn.size)
         val b = 0.25f + 0.75f * daylight
         simpleUniforms(floatArrayOf(b, b, b * 1.02f, 0.8f), ex, ez, far * 0.8f, far * 1.6f)
+        glEnable(GL_BLEND)
+        glDisable(GL_CULL_FACE)
+        glDepthMask(false)
+        dynamic.draw()
+        glDepthMask(true)
+        glEnable(GL_CULL_FACE)
+        glDisable(GL_BLEND)
+    }
+
+    // ---------------------------------------------------------------- weather
+
+    private val columnTop = IntArray(21 * 21)
+    private var columnX = Int.MIN_VALUE
+    private var columnZ = Int.MIN_VALUE
+    private var columnTimer = 0f
+    private var lastWeatherTime = 0L
+
+    /** Rain streaks (or snowflakes in cold biomes) in the columns that can see the sky. */
+    private fun drawWeather(ex: Float, ey: Float, ez: Float) {
+        val strength = game.rain
+        if (strength < 0.02f) return
+        val now = System.nanoTime()
+        val dt = if (lastWeatherTime == 0L) 0f else (now - lastWeatherTime) / 1e9f
+        lastWeatherTime = now
+        val cx = kotlin.math.floor(ex).toInt(); val cz = kotlin.math.floor(ez).toInt()
+        columnTimer -= dt
+        if (cx != columnX || cz != columnZ || columnTimer <= 0f) {
+            columnX = cx; columnZ = cz; columnTimer = 0.5f
+            for (dz in -10..10) for (dx in -10..10) {
+                var y = Chunk.HEIGHT - 1
+                while (y > 0 && !Blocks.blocksLight[game.world.getBlock(cx + dx, y, cz + dz)] && !Blocks.isLiquid(game.world.getBlock(cx + dx, y, cz + dz))) y--
+                columnTop[(dz + 10) * 21 + dx + 10] = y
+            }
+        }
+        val snow = game.world.generator.biomeAt(cx, cz) == com.vishucraft.game.world.Biome.SNOW
+        val t = (System.nanoTime() / 1_000_000L % 100_000L) / 1000f
+        val yaw = game.player.yaw
+        val side = if (snow) 0.05f else 0.018f
+        val ax = floatArrayOf(kotlin.math.cos(yaw) * side, 0f, kotlin.math.sin(yaw) * side)
+        dyn.size = 0
+        val white = Tiles.WHITE
+        val u = ChunkMesher.tileU(white) + 0.01f; val v = ChunkMesher.tileV(white) + 0.01f
+        for (dz in -10..10) for (dx in -10..10) {
+            val top = columnTop[(dz + 10) * 21 + dx + 10]
+            val h = ((cx + dx) * 73856093 xor (cz + dz) * 19349663) and 1023
+            val speed = if (snow) 2.2f else 16f
+            val drops = if (snow) 2 else 3
+            for (k in 0 until drops) {
+                val phase = ((h * (k + 1) * 7) and 1023) / 1023f
+                val y = ey + 12f - ((t * speed + phase * 24f) % 24f)
+                if (y < top + 1) continue
+                val len = if (snow) side * 2 else 0.9f
+                val sway = if (snow) kotlin.math.sin(t * 1.3f + phase * 6f) * 0.3f else 0f
+                val x = cx + dx + ((h shr 3) and 7) / 8f + sway
+                val z = cz + dz + ((h shr 6) and 7) / 8f
+                dyn.ensure(4 * FLOATS_PER_VERTEX)
+                dyn.put(x - ax[0], y, z - ax[2], u, v, 1f); dyn.put(x + ax[0], y, z + ax[2], u, v, 1f)
+                dyn.put(x + ax[0], y + len, z + ax[2], u, v, 1f); dyn.put(x - ax[0], y + len, z - ax[2], u, v, 1f)
+            }
+        }
+        if (dyn.size == 0) return
+        dynamic.upload(dyn.data, dyn.size)
+        val b = 0.35f + 0.65f * game.daylight
+        if (snow) simpleUniforms(floatArrayOf(b, b, b, 0.85f * strength), ex, ez, 0f, 0f)
+        else simpleUniforms(floatArrayOf(0.55f * b, 0.62f * b, 0.8f * b, 0.5f * strength), ex, ez, 0f, 0f)
         glEnable(GL_BLEND)
         glDisable(GL_CULL_FACE)
         glDepthMask(false)

@@ -91,6 +91,7 @@ class MobRenderer {
         m.hurtTime > 0f || m.dead -> Triple(1.6f, 0.45f, 0.45f)
         m.fuse >= 0f && sin(m.fuse * 22f) > 0f -> Triple(2.4f, 2.4f, 2.4f)
         m.burning -> Triple(1.5f, 0.9f, 0.55f)
+        m.loveTime > 0f -> Triple(1.35f, 0.85f, 1.1f)
         else -> Triple(1f, 1f, 1f)
     }
 
@@ -98,11 +99,11 @@ class MobRenderer {
         val parts = MobModels.models.getValue(m.type)
         val swingAmt = if (m.moving) sin(m.walkPhase) * 0.7f else 0f
         val roll = if (m.dead) min(m.deathTime / 0.4f, 1f) * 1.5708f else 0f
-        val scale = if (m.fuse >= 0f) 1f + m.fuse * 0.12f else 1f
+        val scale = (if (m.fuse >= 0f) 1f + m.fuse * 0.12f else 1f) * m.scale
         val cy = cos(m.yaw); val sy = sin(m.yaw)
         val cr = cos(roll); val sr = sin(roll)
-        val exposed = mobs.skyExposed(kotlin.math.floor(m.x).toInt(), kotlin.math.floor(m.y + m.type.height).toInt(), kotlin.math.floor(m.z).toInt())
-        val sky = 0.28f + 0.72f * (if (exposed) 1f else 0f)
+        val exposed = mobs.skyExposed(kotlin.math.floor(m.x).toInt(), kotlin.math.floor(m.y + m.height).toInt(), kotlin.math.floor(m.z).toInt())
+        val sky = if (exposed) 1f else 0.3f
 
         for (p in parts) {
             val angle = when (p.swing) {

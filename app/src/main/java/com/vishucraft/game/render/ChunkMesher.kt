@@ -6,8 +6,8 @@ import com.vishucraft.game.world.RenderType
 import com.vishucraft.game.world.Tiles
 import com.vishucraft.game.world.World
 
-/** Vertex layout: x, y, z, u, v, light. */
-const val FLOATS_PER_VERTEX = 6
+/** Vertex layout: x, y, z, u, v, sky light (x shade x AO), block light (torches, lava...). */
+const val FLOATS_PER_VERTEX = 7
 
 class FloatBuilder(initial: Int = 4096) {
     var data = FloatArray(initial)
@@ -17,10 +17,10 @@ class FloatBuilder(initial: Int = 4096) {
         if (size + extra > data.size) data = data.copyOf(maxOf(data.size * 2, size + extra))
     }
 
-    fun put(x: Float, y: Float, z: Float, u: Float, v: Float, l: Float) {
+    fun put(x: Float, y: Float, z: Float, u: Float, v: Float, l: Float, b: Float = 0f) {
         val d = data
         var i = size
-        d[i++] = x; d[i++] = y; d[i++] = z; d[i++] = u; d[i++] = v; d[i++] = l
+        d[i++] = x; d[i++] = y; d[i++] = z; d[i++] = u; d[i++] = v; d[i++] = l; d[i++] = b
         size = i
     }
 
@@ -80,11 +80,18 @@ class ChunkMesher {
             }
         }
 
+        /** Darkness floor for places the sky cannot reach. */
+        const val CAVE = 0.05f
+        private const val LW = Chunk.SIZE * 3 // light region: the chunk and all 8 neighbours
+
         fun tileU(tile: Int) = (tile % TextureAtlas.TILES_PER_ROW) * TILE_UV
         fun tileV(tile: Int) = (tile / TextureAtlas.TILES_PER_ROW) * TILE_UV
     }
 
     private val pad = ByteArray(P * P * H)
+    private val light = ByteArray(LW * LW * H)
+    private var lightQueue = IntArray(4096)
+    private val grid = arrayOfNulls<Chunk>(9)
     private val padMeta = ByteArray(P * P * H)
     private val topY = IntArray(P * P)
     private val opaqueOut = FloatBuilder(1 shl 16)
@@ -108,7 +115,6 @@ class ChunkMesher {
 
     /** Copies the chunk plus a one-block border from its neighbours. Returns false if a neighbour is missing. */
     private fun gather(world: World, chunk: Chunk): Boolean {
-        val grid = arrayOfNulls<Chunk>(9)
         for (dz in -1..1) for (dx in -1..1) {
             grid[(dz + 1) * 3 + dx + 1] = world.getChunk(chunk.cx + dx, chunk.cz + dz) ?: return false
         }
@@ -138,8 +144,65 @@ class ChunkMesher {
         return true
     }
 
+    private fun lidx(lx: Int, y: Int, lz: Int) = (y * LW + lz) * LW + lx
+
+    private fun blockAtL(lx: Int, y: Int, lz: Int): Int =
+        grid[(lz shr 4) * 3 + (lx shr 4)]!!.blocks[Chunk.index(lx and 15, y, lz and 15)].toInt() and 0xFF
+
+    /** Flood-fills block light from every emitter in the 3x3 chunk area (light travels at most 14 blocks). */
+    private fun computeLight() {
+        light.fill(0)
+        var qn = 0
+        fun push(i: Int) {
+            if (qn == lightQueue.size) lightQueue = lightQueue.copyOf(qn * 2)
+            lightQueue[qn++] = i
+        }
+        for (g in 0 until 9) {
+            val c = grid[g]!!
+            val ox = (g % 3) * 16; val oz = (g / 3) * 16
+            val b = c.blocks
+            for (i in b.indices) {
+                val id = b[i].toInt() and 0xFF
+                if (id == 0) continue
+                val level = Blocks.lightLevel(id, c.meta[i].toInt() and 0xFF)
+                if (level <= 0) continue
+                val li = lidx(ox + (i and 15), i shr 8, oz + ((i shr 4) and 15))
+                if (level > light[li]) { light[li] = level.toByte(); push(li) }
+            }
+        }
+        var head = 0
+        while (head < qn) {
+            val li = lightQueue[head++]
+            val l = light[li] - 1
+            if (l <= 0) continue
+            val lx = li % LW; val lz = (li / LW) % LW; val y = li / (LW * LW)
+            for (f in 0 until 6) {
+                val n = NORMALS[f]
+                val nx = lx + n[0]; val ny = y + n[1]; val nz = lz + n[2]
+                if (nx < 0 || nz < 0 || nx >= LW || nz >= LW || ny < 0 || ny >= H) continue
+                val ni = lidx(nx, ny, nz)
+                if (light[ni] >= l) continue
+                if (opaque[blockAtL(nx, ny, nz)]) continue
+                light[ni] = l.toByte()
+                push(ni)
+            }
+        }
+    }
+
+    /** Block light (0..15) at a padded coordinate. */
+    private fun blockLight(px: Int, y: Int, pz: Int): Int {
+        if (y < 0 || y >= H) return 0
+        return light[lidx(px + 15, y, pz + 15)].toInt()
+    }
+
+    private fun lightCurve(level: Float): Float {
+        val t = level / 15f
+        return t * t * (0.6f + 0.4f * t) * 1.05f
+    }
+
     fun build(world: World, chunk: Chunk, version: Int): MeshData? {
         if (!gather(world, chunk)) return null
+        computeLight()
         opaqueOut.size = 0
         transOut.size = 0
 
@@ -166,12 +229,15 @@ class ChunkMesher {
                 RenderType.LIQUID -> {
                     val above = block(px, y + 1, pz)
                     val surface = above != id
+                    // Flowing liquid gets lower the further it is from its source.
+                    val h = if (!surface) 1f else if (meta == 0) 0.875f else ((8 - meta.coerceIn(1, 7)) / 9f).coerceAtLeast(0.12f)
+                    val out = if (def.translucent) transOut else opaqueOut
                     for (f in 0 until 6) {
                         val n = NORMALS[f]
                         val nb = block(px + n[0], y + n[1], pz + n[2])
                         if (nb == id || opaque[nb]) continue
                         if (f != 0 && nb != Blocks.AIR && Blocks[nb].translucent) continue
-                        emitFace(transOut, px, y, pz, f, def.top, false, if (surface) 0.875f else 1f)
+                        emitFace(out, px, y, pz, f, def.top, emissive, h)
                     }
                 }
                 RenderType.CROSS -> emitCross(opaqueOut, px, y, pz, Blocks.tile(id, meta, 0), emissive)
@@ -208,6 +274,8 @@ class ChunkMesher {
         val baseSky = sky(lx, ly, lz)
 
         val light = FloatArray(4)
+        val bl = FloatArray(4)
+        val baseBlock = blockLight(lx, ly, lz).toFloat()
         for (c in 0 until 4) {
             if (emissive) { light[c] = 2f; continue }
             val o = aoOff[c]
@@ -219,12 +287,14 @@ class ChunkMesher {
             val d = opaque[block(dx, dy, dz)]
             val ao = if (s1 && s2) 0 else 3 - ((if (s1) 1 else 0) + (if (s2) 1 else 0) + (if (d) 1 else 0))
             var skySum = baseSky
+            var blockSum = baseBlock
             var cnt = 1
-            if (!s1) { skySum += sky(s1x, s1y, s1z); cnt++ }
-            if (!s2) { skySum += sky(s2x, s2y, s2z); cnt++ }
-            if (!d && !(s1 && s2)) { skySum += sky(dx, dy, dz); cnt++ }
+            if (!s1) { skySum += sky(s1x, s1y, s1z); blockSum += blockLight(s1x, s1y, s1z); cnt++ }
+            if (!s2) { skySum += sky(s2x, s2y, s2z); blockSum += blockLight(s2x, s2y, s2z); cnt++ }
+            if (!d && !(s1 && s2)) { skySum += sky(dx, dy, dz); blockSum += blockLight(dx, dy, dz); cnt++ }
             val s = skySum / cnt
-            light[c] = shade * AO_CURVE[ao] * (0.28f + 0.72f * s)
+            light[c] = shade * AO_CURVE[ao] * (CAVE + (1f - CAVE) * s)
+            bl[c] = shade * AO_CURVE[ao] * lightCurve(blockSum / cnt)
         }
 
         out.ensure(4 * FLOATS_PER_VERTEX)
@@ -240,13 +310,14 @@ class ChunkMesher {
             out.put(
                 bx + cv[0], by + vy, bz + cv[2],
                 u0 + uv[0] * TILE_UV, v0 + vTex * TILE_UV,
-                light[c],
+                light[c], bl[c],
             )
         }
     }
 
     private fun emitCross(out: FloatBuilder, px: Int, y: Int, pz: Int, tile: Int, emissive: Boolean) {
-        val l = if (emissive) 2f else 0.9f * (0.28f + 0.72f * sky(px, y, pz))
+        val l = if (emissive) 2f else 0.9f * (CAVE + (1f - CAVE) * sky(px, y, pz))
+        val b = 0.9f * lightCurve(blockLight(px, y, pz).toFloat())
         val x0 = (px - 1) + 0.15f; val x1 = (px - 1) + 0.85f
         val z0 = (pz - 1) + 0.15f; val z1 = (pz - 1) + 0.85f
         val y0 = y.toFloat(); val y1 = y + 1f
@@ -254,21 +325,22 @@ class ChunkMesher {
         val u1 = u0 + TILE_UV; val v1 = v0 + TILE_UV
         out.ensure(16 * FLOATS_PER_VERTEX)
         // Two diagonal planes, each emitted with both windings.
-        out.put(x0, y0, z0, u0, v1, l); out.put(x1, y0, z1, u1, v1, l); out.put(x1, y1, z1, u1, v0, l); out.put(x0, y1, z0, u0, v0, l)
-        out.put(x1, y0, z1, u1, v1, l); out.put(x0, y0, z0, u0, v1, l); out.put(x0, y1, z0, u0, v0, l); out.put(x1, y1, z1, u1, v0, l)
-        out.put(x0, y0, z1, u0, v1, l); out.put(x1, y0, z0, u1, v1, l); out.put(x1, y1, z0, u1, v0, l); out.put(x0, y1, z1, u0, v0, l)
-        out.put(x1, y0, z0, u1, v1, l); out.put(x0, y0, z1, u0, v1, l); out.put(x0, y1, z1, u0, v0, l); out.put(x1, y1, z0, u1, v0, l)
+        out.put(x0, y0, z0, u0, v1, l, b); out.put(x1, y0, z1, u1, v1, l, b); out.put(x1, y1, z1, u1, v0, l, b); out.put(x0, y1, z0, u0, v0, l, b)
+        out.put(x1, y0, z1, u1, v1, l, b); out.put(x0, y0, z0, u0, v1, l, b); out.put(x0, y1, z0, u0, v0, l, b); out.put(x1, y1, z1, u1, v0, l, b)
+        out.put(x0, y0, z1, u0, v1, l, b); out.put(x1, y0, z0, u1, v1, l, b); out.put(x1, y1, z0, u1, v0, l, b); out.put(x0, y1, z1, u0, v0, l, b)
+        out.put(x1, y0, z0, u1, v1, l, b); out.put(x0, y0, z1, u0, v1, l, b); out.put(x0, y1, z1, u0, v0, l, b); out.put(x1, y1, z0, u1, v0, l, b)
     }
 
     /** A flat decal lying on top of the block below (redstone dust). */
     private fun emitFlat(out: FloatBuilder, px: Int, y: Int, pz: Int, tile: Int) {
-        val l = 0.28f + 0.72f * sky(px, y, pz)
+        val l = CAVE + (1f - CAVE) * sky(px, y, pz)
+        val b = lightCurve(blockLight(px, y, pz).toFloat())
         val x0 = (px - 1).toFloat(); val z0 = (pz - 1).toFloat(); val yy = y + 1f / 32f
         val u0 = tileU(tile); val v0 = tileV(tile)
         val u1 = u0 + TILE_UV; val v1 = v0 + TILE_UV
         out.ensure(4 * FLOATS_PER_VERTEX)
-        out.put(x0, yy, z0 + 1, u0, v1, l); out.put(x0 + 1, yy, z0 + 1, u1, v1, l)
-        out.put(x0 + 1, yy, z0, u1, v0, l); out.put(x0, yy, z0, u0, v0, l)
+        out.put(x0, yy, z0 + 1, u0, v1, l, b); out.put(x0 + 1, yy, z0 + 1, u1, v1, l, b)
+        out.put(x0 + 1, yy, z0, u1, v0, l, b); out.put(x0, yy, z0, u0, v0, l, b)
     }
 
     /**
@@ -294,8 +366,10 @@ class ChunkMesher {
             }
             val l = if (emissive) 2f else {
                 val s = if (onBoundary) sky(px + n[0], y + n[1], pz + n[2]) else sky(px, y, pz)
-                FACE_SHADE[f] * (0.28f + 0.72f * s)
+                FACE_SHADE[f] * (CAVE + (1f - CAVE) * s)
             }
+            val boxLight = FACE_SHADE[f] * lightCurve(
+                (if (onBoundary) blockLight(px + n[0], y + n[1], pz + n[2]) else blockLight(px, y, pz)).toFloat())
             val u0 = tileU(tile); val v0 = tileV(tile)
             out.ensure(4 * FLOATS_PER_VERTEX)
             for (cv in CORNERS[f]) {
@@ -311,7 +385,7 @@ class ChunkMesher {
                     else -> lz to 1 - ly
                 }
                 out.put(bx + lx, by + ly, bz + lz,
-                    u0 + u.coerceIn(0f, 1f) * TILE_UV, v0 + v.coerceIn(0f, 1f) * TILE_UV, l)
+                    u0 + u.coerceIn(0f, 1f) * TILE_UV, v0 + v.coerceIn(0f, 1f) * TILE_UV, l, boxLight)
             }
         }
     }

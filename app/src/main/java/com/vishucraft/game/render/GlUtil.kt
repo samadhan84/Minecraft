@@ -20,6 +20,7 @@ class Shader(vertexSrc: String, fragmentSrc: String) {
         glBindAttribLocation(program, 0, "aPos")
         glBindAttribLocation(program, 1, "aUv")
         glBindAttribLocation(program, 2, "aLight")
+        glBindAttribLocation(program, 3, "aBlock")
         glLinkProgram(program)
         val status = IntArray(1)
         glGetProgramiv(program, GL_LINK_STATUS, status, 0)
@@ -112,6 +113,7 @@ class GpuMesh(private val usage: Int = GL_STATIC_DRAW) {
         glVertexAttribPointer(0, 3, GL_FLOAT, false, stride, baseBytes)
         glVertexAttribPointer(1, 2, GL_FLOAT, false, stride, baseBytes + 12)
         glVertexAttribPointer(2, 1, GL_FLOAT, false, stride, baseBytes + 20)
+        glVertexAttribPointer(3, 1, GL_FLOAT, false, stride, baseBytes + 24)
     }
 
     private fun bind() {
@@ -119,6 +121,7 @@ class GpuMesh(private val usage: Int = GL_STATIC_DRAW) {
         glEnableVertexAttribArray(0)
         glEnableVertexAttribArray(1)
         glEnableVertexAttribArray(2)
+        glEnableVertexAttribArray(3)
     }
 
     fun draw(mode: Int = GL_TRIANGLES) {
@@ -162,17 +165,20 @@ precision mediump float;
     const val BLOCK_VS = """attribute vec3 aPos;
 attribute vec2 aUv;
 attribute float aLight;
+attribute float aBlock;
 uniform mat4 uViewProj;
 uniform vec3 uOffset;
 uniform vec3 uCamPos;
 varying vec2 vUv;
 varying float vLight;
+varying float vBlock;
 varying float vDist;
 void main() {
     vec3 wp = aPos + uOffset;
     gl_Position = uViewProj * vec4(wp, 1.0);
     vUv = aUv;
     vLight = aLight;
+    vBlock = aBlock;
     vDist = length(wp.xz - uCamPos.xz);
 }
 """
@@ -186,12 +192,16 @@ uniform float uCutout;
 uniform vec3 uTint;
 varying vec2 vUv;
 varying float vLight;
+varying float vBlock;
 varying float vDist;
 void main() {
     vec4 c = texture2D(uTex, vUv);
     if (c.a < uCutout) discard;
-    float l = vLight > 1.5 ? 1.0 : vLight * mix(0.16, 1.0, uDaylight);
-    vec3 col = c.rgb * l * uTint;
+    float sky = vLight * mix(0.16, 1.0, uDaylight);
+    float l = vLight > 1.5 ? 1.0 : max(sky, vBlock);
+    // Torch light is slightly warm where it outshines the sky.
+    vec3 warm = mix(vec3(1.0), vec3(1.08, 0.93, 0.74), clamp((vBlock - sky) * 3.0, 0.0, 1.0));
+    vec3 col = c.rgb * l * uTint * warm;
     float f = clamp((vDist - uFogStart) / (uFogEnd - uFogStart), 0.0, 1.0);
     gl_FragColor = vec4(mix(col, uFogColor, f), c.a);
 }

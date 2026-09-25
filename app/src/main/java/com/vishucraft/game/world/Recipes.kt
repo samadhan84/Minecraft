@@ -124,6 +124,7 @@ object Recipes {
         // Food
         r(i("Bread"), 1, true, i("Wheat") to 3)
         r(i("Golden Apple"), 1, true, i("Apple") to 1, gold to 8)
+        r(i("Bone Meal"), 3, false, i("Bone") to 1)
 
         // Redstone and gadgets
         r(Blocks.REDSTONE_TORCH, 1, false, Blocks.REDSTONE_DUST to 1, stick to 1)
@@ -161,6 +162,7 @@ object Recipes {
             Blocks.JUNGLE_LOG to i("Charcoal"), Blocks.ACACIA_LOG to i("Charcoal"), Blocks.DARK_OAK_LOG to i("Charcoal"),
             Blocks.NETHERRACK to Blocks.NETHER_BRICKS,
             Blocks.CACTUS to Blocks.CONCRETE_FIRST + 13,
+            i("Potato") to i("Baked Potato"),
         )
     }
 
@@ -189,7 +191,7 @@ object Drops {
 
     private fun i(name: String) = Items.find(name)
 
-    fun forBlock(id: Int, tool: ItemDef?): List<Pair<Int, Int>> {
+    fun forBlock(id: Int, tool: ItemDef?, meta: Int = 0): List<Pair<Int, Int>> {
         if (!canHarvest(id, tool)) return emptyList()
         fun one(x: Int) = listOf(x to 1)
         return when (id) {
@@ -203,11 +205,19 @@ object Drops {
             Blocks.REDSTONE_ORE -> listOf(Blocks.REDSTONE_DUST to 4 + rnd.nextInt(2))
             Blocks.GLASS, Blocks.ICE, Blocks.WATER, Blocks.PISTON_HEAD, Blocks.BEDROCK -> emptyList()
             in Blocks.STAINED_GLASS_FIRST until Blocks.STAINED_GLASS_FIRST + 16 -> emptyList()
-            Blocks.LEAVES, Blocks.DARK_OAK_LEAVES -> when (rnd.nextInt(100)) {
-                in 0..4 -> one(i("Apple")); in 5..8 -> one(i("Stick")); else -> emptyList()
+            Blocks.LEAVES, Blocks.SPRUCE_LEAVES, Blocks.BIRCH_LEAVES, Blocks.JUNGLE_LEAVES, Blocks.ACACIA_LEAVES,
+            Blocks.DARK_OAK_LEAVES -> {
+                val sapling = Blocks.SAPLING_FIRST + when (id) {
+                    Blocks.SPRUCE_LEAVES -> 1; Blocks.BIRCH_LEAVES -> 2; Blocks.JUNGLE_LEAVES -> 3
+                    Blocks.ACACIA_LEAVES -> 4; Blocks.DARK_OAK_LEAVES -> 5; else -> 0
+                }
+                when (rnd.nextInt(100)) {
+                    in 0..6 -> one(sapling)
+                    in 7..10 -> if (id == Blocks.LEAVES || id == Blocks.DARK_OAK_LEAVES) one(i("Apple")) else emptyList()
+                    in 11..13 -> one(i("Stick"))
+                    else -> emptyList()
+                }
             }
-            Blocks.BIRCH_LEAVES, Blocks.SPRUCE_LEAVES, Blocks.JUNGLE_LEAVES, Blocks.ACACIA_LEAVES ->
-                if (rnd.nextInt(100) < 5) one(i("Stick")) else emptyList()
             Blocks.TALL_GRASS, Blocks.FERN -> if (rnd.nextInt(100) < 15) one(i("Wheat Seeds")) else emptyList()
             Blocks.GRAVEL -> if (rnd.nextInt(10) == 0) one(i("Flint")) else one(Blocks.GRAVEL)
             Blocks.CLAY -> listOf(i("Clay Ball") to 4)
@@ -216,6 +226,10 @@ object Drops {
             Blocks.BOOKSHELF -> listOf(i("Book") to 3)
             Blocks.COBWEB -> one(i("String"))
             Blocks.REDSTONE_LAMP_ON -> one(Blocks.REDSTONE_LAMP)
+            Blocks.LAVA -> emptyList()
+            Blocks.WHEAT_CROP -> if (meta >= 7) listOf(i("Wheat") to 1, i("Wheat Seeds") to 1 + rnd.nextInt(3)) else one(i("Wheat Seeds"))
+            Blocks.CARROTS -> if (meta >= 7) listOf(i("Carrot") to 2 + rnd.nextInt(3)) else one(i("Carrot"))
+            Blocks.POTATOES -> if (meta >= 7) listOf(i("Potato") to 2 + rnd.nextInt(3)) else one(i("Potato"))
             else -> one(id)
         }
     }

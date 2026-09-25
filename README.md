@@ -11,6 +11,15 @@ procedurally in code when the game starts.
 - **Survival**: 36-slot inventory with stacks, items drop and are picked up, tool durability, the right pickaxe tier is
   needed for ores, hunger with food and eating, natural regeneration, armor (leather to netherite, plus enchanted sets),
   and your items drop where you die.
+- **Torch light**: torches, lava, glowstone, lamps and lit furnaces light up their surroundings; caves are dark
+  until you light them.
+- **Sound and music**: every effect (digging per material, footsteps, pickups, eating, explosions, mob voices, rain and
+  thunder) is synthesised in code, and the calm background music is composed on the fly.
+- **Flowing water and lava**: liquids spread and fall, lava burns and lights caves, water meeting lava makes
+  obsidian or cobblestone, and buckets carry either.
+- **Weather**: rain, snow in cold biomes, and thunderstorms with lightning flashes.
+- **Farming**: till soil, plant wheat, carrots and potatoes, grow saplings into trees, use bone meal, and breed
+  cows, sheep and pigs.
 - **Crafting** from a recipe list (small recipes anywhere, the rest at a crafting table), a **furnace** that smelts ore,
   sand, clay and food using coal, charcoal or wood, and **chests** with 27 slots. Mobs drop leather, meat, wool and more.
 

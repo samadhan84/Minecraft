@@ -19,6 +19,7 @@ import com.vishucraft.game.world.Redstone
 import com.vishucraft.game.world.RenderType
 import com.vishucraft.game.world.ToolType
 import com.vishucraft.game.world.World
+import com.vishucraft.game.world.floorInt
 import java.io.File
 import kotlin.math.abs
 import kotlin.math.max
@@ -60,6 +61,21 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
     val mobs = Mobs(world)
 
     val drops = ItemEntities(world)
+    val fluids = com.vishucraft.game.world.Fluids(world) { x, y, z, id, meta -> setBlock(x, y, z, id, meta) }
+    val nature = Nature(world) { x, y, z, id, meta -> setBlock(x, y, z, id, meta) }
+
+    // Weather: rain strength fades in and out; thunderstorms add lightning.
+    var rain = 0f
+        private set
+    var thunder = false
+        private set
+    /** Brief sky flash after a lightning strike. */
+    var flash = 0f
+        private set
+    private var raining = false
+    private var weatherTimer = 240f + java.util.Random().nextFloat() * 400f
+    private var thunderDelay = -1f
+    private var lavaTimer = 0f
     val inventory = level.inventory
     val mode get() = level.mode
     val survival get() = level.mode == GameMode.SURVIVAL
@@ -79,7 +95,18 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
     fun heldStack(): ItemStack? = inventory.slots[input.selectedSlot.coerceIn(0, 8)]
     fun heldId(): Int = heldStack()?.id ?: 0
     fun heldItem(): ItemDef? = Items[heldId()]
-    fun onPickup() { uiEvents.add("pickup") }
+    fun onPickup() { uiEvents.add("pickup"); sound("pop", player.x, player.y, player.z, 0.4f) }
+
+    /** Sound hook (set by the Android layer): name, position, gain. */
+    var soundSink: ((String, Float, Float, Float, Float) -> Unit)? = null
+    /** Listener position hook for positional audio. */
+    var listener: ((Float, Float, Float, Float) -> Unit)? = null
+    fun sound(name: String, x: Float, y: Float, z: Float, gain: Float = 1f) { soundSink?.invoke(name, x, y, z, gain) }
+    private fun blockSound(id: Int, x: Int, y: Int, z: Int, gain: Float = 1f) =
+        sound("mat:$id", x + 0.5f, y + 0.5f, z + 0.5f, gain)
+    private var nextStep = 1.7f
+    private var digSoundTimer = 0f
+    private var wasInWater = false
     val playerAlive get() = health > 0f
     private var regenTimer = 0f
     private var lastVy = 0f
@@ -99,6 +126,8 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
         }
         input.selectedSlot = level.selectedSlot
         if (survival) player.flying = false
+        redstone.onPrime = { x, y, z -> sound("fuse", x + 0.5f, y + 0.5f, z + 0.5f) }
+        redstone.onClick = { x, y, z -> sound("click", x + 0.5f, y + 0.5f, z + 0.5f) }
         mobs.onDeath = { m -> if (survival) for ((id, n) in mobDrops(m)) drops.spawn(ItemStack(id, n), m.x, m.y + 0.5f, m.z) }
         // Chunk offsets sorted nearest first, so the area around the player streams in first.
         val r = 16
@@ -116,20 +145,47 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
                 hurtPlayer((1f - d / blast) * r * 5.5f, ex, ez, knockback = false)
             }
             if (d < 40f) shake = 0.6f
+            sound("explode", ex, ey, ez, 1.4f)
             for (m in mobs.list) {
-                val mx = m.x - ex; val mz = m.z - ez; val my = m.y + m.type.height / 2 - ey
+                val mx = m.x - ex; val mz = m.z - ez; val my = m.y + m.height / 2 - ey
                 val md = sqrt(mx * mx + my * my + mz * mz)
                 if (md < blast) mobs.damage(m, (1f - md / blast) * r * 6f, mx / max(md, 0.5f), mz / max(md, 0.5f))
             }
         }
     }
 
+    /** Sun brightness 0..1, dimmed by rain and brightened by lightning. */
     val daylight: Float
         get() {
             val s = kotlin.math.sin(timeOfDay * 2 * Math.PI).toFloat()
             val t = ((s + 0.2f) / 0.5f).coerceIn(0f, 1f)
-            return t * t * (3 - 2 * t)
+            val sun = t * t * (3 - 2 * t) * (1f - 0.45f * rain)
+            return maxOf(sun, flash)
         }
+
+    private fun updateWeather(dt: Float) {
+        weatherTimer -= dt
+        val r = java.util.Random()
+        if (weatherTimer <= 0f) {
+            raining = !raining
+            thunder = raining && r.nextInt(10) < 3
+            weatherTimer = if (raining) 120f + r.nextFloat() * 200f else 300f + r.nextFloat() * 500f
+        }
+        rain = if (raining) minOf(1f, rain + dt * 0.12f) else maxOf(0f, rain - dt * 0.12f)
+        if (flash > 0f) flash = maxOf(0f, flash - dt * 3f)
+        if (thunder && rain > 0.8f && r.nextFloat() < dt / 14f) {
+            flash = 0.9f
+            thunderDelay = 0.3f + r.nextFloat() * 1.8f
+        }
+        if (thunderDelay > 0f) {
+            thunderDelay -= dt
+            if (thunderDelay <= 0f) { thunderDelay = -1f; sound("thunder", Float.NaN, 0f, 0f, 1f) }
+        }
+    }
+
+    fun setWeather(rainOn: Boolean, storm: Boolean) {
+        raining = rainOn; thunder = rainOn && storm; weatherTimer = if (rainOn) 240f else 600f
+    }
 
     fun update(dt: Float) {
         streamChunks()
@@ -162,13 +218,31 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
                 hurtPlayer((-lastVy - 13f) * 0.9f, player.x, player.z, knockback = false)
             }
             wasOnGround = player.onGround
+            // Footsteps and splashes.
+            if (player.walkDist >= nextStep) {
+                nextStep = player.walkDist + 1.7f
+                val under = world.getBlock(player.blockX(), floorInt(player.y - 0.2f), player.blockZ())
+                if (under != Blocks.AIR) blockSound(under, player.blockX(), floorInt(player.y - 0.2f), player.blockZ(), 0.35f)
+            }
+            if (player.inWater && !wasInWater && lastVy < -4f) sound("splash", player.x, player.y, player.z)
+            wasInWater = player.inWater
             if (player.y < -20f) hurtPlayer(100f, player.x, player.z, knockback = false)
             mobs.update(dt, this)
             drops.update(dt, this)
+            // Lava burns.
+            val inLava = world.getBlock(player.blockX(), floorInt(player.y + 0.3f), player.blockZ()) == Blocks.LAVA ||
+                world.getBlock(player.blockX(), floorInt(player.eyeY), player.blockZ()) == Blocks.LAVA
+            if (inLava) {
+                lavaTimer -= dt
+                if (lavaTimer <= 0f) { lavaTimer = 0.5f; hurtPlayer(4f, player.x, player.z, knockback = false) }
+            } else lavaTimer = 0f
             if (survival) hunger(dt)
         }
 
         if (!survival && health < 20f) health = 20f
+        fluids.tick(dt)
+        nature.tick(dt, player.blockX(), player.blockZ())
+        updateWeather(dt)
         furnaceTimer += dt
         if (furnaceTimer >= 0.25f) { tickFurnaces(furnaceTimer); furnaceTimer = 0f }
 
@@ -196,6 +270,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
             player.vx += dx / d * 7f; player.vz += dz / d * 7f; player.vy = max(player.vy, 5f)
         }
         uiEvents.add("hurt")
+        sound("hurt", player.x, player.y + 1f, player.z)
         if (health <= 0f) respawn()
     }
 
@@ -244,6 +319,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
         saturation = minOf(food, saturation + item.food * 1.2f)
         if (item.name == "Golden Apple") health = minOf(20f, health + 8f)
         uiEvents.add("eat")
+        sound("eat", player.x, player.y + 1.5f, player.z)
         return true
     }
 
@@ -266,6 +342,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
             inventory.slots[input.selectedSlot] = null
             uiEvents.add("toast:Your ${def.name} broke!")
             uiEvents.add("break_tool")
+            sound("break_tool", player.x, player.y + 1f, player.z)
         }
     }
 
@@ -317,6 +394,8 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
         }
         val key = (t.x.toLong() shl 40) xor (t.y.toLong() shl 20) xor t.z.toLong()
         if (key != breakKey) { breakKey = key; breakProgress = 0f }
+        digSoundTimer -= dt
+        if (digSoundTimer <= 0f) { digSoundTimer = 0.24f; blockSound(t.block, t.x, t.y, t.z, 0.45f) }
         val time = mineTime(t.block)
         breakProgress += if (time <= 0f) 1f else dt / time
         if (breakProgress >= 1f) {
@@ -329,9 +408,10 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
         val id = world.getBlock(x, y, z)
         val meta = world.getMeta(x, y, z)
         setBlock(x, y, z, Blocks.AIR)
+        blockSound(id, x, y, z)
         val be = world.blockEntities.remove(x, y, z)
         if (survival) {
-            for ((dropId, n) in Drops.forBlock(id, heldItem())) drops.spawn(ItemStack(dropId, n), x + 0.5f, y + 0.3f, z + 0.5f)
+            for ((dropId, n) in Drops.forBlock(id, heldItem(), meta)) drops.spawn(ItemStack(dropId, n), x + 0.5f, y + 0.3f, z + 0.5f)
             when (be) {
                 is ChestEntity -> be.slots.forEach { s -> if (s != null) drops.spawn(s, x + 0.5f, y + 0.5f, z + 0.5f) }
                 is FurnaceEntity -> be.contents().forEach { s -> drops.spawn(s, x + 0.5f, y + 0.5f, z + 0.5f) }
@@ -367,8 +447,17 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
     private fun use() {
         val sel = heldId()
         val item = Items[sel]
+        // Seeds, carrots and potatoes are planted on farmland.
+        val crop = when (item?.name) { "Wheat Seeds" -> Blocks.WHEAT_CROP; "Carrot" -> Blocks.CARROTS; "Potato" -> Blocks.POTATOES; else -> -1 }
+        val tgt = target
+        if (crop > 0 && tgt != null && tgt.block == Blocks.FARMLAND && tgt.ny == 1 && world.getBlock(tgt.x, tgt.y + 1, tgt.z) == Blocks.AIR) {
+            setBlock(tgt.x, tgt.y + 1, tgt.z, crop, 0)
+            consumeHeld()
+            blockSound(Blocks.GRASS, tgt.x, tgt.y + 1, tgt.z, 0.7f)
+            return
+        }
         // Eating works without looking at anything.
-        if (item != null && item.use == ItemUse.EAT) {
+        if (item != null && item.use == ItemUse.EAT && mobs.raycast(player.x, player.eyeY, player.z, dir[0], dir[1], dir[2], 4f)?.let { mobs.wantsFood(it.mob, sel) } != true) {
             if (eat(item)) consumeHeld()
             return
         }
@@ -379,10 +468,16 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
                 val bx = it.x + 0.5f - player.x; val by = it.y + 0.5f - player.eyeY; val bz = it.z + 0.5f - player.z
                 sqrt(bx * bx + by * by + bz * bz) - 0.5f
             } ?: Float.MAX_VALUE
+            if (mobHit.distance <= blockDist && mobs.feed(mobHit.mob, sel)) {
+                consumeHeld()
+                sound(mobs.voice(mobHit.mob.type), mobHit.mob.x, mobHit.mob.y + 1f, mobHit.mob.z, 0.8f)
+                return
+            }
             if (mobHit.distance <= blockDist) {
                 val dmg = (item?.attack ?: 1).toFloat()
                 val len = sqrt(dir[0] * dir[0] + dir[2] * dir[2]).coerceAtLeast(0.01f)
                 mobs.damage(mobHit.mob, dmg, dir[0] / len, dir[2] / len)
+                sound("hurt", mobHit.mob.x, mobHit.mob.y + 1f, mobHit.mob.z, 0.6f)
                 damageHeld(if (item?.tool == ToolType.SWORD) 1 else 2)
                 exhaust(0.1f)
                 if (mobHit.mob.dead) uiEvents.add("toast:${mobHit.mob.type.displayName} defeated")
@@ -411,10 +506,20 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
                     setBlock(t.x, t.y, t.z, Blocks.DIRT_PATH); damageHeld(1)
                 }
                 ItemUse.IGNITE -> if (t.block == Blocks.TNT) { redstone.prime(t.x, t.y, t.z); damageHeld(1) }
-                ItemUse.BUCKET -> if (t.block == Blocks.WATER) {
+                ItemUse.BUCKET -> if (Blocks.isLiquid(t.block) && world.getMeta(t.x, t.y, t.z) == 0) {
+                    val full = Items.find(if (t.block == Blocks.LAVA) "Lava Bucket" else "Water Bucket")
                     setBlock(t.x, t.y, t.z, Blocks.AIR)
-                    if (survival) { consumeHeld(); inventory.add(Items.find("Water Bucket"), 1).let { left -> if (left > 0) drops.spawn(ItemStack(Items.find("Water Bucket")), player.x, player.y, player.z) } }
+                    sound("splash", t.x + 0.5f, t.y + 0.5f, t.z + 0.5f, 0.6f)
+                    if (survival) { consumeHeld(); inventory.add(full, 1).let { left -> if (left > 0) drops.spawn(ItemStack(full), player.x, player.y, player.z) } }
                 }
+                ItemUse.LAVA_BUCKET -> {
+                    val x = t.x + t.nx; val y = t.y + t.ny; val z = t.z + t.nz
+                    if (world.getBlock(x, y, z) == Blocks.AIR) {
+                        setBlock(x, y, z, Blocks.LAVA)
+                        if (survival) inventory.slots[input.selectedSlot] = ItemStack(Items.find("Bucket"), 1)
+                    }
+                }
+                ItemUse.GROW -> if (nature.boneMeal(t.x, t.y, t.z)) { consumeHeld(); uiEvents.add("place") }
                 ItemUse.WATER_BUCKET -> {
                     val x = t.x + t.nx; val y = t.y + t.ny; val z = t.z + t.nz
                     if (world.getBlock(x, y, z) == Blocks.AIR) {
@@ -439,7 +544,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
         val z = if (replace) t.z else t.z + t.nz
         if (y < 0 || y >= Chunk.HEIGHT) return
         val existing = world.getBlock(x, y, z)
-        if (existing != Blocks.AIR && existing != Blocks.WATER && !replace) return
+        if (existing != Blocks.AIR && !Blocks.isLiquid(existing) && !replace) return
         if (Blocks.solid[id] && player.intersectsBlock(x, y, z)) return
         val below = world.getBlock(x, y - 1, z)
         if (def.render == RenderType.CROSS && id != Blocks.TORCH && id != Blocks.REDSTONE_TORCH && id != Blocks.LEVER &&
@@ -452,6 +557,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
         if (def.needsSupport && !Blocks.solid[below] && id != Blocks.SUGAR_CANE) return
         setBlock(x, y, z, id, placementMeta(def.facing))
         consumeHeld()
+        blockSound(id, x, y, z, 0.8f)
         uiEvents.add("place")
     }
 
@@ -464,7 +570,13 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
     }
 
     fun setBlock(x: Int, y: Int, z: Int, id: Int, meta: Int = 0) {
+        val oldLight = Blocks.lightLevel(world.getBlock(x, y, z), world.getMeta(x, y, z))
         if (world.setBlock(x, y, z, id, meta)) {
+            fluids.onChange(x, y, z)
+            // Light spreads up to 14 blocks, so neighbouring chunks re-mesh (asynchronously) when a light changes.
+            if (oldLight != Blocks.lightLevel(id, meta)) {
+                for (dz in -1..1) for (dx in -1..1) if (dx != 0 || dz != 0) world.getChunk((x shr 4) + dx, (z shr 4) + dz)?.let { it.version++ }
+            }
             val cx = x shr 4; val cz = z shr 4
             dirtyChunks.add(Chunk.key(cx, cz))
             // Border edits change the neighbour's faces and lighting too.

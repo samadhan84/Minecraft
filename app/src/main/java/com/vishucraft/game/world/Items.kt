@@ -1,6 +1,6 @@
 package com.vishucraft.game.world
 
-enum class ItemUse { NONE, TILL, PATH, IGNITE, BUCKET, WATER_BUCKET, EAT, BOW }
+enum class ItemUse { NONE, TILL, PATH, IGNITE, BUCKET, WATER_BUCKET, EAT, BOW, GROW, LAVA_BUCKET }
 
 /** 0 helmet, 1 chestplate, 2 leggings, 3 boots; -1 when not armor. */
 typealias ArmorSlot = Int
@@ -155,6 +155,13 @@ object Items {
                     armorPoints = points[i] + 1, ench = "Protection IV · Unbreaking III")
             }
         }
+
+        // ---- Farming and more (appended so older saves keep their ids)
+        add("Carrot", "carrot", food = 3)
+        add("Potato", "potato", food = 1)
+        add("Baked Potato", "baked_potato", food = 5)
+        add("Bone Meal", "bone_meal", use = ItemUse.GROW)
+        add("Lava Bucket", "lava_bucket", use = ItemUse.LAVA_BUCKET, maxStack = 1, fuel = 100f)
 
         all = list
         for (i in all) { byId[i.id] = i; byName[i.name] = i.id }

@@ -43,17 +43,23 @@ class Redstone(private val world: World, private val set: (Int, Int, Int, Int, I
     private fun opaqueAt(p: Long) = p >= 0 && Blocks.opaque[id(p)]
 
     fun pressButton(x: Int, y: Int, z: Int) {
+        onClick?.invoke(x, y, z)
         set(x, y, z, Blocks.STONE_BUTTON, 1)
         buttons[RedstoneIds.pack(x, y, z)] = 10
     }
 
     fun toggleLever(x: Int, y: Int, z: Int) {
+        onClick?.invoke(x, y, z)
         set(x, y, z, Blocks.LEVER, if (world.getMeta(x, y, z) != 0) 0 else 1)
     }
 
+    /** Called when TNT is lit, and when a lever / button is used (for sounds). */
+    var onPrime: ((Int, Int, Int) -> Unit)? = null
+    var onClick: ((Int, Int, Int) -> Unit)? = null
+
     fun prime(x: Int, y: Int, z: Int, ticks: Int = 40) {
         val p = RedstoneIds.pack(x, y, z)
-        if (!fuses.containsKey(p)) fuses[p] = ticks
+        if (!fuses.containsKey(p)) { fuses[p] = ticks; onPrime?.invoke(x, y, z) }
     }
 
     fun tick() {

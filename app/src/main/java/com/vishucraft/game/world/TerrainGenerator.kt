@@ -119,7 +119,8 @@ class TerrainGenerator(private val seed: Long) {
                 val id = chunk.get(x, y, z)
                 if (id == Blocks.BEDROCK || id == Blocks.WATER || id == Blocks.ICE) continue
                 if (h <= SEA_LEVEL + 1 && y >= SEA_LEVEL - 6) continue
-                if (isCave(wx, y, wz)) chunk.set(x, y, z, Blocks.AIR)
+                // Deep caves end in lava lakes.
+                if (isCave(wx, y, wz)) chunk.set(x, y, z, if (y <= 10) Blocks.LAVA else Blocks.AIR)
             }
         }
 

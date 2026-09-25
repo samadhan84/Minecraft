@@ -219,7 +219,12 @@ object Blocks {
     const val STICKY_PISTON = 194
     const val PISTON_HEAD = 195
     const val ANCIENT_DEBRIS = 196
-    const val COUNT = 197
+    const val LAVA = 197
+    const val WHEAT_CROP = 198
+    const val CARROTS = 199
+    const val POTATOES = 200
+    const val SAPLING_FIRST = 201 // oak, spruce, birch, jungle, acacia, dark oak
+    const val COUNT = 207
 
     /** Dye colours used for wool, concrete, terracotta and stained glass. */
     val DYES = listOf(
@@ -228,6 +233,9 @@ object Blocks {
     )
 
     private val defs = arrayOfNulls<BlockDef>(COUNT)
+
+    /** Light for blocks without a rule in [lightLevel] (lava...). Declared before init so it exists there. */
+    @JvmField val extraLight = IntArray(256)
     private fun t(name: String) = Tiles.id(name)
     private fun reg(d: BlockDef) {
         check(defs[d.id] == null) { "duplicate block id ${d.id}" }
@@ -271,7 +279,7 @@ object Blocks {
         cube(GRAVEL, "Gravel", "gravel", 0.45f, S, N)
         reg(BlockDef(GLASS, "Glass", t("glass"), opaque = false, hardness = 0.3f, cullSelf = true))
         reg(BlockDef(WATER, "Water", t("water"), render = RenderType.LIQUID, opaque = false, solid = false,
-            translucent = true, blocksLight = false, breakable = false, cullSelf = true, inInventory = false))
+            translucent = true, blocksLight = false, breakable = false, cullSelf = true, inInventory = false, movable = false))
         reg(BlockDef(BEDROCK, "Bedrock", t("bedrock"), breakable = false, movable = false))
         cube(COAL_ORE, "Coal Ore", "coal_ore", 1.2f, P, N)
         cube(IRON_ORE, "Iron Ore", "iron_ore", 1.3f, P, N)
@@ -440,6 +448,20 @@ object Blocks {
         t("piston_inner")
         t("furnace_front_on")
         column(ANCIENT_DEBRIS, "Ancient Debris", "ancient_debris_top", "ancient_debris", "ancient_debris_top", 6f, P, N)
+        reg(BlockDef(LAVA, "Lava", t("lava"), render = RenderType.LIQUID, opaque = false, solid = false,
+            blocksLight = false, emissive = true, breakable = false, cullSelf = true, inInventory = false, movable = false))
+        extraLight[LAVA] = 15
+        for (i in 0..7) t("wheat_stage_$i")
+        for (i in 0..3) { t("carrots_stage_$i"); t("potatoes_stage_$i") }
+        reg(BlockDef(WHEAT_CROP, "Wheat Crops", t("wheat_stage_0"), render = RenderType.CROSS, opaque = false, solid = false,
+            hardness = 0f, needsSupport = true, inInventory = false, movable = false, category = N))
+        reg(BlockDef(CARROTS, "Carrots", t("carrots_stage_0"), render = RenderType.CROSS, opaque = false, solid = false,
+            hardness = 0f, needsSupport = true, inInventory = false, movable = false, category = N))
+        reg(BlockDef(POTATOES, "Potatoes", t("potatoes_stage_0"), render = RenderType.CROSS, opaque = false, solid = false,
+            hardness = 0f, needsSupport = true, inInventory = false, movable = false, category = N))
+        for ((i, w) in listOf("Oak", "Spruce", "Birch", "Jungle", "Acacia", "Dark Oak").withIndex()) {
+            plant(SAPLING_FIRST + i, "$w Sapling", "sapling_${w.lowercase().replace(' ', '_')}")
+        }
         reg(BlockDef(PISTON_HEAD, "Piston Head", t("piston_front"), t("oak_planks"), render = RenderType.PISTON_HEAD,
             opaque = false, blocksLight = false, hardness = 0.6f, tool = P, category = R, inInventory = false, movable = false))
     }
@@ -466,6 +488,22 @@ object Blocks {
 
     operator fun get(id: Int): BlockDef = all[id]
 
+    /** Block light emitted (0..15). */
+    fun lightLevel(id: Int, meta: Int): Int = when (id) {
+        GLOWSTONE, SEA_LANTERN, JACK_O_LANTERN, REDSTONE_LAMP_ON -> 15
+        TORCH -> 14
+        FURNACE -> if (meta and 8 != 0) 13 else 0
+        CRYING_OBSIDIAN -> 10
+        REDSTONE_TORCH -> if (meta == 0) 7 else 0
+        MAGMA -> 3
+        else -> extraLight[id]
+    }
+
+
+    fun isLiquid(id: Int) = id == WATER || id == LAVA
+    fun isCrop(id: Int) = id == WHEAT_CROP || id == CARROTS || id == POTATOES
+    fun isSapling(id: Int) = id in SAPLING_FIRST until SAPLING_FIRST + 6
+
     fun isEmissive(id: Int, meta: Int): Boolean {
         if (id == FURNACE) return meta and 8 != 0
         if (!all[id].emissive) return false
@@ -480,6 +518,9 @@ object Blocks {
             REDSTONE_TORCH -> return if (meta != 0) Tiles.id("redstone_torch_off") else d.top
             LEVER -> return if (meta != 0) Tiles.id("lever_on") else d.top
             TNT -> if (meta == 2) return Tiles.id("tnt_flash")
+            WHEAT_CROP -> return Tiles.id("wheat_stage_${meta.coerceIn(0, 7)}")
+            CARROTS -> return Tiles.id("carrots_stage_${(meta.coerceIn(0, 7)) / 2}")
+            POTATOES -> return Tiles.id("potatoes_stage_${(meta.coerceIn(0, 7)) / 2}")
         }
         if (d.facing != Facing.NONE) {
             var f = meta and 7
