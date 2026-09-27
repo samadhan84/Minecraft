@@ -281,8 +281,15 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
             if (survival) for ((id, n) in mobDrops(m)) drops.spawn(ItemStack(id, n), m.x, m.y + 0.5f, m.z)
             val near = (m.x - player.x) * (m.x - player.x) + (m.z - player.z) * (m.z - player.z) < 24f * 24f
             if (near) {
-                addXp(if (m.type.hostile) 5 else 1 + java.util.Random().nextInt(3))
+                addXp(if (m.type == MobType.WARDEN) 500 else if (m.type.hostile) 5 else 1 + java.util.Random().nextInt(3))
                 if (m.type.hostile) award("kill")
+            }
+            if (m.type == MobType.WARDEN) {
+                // The boss drops its loot even in creative, and the game shows the ending.
+                if (!survival) for ((id, n) in mobDrops(m)) drops.spawn(ItemStack(id, n), m.x, m.y + 0.5f, m.z)
+                level.bossDefeated = true
+                award("boss")
+                uiEvents.add("ending")
             }
         }
         // Chunk offsets sorted nearest first, so the area around the player streams in first.
@@ -617,6 +624,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
             MobType.WISP -> listOf(i("Emerald") to r.nextInt(2), Blocks.PURPUR to r.nextInt(2), i("Ender Pearl") to r.nextInt(2),
                 i("Amethyst Shard") to r.nextInt(2))
             MobType.VILLAGER, MobType.EXPLORER, MobType.WOLF, MobType.HORSE -> if (m.type == MobType.HORSE) listOf(i("Leather") to r.nextInt(3)) else emptyList()
+            MobType.WARDEN -> listOf(i("Nether Star") to 1, i("Elytra") to 1, i("Diamond") to 6, i("Totem of Undying") to 1)
             MobType.CHICKEN -> listOf(i("Feather") to r.nextInt(3), i("Raw Chicken") to 1)
             MobType.RABBIT -> listOf(i("Rabbit Hide") to r.nextInt(2), i("Raw Rabbit") to 1, i("Rabbit's Foot") to (if (r.nextInt(10) == 0) 1 else 0))
             MobType.CAT -> listOf(i("String") to r.nextInt(3))
@@ -1116,6 +1124,11 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
         if (survival && !inventory.remove(Items.find("Name Tag"), 1)) return
         m.customName = clean
         uiEvents.add("toast:This ${m.type.displayName.lowercase()} is now called $clean")
+    }
+
+    /** The boss bar: name and health 0..1 while the Sky Warden is around. */
+    fun bossBar(): Pair<String, Float>? = mobs.list.firstOrNull { it.type == MobType.WARDEN && !it.dead }?.let {
+        it.type.displayName to (it.health / it.type.maxHealth).coerceIn(0f, 1f)
     }
 
     /** What the crosshair is on: a named or tamed mob's label for the HUD. */

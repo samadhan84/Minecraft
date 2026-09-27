@@ -75,7 +75,7 @@ const val CONTROLS_HELP =
 
 class App(private val demo: File?) {
     private enum class Menu { TITLE, WORLDS, CREATE, JOIN, SETTINGS, CONTROLS, CONFIRM_DELETE, UNLOCK }
-    private enum class Overlay { NONE, PAUSE, CREATIVE, CONTAINER, SETTINGS, CONTROLS, SAVE_QUIT, NAME_MOB, TRADE, ACHIEVEMENTS, SIGN }
+    private enum class Overlay { NONE, PAUSE, CREATIVE, CONTAINER, SETTINGS, CONTROLS, SAVE_QUIT, NAME_MOB, TRADE, ACHIEVEMENTS, SIGN, ENDING }
 
     private var window = NULL
     private val prefs = Prefs()
@@ -220,6 +220,7 @@ class App(private val demo: File?) {
             Overlay.TRADE -> tradeScreen(s)
             Overlay.ACHIEVEMENTS -> achievementsScreen(s)
             Overlay.SIGN -> signScreen(s)
+            Overlay.ENDING -> endingScreen()
         }
         ui.end()
     }
@@ -281,6 +282,7 @@ class App(private val demo: File?) {
             e == "sleep" -> hud.sleep = 3f
             e.startsWith("toast:") -> hud.toast(e.removePrefix("toast:"), 3f)
             e == "craft" -> audio.play("craft")
+            e == "ending" -> overlay = Overlay.ENDING
             e == "open:ender" -> openContainer(ContainerScreen.Mode.CHEST, chest = s.level.enderChest)
             e.startsWith("signedit:") -> {
                 signPos = e.removePrefix("signedit:").split(',').map { it.toInt() }
@@ -510,6 +512,20 @@ class App(private val demo: File?) {
     private var namingUid = -1
     private var signPos = listOf(0, 0, 0)
     private val signField = Ui.Field("", "Text on the sign", 60)
+
+    private fun endingScreen() {
+        ui.rect(0f, 0f, ui.width, ui.height, rgba(0, 0, 0, 220))
+        title("The End", ui.height * 0.15f)
+        var y = ui.height * 0.15f + 70
+        val text = "You defeated the Sky Warden and freed the Sky Isles!\n\n" +
+                "It dropped a Nether Star, an Elytra, diamonds and a Totem of Undying.\n\n" +
+                "Thank you for playing DhruvVishu.\n\n" +
+                "Made for Dhruv and Vishu.\n" +
+                "Every block, creature, sound and song in this game was made from code.\n\n" +
+                "The world is still yours: keep building, exploring and playing."
+        for (line in text.split('\n')) { ui.text(line, ui.width / 2, y, 19f, rgba(230, 230, 255), 1); y += 28 }
+        if (ui.button("Keep playing", ui.width / 2 - 140, y + 20, 280f, 44f)) overlay = Overlay.NONE
+    }
 
     private fun signScreen(s: GameSession) {
         val cx = ui.width / 2; val w = 560f
@@ -773,6 +789,7 @@ class App(private val demo: File?) {
             Overlay.PAUSE -> if (key == GLFW_KEY_ESCAPE) overlay = Overlay.NONE
             Overlay.TRADE -> if (key == GLFW_KEY_ESCAPE || key == GLFW_KEY_E) overlay = Overlay.NONE
             Overlay.SIGN -> if (key == GLFW_KEY_ESCAPE) { ui.focus = null; overlay = Overlay.NONE }
+            Overlay.ENDING -> if (key == GLFW_KEY_ESCAPE) overlay = Overlay.NONE
             Overlay.SETTINGS, Overlay.CONTROLS, Overlay.SAVE_QUIT, Overlay.NAME_MOB, Overlay.ACHIEVEMENTS -> if (key == GLFW_KEY_ESCAPE) { ui.focus = null; overlay = Overlay.PAUSE }
             Overlay.CREATIVE, Overlay.CONTAINER -> when (key) {
                 GLFW_KEY_ESCAPE, GLFW_KEY_E, GLFW_KEY_I -> closeOverlay()

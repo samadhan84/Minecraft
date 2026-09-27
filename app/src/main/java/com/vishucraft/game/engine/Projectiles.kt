@@ -21,6 +21,8 @@ class Projectile(var x: Float, var y: Float, var z: Float, var vx: Float, var vy
         /** A Rattler's thorn and a witch's splash potion (monster projectiles). */
         const val THORN = 4
         const val POTION = 5
+        /** The Sky Warden's fireball. */
+        const val FIREBALL = 6
     }
 }
 

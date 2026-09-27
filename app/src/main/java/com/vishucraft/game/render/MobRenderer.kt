@@ -182,6 +182,13 @@ object MobModels {
             box(-0.5f, 0.75f, -0.125f, -0.25f, 1.45f, 0.125f, tiles("drowned_skin"), 2, pivotY = 1.35f),
             box(0.25f, 0.75f, -0.125f, 0.5f, 1.45f, 0.125f, tiles("drowned_skin"), 2, pivotY = 1.35f),
         ),
+        MobType.WARDEN to listOf(
+            box(-0.7f, 0.4f, -1.4f, 0.7f, 1.2f, 1.2f, tiles("warden_body")),
+            box(-0.45f, 0.5f, -2.1f, 0.45f, 1.2f, -1.4f, tiles("warden_body", front = "warden_face")),
+            box(-4.2f, 0.9f, -0.8f, -0.7f, 1.0f, 0.9f, tiles("warden_wing")),
+            box(0.7f, 0.9f, -0.8f, 4.2f, 1.0f, 0.9f, tiles("warden_wing")),
+            box(-0.2f, 0.6f, 1.2f, 0.2f, 0.9f, 2.6f, tiles("warden_body")),
+        ),
         MobType.BOOMLING to listOf(
             box(-0.4f, 0.35f, -0.4f, 0.4f, 1.1f, 0.4f, tiles("boomling_shell", front = "boomling_face")),
             box(-0.3f, 1.1f, -0.3f, 0.3f, 1.2f, 0.3f, tiles("boomling_shell")),

@@ -887,6 +887,17 @@ object TextureAtlas {
             "drowned_skin" -> noisy(t, rgb(80, 150, 140), 0.07f, 0.2f)
             "drowned_face" -> animalFace(t, rgb(80, 150, 140), rgb(120, 240, 230), 6, rgb(40, 80, 70), 6)
             "drowned_shirt" -> noisy(t, rgb(60, 110, 100), 0.1f, 0.25f)
+            "warden_body" -> {
+                val (_, edge) = voronoi(t.rnd, 7)
+                t.fill { x, y -> if (edge[y][x] < 0.9f) rgb(150, 110, 240) else scale(rgb(40, 34, 70), t.jitter(0.1f)) }
+            }
+            "warden_face" -> {
+                noisy(t, rgb(40, 34, 70), 0.1f, 0.2f)
+                for (x in 2..5) { t[x, 6] = rgb(250, 240, 140); t[x, 7] = rgb(250, 200, 60) }
+                for (x in 10..13) { t[x, 6] = rgb(250, 240, 140); t[x, 7] = rgb(250, 200, 60) }
+                for (x in 4..11) t[x, 12] = if (x % 2 == 0) rgb(230, 230, 240) else rgb(20, 16, 30)
+            }
+            "warden_wing" -> t.fill { x, y -> if ((x + y) % 6 == 0) rgb(170, 140, 250) else scale(rgb(70, 50, 120), t.jitter(0.12f)) }
             else -> return false
         }
         return true

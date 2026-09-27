@@ -53,7 +53,9 @@ enum class MobType(
     WITCH("Witch", 0.3f, 1.95f, 26, true, 2.0f),
     /** Tall and quiet: leaves you alone until you hit it, then teleports around and hits hard. */
     ENDERMAN("Enderman", 0.3f, 2.9f, 40, true, 3.4f),
-    DROWNED("Drowned", 0.3f, 1.95f, 20, true, 2.2f);
+    DROWNED("Drowned", 0.3f, 1.95f, 20, true, 2.2f),
+    /** The boss of the Sky Isles: a huge winged guardian. */
+    WARDEN("Sky Warden", 1.2f, 1.6f, 200, true, 7f);
 
     val swims get() = this == SQUID || this == COD
 }
@@ -408,6 +410,7 @@ class Mobs(private val world: World) {
                 flyer(m, dt, game, dist, dx, dz)
                 return
             }
+            MobType.WARDEN -> { boss(m, dt, game); return }
             else -> {
                 if (m.fleeTime > 0f) {
                     m.fleeTime -= dt
@@ -480,6 +483,48 @@ class Mobs(private val world: World) {
             val x = floorInt(cx) + rnd.nextInt(13) - 6; val z = floorInt(cz) + rnd.nextInt(13) - 6
             val y = surfaceY(x, z)
             if (y > 0 && roomAt(x, y + 1, z, 3) && world.getBlock(x, y, z) != Blocks.WATER) { m.x = x + 0.5f; m.y = y + 1f; m.z = z + 0.5f; return }
+        }
+    }
+
+    /** The Sky Warden: circles high above, throws fireballs and dives at the player. */
+    private fun boss(m: Mob, dt: Float, game: Game) {
+        val p = game.nearestTarget(m.x, m.z)
+        m.moving = true
+        m.walkPhase += dt * 3f
+        val dx = p.x - m.x; val dz = p.z - m.z
+        val dist = sqrt(dx * dx + dz * dz)
+        val angry = m.health < m.type.maxHealth / 2f // second phase: faster and meaner
+        var tx: Float; var ty: Float; var tz: Float
+        if (m.swoopTime > 0f) {
+            m.swoopTime -= dt
+            tx = p.x; ty = p.y + 1f; tz = p.z
+        } else {
+            val a = m.walkPhase * 0.15f
+            tx = p.x + cos(a) * 14f; ty = p.y + 11f; tz = p.z + sin(a) * 14f
+            if (rnd.nextFloat() < dt / (if (angry) 5f else 8f)) m.swoopTime = 2.5f
+        }
+        // Fireballs.
+        m.shootTimer -= dt
+        if (m.shootTimer <= 0f && dist < 40f && game.playerAlive) {
+            m.shootTimer = if (angry) 1.6f else 3f
+            val sx = m.x; val sy = m.y + 0.8f; val sz = m.z
+            val vx = p.x - sx; val vy = p.eyeY - sy; val vz = p.z - sz
+            val len = sqrt(vx * vx + vy * vy + vz * vz).coerceAtLeast(0.1f)
+            game.projectiles.shoot(sx, sy, sz, vx / len * 18f, vy / len * 18f + len * 0.3f, vz / len * 18f, false, if (angry) 6f else 4f, Projectile.FIREBALL)
+            game.sound("bow", sx, sy, sz, 1f)
+        }
+        val ex = tx - m.x; val ey = ty - m.y; val ez = tz - m.z
+        val len = sqrt(ex * ex + ey * ey + ez * ez).coerceAtLeast(0.1f)
+        val sp = m.type.speed * (if (angry) 1.35f else 1f)
+        m.vx = approach(m.vx, ex / len * sp, 8f * dt); m.vy = approach(m.vy, ey / len * sp, 8f * dt); m.vz = approach(m.vz, ez / len * sp, 8f * dt)
+        m.yaw = atan2(m.vx, -m.vz)
+        m.x += m.vx * dt; m.y += m.vy * dt; m.z += m.vz * dt
+        m.attackCooldown -= dt
+        val py = p.y + 1f - m.y
+        if (sqrt(dx * dx + dz * dz + py * py) < 2.4f && m.attackCooldown <= 0f && game.playerAlive) {
+            m.attackCooldown = 1.5f
+            game.hurtTarget(p, if (angry) 9f else 6f, m.x, m.z)
+            m.swoopTime = 0f
         }
     }
 
@@ -561,6 +606,7 @@ class Mobs(private val world: World) {
     }
 
     fun voice(t: MobType) = when (t) {
+        MobType.WARDEN -> "enderman"
         MobType.DROWNED -> "zombie"; MobType.RABBIT, MobType.SQUID, MobType.COD -> "none"
         else -> t.name.lowercase()
     }
@@ -646,6 +692,13 @@ class Mobs(private val world: World) {
             list.add(Mob(MobType.VILLAGER, x + 0.5f, y.toFloat(), z + 0.5f))
         }
 
+        if (game.dimension == com.vishucraft.game.world.Dimension.SKY && hostileEnabled && !game.level.bossDefeated &&
+            list.none { it.type == MobType.WARDEN } && parked.none { it.type == MobType.WARDEN }) {
+            // The Sky Warden guards the Sky Isles until it is defeated.
+            list.add(Mob(MobType.WARDEN, p.x + 20f, p.y + 14f, p.z + 20f))
+            game.uiEvents.add("toast:The Sky Warden has noticed you!")
+            game.sound("enderman", p.x, p.y + 10f, p.z, 1.5f)
+        }
         if (game.dimension != com.vishucraft.game.world.Dimension.OVERWORLD) {
             if (!hostileEnabled || hostile >= 8) return
             val (x, z) = ringPoint(p.x, p.z, 14f, 40f)

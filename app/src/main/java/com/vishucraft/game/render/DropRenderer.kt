@@ -21,6 +21,7 @@ class DropRenderer {
     private val eggTile = Items[Items.find("Egg")]!!.icon
     private val pearlTile = Items[Items.find("Ender Pearl")]!!.icon
     private val potionTile = Items[Items.find("Potion of Healing")]!!.icon
+    private val fireTile = Items[Items.find("Fire Charge")]!!.icon
 
     fun draw(shader: Shader, drops: ItemEntities, camX: Float, camZ: Float, maxDist: Float, time: Float,
              carts: com.vishucraft.game.engine.Carts? = null, arrows: com.vishucraft.game.engine.Projectiles? = null,
@@ -34,6 +35,7 @@ class DropRenderer {
                 com.vishucraft.game.engine.Projectile.EGG -> eggTile
                 com.vishucraft.game.engine.Projectile.PEARL -> pearlTile
                 com.vishucraft.game.engine.Projectile.POTION -> potionTile
+                com.vishucraft.game.engine.Projectile.FIREBALL -> fireTile
                 else -> arrowTile
             }
             val arrowLike = a.kind == com.vishucraft.game.engine.Projectile.ARROW || a.kind == com.vishucraft.game.engine.Projectile.THORN

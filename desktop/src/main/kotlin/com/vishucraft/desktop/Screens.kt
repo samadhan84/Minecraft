@@ -133,6 +133,13 @@ class Hud(private val game: Game) {
         }
         if (game.gliding) ui.text("Gliding", w / 2, 40f, 18f, rgba(220, 220, 255), 1)
         game.lookedAtLabel()?.let { ui.text(it, w / 2, h / 2 - 50, 18f, -1, 1) }
+        // Boss health bar.
+        game.bossBar()?.let { (name, hp) ->
+            val bw = minOf(600f, w - 80)
+            ui.text(name, w / 2, 14f, 18f, rgba(220, 200, 255), 1)
+            ui.rect(w / 2 - bw / 2, 38f, bw, 10f, rgba(40, 20, 60, 200))
+            ui.rect(w / 2 - bw / 2, 38f, bw * hp, 10f, rgba(170, 110, 250))
+        }
         if (debug != null) {
             var y = 8f
             for (line in debug.split('\n')) { ui.text(line, 10f, y, 16f); y += 20f }

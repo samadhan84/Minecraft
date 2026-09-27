@@ -484,6 +484,17 @@ class GameActivity : Activity() {
                 else screen.open(ContainerScreen.Mode.FURNACE, furnaceEntity = world.blockEntities.furnace(x, y, z))
             }
             e == "craft" -> { sounds.play("craft"); updateHand() }
+            e == "ending" -> {
+                releaseInputs()
+                android.app.AlertDialog.Builder(this).setTitle("The End")
+                    .setMessage("You defeated the Sky Warden and freed the Sky Isles!\n\n" +
+                "It dropped a Nether Star, an Elytra, diamonds and a Totem of Undying.\n\n" +
+                "Thank you for playing DhruvVishu.\n\n" +
+                "Made for Dhruv and Vishu.\n" +
+                "Every block, creature, sound and song in this game was made from code.\n\n" +
+                "The world is still yours: keep building, exploring and playing.")
+                    .setPositiveButton("Keep playing", null).show()
+            }
             e == "open:ender" -> { releaseInputs(); screen.open(ContainerScreen.Mode.CHEST, chestEntity = level.enderChest) }
             e.startsWith("signedit:") -> {
                 val (x, y, z) = e.removePrefix("signedit:").split(',').map { it.toInt() }
@@ -525,7 +536,10 @@ class GameActivity : Activity() {
             "$name ${left.toInt() / 60}:${"%02d".format(left.toInt() % 60)}"
         }
         effectsText.text = (fx + (if (game.gliding) listOf("Gliding") else emptyList())).joinToString("\n")
-        lookLabel.text = game.lookedAtLabel() ?: ""
+        lookLabel.text = game.bossBar()?.let { (name, hp) ->
+            val n = (hp * 20).toInt()
+            "$name\n" + "▰".repeat(n) + "▱".repeat(20 - n)
+        } ?: game.lookedAtLabel() ?: ""
         val flying = game.player.flying
         flyButton.toggled = flying
         downButton.visibility = if (flying) View.VISIBLE else View.GONE
