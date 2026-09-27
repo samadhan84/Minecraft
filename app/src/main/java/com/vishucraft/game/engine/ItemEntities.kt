@@ -28,6 +28,12 @@ class ItemEntities(private val world: World) {
         })
     }
 
+    /** An item thrown by the player: flies forward and can't be picked up again for 2 seconds. */
+    fun toss(stack: ItemStack, x: Float, y: Float, z: Float, dx: Float, dy: Float, dz: Float) {
+        if (stack.count <= 0) return
+        list.add(ItemEntity(stack, x, y, z).apply { vx = dx * 6f; vy = dy * 6f + 2f; vz = dz * 6f; pickupDelay = 2f })
+    }
+
     fun update(dt: Float, game: Game) {
         val p = game.player
         val it = list.iterator()

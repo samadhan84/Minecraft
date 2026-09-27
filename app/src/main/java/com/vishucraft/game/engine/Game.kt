@@ -147,6 +147,9 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
     val craftGrid = arrayOfNulls<ItemStack>(9)
 
     /** Puts everything left in the crafting grid back into the inventory (or drops it). */
+    /** Called when a chest / furnace screen closes. */
+    fun closeContainer() { net?.closeContainer() }
+
     fun returnCraftGrid() {
         for (i in craftGrid.indices) {
             val s = craftGrid[i] ?: continue
@@ -213,6 +216,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
         redstone.daylight = { daylight }
         redstone.occupied = { x, y, z -> occupied(x, y, z) }
         redstone.plateLoad = { x, y, z, items -> plateLoad(x, y, z, items) }
+        if (net == null) loadEntities()
         mobs.onDeath = { m -> if (survival) for ((id, n) in mobDrops(m)) drops.spawn(ItemStack(id, n), m.x, m.y + 0.5f, m.z) }
         // Chunk offsets sorted nearest first, so the area around the player streams in first.
         val r = 16
@@ -296,9 +300,11 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
         target = Raycast.cast(world, player.x, player.eyeY, player.z, dir[0], dir[1], dir[2], REACH)
 
         while (true) {
-            when (input.actions.poll() ?: break) {
+            val action = input.actions.poll() ?: break
+            when (action) {
                 GameInput.Action.PLACE -> use()
                 GameInput.Action.ATTACK -> attack()
+                GameInput.Action.DROP, GameInput.Action.DROP_STACK -> dropHeld(action == GameInput.Action.DROP_STACK)
                 GameInput.Action.TOGGLE_FLY -> if (!survival) { player.flying = !player.flying; player.vy = 0f }
             }
         }
@@ -865,6 +871,16 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
         }
     }
 
+    /** Throws the held item (or the whole stack) forward. */
+    private fun dropHeld(all: Boolean) {
+        val s = heldStack() ?: return
+        val n = if (all) s.count else 1
+        drops.toss(ItemStack(s.id, n, s.damage), player.x, player.eyeY - 0.3f, player.z, dir[0], dir[1], dir[2])
+        s.count -= n
+        if (s.count <= 0) inventory.slots[input.selectedSlot] = null
+        uiEvents.add("place")
+    }
+
     /** Flint and steel wears out; a fire charge is used up. */
     private fun ignited(item: ItemDef) { if (item.name == "Fire Charge") consumeHeld() else damageHeld(1) }
 
@@ -959,9 +975,9 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
                 uiEvents.add("toast:Repeater delay: ${delay + 1}")
                 return
             }
-            Blocks.HOPPER -> { world.blockEntities.hopper(t.x, t.y, t.z); uiEvents.add("open:hopper:${t.x},${t.y},${t.z}"); return }
-            Blocks.FURNACE -> { world.blockEntities.furnace(t.x, t.y, t.z); uiEvents.add("open:furnace:${t.x},${t.y},${t.z}"); return }
-            Blocks.CHEST -> { world.blockEntities.chest(t.x, t.y, t.z); uiEvents.add("open:chest:${t.x},${t.y},${t.z}"); return }
+            Blocks.HOPPER -> { world.blockEntities.hopper(t.x, t.y, t.z); net?.openContainer(t.x, t.y, t.z, 2); uiEvents.add("open:hopper:${t.x},${t.y},${t.z}"); return }
+            Blocks.FURNACE -> { world.blockEntities.furnace(t.x, t.y, t.z); net?.openContainer(t.x, t.y, t.z, 1); uiEvents.add("open:furnace:${t.x},${t.y},${t.z}"); return }
+            Blocks.CHEST -> { world.blockEntities.chest(t.x, t.y, t.z); net?.openContainer(t.x, t.y, t.z, 0); uiEvents.add("open:chest:${t.x},${t.y},${t.z}"); return }
             Blocks.NOTE_BLOCK, Blocks.JUKEBOX -> if (item == null) return
         }
 
@@ -1241,6 +1257,24 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
         level.health = health; level.food = food; level.saturation = saturation
         level.selectedSlot = input.selectedSlot
         world.saveChunks()
+        saveEntities()
         saveDir?.let { level.write(it) }
+    }
+
+    /** Animals, pets and minecarts are kept in entities.dat next to the chunks of each dimension. */
+    private fun saveEntities() {
+        val dir = world.dataDir ?: return
+        try {
+            dir.mkdirs()
+            val tmp = File(dir, "entities.dat.tmp")
+            java.io.DataOutputStream(tmp.outputStream().buffered()).use { d -> mobs.write(d); carts.write(d) }
+            tmp.renameTo(File(dir, "entities.dat"))
+        } catch (_: Exception) {}
+    }
+
+    private fun loadEntities() {
+        val f = File(world.dataDir ?: return, "entities.dat")
+        if (!f.exists()) return
+        try { java.io.DataInputStream(f.inputStream().buffered()).use { d -> mobs.read(d); carts.read(d) } } catch (_: Exception) {}
     }
 }

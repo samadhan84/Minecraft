@@ -3,7 +3,10 @@ package com.vishucraft.game.net
 import com.vishucraft.game.engine.Game
 import com.vishucraft.game.engine.Mob
 import com.vishucraft.game.engine.MobType
+import com.vishucraft.game.world.BlockEntities
+import com.vishucraft.game.world.BlockEntity
 import com.vishucraft.game.world.Chunk
+import com.vishucraft.game.world.RedstoneIds
 import com.vishucraft.game.world.GameMode
 import java.io.ByteArrayOutputStream
 import java.io.DataOutputStream
@@ -39,6 +42,9 @@ abstract class Session {
     abstract fun blockChanged(x: Int, y: Int, z: Int, id: Int, meta: Int)
     open fun attack(uid: Int, damage: Float, kx: Float, kz: Float) {}
     open fun hurtRemote(id: Int, amount: Float, fromX: Float, fromZ: Float) {}
+    /** A guest opened a chest (kind 0), furnace (1) or hopper (2): ask the host for what is inside. */
+    open fun openContainer(x: Int, y: Int, z: Int, kind: Int) {}
+    open fun closeContainer() {}
     abstract fun close()
     abstract val status: String
 
@@ -57,7 +63,13 @@ class HostSession(private val game: Game, private val worldName: String, private
     private var nextId = 1
     @Volatile private var running = true
     private val pendingChunks = ArrayList<Triple<Connection, Int, Int>>()
-    private var playerTimer = 0f; private var mobTimer = 0f; private var timeTimer = 0f
+    private var playerTimer = 0f; private var mobTimer = 0f; private var timeTimer = 0f; private var containerTimer = 0f
+
+    private fun hostEntity(game: Game, x: Int, y: Int, z: Int, kind: Int): BlockEntity? = when (kind) {
+        1 -> game.world.blockEntities.furnace(x, y, z)
+        2 -> game.world.blockEntities.hopper(x, y, z)
+        else -> game.world.blockEntities.chest(x, y, z)
+    }
 
     init {
         Thread({
@@ -132,7 +144,32 @@ class HostSession(private val game: Game, private val worldName: String, private
                     val uid = d.readInt(); val dmg = d.readFloat(); val kx = d.readFloat(); val kz = d.readFloat()
                     game.mobs.list.firstOrNull { it.uid == uid }?.let { game.mobs.damage(it, dmg, kx, kz) }
                 }
+                Msg.CONTAINER_OPEN -> {
+                    val x = d.readInt(); val y = d.readInt(); val z = d.readInt()
+                    c.openContainer = RedstoneIds.pack(x, y, z); c.containerKind = d.readInt(); c.containerSent = null
+                }
+                Msg.CONTAINER -> {
+                    // A guest changed a chest or furnace: take their version.
+                    val x = d.readInt(); val y = d.readInt(); val z = d.readInt()
+                    val bytes = ByteArray(d.readInt()); d.readFully(bytes)
+                    hostEntity(game, x, y, z, c.containerKind)?.let { BlockEntities.apply(it, bytes); c.containerSent = bytes }
+                }
+                Msg.CONTAINER_CLOSE -> c.openContainer = null
                 Msg.BYE -> c.close()
+            }
+        }
+        // Keep guests' open chests and furnaces up to date (furnaces smelt on the host).
+        containerTimer += dt
+        if (containerTimer >= 0.25f) {
+            containerTimer = 0f
+            for (c in clients) {
+                val pos = c.openContainer ?: continue
+                val x = RedstoneIds.x(pos); val y = RedstoneIds.y(pos); val z = RedstoneIds.z(pos)
+                val e = hostEntity(game, x, y, z, c.containerKind) ?: continue
+                val bytes = BlockEntities.encode(e)
+                if (c.containerSent?.contentEquals(bytes) == true) continue
+                c.containerSent = bytes
+                c.send(Msg.CONTAINER) { o -> o.writeInt(x); o.writeInt(y); o.writeInt(z); o.writeInt(bytes.size); o.write(bytes) }
             }
         }
         // Players who left.
@@ -267,6 +304,45 @@ class ClientSession private constructor(private val conn: Connection) : Session(
     override fun attack(uid: Int, damage: Float, kx: Float, kz: Float) =
         conn.send(Msg.ATTACK) { it.writeInt(uid); it.writeFloat(damage); it.writeFloat(kx); it.writeFloat(kz) }
 
+    private var openPos: IntArray? = null
+    private var openKind = 0
+    private var synced: ByteArray? = null
+    private var containerTimer = 0f
+
+    override fun openContainer(x: Int, y: Int, z: Int, kind: Int) {
+        openPos = intArrayOf(x, y, z); openKind = kind; synced = null
+        conn.send(Msg.CONTAINER_OPEN) { it.writeInt(x); it.writeInt(y); it.writeInt(z); it.writeInt(kind) }
+    }
+
+    override fun closeContainer() {
+        if (openPos == null) return
+        sendIfChanged(lastGame ?: return)
+        openPos = null
+        conn.send(Msg.CONTAINER_CLOSE)
+    }
+
+    private var lastGame: Game? = null
+
+    private fun localEntity(game: Game): BlockEntity? {
+        val (x, y, z) = openPos ?: return null
+        return when (openKind) {
+            1 -> game.world.blockEntities.furnace(x, y, z)
+            2 -> game.world.blockEntities.hopper(x, y, z)
+            else -> game.world.blockEntities.chest(x, y, z)
+        }
+    }
+
+    /** Sends our copy of the open container when we changed it (only after the host's copy has arrived). */
+    private fun sendIfChanged(game: Game) {
+        val (x, y, z) = openPos ?: return
+        val before = synced ?: return
+        val e = localEntity(game) ?: return
+        val bytes = BlockEntities.encode(e)
+        if (bytes.contentEquals(before)) return
+        synced = bytes
+        conn.send(Msg.CONTAINER) { o -> o.writeInt(x); o.writeInt(y); o.writeInt(z); o.writeInt(bytes.size); o.write(bytes) }
+    }
+
     override fun poll(game: Game, dt: Float) {
         while (true) {
             val p = inbox.poll() ?: break
@@ -314,10 +390,21 @@ class ClientSession private constructor(private val conn: Connection) : Session(
                     game.mobs.list.clear(); game.mobs.list.addAll(fresh)
                 }
                 Msg.HURT -> game.hurtPlayer(d.readFloat(), d.readFloat(), d.readFloat())
+                Msg.CONTAINER -> {
+                    val x = d.readInt(); val y = d.readInt(); val z = d.readInt()
+                    val bytes = ByteArray(d.readInt()); d.readFully(bytes)
+                    val pos = openPos
+                    if (pos != null && pos[0] == x && pos[1] == y && pos[2] == z) {
+                        localEntity(game)?.let { BlockEntities.apply(it, bytes); synced = BlockEntities.encode(it) }
+                    }
+                }
                 Msg.TIME -> { game.timeOfDay = d.readFloat(); game.setRain(d.readFloat()) }
                 Msg.BYE -> conn.close()
             }
         }
+        lastGame = game
+        containerTimer += dt
+        if (containerTimer >= 0.2f) { containerTimer = 0f; sendIfChanged(game) }
         posTimer += dt
         if (posTimer >= 0.1f) {
             posTimer = 0f

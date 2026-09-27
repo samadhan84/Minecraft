@@ -35,6 +35,8 @@ class World(val seed: Long, private val saveDir: File?, val dimension: Dimension
     ) { r -> Thread(r, "world-worker").apply { isDaemon = true; priority = Thread.NORM_PRIORITY - 1 } }
 
     private val chunkDir: File? = saveDir?.let { File(it, "chunks").apply { mkdirs() } }
+    /** Folder this dimension is saved in (null for Wi-Fi guests). */
+    val dataDir: File? get() = saveDir
     val blockEntities = BlockEntities().also { be -> saveDir?.let { be.read(File(it, "blockentities.dat")) } }
 
     fun getChunk(cx: Int, cz: Int): Chunk? = chunks[Chunk.key(cx, cz)]

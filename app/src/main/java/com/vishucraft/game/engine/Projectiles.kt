@@ -94,6 +94,17 @@ class Carts(private val world: World) {
     val list = ArrayList<Cart>()
     var riding: Cart? = null
 
+    fun write(d: java.io.DataOutputStream) {
+        d.writeInt(list.size)
+        for (c in list) { d.writeFloat(c.x); d.writeFloat(c.y); d.writeFloat(c.z); d.writeFloat(c.hx); d.writeFloat(c.hz) }
+    }
+
+    fun read(d: java.io.DataInputStream) {
+        repeat(d.readInt()) {
+            list.add(Cart(d.readFloat(), d.readFloat(), d.readFloat()).also { c -> c.hx = d.readFloat(); c.hz = d.readFloat() })
+        }
+    }
+
     private fun railAt(x: Int, y: Int, z: Int): Int = world.getBlock(x, y, z).let { if (com.vishucraft.game.world.Rails.isRail(it)) it else 0 }
 
     /** Points a cart along its track in the direction closest to (lookX, lookZ). */
@@ -120,7 +131,8 @@ class Carts(private val world: World) {
     }.minByOrNull { (it.x - px) * (it.x - px) + (it.z - pz) * (it.z - pz) }
 
     fun update(dt: Float, game: Game) {
-        for (c in list) step(c, dt, game)
+        // Carts in chunks that are not loaded wait there (they would otherwise fall through the missing ground).
+        for (c in list) if (world.isLoaded(floorInt(c.x), floorInt(c.z))) step(c, dt, game)
         riding?.let { c ->
             val p = game.player
             p.x = c.x; p.z = c.z; p.y = c.y + 0.35f

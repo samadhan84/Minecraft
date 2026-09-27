@@ -90,6 +90,40 @@ class BlockEntities {
     fun furnace(x: Int, y: Int, z: Int) = map.getOrPut(RedstoneIds.pack(x, y, z)) { FurnaceEntity() } as? FurnaceEntity
     fun remove(x: Int, y: Int, z: Int) = map.remove(RedstoneIds.pack(x, y, z))
 
+    companion object {
+        /** One chest / hopper / furnace as bytes (used to share containers over Wi-Fi). */
+        fun encode(e: BlockEntity): ByteArray {
+            val out = java.io.ByteArrayOutputStream()
+            DataOutputStream(out).use { d -> writeEntity(d, e) }
+            return out.toByteArray()
+        }
+
+        /** Copies [bytes] (from [encode]) into an existing entity of the same kind, so open screens update. */
+        fun apply(e: BlockEntity, bytes: ByteArray) {
+            val d = DataInputStream(bytes.inputStream())
+            val kind = d.readByte().toInt()
+            when {
+                e is ChestEntity && (kind == 0 || kind == 2) -> for (i in e.slots.indices) e.slots[i] = Inventory.readStack(d)
+                e is FurnaceEntity && kind == 1 -> {
+                    e.input = Inventory.readStack(d); e.fuel = Inventory.readStack(d); e.output = Inventory.readStack(d)
+                    e.burnLeft = d.readFloat(); e.burnTotal = d.readFloat(); e.progress = d.readFloat()
+                }
+            }
+        }
+
+        private fun writeEntity(d: DataOutputStream, e: BlockEntity) {
+            when (e) {
+                is HopperEntity -> { d.writeByte(2); for (s in e.slots) Inventory.writeStack(d, s) }
+                is ChestEntity -> { d.writeByte(0); for (s in e.slots) Inventory.writeStack(d, s) }
+                is FurnaceEntity -> {
+                    d.writeByte(1)
+                    Inventory.writeStack(d, e.input); Inventory.writeStack(d, e.fuel); Inventory.writeStack(d, e.output)
+                    d.writeFloat(e.burnLeft); d.writeFloat(e.burnTotal); d.writeFloat(e.progress)
+                }
+            }
+        }
+    }
+
     fun write(file: File) {
         val tmp = File(file.parentFile, file.name + ".tmp")
         DataOutputStream(tmp.outputStream().buffered()).use { d ->
@@ -98,15 +132,7 @@ class BlockEntities {
             d.writeInt(entries.size)
             for ((pos, e) in entries) {
                 d.writeLong(pos)
-                when (e) {
-                    is HopperEntity -> { d.writeByte(2); for (s in e.slots) Inventory.writeStack(d, s) }
-                    is ChestEntity -> { d.writeByte(0); for (s in e.slots) Inventory.writeStack(d, s) }
-                    is FurnaceEntity -> {
-                        d.writeByte(1)
-                        Inventory.writeStack(d, e.input); Inventory.writeStack(d, e.fuel); Inventory.writeStack(d, e.output)
-                        d.writeFloat(e.burnLeft); d.writeFloat(e.burnTotal); d.writeFloat(e.progress)
-                    }
-                }
+                writeEntity(d, e)
             }
         }
         tmp.renameTo(file)

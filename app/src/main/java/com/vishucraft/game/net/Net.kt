@@ -33,6 +33,9 @@ object Msg {
     const val TIME = 11        // h->c timeOfDay, rain
     const val BYE = 12
     const val REJECT = 13      // h->c reason (wrong or missing password)
+    const val CONTAINER_OPEN = 14  // c->h x, y, z, kind (0 chest, 1 furnace, 2 hopper)
+    const val CONTAINER = 15       // both ways x, y, z, entity bytes (see BlockEntities.encode)
+    const val CONTAINER_CLOSE = 16 // c->h
 }
 
 class Packet(val type: Int, val data: ByteArray, val from: Connection)
@@ -45,6 +48,10 @@ class Connection(private val socket: Socket, private val inbox: ConcurrentLinked
     var name = "Player"
     /** Said hello with the right password; until then only HELLO is accepted. */
     @Volatile var authed = false
+    /** The chest / furnace this player has open (packed position), or null. */
+    @Volatile var openContainer: Long? = null
+    var containerKind = 0
+    var containerSent: ByteArray? = null
     private val outbox = LinkedBlockingQueue<ByteArray>()
 
     init {

@@ -248,6 +248,7 @@ class ContainerScreen(private val game: Game) {
         }
         held = null
         game.returnCraftGrid()
+        game.closeContainer()
     }
 
     private fun gridSize() = if (mode == Mode.CRAFTING) 3 else 2

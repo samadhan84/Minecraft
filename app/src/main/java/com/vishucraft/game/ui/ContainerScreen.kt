@@ -349,7 +349,7 @@ class ContainerScreen(
 
     fun close() {
         visibility = GONE; selected = null
-        act { g -> g.returnCraftGrid() }
+        act { g -> g.returnCraftGrid(); g.closeContainer() }
         onClose()
     }
 

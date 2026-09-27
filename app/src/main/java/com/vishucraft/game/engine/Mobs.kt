@@ -74,6 +74,15 @@ class Mob(val type: MobType, var x: Float, var y: Float, var z: Float, val uid: 
     /** Crawlers become aggressive when hit. */
     internal var angry = false
     internal var swoopTime = 0f
+    /** Given with a name tag; named mobs never despawn. */
+    var customName: String? = null
+    /** Tamed by the player (wolves, cats, horses). */
+    var tamed = false
+    var saddled = false
+    /** Tamed pets sit and stay when told to. */
+    var sitting = false
+    /** Chickens: seconds until the next egg. Sheep: seconds until the wool grows back. */
+    var timer = 0f
 
     val dead get() = deathTime >= 0f
 }
@@ -84,7 +93,42 @@ class MobHit(val mob: Mob, val distance: Float)
 /** Spawning, AI and physics for all mobs. Runs on the game thread. */
 class Mobs(private val world: World) {
     val list = ArrayList<Mob>()
+    /** Animals and pets that are far away or in unloaded chunks: kept (and saved) but not simulated. */
+    val parked = ArrayList<Mob>()
     var hostileEnabled = true
+    private var unparkTimer = 0f
+
+    /** Animals, named mobs and pets stay in the world; monsters despawn when far away. */
+    fun persistent(m: Mob) = !m.type.hostile || m.customName != null || m.tamed
+
+    fun write(d: java.io.DataOutputStream) {
+        val all = (list + parked).filter { !it.dead && persistent(it) && it.type != MobType.EXPLORER }
+        d.writeInt(1)
+        d.writeInt(all.size)
+        for (m in all) {
+            d.writeUTF(m.type.name)
+            d.writeFloat(m.x); d.writeFloat(m.y); d.writeFloat(m.z); d.writeFloat(m.yaw)
+            d.writeFloat(m.health); d.writeFloat(m.age); d.writeFloat(m.timer)
+            d.writeUTF(m.customName ?: "")
+            d.writeByte((if (m.tamed) 1 else 0) or (if (m.saddled) 2 else 0) or (if (m.sitting) 4 else 0))
+        }
+    }
+
+    fun read(d: java.io.DataInputStream) {
+        if (d.readInt() != 1) return
+        repeat(d.readInt()) {
+            val name = d.readUTF()
+            val x = d.readFloat(); val y = d.readFloat(); val z = d.readFloat(); val yaw = d.readFloat()
+            val health = d.readFloat(); val age = d.readFloat(); val timer = d.readFloat()
+            val custom = d.readUTF(); val flags = d.readByte().toInt()
+            val type = MobType.values().firstOrNull { it.name == name } ?: return@repeat
+            parked.add(Mob(type, x, y, z).also { m ->
+                m.yaw = yaw; m.health = health; m.age = age; m.timer = timer
+                m.customName = custom.ifEmpty { null }
+                m.tamed = flags and 1 != 0; m.saddled = flags and 2 != 0; m.sitting = flags and 4 != 0
+            })
+        }
+    }
     /** Called once when a mob dies (for drops). */
     var onDeath: ((Mob) -> Unit)? = null
     private val rnd = Random()
@@ -98,13 +142,25 @@ class Mobs(private val world: World) {
         }
         breed(dt)
         val p = game.player
+        // Bring kept animals back once their chunk is loaded and the player is near.
+        unparkTimer -= dt
+        if (unparkTimer <= 0f && parked.isNotEmpty()) {
+            unparkTimer = 1f
+            val back = parked.filter { m ->
+                val dx = m.x - p.x; val dz = m.z - p.z
+                dx * dx + dz * dz < 96f * 96f && world.isLoaded(floorInt(m.x), floorInt(m.z)) &&
+                    world.isLoaded(floorInt(m.x) + 16, floorInt(m.z)) && world.isLoaded(floorInt(m.x) - 16, floorInt(m.z))
+            }
+            parked.removeAll(back.toSet()); list.addAll(back)
+        }
         val it = list.iterator()
         while (it.hasNext()) {
             val m = it.next()
             val dx = m.x - p.x; val dz = m.z - p.z
             val far = dx * dx + dz * dz > 110f * 110f
-            if (far || !world.isLoaded(floorInt(m.x), floorInt(m.z)) || (!hostileEnabled && m.type.hostile) ||
-                (m.dead && m.deathTime > 0.8f)) {
+            if (m.dead && m.deathTime > 0.8f) { it.remove(); continue }
+            if (far || !world.isLoaded(floorInt(m.x), floorInt(m.z)) || (!hostileEnabled && m.type.hostile && !m.tamed)) {
+                if (persistent(m) && !m.dead && (far || !world.isLoaded(floorInt(m.x), floorInt(m.z)))) parked.add(m)
                 it.remove(); continue
             }
             tick(m, dt, game)

@@ -74,7 +74,7 @@ class GameActivity : Activity() {
                 "Keyboard:\n" +
                 "• W A S D: move, arrows: turn, R / V: look up / down\n" +
                 "• Space: jump, C or Shift: fly down, F: fly\n" +
-                "• Enter or K: place, J: mine, E: inventory, 1-9 / Q / Tab: slots"
+                "• Enter or K: place, J: mine, E: inventory, 1-9 / Tab: slots, Q: drop item, Ctrl: sprint"
     }
 
     private lateinit var glView: GLSurfaceView
@@ -90,6 +90,9 @@ class GameActivity : Activity() {
     private lateinit var pauseMenu: LinearLayout
     private lateinit var inventory: InventoryView
     private lateinit var flyButton: HudButton
+    private lateinit var runButton: HudButton
+    private var sprinting = false
+    private lateinit var effectsText: TextView
     private lateinit var downButton: HudButton
     private lateinit var root: FrameLayout
     private lateinit var settings: Settings
@@ -161,6 +164,8 @@ class GameActivity : Activity() {
 
         val jump = HudButton(this, "▲") { input.jumpHeld = it }
         if (touch) root.addView(jump, lp(76f, 76f, Gravity.BOTTOM or Gravity.END, r = 24f, b = 64f))
+        runButton = HudButton(this, "RUN") { if (it) { sprinting = !sprinting; input.sprint = sprinting; runButton.toggled = sprinting } }
+        if (touch) root.addView(runButton, lp(64f, 44f, Gravity.BOTTOM or Gravity.END, r = 30f, b = 150f))
         downButton = HudButton(this, "▼") { input.descendHeld = it }
         if (touch) root.addView(downButton, lp(64f, 64f, Gravity.BOTTOM or Gravity.END, r = 112f, b = 64f))
         downButton.visibility = View.GONE
@@ -177,7 +182,16 @@ class GameActivity : Activity() {
         bar.addView(hotbar, LinearLayout.LayoutParams(dpi(9 * 42f), dpi(42f)))
         val inv = HudButton(this, "•••") { if (it) handler.post { showInventory(true) } }
         bar.addView(inv, LinearLayout.LayoutParams(dpi(46f), dpi(42f)).apply { leftMargin = dpi(4f) })
+        // Throw the held item away (one at a time).
+        val drop = HudButton(this, "DROP") { if (it) input.actions.add(GameInput.Action.DROP) }
+        if (touch) bar.addView(drop, LinearLayout.LayoutParams(dpi(52f), dpi(42f)).apply { leftMargin = dpi(4f) })
         root.addView(bar, lp(-2f, -2f, Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL, b = 4f))
+
+        effectsText = TextView(this).apply {
+            setTextColor(Color.rgb(200, 230, 255)); textSize = 13f
+            setShadowLayer(2f, 1f, 1f, Color.BLACK); gravity = Gravity.END
+        }
+        root.addView(effectsText, lp(-2f, -2f, Gravity.TOP or Gravity.END, t = 64f, r = 16f))
 
         stats = TextView(this).apply {
             setTextColor(Color.WHITE); textSize = 12f
@@ -446,6 +460,12 @@ class GameActivity : Activity() {
         status.update(game.health, game.food, game.inventory.armorPoints())
         updateHand()
         stats.text = text
+        // Potion effects with the time left, top right.
+        val fx = game.effects.toSortedMap().map { (key, left) ->
+            val name = com.vishucraft.game.world.Items.POTIONS.firstOrNull { it.second == key }?.first ?: key
+            "$name ${left.toInt() / 60}:${"%02d".format(left.toInt() % 60)}"
+        }
+        effectsText.text = (fx + (if (game.gliding) listOf("Gliding") else emptyList())).joinToString("\n")
         val flying = game.player.flying
         flyButton.toggled = flying
         downButton.visibility = if (flying) View.VISIBLE else View.GONE
@@ -595,7 +615,9 @@ class GameActivity : Activity() {
             KeyEvent.KEYCODE_F, KeyEvent.KEYCODE_BUTTON_X -> if (first) input.actions.add(GameInput.Action.TOGGLE_FLY)
             KeyEvent.KEYCODE_E, KeyEvent.KEYCODE_I, KeyEvent.KEYCODE_MENU, KeyEvent.KEYCODE_BUTTON_Y,
             KeyEvent.KEYCODE_PROG_RED, KeyEvent.KEYCODE_TV_CONTENTS_MENU -> if (first) showInventory(true)
-            KeyEvent.KEYCODE_Q, KeyEvent.KEYCODE_BUTTON_L1, KeyEvent.KEYCODE_MEDIA_REWIND, KeyEvent.KEYCODE_MEDIA_PREVIOUS -> if (first) cycleSlot(-1)
+            KeyEvent.KEYCODE_Q -> if (first) input.actions.add(if (e.isCtrlPressed) GameInput.Action.DROP_STACK else GameInput.Action.DROP)
+            KeyEvent.KEYCODE_CTRL_LEFT -> input.sprint = down || sprinting
+            KeyEvent.KEYCODE_BUTTON_L1, KeyEvent.KEYCODE_MEDIA_REWIND, KeyEvent.KEYCODE_MEDIA_PREVIOUS -> if (first) cycleSlot(-1)
             KeyEvent.KEYCODE_TAB, KeyEvent.KEYCODE_BUTTON_R1, KeyEvent.KEYCODE_MEDIA_FAST_FORWARD, KeyEvent.KEYCODE_MEDIA_NEXT -> if (first) cycleSlot(1)
             in KeyEvent.KEYCODE_1..KeyEvent.KEYCODE_9 -> if (first) { hotbar.selected = e.keyCode - KeyEvent.KEYCODE_1; selectSlot(hotbar.selected) }
             KeyEvent.KEYCODE_BUTTON_B, KeyEvent.KEYCODE_BUTTON_START, KeyEvent.KEYCODE_ESCAPE, KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE ->

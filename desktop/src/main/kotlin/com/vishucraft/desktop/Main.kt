@@ -69,7 +69,7 @@ const val CONTROLS_HELP =
         "Space: jump / swim / fly up    ·    Shift: fly down\n" +
         "Double-tap Space or F: fly (Creative)    ·    Ctrl: sprint\n" +
         "Minecart: place it on a rail, Space next to it to get in, Shift to get out\n" +
-        "1-9 or mouse wheel: choose hotbar slot\n" +
+        "1-9 or mouse wheel: choose hotbar slot    ·    Q: drop item (Ctrl+Q: whole stack)\n" +
         "E: inventory & crafting    ·    Esc: pause menu\n" +
         "F3: FPS & coordinates    ·    F11: fullscreen    ·    F2: screenshot"
 
@@ -681,6 +681,7 @@ class App(private val demo: File?) {
                 GLFW_KEY_ESCAPE -> overlay = Overlay.PAUSE
                 GLFW_KEY_E, GLFW_KEY_I -> openInventory()
                 GLFW_KEY_F -> input.actions.add(GameInput.Action.TOGGLE_FLY)
+                GLFW_KEY_Q -> input.actions.add(if (mods and GLFW_MOD_CONTROL != 0) GameInput.Action.DROP_STACK else GameInput.Action.DROP)
                 GLFW_KEY_SPACE -> {
                     val now = glfwGetTime()
                     if (now - lastSpace < 0.3 && !s.game.survival) input.actions.add(GameInput.Action.TOGGLE_FLY)
