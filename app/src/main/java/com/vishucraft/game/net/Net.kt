@@ -32,6 +32,7 @@ object Msg {
     const val HURT = 10        // h->c amount, fromX, fromZ
     const val TIME = 11        // h->c timeOfDay, rain
     const val BYE = 12
+    const val REJECT = 13      // h->c reason (wrong or missing password)
 }
 
 class Packet(val type: Int, val data: ByteArray, val from: Connection)
@@ -42,6 +43,8 @@ class Connection(private val socket: Socket, private val inbox: ConcurrentLinked
         private set
     var id = -1
     var name = "Player"
+    /** Said hello with the right password; until then only HELLO is accepted. */
+    @Volatile var authed = false
     private val outbox = LinkedBlockingQueue<ByteArray>()
 
     init {
@@ -104,7 +107,7 @@ fun reader(data: ByteArray) = DataInputStream(ByteArrayInputStream(data))
 
 /** Finds hosts on the local network (they broadcast their name every second). */
 object Discovery {
-    class Host(val name: String, val address: String, val players: Int)
+    class Host(val name: String, val address: String, val players: Int, val locked: Boolean = false)
 
     /** Listens for [millis] and returns the games heard. Call off the main thread. */
     fun scan(millis: Int): List<Host> {
@@ -122,7 +125,7 @@ object Discovery {
                     val text = String(p.data, 0, p.length, Charsets.UTF_8).split('|')
                     if (text.size >= 3 && text[0] == Msg.MAGIC) {
                         val addr = p.address.hostAddress ?: continue
-                        found[addr] = Host(text[1], addr, text[2].toIntOrNull() ?: 1)
+                        found[addr] = Host(text[1], addr, text[2].toIntOrNull() ?: 1, text.getOrNull(3) == "locked")
                     }
                 }
             }
@@ -131,8 +134,8 @@ object Discovery {
         return found.values.toList()
     }
 
-    fun announce(socket: DatagramSocket, name: String, players: Int) {
-        val bytes = "${Msg.MAGIC}|$name|$players".toByteArray(Charsets.UTF_8)
+    fun announce(socket: DatagramSocket, name: String, players: Int, locked: Boolean = false) {
+        val bytes = "${Msg.MAGIC}|$name|$players${if (locked) "|locked" else ""}".toByteArray(Charsets.UTF_8)
         try {
             socket.broadcast = true
             socket.send(DatagramPacket(bytes, bytes.size, InetAddress.getByName("255.255.255.255"), Msg.DISCOVERY_PORT))

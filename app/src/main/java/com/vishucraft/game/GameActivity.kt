@@ -274,7 +274,7 @@ class GameActivity : Activity() {
         }
         addMenu("Settings") { settingsDialog(this) { applySettings() } }
         addMenu("Controls") { showControls() }
-        addMenu("Save and quit") { finish() }
+        addMenu("Save and quit") { saveAndQuit() }
         root.addView(pauseMenu, FrameLayout.LayoutParams(-1, -1))
         if (!touch) handler.postDelayed({ showToast("Press MENU / Y for controls help in the pause menu (Back)") }, 800)
     }
@@ -343,6 +343,29 @@ class GameActivity : Activity() {
         input.lookStickX = 0f; input.lookStickY = 0f
         input.moveForward = 0f; input.moveStrafe = 0f
         input.jumpHeld = false; input.descendHeld = false; input.breakHeld = false
+    }
+
+    /** Save and quit, choosing (or changing / removing) the world's password on the way out. */
+    private fun saveAndQuit() {
+        if (game.isClient) { finish(); return }
+        val input = android.widget.EditText(this).apply {
+            hint = if (level.hasPassword) "New password (leave empty to keep it)" else "Password (leave empty for none)"
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
+        }
+        val b = android.app.AlertDialog.Builder(this)
+            .setTitle("Save and quit")
+            .setMessage(if (level.hasPassword) "This world has a password. Type a new one to change it."
+                else "Choose a password for this world. It is needed to open it and to join it over Wi-Fi.")
+            .setView(input)
+            .setPositiveButton("Save and quit") { _, _ ->
+                val p = input.text.toString()
+                glView.queueEvent { if (p.isNotEmpty()) level.setPassword(p); runOnUiThread { finish() } }
+            }
+            .setNegativeButton("Cancel", null)
+        if (level.hasPassword) b.setNeutralButton("Remove password") { _, _ ->
+            glView.queueEvent { level.setPassword(""); runOnUiThread { finish() } }
+        }
+        b.show()
     }
 
     private fun showControls() {

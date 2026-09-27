@@ -410,7 +410,7 @@ class ChunkMesher {
      * 0 N-S, 1 E-W, 2..5 ascending towards +X, -X, -Z, +Z, 6..9 curves (SE, SW, NW, NE).
      */
     private fun emitRail(out: FloatBuilder, px: Int, y: Int, pz: Int, id: Int, meta: Int) {
-        val shape = meta and 15
+        val shape = com.vishucraft.game.world.Rails.shape(id, meta)
         val tile = Blocks.tile(id, meta, 0)
         val l = CAVE + (1f - CAVE) * sky(px, y, pz)
         val bl = lightCurve(blockLight(px, y, pz).toFloat())

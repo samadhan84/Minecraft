@@ -4,6 +4,12 @@ package com.vishucraft.game.world
 object Rails {
     fun isRail(id: Int) = id == Blocks.RAIL || id == Blocks.POWERED_RAIL
 
+    /**
+     * The track shape stored in a rail's meta. Powered rails keep their "on" flag in bit 3 (they never curve,
+     * so their shape is 0..5): reading all four bits would turn a powered straight rail into a curve.
+     */
+    fun shape(id: Int, meta: Int) = if (id == Blocks.POWERED_RAIL) meta and 7 else meta and 15
+
     /** The two directions (dx, dz) a rail shape connects. */
     fun exits(shape: Int): Array<IntArray> = when (shape) {
         1, 2, 3 -> arrayOf(intArrayOf(1, 0), intArrayOf(-1, 0))

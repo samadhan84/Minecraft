@@ -200,7 +200,11 @@ void main() { gl_FragColor = texture2D(uTex, vUv) * vColor; }""",
     }
 
     /** A one-line text box; click to focus, then type. */
-    class Field(var text: String, val hint: String = "", val maxLength: Int = 32) { var focused = false }
+    class Field(var text: String, val hint: String = "", val maxLength: Int = 32, val secret: Boolean = false) { var focused = false }
+
+    /** Set when Enter is pressed in a text box; screens use it as "OK". */
+    var submitted = false
+    fun takeSubmit(): Boolean = submitted.also { submitted = false }
 
     /** The focused field receives typed characters (see [type] / [backspace]). */
     var focus: Field? = null
@@ -212,7 +216,7 @@ void main() { gl_FragColor = texture2D(uTex, vUv) * vColor; }""",
         frame(x, y, w, h, if (f.focused) rgba(255, 235, 90) else rgba(150, 150, 150), 2f)
         val caret = if (f.focused && (System.currentTimeMillis() / 500) % 2 == 0L) "_" else ""
         if (f.text.isEmpty() && !f.focused) text(f.hint, x + 10, y + h / 2 - 9f, 18f, rgba(130, 130, 130), shadow = false)
-        else text(f.text + caret, x + 10, y + h / 2 - 9f, 18f)
+        else text((if (f.secret) "*".repeat(f.text.length) else f.text) + caret, x + 10, y + h / 2 - 9f, 18f)
     }
 
     fun type(c: Int) {

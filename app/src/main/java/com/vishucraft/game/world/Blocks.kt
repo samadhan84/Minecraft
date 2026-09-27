@@ -14,6 +14,9 @@ object Tiles {
     val SUN = id("sun")
     val MOON = id("moon")
     val CRACK_0 = id("crack_0").also { for (i in 1..9) id("crack_$i") }
+    // Registered up front so they are painted into the atlas (tiles first asked for while drawing would be blank).
+    val CART_SIDE = id("cart_side")
+    val CART_FLOOR = id("cart_floor")
 }
 
 enum class RenderType { NONE, CUBE, CROSS, LIQUID, FLAT, BOX, PISTON_HEAD, SHAPE, RAIL, PORTAL }

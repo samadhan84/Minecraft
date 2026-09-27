@@ -174,6 +174,8 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
     val playerAlive get() = health > 0f
     private var regenTimer = 0f
     private var lastVy = 0f
+    private var lastJump = false
+    private var lastCrouch = false
     private var wasOnGround = true
 
     /** Messages for the UI thread: "hurt", "died", or "toast:<text>". */
@@ -312,6 +314,15 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
                     player.y = y + 1f
                 }
                 spawned = true
+            }
+            // Jump (Space) next to a minecart gets in; jump or crouch (Shift) again gets out.
+            val jumpPressed = input.jumpHeld && !lastJump
+            val crouchPressed = input.descendHeld && !lastCrouch
+            lastJump = input.jumpHeld; lastCrouch = input.descendHeld
+            if (carts.riding != null && crouchPressed) { carts.riding = null; player.y += 0.6f }
+            else if (carts.riding == null && jumpPressed && !player.flying) {
+                val len = sqrt(dir[0] * dir[0] + dir[2] * dir[2]).coerceAtLeast(0.01f)
+                carts.nearby(player.x, player.y, player.z, dir[0] / len, dir[2] / len)?.let { carts.enter(it, dir[0], dir[2]) }
             }
             lastVy = player.vy
             player.speedMul = (if (input.sprint && !player.flying) 1.3f else 1f) * (if (hasEffect("swiftness")) 1.4f else 1f)
@@ -898,7 +909,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
             if (item?.tool == ToolType.SWORD || item?.tool == ToolType.AXE) {
                 carts.list.remove(c)
                 if (survival) drops.spawn(ItemStack(Items.find("Minecart")), c.x, c.y + 0.5f, c.z)
-            } else carts.riding = c
+            } else carts.enter(c, dir[0], dir[2])
             return
         }
         // Bows shoot where you look (arrows are used up in survival).
@@ -971,8 +982,12 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
                     }
                 }
                 ItemUse.CART -> if (com.vishucraft.game.world.Rails.isRail(t.block)) {
-                    carts.list.add(Cart(t.x + 0.5f, t.y.toFloat(), t.z + 0.5f))
+                    // The cart faces away from you, so it rolls off the way you are looking.
+                    val cart = Cart(t.x + 0.5f, t.y.toFloat(), t.z + 0.5f)
+                    carts.list.add(cart)
+                    carts.aim(cart, dir[0], dir[2])
                     consumeHeld()
+                    sound("hit_stone", cart.x, cart.y, cart.z, 0.6f)
                 }
                 ItemUse.BUCKET -> if (Blocks.isLiquid(t.block) && world.getMeta(t.x, t.y, t.z) == 0) {
                     val full = Items.find(if (t.block == Blocks.LAVA) "Lava Bucket" else "Water Bucket")
@@ -1109,7 +1124,9 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
         if (!com.vishucraft.game.world.Rails.isRail(id)) return
         val m = world.getMeta(x, y, z)
         val shape = com.vishucraft.game.world.Rails.shapeFor(world, x, y, z, id == Blocks.POWERED_RAIL)
-        if (shape != (m and 15)) setBlock(x, y, z, id, (m and 15.inv()) or shape)
+        // Powered rails keep their "on" flag (bit 3) when re-shaped.
+        val mask = if (id == Blocks.POWERED_RAIL) 7 else 15
+        if (shape != com.vishucraft.game.world.Rails.shape(id, m)) setBlock(x, y, z, id, (m and mask.inv()) or shape)
     }
 
     private fun place(t: RayHit, id: Int) {

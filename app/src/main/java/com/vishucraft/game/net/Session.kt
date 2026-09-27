@@ -75,17 +75,18 @@ class HostSession(private val game: Game, private val worldName: String, private
         Thread({
             DatagramSocket().use { udp ->
                 while (running) {
-                    Discovery.announce(udp, worldName, 1 + clients.size)
+                    Discovery.announce(udp, worldName, 1 + clients.count { it.authed }, game.level.hasPassword)
                     Thread.sleep(1000)
                 }
             }
         }, "net-announce").apply { isDaemon = true; start() }
     }
 
-    override val status get() = "Hosting \"$worldName\" · ${clients.count { it.open }} joined"
+    override val status get() = "Hosting \"$worldName\" · ${clients.count { it.open && it.authed }} joined" +
+        if (game.level.hasPassword) " · password protected" else ""
 
     private fun broadcast(type: Int, except: Connection? = null, body: (DataOutputStream) -> Unit) {
-        for (c in clients) if (c.open && c !== except) c.send(type, body)
+        for (c in clients) if (c.open && c.authed && c !== except) c.send(type, body)
     }
 
     override fun blockChanged(x: Int, y: Int, z: Int, id: Int, meta: Int) =
@@ -100,9 +101,19 @@ class HostSession(private val game: Game, private val worldName: String, private
             val p = inbox.poll() ?: break
             val d = reader(p.data)
             val c = p.from
+            // Until a client has said hello with the right password it gets nothing and can change nothing.
+            if (!c.authed && p.type != Msg.HELLO) continue
             when (p.type) {
                 Msg.HELLO -> {
+                    if (c.authed) continue
                     c.name = d.readUTF()
+                    val hash = try { d.readUTF() } catch (_: Exception) { "" } // older versions send no password
+                    if (game.level.hasPassword && hash != game.level.passwordHash) {
+                        c.send(Msg.REJECT) { it.writeUTF(if (hash.isEmpty()) "This world needs a password" else "Wrong password") }
+                        Thread { Thread.sleep(300); c.close() }.start()
+                        continue
+                    }
+                    c.authed = true
                     players[c.id] = RemotePlayer(c.id, c.name).also { it.moveTo(game.player.x, game.player.y, game.player.z, 0f) }
                     c.send(Msg.WELCOME) {
                         it.writeInt(c.id); it.writeLong(game.world.seed); it.writeInt(game.level.mode.ordinal)
@@ -147,7 +158,7 @@ class HostSession(private val game: Game, private val worldName: String, private
             val all = ArrayList<Triple<Int, String, FloatArray>>()
             all.add(Triple(0, hostName, floatArrayOf(game.player.x, game.player.y, game.player.z, game.player.yaw)))
             for (r in players.values) all.add(Triple(r.id, r.name, floatArrayOf(r.x, r.y, r.z, r.proxy.yaw)))
-            for (c in clients) if (c.open) c.send(Msg.PLAYERS) { o ->
+            for (c in clients) if (c.open && c.authed) c.send(Msg.PLAYERS) { o ->
                 val others = all.filter { a -> a.first != c.id }
                 o.writeInt(others.size)
                 for ((id, name, p) in others) { o.writeInt(id); o.writeUTF(name); for (v in p) o.writeFloat(v) }
@@ -189,6 +200,9 @@ class HostSession(private val game: Game, private val worldName: String, private
 }
 
 /** A player who joined someone else's world. The host owns the world; we mirror it. */
+/** The host wants a (different) password. */
+class PasswordException(message: String) : java.io.IOException(message)
+
 class ClientSession private constructor(private val conn: Connection) : Session() {
     override val isClient = true
     var myId = 0; var seed = 0L; var mode = GameMode.CREATIVE; var time = 0.3f; var worldName = ""
@@ -198,17 +212,22 @@ class ClientSession private constructor(private val conn: Connection) : Session(
 
     companion object {
         /** Connects and waits for the host's welcome (call off the main thread). */
-        fun connect(address: String, name: String, timeoutMs: Int = 5000): ClientSession {
+        fun connect(address: String, name: String, password: String = "", timeoutMs: Int = 5000): ClientSession {
             val socket = Socket()
             socket.connect(InetSocketAddress(address, Msg.PORT), timeoutMs)
             val inbox = ConcurrentLinkedQueue<Packet>()
             val c = Connection(socket, inbox)
             val s = ClientSession(c)
-            c.send(Msg.HELLO) { it.writeUTF(name) }
+            c.send(Msg.HELLO) { it.writeUTF(name); it.writeUTF(com.vishucraft.game.world.LevelData.hashPassword(password)) }
             val end = System.currentTimeMillis() + timeoutMs
             while (System.currentTimeMillis() < end) {
                 val p = inbox.poll()
                 if (p == null) { Thread.sleep(20); continue }
+                if (p.type == Msg.REJECT) {
+                    val reason = reader(p.data).readUTF()
+                    c.close()
+                    throw PasswordException(reason)
+                }
                 if (p.type == Msg.WELCOME) {
                     val d = reader(p.data)
                     s.myId = d.readInt(); s.seed = d.readLong(); s.mode = GameMode.values()[d.readInt().coerceIn(0, 1)]

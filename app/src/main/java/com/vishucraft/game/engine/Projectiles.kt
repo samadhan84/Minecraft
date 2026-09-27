@@ -96,6 +96,29 @@ class Carts(private val world: World) {
 
     private fun railAt(x: Int, y: Int, z: Int): Int = world.getBlock(x, y, z).let { if (com.vishucraft.game.world.Rails.isRail(it)) it else 0 }
 
+    /** Points a cart along its track in the direction closest to (lookX, lookZ). */
+    fun aim(c: Cart, lookX: Float, lookZ: Float) {
+        val bx = floorInt(c.x); val bz = floorInt(c.z); var by = floorInt(c.y + 0.1f)
+        if (railAt(bx, by, bz) == 0) by -= 1
+        if (railAt(bx, by, bz) == 0) return
+        val exits = com.vishucraft.game.world.Rails.exits(com.vishucraft.game.world.Rails.shape(railAt(bx, by, bz), world.getMeta(bx, by, bz)))
+        val best = exits.maxByOrNull { it[0] * lookX + it[1] * lookZ } ?: return
+        c.hx = best[0].toFloat(); c.hz = best[1].toFloat()
+    }
+
+    /** Get into a cart. A cart that is standing still will head the way you are looking. */
+    fun enter(c: Cart, lookX: Float, lookZ: Float) {
+        riding = c
+        if (c.speed < 0.5f) aim(c, lookX, lookZ)
+    }
+
+    /** The cart right in front of the player (within reach of a jump), if any. */
+    fun nearby(px: Float, py: Float, pz: Float, lookX: Float, lookZ: Float): Cart? = list.filter {
+        val dx = it.x - px; val dz = it.z - pz
+        val d = kotlin.math.sqrt(dx * dx + dz * dz)
+        d < 2.2f && abs(it.y - py) < 1.6f && (d < 0.8f || (dx * lookX + dz * lookZ) / d > 0.2f)
+    }.minByOrNull { (it.x - px) * (it.x - px) + (it.z - pz) * (it.z - pz) }
+
     fun update(dt: Float, game: Game) {
         for (c in list) step(c, dt, game)
         riding?.let { c ->
@@ -131,7 +154,7 @@ class Carts(private val world: World) {
         }
         c.vy = 0f
         val meta = world.getMeta(bx, by, bz)
-        val shape = meta and 15
+        val shape = com.vishucraft.game.world.Rails.shape(rail, meta)
         val exits = com.vishucraft.game.world.Rails.exits(shape)
         // Keep heading along one of the rail's exits (the one not behind us on curves).
         val fx = c.x - (bx + 0.5f); val fz = c.z - (bz + 0.5f)
@@ -157,6 +180,13 @@ class Carts(private val world: World) {
             if (c.speed < 0f) { c.hx = -c.hx; c.hz = -c.hz; c.speed = -c.speed }
         }
         if (rail == Blocks.POWERED_RAIL) {
+            // A cart standing on a powered rail next to a wall is pushed away from the wall;
+            // otherwise it keeps going the way it was already heading.
+            if (meta and 8 != 0 && c.speed < 0.5f) {
+                val front = Blocks.solid[world.getBlock(bx + c.hx.toInt(), by, bz + c.hz.toInt())]
+                val back = Blocks.solid[world.getBlock(bx - c.hx.toInt(), by, bz - c.hz.toInt())]
+                if (front && !back) { c.hx = -c.hx; c.hz = -c.hz }
+            }
             if (meta and 8 != 0) c.speed = minOf(12f, c.speed + 14f * dt).coerceAtLeast(if (c.speed < 0.5f) 2f else 0f)
             else c.speed = maxOf(0f, c.speed - 25f * dt)
         }

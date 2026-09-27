@@ -79,8 +79,8 @@ class DropRenderer {
     /** An open-topped box on wheels. */
     private fun cart(cx: Float, cy: Float, cz: Float, yaw: Float) {
         val c = cos(yaw); val s = sin(yaw)
-        val side = com.vishucraft.game.world.Tiles.id("cart_side")
-        val floor = com.vishucraft.game.world.Tiles.id("cart_floor")
+        val side = com.vishucraft.game.world.Tiles.CART_SIDE
+        val floor = com.vishucraft.game.world.Tiles.CART_FLOOR
         val boxes = listOf(
             floatArrayOf(-0.45f, 0.1f, -0.6f, 0.45f, 0.2f, 0.6f) to floor,
             floatArrayOf(-0.45f, 0.1f, -0.6f, -0.37f, 0.65f, 0.6f) to side,

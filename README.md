@@ -33,9 +33,14 @@ procedurally in code when the game starts. It runs on Android phones, tablets an
   Gliders (swooping moth-wings), Cinder Brutes in the Ember Realm, Void Wisps in the Sky Isles, and villagers.
 - **Building pieces**: doors and trapdoors for every wood type plus iron, fences and gates for every wood, five kinds of stairs, fences and gates, ladders, glass panes
   and iron bars, all with proper collision.
-- **Buttons and pressure plates**: stone and wooden buttons (wooden ones stay pressed longer) in every wood; stone
-  pressure plates (players and mobs), wooden ones (also dropped items) and light / heavy weighted plates whose signal
-  gets stronger the more stands on them.
+- **Buttons and pressure plates**: stone and wooden buttons in every wood stay on for 3 seconds; pressure plates stay
+  on for 2 seconds after you step off. Stone plates notice players and mobs, wooden ones also dropped items, and
+  light / heavy weighted plates give a stronger signal the more stands on them.
+- **World passwords**: when you choose "Save and quit" you can give the world a password (or change / remove it).
+  It is then needed to open the world, to delete it, and for friends to join it over Wi-Fi. Passwords are stored and
+  sent only as a SHA-256 hash.
+- **Minecarts**: place one on a rail (it faces the way you look), jump (Space / ▲) next to it to get in, crouch
+  (Shift / ▼) or tap to get out. Powered rails boost a cart in whatever direction it is already going.
 - **More items**: raw ores and nuggets, quartz, amethyst, blaze rods and powder, ender pearls (throw to teleport),
   eyes of ender, snowballs, eggs, dyes in 16 colours (dye wool at a crafting table), bowls, bottles, name tags, leads,
   saddles, maps, books and quills; shears (shear sheep, cut leaves), fishing rods (fish in any water), shields (block

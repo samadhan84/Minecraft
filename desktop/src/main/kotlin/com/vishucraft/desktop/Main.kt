@@ -68,13 +68,14 @@ const val CONTROLS_HELP =
         "Right mouse: place blocks, use doors, beds, chests, eat, ride minecarts\n" +
         "Space: jump / swim / fly up    ·    Shift: fly down\n" +
         "Double-tap Space or F: fly (Creative)    ·    Ctrl: sprint\n" +
+        "Minecart: place it on a rail, Space next to it to get in, Shift to get out\n" +
         "1-9 or mouse wheel: choose hotbar slot\n" +
         "E: inventory & crafting    ·    Esc: pause menu\n" +
         "F3: FPS & coordinates    ·    F11: fullscreen    ·    F2: screenshot"
 
 class App(private val demo: File?) {
-    private enum class Menu { TITLE, WORLDS, CREATE, JOIN, SETTINGS, CONTROLS, CONFIRM_DELETE }
-    private enum class Overlay { NONE, PAUSE, CREATIVE, CONTAINER, SETTINGS, CONTROLS }
+    private enum class Menu { TITLE, WORLDS, CREATE, JOIN, SETTINGS, CONTROLS, CONFIRM_DELETE, UNLOCK }
+    private enum class Overlay { NONE, PAUSE, CREATIVE, CONTAINER, SETTINGS, CONTROLS, SAVE_QUIT }
 
     private var window = NULL
     private val prefs = Prefs()
@@ -96,6 +97,13 @@ class App(private val demo: File?) {
     private val seedField = Ui.Field("", "Seed (leave empty for random)")
     private var survival = true
     private var deleteTarget: File? = null
+
+    // Passwords
+    private val passwordField = Ui.Field("", "Password", 32, secret = true)
+    private var unlockWorld: WorldInfo? = null
+    private var unlockThen: ((WorldInfo) -> Unit)? = null
+    @Volatile private var joinLocked: String? = null
+    private var joinAddress = ""
 
     // Join form
     private val addressField = Ui.Field("", "Host address, e.g. 192.168.1.23")
@@ -207,6 +215,7 @@ class App(private val demo: File?) {
             Overlay.CONTAINER -> if (!container!!.draw(ui)) closeOverlay()
             Overlay.SETTINGS -> settingsScreen { overlay = Overlay.PAUSE }
             Overlay.CONTROLS -> controlsScreen { overlay = Overlay.PAUSE }
+            Overlay.SAVE_QUIT -> saveQuitScreen(s)
         }
         ui.end()
     }
@@ -372,6 +381,7 @@ class App(private val demo: File?) {
             Menu.JOIN -> joinScreen()
             Menu.SETTINGS -> settingsScreen { menu = Menu.TITLE }
             Menu.CONTROLS -> controlsScreen { menu = Menu.TITLE }
+            Menu.UNLOCK -> unlockScreen()
             Menu.CONFIRM_DELETE -> {
                 val d = deleteTarget
                 val name = d?.let { LevelData.read(it)?.name } ?: "?"
@@ -409,12 +419,13 @@ class App(private val demo: File?) {
             val y = top + i * rowH - worldScroll
             if (y < top - 1 || y + rowH > bottom + 1) continue
             val mode = if (wi.level.mode == GameMode.SURVIVAL) "Survival" else "Creative"
-            if (ui.button("${wi.level.name}  ·  $mode", cx - w / 2, y, w - 110, 42f)) {
+            val lock = if (wi.level.hasPassword) "  ·  (password)" else ""
+            if (ui.button("${wi.level.name}  ·  $mode$lock", cx - w / 2, y, w - 110, 42f)) {
                 message = null
-                startSession(GameSession(wi.dir, wi.level))
+                withPassword(wi) { startSession(GameSession(it.dir, it.level)) }
                 return
             }
-            if (ui.button("Delete", cx + w / 2 - 100, y, 100f, 42f)) { deleteTarget = wi.dir; menu = Menu.CONFIRM_DELETE }
+            if (ui.button("Delete", cx + w / 2 - 100, y, 100f, 42f)) withPassword(wi) { deleteTarget = it.dir; menu = Menu.CONFIRM_DELETE }
         }
         if (ui.button("Create new world", cx - w / 2, ui.height - 70, w / 2 - 5, 44f)) {
             nameField.text = "World ${list.size + 1}"; seedField.text = ""; survival = true
@@ -459,14 +470,68 @@ class App(private val demo: File?) {
         Thread({ hosts = try { Discovery.scan(2500) } catch (_: Exception) { emptyList() }; scanning = false }, "scan").start()
     }
 
-    private fun connect(address: String) {
+    /** Opens (or deletes) a world straight away, or after asking for its password. */
+    private fun withPassword(wi: WorldInfo, then: (WorldInfo) -> Unit) {
+        if (!wi.level.hasPassword) { then(wi); return }
+        unlockWorld = wi; unlockThen = then
+        passwordField.text = ""; ui.focus = passwordField
+        menu = Menu.UNLOCK
+    }
+
+    private fun unlockScreen() {
+        val wi = unlockWorld ?: run { menu = Menu.WORLDS; return }
+        val cx = ui.width / 2; val w = 420f
+        title("\"${wi.level.name}\" is locked", ui.height * 0.25f)
+        ui.text("Type the world's password:", cx - w / 2, ui.height * 0.4f - 26, 16f, rgba(220, 220, 220))
+        ui.field(passwordField, cx - w / 2, ui.height * 0.4f, w)
+        val y = ui.height * 0.4f + 60
+        if (ui.button("OK", cx - w / 2, y, w / 2 - 5, 44f) || ui.takeSubmit()) {
+            if (wi.level.checkPassword(passwordField.text)) {
+                ui.focus = null; menu = Menu.WORLDS; message = null
+                unlockWorld = null
+                unlockThen?.invoke(wi)
+            } else { message = "Wrong password"; passwordField.text = "" }
+        }
+        if (ui.button("Cancel", cx + 5, y, w / 2 - 5, 44f)) { ui.focus = null; message = null; menu = Menu.WORLDS }
+    }
+
+    /** Save and quit, choosing (or changing / removing) the world's password on the way out. */
+    private fun saveQuitScreen(s: GameSession) {
+        val cx = ui.width / 2; val w = 460f
+        ui.rect(0f, 0f, ui.width, ui.height, rgba(0, 0, 0, 170))
+        title("Save and quit", ui.height * 0.18f)
+        val level = s.level
+        val info = if (level.hasPassword) "This world has a password. Type a new one to change it, or leave it empty to keep it."
+            else "Choose a password for this world (optional). It is needed to open it and to join it over Wi-Fi."
+        ui.text(info, cx, ui.height * 0.18f + 56, 16f, rgba(220, 220, 220), 1)
+        var y = ui.height * 0.18f + 110
+        ui.field(passwordField, cx - w / 2, y, w)
+        y += 60
+        fun quit() { ui.focus = null; leaveWorld(); menu = Menu.TITLE }
+        if (ui.button("Save and quit", cx - w / 2, y, w, 44f) || ui.takeSubmit()) {
+            if (passwordField.text.isNotEmpty()) s.level.setPassword(passwordField.text)
+            quit(); return
+        }
+        y += 52
+        if (level.hasPassword && ui.button("Remove the password and quit", cx - w / 2, y, w, 40f)) { s.level.setPassword(""); quit(); return }
+        if (level.hasPassword) y += 48
+        if (ui.button("Cancel", cx - w / 2, y, w, 40f)) { ui.focus = null; overlay = Overlay.PAUSE }
+    }
+
+    private fun connect(address: String, password: String = "") {
         if (joining != null) return
         joining = address
+        joinAddress = address
+        joinLocked = null
         message = null
         val name = prefs.playerName
         Thread({
-            val result = try { ClientSession.connect(address, name) } catch (_: Exception) { null }
-            if (result == null) message = "No game answered at $address. Are both on the same Wi-Fi, and did the host choose \"Open to Wi-Fi\"?"
+            var locked: String? = null
+            val result = try { ClientSession.connect(address, name, password) }
+                catch (e: com.vishucraft.game.net.PasswordException) { locked = e.message ?: "Password needed"; null }
+                catch (_: Exception) { null }
+            if (locked != null) { joinLocked = locked; passwordField.text = "" }
+            else if (result == null) message = "No game answered at $address. Are both on the same Wi-Fi, and did the host choose \"Open to Wi-Fi\"?"
             joined = result
             joining = null
         }, "join").start()
@@ -485,12 +550,19 @@ class App(private val demo: File?) {
             return
         }
         var y = 120f
+        joinLocked?.let { reason ->
+            // The host's world has a password.
+            ui.text("$reason: type the password for $joinAddress", cx, y, 18f, rgba(255, 220, 160), 1)
+            ui.field(passwordField, cx - w / 2, y + 34, w - 130)
+            if (ui.button("Join", cx + w / 2 - 120, y + 34, 120f, 36f) || ui.takeSubmit()) { ui.focus = null; connect(joinAddress, passwordField.text) }
+            y += 90
+        }
         when {
             joining != null -> ui.text("Connecting to $joining…", cx, y, 20f, rgba(220, 220, 220), 1)
             scanning -> ui.text("Looking for games on your Wi-Fi…", cx, y, 20f, rgba(220, 220, 220), 1)
             hosts.isEmpty() -> ui.text("No games found. The host must choose \"Open to Wi-Fi\" in the pause menu.", cx, y, 18f, rgba(220, 220, 220), 1)
             else -> for (h in hosts) {
-                if (ui.button("${h.name}  ·  ${h.players} playing", cx - w / 2, y, w, 42f)) connect(h.address)
+                if (ui.button("${h.name}  ·  ${h.players} playing${if (h.locked) "  ·  (password)" else ""}", cx - w / 2, y, w, 42f)) connect(h.address)
                 y += 50
             }
         }
@@ -500,7 +572,7 @@ class App(private val demo: File?) {
         if (ui.button("Join", cx + w / 2 - 120, y, 120f, 36f, addressField.text.isNotBlank())) connect(addressField.text.trim())
         ui.text("Your name: ${prefs.playerName}", cx - w / 2, y + 50, 16f, rgba(200, 200, 200))
         if (ui.button("Search again", cx - w / 2, ui.height - 70, w / 2 - 5, 44f, !scanning)) scan()
-        if (ui.button("Back", cx + 5, ui.height - 70, w / 2 - 5, 44f)) { ui.focus = null; message = null; menu = Menu.TITLE }
+        if (ui.button("Back", cx + 5, ui.height - 70, w / 2 - 5, 44f)) { ui.focus = null; message = null; joinLocked = null; menu = Menu.TITLE }
     }
 
     private fun settingsScreen(back: () -> Unit) {
@@ -554,7 +626,10 @@ class App(private val demo: File?) {
         }
         b("Settings") { overlay = Overlay.SETTINGS }
         b("Controls") { overlay = Overlay.CONTROLS }
-        b("Save and quit to title") { leaveWorld(); menu = Menu.TITLE }
+        b("Save and quit to title") {
+            if (game.isClient) { leaveWorld(); menu = Menu.TITLE }
+            else { passwordField.text = ""; ui.focus = passwordField; overlay = Overlay.SAVE_QUIT }
+        }
     }
 
     // ---------------------------------------------------------------- input callbacks
@@ -583,7 +658,8 @@ class App(private val demo: File?) {
         if (ui.focus != null) {
             when (key) {
                 GLFW_KEY_BACKSPACE -> ui.backspace()
-                GLFW_KEY_ESCAPE, GLFW_KEY_ENTER, GLFW_KEY_KP_ENTER, GLFW_KEY_TAB -> ui.focus = null
+                GLFW_KEY_ENTER, GLFW_KEY_KP_ENTER -> ui.submitted = true
+                GLFW_KEY_ESCAPE, GLFW_KEY_TAB -> ui.focus = null
                 GLFW_KEY_V -> if (mods and GLFW_MOD_CONTROL != 0) glfwGetClipboardString(window)?.forEach { ui.type(it.code) }
             }
             return
@@ -613,7 +689,7 @@ class App(private val demo: File?) {
                 in GLFW_KEY_1..GLFW_KEY_9 -> input.selectedSlot = key - GLFW_KEY_1
             }
             Overlay.PAUSE -> if (key == GLFW_KEY_ESCAPE) overlay = Overlay.NONE
-            Overlay.SETTINGS, Overlay.CONTROLS -> if (key == GLFW_KEY_ESCAPE) overlay = Overlay.PAUSE
+            Overlay.SETTINGS, Overlay.CONTROLS, Overlay.SAVE_QUIT -> if (key == GLFW_KEY_ESCAPE) { ui.focus = null; overlay = Overlay.PAUSE }
             Overlay.CREATIVE, Overlay.CONTAINER -> when (key) {
                 GLFW_KEY_ESCAPE, GLFW_KEY_E, GLFW_KEY_I -> closeOverlay()
                 in GLFW_KEY_1..GLFW_KEY_9 -> input.selectedSlot = key - GLFW_KEY_1
@@ -728,10 +804,30 @@ class App(private val demo: File?) {
             f == 409 -> shot("04b-creative-items")
             f == 410 -> creative?.tab = 3
             f == 412 -> shot("04c-creative-redstone")
-            f == 413 -> overlay = Overlay.PAUSE
-            f == 415 -> shot("05-pause")
-            f == 417 -> { leaveWorld(); menu = Menu.CREATE; nameField.text = "Demo survival"; seedField.text = "777"; survival = true }
-            f == 419 -> demoCreate = true
+            f == 413 -> {
+                overlay = Overlay.NONE
+                // A short track straight ahead with a minecart on it.
+                session?.game?.let { g ->
+                    val p = g.player
+                    p.pitch = -0.35f
+                    val fx = kotlin.math.round(kotlin.math.sin(p.yaw)).toInt(); val fz = kotlin.math.round(-kotlin.math.cos(p.yaw)).toInt()
+                    val (sx, sz) = if (fx != 0) fx to 0 else 0 to (if (fz == 0) -1 else fz)
+                    val y = com.vishucraft.game.world.floorInt(p.y)
+                    for (i in 2..9) {
+                        val x = com.vishucraft.game.world.floorInt(p.x) + sx * i; val z = com.vishucraft.game.world.floorInt(p.z) + sz * i
+                        g.setBlock(x, y - 1, z, Blocks.STONE); g.setBlock(x, y, z, if (i in 5..6) Blocks.POWERED_RAIL else Blocks.RAIL, if (sx != 0) 1 else 0)
+                        g.setBlock(x, y + 1, z, Blocks.AIR); g.setBlock(x, y + 2, z, Blocks.AIR)
+                    }
+                    g.carts.list.add(com.vishucraft.game.engine.Cart(com.vishucraft.game.world.floorInt(p.x) + sx * 3 + 0.5f, y.toFloat(), com.vishucraft.game.world.floorInt(p.z) + sz * 3 + 0.5f))
+                }
+            }
+            f == 440 -> shot("04d-minecart")
+            f == 441 -> overlay = Overlay.PAUSE
+            f == 443 -> shot("05-pause")
+            f == 444 -> { passwordField.text = "secret"; overlay = Overlay.SAVE_QUIT }
+            f == 446 -> shot("05b-save-and-quit")
+            f == 447 -> { overlay = Overlay.NONE; leaveWorld(); menu = Menu.CREATE; nameField.text = "Demo survival"; seedField.text = "777"; survival = true }
+            f == 449 -> demoCreate = true
             f == 800 -> shot("06-survival-world")
             f == 802 -> session?.let {
                 it.game.inventory.add(com.vishucraft.game.world.Items.find("Minecart"), 1)

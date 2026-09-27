@@ -202,9 +202,22 @@ class LevelData(
     /** Respawn point set by sleeping in a bed (Overworld only). */
     var hasBedSpawn: Boolean = false,
     var bedX: Int = 0, var bedY: Int = 0, var bedZ: Int = 0,
+    /** SHA-256 of the world password ("" = no password). Needed to open the world and to join it over Wi-Fi. */
+    var passwordHash: String = "",
 ) {
+    val hasPassword get() = passwordHash.isNotEmpty()
+    fun checkPassword(password: String) = !hasPassword || hashPassword(password) == passwordHash
+    fun setPassword(password: String) { passwordHash = if (password.isEmpty()) "" else hashPassword(password) }
+
     companion object {
-        private const val VERSION = 4
+        private const val VERSION = 5
+
+        /** Passwords are never stored or sent as plain text. */
+        fun hashPassword(password: String): String {
+            if (password.isEmpty()) return ""
+            val md = java.security.MessageDigest.getInstance("SHA-256")
+            return md.digest("dhruvilcraft:$password".toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it) }
+        }
 
         /** Creative worlds start with a useful hotbar; survival starts empty-handed. */
         fun create(seed: Long, name: String, mode: GameMode): LevelData {
@@ -249,6 +262,7 @@ class LevelData(
                             l.hasBedSpawn = d.readBoolean()
                             l.bedX = d.readInt(); l.bedY = d.readInt(); l.bedZ = d.readInt()
                         }
+                        if (version >= 5) l.passwordHash = d.readUTF()
                     }
                     l.hasPlayer = true
                     l
@@ -279,6 +293,7 @@ class LevelData(
             d.writeBoolean(arriving)
             d.writeBoolean(hasBedSpawn)
             d.writeInt(bedX); d.writeInt(bedY); d.writeInt(bedZ)
+            d.writeUTF(passwordHash)
         }
         tmp.renameTo(f)
     }

@@ -20,6 +20,9 @@ import kotlin.math.sqrt
 class Redstone(private val world: World, private val set: (Int, Int, Int, Int, Int) -> Unit) {
     companion object {
         const val TICK_SECONDS = 0.1f
+        /** Buttons stay pressed for 3 s, pressure plates stay on 2 s after being stepped off. */
+        const val BUTTON_TICKS = 30
+        const val PLATE_HOLD_TICKS = 20
         const val EXTENDED = 8
         private val N = ChunkMesher.NORMALS
     }
@@ -35,6 +38,8 @@ class Redstone(private val world: World, private val set: (Int, Int, Int, Int, I
     /** Supplied by the game: sun brightness and whether something stands on a block. */
     var daylight: () -> Float = { 1f }
     var occupied: (Int, Int, Int) -> Boolean = { _, _, _ -> false }
+    /** Pressure plates that are still counting down after being stepped off (ticks left). */
+    private val plateHold = HashMap<Long, Int>()
     /** How many things stand on a pressure plate (players and mobs; also dropped items when [items]). */
     var plateLoad: (Int, Int, Int, Boolean) -> Int = { x, y, z, _ -> if (occupied(x, y, z)) 1 else 0 }
     private val fuses = HashMap<Long, Int>()
@@ -54,13 +59,13 @@ class Redstone(private val world: World, private val set: (Int, Int, Int, Int, I
     private fun setAt(p: Long, id: Int, meta: Int = 0) = set(RedstoneIds.x(p), RedstoneIds.y(p), RedstoneIds.z(p), id, meta)
     private fun opaqueAt(p: Long) = p >= 0 && Blocks.opaque[id(p)]
 
-    /** Stone buttons stay pressed for 1 second, wooden ones for 1.5 seconds. */
+    /** Every button stays pressed for 3 seconds. */
     fun pressButton(x: Int, y: Int, z: Int) {
         val id = world.getBlock(x, y, z)
         if (!Blocks.isButton(id)) return
         onClick?.invoke(x, y, z)
         set(x, y, z, id, 1)
-        buttons[RedstoneIds.pack(x, y, z)] = if (id == Blocks.STONE_BUTTON) 10 else 15
+        buttons[RedstoneIds.pack(x, y, z)] = BUTTON_TICKS
     }
 
     fun toggleLever(x: Int, y: Int, z: Int) {
@@ -125,10 +130,16 @@ class Redstone(private val world: World, private val set: (Int, Int, Int, Int, I
             val pid = id(p)
             if (!Blocks.isPlate(pid)) continue
             val n = plateLoad(RedstoneIds.x(p), RedstoneIds.y(p), RedstoneIds.z(p), pid != Blocks.PRESSURE_PLATE)
-            val level = when (pid) {
+            var level = when (pid) {
                 Blocks.GOLD_PLATE -> minOf(15, n)
                 Blocks.IRON_PLATE -> minOf(15, (n + 9) / 10)
                 else -> if (n > 0) 15 else 0
+            }
+            // A plate stays on for 2 seconds after the last thing steps off it.
+            if (level > 0) plateHold[p] = PLATE_HOLD_TICKS
+            else {
+                val hold = plateHold[p] ?: 0
+                if (hold > 0) { plateHold[p] = hold - 1; level = meta(p) } else plateHold.remove(p)
             }
             if (level != meta(p)) setAt(p, pid, level)
             if (level > 0) levels[p] = level
