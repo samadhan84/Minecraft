@@ -58,7 +58,7 @@ object Recipes {
             list.add(Recipe(result, count, ing, table, pattern, key))
         }
         val planks = intArrayOf(Blocks.PLANKS, Blocks.SPRUCE_PLANKS, Blocks.BIRCH_PLANKS, Blocks.JUNGLE_PLANKS,
-            Blocks.ACACIA_PLANKS, Blocks.DARK_OAK_PLANKS)
+            Blocks.ACACIA_PLANKS, Blocks.DARK_OAK_PLANKS, Blocks.CHERRY_PLANKS, Blocks.MANGROVE_PLANKS, Blocks.BAMBOO_PLANKS)
         val cobble = intArrayOf(Blocks.COBBLESTONE, Blocks.COBBLED_DEEPSLATE)
         val stick = i("Stick"); val coal = intArrayOf(i("Coal"), i("Charcoal"))
         val iron = i("Iron Ingot"); val gold = i("Gold Ingot"); val diamond = i("Diamond")
@@ -66,7 +66,8 @@ object Recipes {
         // Wood
         for ((log, plank) in listOf(Blocks.LOG to Blocks.PLANKS, Blocks.SPRUCE_LOG to Blocks.SPRUCE_PLANKS,
             Blocks.BIRCH_LOG to Blocks.BIRCH_PLANKS, Blocks.JUNGLE_LOG to Blocks.JUNGLE_PLANKS,
-            Blocks.ACACIA_LOG to Blocks.ACACIA_PLANKS, Blocks.DARK_OAK_LOG to Blocks.DARK_OAK_PLANKS)) r(plank, 4, false, log to 1)
+            Blocks.ACACIA_LOG to Blocks.ACACIA_PLANKS, Blocks.DARK_OAK_LOG to Blocks.DARK_OAK_PLANKS,
+            Blocks.CHERRY_LOG to Blocks.CHERRY_PLANKS, Blocks.MANGROVE_LOG to Blocks.MANGROVE_PLANKS)) r(plank, 4, false, log to 1)
         sh(stick, 4, listOf("M", "M"), 'M' to planks)
         sh(Blocks.CRAFTING_TABLE, 1, listOf("MM", "MM"), 'M' to planks)
         r(Blocks.TORCH, 4, false, coal to 1, stick to 1)
@@ -279,6 +280,46 @@ object Recipes {
         sh(Blocks.PAINTING, 1, listOf("SSS", "SWS", "SSS"), 'S' to stick, 'W' to woolIds.values.toIntArray())
         sh(Blocks.ITEM_FRAME, 1, listOf("SSS", "SLS", "SSS"), 'S' to stick, 'L' to i("Leather"))
         sh(i("Oak Boat"), 1, listOf("P P", "PPP"), 'P' to planks)
+
+        // ---- Pack 3: nature and work blocks
+        val bamboo = Blocks.BAMBOO
+        sh(Blocks.BAMBOO_PLANKS, 2, listOf("BB", "BB"), 'B' to bamboo)
+        sh(stick, 1, listOf("B", "B"), 'B' to bamboo)
+        sh(Blocks.SCAFFOLDING, 6, listOf("BSB", "B B", "B B"), 'B' to bamboo, 'S' to i("String"))
+        sh(i("Bamboo Raft"), 1, listOf("P P", "PPP"), 'P' to Blocks.BAMBOO_PLANKS)
+        sh(Blocks.CUT_COPPER, 4, listOf("CC", "CC"), 'C' to Blocks.COPPER_BLOCK)
+        sh(Blocks.POLISHED_DEEPSLATE, 4, listOf("CC", "CC"), 'C' to Blocks.COBBLED_DEEPSLATE)
+        sh(Blocks.DEEPSLATE_BRICKS, 4, listOf("CC", "CC"), 'C' to Blocks.POLISHED_DEEPSLATE)
+        sh(Blocks.DEEPSLATE_TILES, 4, listOf("CC", "CC"), 'C' to Blocks.DEEPSLATE_BRICKS)
+        sh(Blocks.AMETHYST_BLOCK, 1, listOf("AA", "AA"), 'A' to i("Amethyst Shard"))
+        sh(Blocks.MUD_BRICKS, 4, listOf("MM", "MM"), 'M' to Blocks.MUD)
+        r(Blocks.MUD, 1, false, Blocks.DIRT to 1, i("Water Bucket") to 1)
+        sh(Blocks.HONEYCOMB_BLOCK, 1, listOf("HH", "HH"), 'H' to i("Honeycomb"))
+        sh(Blocks.HONEY_BLOCK, 1, listOf("HH", "HH"), 'H' to i("Honey Bottle"))
+        sh(Blocks.SLIME_BLOCK, 1, listOf("SSS", "SSS", "SSS"), 'S' to i("Slimeball"))
+        r(i("Slimeball"), 9, false, Blocks.SLIME_BLOCK to 1)
+        sh(Blocks.BEE_NEST, 1, listOf("PPP", "HHH", "PPP"), 'P' to planks, 'H' to i("Honeycomb"))
+        sh(Blocks.MOSS_BLOCK, 1, listOf("LL", "LL"), 'L' to intArrayOf(Blocks.LEAVES, Blocks.JUNGLE_LEAVES))
+        val allLogs = intArrayOf(Blocks.LOG, Blocks.SPRUCE_LOG, Blocks.BIRCH_LOG, Blocks.JUNGLE_LOG, Blocks.ACACIA_LOG,
+            Blocks.DARK_OAK_LOG, Blocks.CHERRY_LOG, Blocks.MANGROVE_LOG)
+        sh(Blocks.SMOKER, 1, listOf(" L ", "LFL", " L "), 'L' to allLogs, 'F' to Blocks.FURNACE)
+        sh(Blocks.BLAST_FURNACE, 1, listOf("III", "IFI", "SSS"), 'I' to iron, 'F' to Blocks.FURNACE, 'S' to Blocks.SMOOTH_STONE)
+        sh(Blocks.STONECUTTER, 1, listOf(" I ", "SSS"), 'I' to iron, 'S' to Blocks.STONE)
+        sh(Blocks.GRINDSTONE, 1, listOf("SLS", "P P"), 'S' to stick, 'L' to Blocks.STONE_SLAB, 'P' to planks)
+        sh(Blocks.SMITHING_TABLE, 1, listOf("II", "PP", "PP"), 'I' to iron, 'P' to planks)
+        sh(Blocks.LOOM, 1, listOf("SS", "PP"), 'S' to i("String"), 'P' to planks)
+        sh(Blocks.CARTOGRAPHY_TABLE, 1, listOf("AA", "PP", "PP"), 'A' to i("Paper"), 'P' to planks)
+        sh(Blocks.FLETCHING_TABLE, 1, listOf("FF", "PP", "PP"), 'F' to i("Flint"), 'P' to planks)
+        sh(Blocks.LECTERN, 1, listOf("SSS", " B ", " S "), 'S' to Blocks.OAK_SLAB, 'B' to Blocks.BOOKSHELF)
+        sh(Blocks.DISPENSER, 1, listOf("CCC", "CBC", "CRC"), 'C' to cobble, 'B' to i("Bow"), 'R' to Blocks.REDSTONE_DUST)
+        sh(Blocks.DROPPER, 1, listOf("CCC", "C C", "CRC"), 'C' to cobble, 'R' to Blocks.REDSTONE_DUST)
+        sh(Blocks.TARGET, 1, listOf(" R ", "RHR", " R "), 'R' to Blocks.REDSTONE_DUST, 'H' to Blocks.HAY_BALE)
+        sh(Blocks.SNOW_LAYER, 6, listOf("SSS"), 'S' to Blocks.SNOW)
+        fun dyeOf(c: String) = i("${c.split('_').joinToString(" ") { it.replaceFirstChar { ch -> ch.uppercase() } }} Dye")
+        for ((k, dye) in listOf(0 to "pink", 1 to "blue", 2 to "white", 3 to "light_gray", 4 to "light_gray", 5 to "magenta", 6 to "red")) {
+            r(dyeOf(dye), 1, false, Blocks.FLOWER_FIRST + k to 1)
+        }
+        r(i("Mushroom Stew"), 1, false, Blocks.RED_MUSHROOM to 1, Blocks.BROWN_MUSHROOM to 1, i("Bowl") to 1)
         crafting = list
 
         smelting = mapOf(
@@ -305,6 +346,12 @@ object Recipes {
             i("Raw Chicken") to i("Cooked Chicken"), i("Raw Cod") to i("Cooked Cod"), i("Raw Salmon") to i("Cooked Salmon"),
             i("Raw Rabbit") to i("Cooked Rabbit"),
             i("Potato") to i("Baked Potato"),
+            Blocks.KELP to i("Dried Kelp"),
+            Blocks.CHERRY_LOG to i("Charcoal"), Blocks.MANGROVE_LOG to i("Charcoal"),
+            Blocks.DEEPSLATE_ORE_FIRST to i("Coal"), Blocks.DEEPSLATE_ORE_FIRST + 1 to iron, Blocks.DEEPSLATE_ORE_FIRST + 2 to gold,
+            Blocks.DEEPSLATE_ORE_FIRST + 3 to diamond, Blocks.DEEPSLATE_ORE_FIRST + 5 to i("Lapis Lazuli"),
+            Blocks.DEEPSLATE_BRICKS to Blocks.DEEPSLATE_TILES,
+            Blocks.MUD to Blocks.MUD_BRICKS,
         )
     }
 
@@ -367,12 +414,18 @@ object Drops {
     private val rnd = Random()
 
     /** Pickaxe tier needed to get anything from the block. */
-    fun harvestTier(id: Int): Int = when (id) {
+    fun harvestTier(id: Int): Int = if (Blocks.isDeepslateOre(id)) harvestTier(deepslateBase(id)) else when (id) {
         Blocks.IRON_ORE, Blocks.IRON_BLOCK, Blocks.COPPER_ORE, Blocks.COPPER_BLOCK, Blocks.LAPIS_ORE, Blocks.LAPIS_BLOCK -> 1
         Blocks.GOLD_ORE, Blocks.GOLD_BLOCK, Blocks.DIAMOND_ORE, Blocks.DIAMOND_BLOCK, Blocks.EMERALD_ORE,
         Blocks.EMERALD_BLOCK, Blocks.REDSTONE_ORE -> 2
         Blocks.OBSIDIAN, Blocks.CRYING_OBSIDIAN, Blocks.ANCIENT_DEBRIS, Blocks.NETHERITE_BLOCK -> 3
+        Blocks.EXPOSED_COPPER, Blocks.WEATHERED_COPPER, Blocks.OXIDIZED_COPPER, Blocks.CUT_COPPER -> 1
         else -> 0
+    }
+
+    /** The plain ore a deepslate ore behaves like. */
+    fun deepslateBase(id: Int) = when (id - Blocks.DEEPSLATE_ORE_FIRST) {
+        0 -> Blocks.COAL_ORE; 1 -> Blocks.IRON_ORE; 2 -> Blocks.GOLD_ORE; 3 -> Blocks.DIAMOND_ORE; 4 -> Blocks.REDSTONE_ORE; else -> Blocks.LAPIS_ORE
     }
 
     fun canHarvest(id: Int, tool: ItemDef?): Boolean {
@@ -386,8 +439,18 @@ object Drops {
 
     fun forBlock(id: Int, tool: ItemDef?, meta: Int = 0): List<Pair<Int, Int>> {
         if (!canHarvest(id, tool)) return emptyList()
+        if (Blocks.isDeepslateOre(id)) return forBlock(deepslateBase(id), tool, meta)
         fun one(x: Int) = listOf(x to 1)
         return when (id) {
+            Blocks.BERRY_BUSH -> if (meta >= 2) listOf(i("Sweet Berries") to meta) else one(i("Sweet Berries"))
+            Blocks.SEAGRASS -> if (tool?.name == "Shears") one(id) else emptyList()
+            Blocks.SNOW_LAYER -> one(i("Snowball"))
+            Blocks.RED_MUSHROOM_BLOCK -> listOf(Blocks.RED_MUSHROOM to rnd.nextInt(3))
+            Blocks.BROWN_MUSHROOM_BLOCK -> listOf(Blocks.BROWN_MUSHROOM to rnd.nextInt(3))
+            Blocks.AMETHYST_BLOCK -> if (tool == null) listOf(i("Amethyst Shard") to 4) else one(id)
+            Blocks.CHERRY_LEAVES, Blocks.MANGROVE_LEAVES -> if (tool?.name == "Shears") one(id)
+                else if (rnd.nextInt(100) < 7) one(if (id == Blocks.CHERRY_LEAVES) Blocks.CHERRY_SAPLING else i("Stick")) else emptyList()
+            Blocks.BEE_NEST -> one(Blocks.BEE_NEST)
             Blocks.STONE -> one(Blocks.COBBLESTONE)
             Blocks.DEEPSLATE -> one(Blocks.COBBLED_DEEPSLATE)
             Blocks.GRASS, Blocks.SNOW_GRASS, Blocks.MYCELIUM, Blocks.PODZOL, Blocks.FARMLAND, Blocks.DIRT_PATH -> one(Blocks.DIRT)

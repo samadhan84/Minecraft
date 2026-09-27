@@ -449,6 +449,8 @@ object TextureAtlas {
         "jungle" to Wood(rgb(92, 72, 34), rgb(60, 48, 22), rgb(162, 116, 80), rgb(48, 142, 32)),
         "acacia" to Wood(rgb(106, 100, 92), rgb(72, 68, 62), rgb(172, 92, 50), rgb(104, 132, 42)),
         "dark_oak" to Wood(rgb(62, 48, 30), rgb(40, 30, 18), rgb(70, 46, 22), rgb(42, 92, 26)),
+        "cherry" to Wood(rgb(64, 36, 44), rgb(40, 22, 28), rgb(226, 178, 172), rgb(240, 168, 198)),
+        "mangrove" to Wood(rgb(84, 66, 40), rgb(56, 42, 26), rgb(118, 56, 50), rgb(66, 118, 40)),
     )
 
     private fun speckled(t: Tile, base: Int, spot: Int, spots: Int, amount: Float = 0.06f) {
@@ -1344,6 +1346,188 @@ object TextureAtlas {
         return true
     }
 
+    // ---------------------------------------------------------------- pack 3 (original pixel art)
+
+    /** Colours for spawn eggs: base and spots. */
+    private val EGG_COLORS = mapOf(
+        "cow" to (rgb(68, 50, 38) to rgb(160, 160, 160)), "pig" to (rgb(238, 166, 166) to rgb(200, 110, 110)),
+        "sheep" to (rgb(230, 230, 230) to rgb(250, 180, 180)), "zombie" to (rgb(0, 170, 170) to rgb(110, 140, 90)),
+        "boomling" to (rgb(62, 60, 66) to rgb(240, 124, 34)), "rattler" to (rgb(92, 70, 46) to rgb(80, 140, 60)),
+        "crawler" to (rgb(78, 94, 130) to rgb(255, 190, 60)), "glider" to (rgb(80, 60, 110) to rgb(220, 210, 240)),
+        "cinder" to (rgb(70, 30, 22) to rgb(255, 150, 30)), "wisp" to (rgb(120, 60, 200) to rgb(250, 240, 180)),
+        "villager" to (rgb(90, 60, 50) to rgb(190, 140, 110)), "chicken" to (rgb(230, 230, 230) to rgb(220, 40, 40)),
+        "rabbit" to (rgb(160, 120, 80) to rgb(110, 80, 50)), "horse" to (rgb(190, 140, 90) to rgb(60, 40, 20)),
+        "wolf" to (rgb(214, 210, 206) to rgb(190, 160, 130)), "cat" to (rgb(220, 150, 70) to rgb(120, 70, 40)),
+        "squid" to (rgb(40, 60, 100) to rgb(110, 130, 160)), "cod" to (rgb(190, 170, 130) to rgb(220, 200, 150)),
+        "skeleton" to (rgb(200, 200, 200) to rgb(80, 80, 80)), "slime" to (rgb(110, 190, 90) to rgb(60, 120, 50)),
+        "witch" to (rgb(60, 20, 20) to rgb(80, 160, 50)), "enderman" to (rgb(22, 22, 22) to rgb(10, 10, 10)),
+        "drowned" to (rgb(80, 180, 170) to rgb(120, 100, 60)), "warden" to (rgb(40, 34, 70) to rgb(150, 110, 240)),
+        "iron_golem" to (rgb(210, 205, 195) to rgb(120, 150, 90)), "snow_golem" to (rgb(240, 250, 250) to rgb(230, 130, 30)),
+        "bat" to (rgb(76, 62, 48) to rgb(20, 20, 20)), "fox" to (rgb(214, 124, 50) to rgb(230, 220, 210)),
+        "turtle" to (rgb(230, 230, 220) to rgb(70, 160, 70)), "bee" to (rgb(240, 196, 60) to rgb(60, 40, 20)),
+        "goat" to (rgb(160, 140, 120) to rgb(230, 225, 215)), "frog" to (rgb(210, 120, 60) to rgb(250, 200, 140)),
+        "axolotl" to (rgb(250, 180, 210) to rgb(180, 60, 120)), "parrot" to (rgb(20, 180, 20) to rgb(250, 0, 0)),
+        "panda" to (rgb(230, 230, 230) to rgb(30, 30, 30)), "polar_bear" to (rgb(240, 240, 234) to rgb(150, 150, 146)),
+        "llama" to (rgb(200, 170, 120) to rgb(120, 90, 60)), "mooshroom" to (rgb(160, 20, 20) to rgb(180, 180, 180)),
+    )
+
+    private fun pack3Tile(name: String, t: Tile): Boolean {
+        if (name.startsWith("spawn_egg_")) {
+            val (base, spot) = EGG_COLORS[name.removePrefix("spawn_egg_")] ?: (rgb(200, 200, 200) to rgb(90, 90, 90))
+            mask(t, EGG, base)
+            repeat(6) { val x = 5 + t.rnd.nextInt(6); val y = 5 + t.rnd.nextInt(7); if ((t[x, y] ushr 24) != 0) { t[x, y] = spot; t[x + 1, y] = scale(spot, 0.85f) } }
+            return true
+        }
+        if (name.startsWith("deepslate_") && name.endsWith("_ore")) {
+            val ore = name.removePrefix("deepslate_").removeSuffix("_ore")
+            val c = when (ore) {
+                "coal" -> rgb(30, 30, 30); "iron" -> rgb(216, 176, 146); "gold" -> rgb(250, 214, 64)
+                "diamond" -> rgb(100, 230, 220); "redstone" -> rgb(230, 30, 20); else -> rgb(40, 70, 190)
+            }
+            t.fill { _, y -> scale(rgb(76, 76, 82), (if (y % 4 == 0) 0.8f else 1f) * t.jitter(0.08f)) }
+            repeat(5) {
+                val cx = 2 + t.rnd.nextInt(12); val cy = 2 + t.rnd.nextInt(12)
+                for (i in 0 until 4 + t.rnd.nextInt(3)) { t[cx + t.rnd.nextInt(3) - 1, cy + t.rnd.nextInt(3) - 1] = scale(c, t.jitter(0.12f)) }
+            }
+            return true
+        }
+        val brown = rgb(122, 90, 56)
+        when (name) {
+            // ---- nature
+            "bamboo" -> t.fill { x, y -> if (x in 6..9) (if (y % 6 == 0) rgb(92, 120, 30) else scale(rgb(128, 170, 44), if (x == 6) 0.85f else t.jitter(0.05f))) else if ((x == 10 || x == 11) && y % 6 == 2) rgb(90, 150, 40) else 0 }
+            "bamboo_planks" -> t.fill { x, y -> scale(rgb(206, 186, 90), (if (y % 4 == 0) 0.8f else if (x % 8 == 0) 0.9f else 1f) * t.jitter(0.04f)) }
+            "berry_bush_0", "berry_bush_1", "berry_bush_2", "berry_bush_3" -> {
+                val age = name.last() - '0'
+                leaves(t, rgb(50, 100, 50))
+                for (y in 0 until 16) for (x in 0 until 16) if (y < 4 - age && (t[x, y] ushr 24) != 0) t[x, y] = 0
+                if (age >= 2) repeat(if (age == 3) 12 else 6) { val x = 1 + t.rnd.nextInt(14); val y = 4 + t.rnd.nextInt(11); t[x, y] = rgb(210, 30, 50); t[x + 1, y] = rgb(170, 20, 40) }
+            }
+            "kelp" -> t.fill { x, y -> val c = 7 + (kotlin.math.sin(y * 0.8) * 2).toInt(); if (abs(x - c) <= 1 || (y % 5 == 1 && abs(x - c - 2) <= 1)) scale(rgb(70, 130, 40), t.jitter(0.1f)) else 0 }
+            "seagrass" -> { sprite(t); for (k in 0..4) { val x0 = 2 + k * 3; for (y in 4 + k % 3 until 16) t[x0 + (if (y % 4 < 2) 0 else 1), y] = scale(rgb(60, 140, 50), t.jitter(0.1f)) } }
+            "exposed_copper" -> mineralBlock(t, rgb(160, 126, 104), 1)
+            "weathered_copper" -> { mineralBlock(t, rgb(108, 150, 110), 1); repeat(20) { t[t.rnd.nextInt(16), t.rnd.nextInt(16)] = rgb(150, 110, 80) } }
+            "oxidized_copper" -> mineralBlock(t, rgb(84, 164, 132), 2)
+            "cut_copper" -> t.fill { x, y -> if (x % 8 == 0 || y % 8 == 0) rgb(150, 80, 56) else scale(rgb(194, 110, 78), t.jitter(0.05f)) }
+            "deepslate_bricks" -> t.fill { x, y -> val row = y / 4; if (y % 4 == 0 || (x + row * 4) % 8 == 0) rgb(50, 50, 54) else scale(rgb(84, 84, 90), t.jitter(0.07f)) }
+            "deepslate_tiles" -> t.fill { x, y -> if (y % 4 == 0 || (x + (y / 4) * 2) % 4 == 0) rgb(40, 40, 44) else scale(rgb(70, 70, 76), t.jitter(0.07f)) }
+            "polished_deepslate" -> polished(t, rgb(76, 76, 82))
+            "amethyst_block" -> { val (ids, edge) = voronoi(t.rnd, 7); t.fill { x, y -> if (edge[y][x] < 0.8f) rgb(200, 160, 250) else scale(rgb(140, 100, 200), (0.85f + ids[y][x] * 0.04f) * t.jitter(0.05f)) } }
+            "moss_block" -> { noisy(t, rgb(90, 120, 44), 0.12f, 0.3f); repeat(20) { t[t.rnd.nextInt(16), t.rnd.nextInt(16)] = rgb(110, 146, 56) } }
+            "mud" -> noisy(t, rgb(60, 56, 62), 0.08f, 0.25f)
+            "mud_bricks" -> t.fill { x, y -> val row = y / 4; if (y % 4 == 3 || (x + row * 4) % 8 == 7) rgb(110, 84, 62) else scale(rgb(146, 112, 84), t.jitter(0.05f)) }
+            "dripstone" -> t.fill { x, y -> scale(rgb(134, 108, 92), (if ((x + y / 3) % 5 == 0) 0.85f else 1f) * t.jitter(0.07f)) }
+            "lily_pad" -> t.fill { x, y -> val d = kotlin.math.hypot(x - 7.5, y - 7.5); if (d < 7.3 && !(x in 7..8 && y < 8)) scale(rgb(40, 110, 30), (if (d > 6.3) 0.8f else 1f) * t.jitter(0.06f)) else 0 }
+            "pink_petals" -> { sprite(t); repeat(9) { val x = 1 + t.rnd.nextInt(13); val y = 3 + t.rnd.nextInt(12); t[x, y] = rgb(246, 170, 210); t[x + 1, y] = rgb(236, 140, 190); t[x, y + 1] = rgb(250, 200, 225); t[x + 1, y + 1] = rgb(240, 210, 60) } }
+            "cornflower" -> flower(t, rgb(70, 100, 230))
+            "lily_of_the_valley" -> { flower(t, rgb(246, 246, 240)); t[7, 5] = rgb(246, 246, 240) }
+            "azure_bluet" -> flower(t, rgb(220, 228, 240))
+            "oxeye_daisy" -> flower(t, rgb(250, 250, 250))
+            "allium" -> { flower(t, rgb(190, 100, 230)); for (dy in -1..1) for (dx in -1..1) t[7 + dx, 5 + dy] = rgb(200, 120, 240) }
+            "red_tulip" -> { flower(t, rgb(220, 40, 40)); t[7, 5] = rgb(200, 30, 30); t[7, 3] = rgb(220, 40, 40) }
+            "red_mushroom_block" -> { noisy(t, rgb(190, 40, 36), 0.06f, 0.15f); repeat(5) { val x = t.rnd.nextInt(14); val y = t.rnd.nextInt(14); for (dy in 0..1) for (dx in 0..1) t[x + dx, y + dy] = rgb(236, 230, 220) } }
+            "brown_mushroom_block" -> noisy(t, rgb(148, 108, 78), 0.06f, 0.2f)
+            "mushroom_stem" -> t.fill { x, _ -> scale(rgb(214, 208, 196), (if (x % 5 == 0) 0.9f else 1f) * t.jitter(0.04f)) }
+            "mushroom_stem_top" -> noisy(t, rgb(196, 186, 170), 0.05f, 0.15f)
+            "bee_nest_top" -> t.fill { x, y -> scale(if ((x + y) % 4 == 0) rgb(200, 150, 60) else rgb(226, 180, 80), t.jitter(0.06f)) }
+            "bee_nest_side" -> t.fill { _, y -> scale(if (y % 4 == 0) rgb(190, 140, 50) else rgb(226, 180, 80), t.jitter(0.06f)) }
+            "bee_nest_front", "bee_nest_front_honey" -> {
+                t.fill { _, y -> scale(if (y % 4 == 0) rgb(190, 140, 50) else rgb(226, 180, 80), t.jitter(0.06f)) }
+                for (y in 9..11) for (x in 6..9) t[x, y] = rgb(40, 28, 16)
+                if (name.endsWith("honey")) for ((x, y) in listOf(3 to 3, 4 to 3, 12 to 5, 11 to 6, 4 to 13, 12 to 12)) t[x, y] = rgb(255, 190, 30)
+            }
+            "honeycomb_block" -> mask(t, arrayOf("dmmdmmdmmdmmdmmd", "mllmmllmmllmmllm", "mmmmmmmmmmmmmmmm", "dmmdmmdmmdmmdmmd", "mmdmmdmmdmmdmmdm", "llmmllmmllmmllmm", "mmmmmmmmmmmmmmmm", "mmdmmdmmdmmdmmdm", "dmmdmmdmmdmmdmmd", "mllmmllmmllmmllm", "mmmmmmmmmmmmmmmm", "dmmdmmdmmdmmdmmd", "mmdmmdmmdmmdmmdm", "llmmllmmllmmllmm", "mmmmmmmmmmmmmmmm", "mmdmmdmmdmmdmmdm"), rgb(230, 160, 40))
+            "slime_block" -> t.fill { x, y -> if (x == 0 || y == 0 || x == 15 || y == 15 || (x in 3..12 && (y == 3 || y == 12)) || (y in 3..12 && (x == 3 || x == 12))) withAlpha(rgb(90, 180, 70), 230) else withAlpha(rgb(120, 210, 100), 150) }
+            "honey_block" -> t.fill { x, y -> if (x == 0 || y == 0 || x == 15 || y == 15) withAlpha(rgb(220, 140, 20), 240) else withAlpha(mix(rgb(250, 180, 40), rgb(255, 210, 90), (x + y) / 30f), 190) }
+            "target_top", "target_side" -> t.fill { x, y -> val d = max(abs(x - 7.5f), abs(y - 7.5f)).toInt(); if (name == "target_top") scale(rgb(226, 206, 150), t.jitter(0.05f)) else if (d % 3 == 0 || d < 1) rgb(220, 50, 50) else scale(rgb(240, 236, 226), t.jitter(0.03f)) }
+            "sapling_cherry" -> { sprite(t); for (y in 8 until 16) t[7, y] = rgb(90, 50, 60); for (dy in -3..2) for (dx in -3..3) if (abs(dx) + abs(dy) <= 4) t[7 + dx, 5 + dy] = scale(rgb(240, 168, 198), t.jitter(0.1f)) }
+            // ---- work blocks
+            "smoker_top" -> { stone(t, rgb(100, 100, 100)); for (x in 4..11) for (y in 4..11) t[x, y] = rgb(40, 40, 40) }
+            "smoker_side" -> { logSide(t, rgb(90, 70, 50), rgb(60, 46, 30), false); for (x in 0 until 16) { t[x, 0] = rgb(80, 80, 84); t[x, 15] = rgb(80, 80, 84); t[x, 8] = rgb(80, 80, 84) } }
+            "smoker_front", "smoker_front_on" -> { furnaceFront(t); for (x in 0 until 16) { t[x, 0] = rgb(90, 70, 50); t[x, 1] = rgb(90, 70, 50) }; if (name.endsWith("on")) for (y in 9..13) for (x in 5..10) t[x, y] = if ((x + y) % 2 == 0) rgb(255, 170, 40) else rgb(250, 110, 20) }
+            "blast_furnace_top" -> { stone(t, rgb(140, 140, 144)); bevel(t, rgb(170, 170, 174), rgb(80, 80, 84)) }
+            "blast_furnace_side" -> { noisy(t, rgb(96, 96, 100), 0.05f, 0.15f); for (y in 0 until 16) { t[0, y] = rgb(60, 60, 64); t[15, y] = rgb(60, 60, 64) }; for (x in 0 until 16) t[x, 7] = rgb(130, 130, 136) }
+            "blast_furnace_front", "blast_furnace_front_on" -> {
+                noisy(t, rgb(96, 96, 100), 0.05f, 0.15f)
+                for (y in 8..13) for (x in 4..11) t[x, y] = if (x % 2 == 0) rgb(50, 50, 54) else rgb(30, 30, 34)
+                if (name.endsWith("on")) for (y in 9..13) for (x in 4..11) if (x % 2 == 1) t[x, y] = rgb(255, 150, 40)
+            }
+            "stonecutter_top" -> { stone(t, rgb(150, 150, 150)); for (x in 1..14) { t[x, 7] = rgb(200, 200, 210); t[x, 8] = rgb(90, 90, 96) } }
+            "stonecutter_side" -> t.fill { _, y -> if (y < 7) 0 else scale(rgb(130, 130, 130), t.jitter(0.06f)) }
+            "grindstone" -> noisy(t, rgb(140, 140, 140), 0.06f, 0.15f)
+            "grindstone_side" -> t.fill { x, y -> val d = kotlin.math.hypot(x - 7.5, y - 7.5); if (d < 7.5) scale(rgb(150, 150, 150), (if (d < 2) 0.6f else 1f) * t.jitter(0.05f)) else 0 }
+            "smithing_table_top" -> { noisy(t, rgb(50, 50, 56), 0.06f, 0.15f); bevel(t, rgb(80, 80, 88), rgb(30, 30, 34)) }
+            "smithing_table_side" -> { planks(t, rgb(70, 46, 22)); for (x in 0 until 16) for (y in 0..3) t[x, y] = scale(rgb(50, 50, 56), t.jitter(0.06f)); for (x in 5..10) t[x, 9] = rgb(200, 200, 210) }
+            "loom_top" -> { planks(t, rgb(190, 160, 110)); for (x in 2..13) t[x, 7] = rgb(240, 240, 240) }
+            "loom_side" -> { planks(t, rgb(166, 132, 80)); for (y in 3..12) for (x in 3..12) if (x % 2 == 0) t[x, y] = rgb(230, 230, 230) }
+            "cartography_table_top" -> { t.fill { x, y -> if (x < 2 || y < 2 || x > 13 || y > 13) scale(rgb(70, 46, 22), t.jitter(0.05f)) else scale(rgb(230, 220, 190), t.jitter(0.03f)) }; line(t, 3, 10, 7, 5, rgb(100, 140, 60), false); line(t, 7, 5, 12, 9, rgb(60, 110, 180), false) }
+            "cartography_table_side" -> { planks(t, rgb(70, 46, 22)); for (y in 3..8) for (x in 3..12) t[x, y] = scale(rgb(230, 220, 190), t.jitter(0.03f)) }
+            "fletching_table_top" -> { planks(t, rgb(198, 178, 120)); line(t, 3, 12, 12, 3, rgb(120, 90, 50), false); t[12, 3] = rgb(80, 80, 80); t[3, 12] = rgb(240, 240, 240) }
+            "fletching_table_side" -> { planks(t, rgb(198, 178, 120)); for (x in 0 until 16) t[x, 2] = rgb(60, 60, 60) }
+            "lectern_top" -> { planks(t, brown); for (y in 3..12) for (x in 2..13) t[x, y] = if (x == 7 || x == 8) rgb(180, 160, 130) else scale(rgb(240, 236, 220), t.jitter(0.02f)) }
+            "lectern_side" -> { planks(t, brown); for (y in 0 until 16) for (x in 0 until 16) if (x in 5..10 || y > 13 || y < 2) t[x, y] = scale(rgb(150, 112, 62), t.jitter(0.05f)) }
+            "dispenser_front", "dropper_front" -> {
+                stone(t, rgb(118, 118, 118)); bevel(t, rgb(150, 150, 150), rgb(70, 70, 70))
+                if (name == "dispenser_front") for (y in 5..10) for (x in 5..10) { if (abs(x - 7.5f) + abs(y - 7.5f) < 4f) t[x, y] = rgb(30, 30, 30) }
+                else for (y in 5..10) for (x in 5..10) t[x, y] = if (x in 6..9 && y in 6..9) rgb(30, 30, 30) else rgb(60, 60, 60)
+            }
+            // ---- items
+            "goat_horn" -> { sprite(t); line(t, 3, 12, 8, 8, rgb(210, 200, 170)); line(t, 8, 8, 12, 3, rgb(230, 220, 190)); t[12, 3] = rgb(150, 140, 120) }
+            "raft" -> mask(t, arrayOf("d..........d", "dmmmmmmmmmmd", "dlmlmlmlmlmd", ".dmmmmmmmmd."), rgb(206, 186, 90))
+            "axolotl_bucket", "cod_bucket" -> {
+                bucket(t, true)
+                val c = if (name == "axolotl_bucket") rgb(250, 160, 200) else rgb(190, 160, 110)
+                for (x in 6..9) t[x, 7] = c; t[10, 6] = c; t[10, 8] = c
+            }
+            // ---- mob skins
+            "golem_iron" -> { noisy(t, rgb(210, 205, 195), 0.05f, 0.15f); repeat(5) { val x = t.rnd.nextInt(15); for (y in 0 until 16) if (t.rnd.nextInt(3) == 0) t[x, y] = rgb(100, 140, 60) } }
+            "golem_chest" -> { noisy(t, rgb(210, 205, 195), 0.05f, 0.15f); for (x in 2..13) { t[x, 5] = rgb(150, 145, 140); t[x, 10] = rgb(150, 145, 140) } }
+            "golem_face" -> { animalFace(t, rgb(210, 205, 195), rgb(170, 30, 30), 5, null); for (y in 6..12) t[7, y] = rgb(170, 160, 150); t[8, 12] = rgb(170, 160, 150) }
+            "snow_body" -> noisy(t, rgb(240, 250, 250), 0.02f, 0.06f)
+            "bat_fur" -> noisy(t, rgb(76, 62, 48), 0.1f, 0.2f)
+            "bat_face" -> { animalFace(t, rgb(76, 62, 48), rgb(20, 20, 20), 6, rgb(40, 30, 24), 2); t[2, 0] = rgb(40, 30, 24); t[13, 0] = rgb(40, 30, 24) }
+            "bat_wing" -> t.fill { x, y -> scale(if (x % 5 == 0) rgb(40, 32, 26) else rgb(58, 48, 38), t.jitter(0.08f)) }
+            "fox_fur" -> noisy(t, rgb(214, 124, 50), 0.06f, 0.15f)
+            "fox_leg" -> t.fill { _, y -> scale(if (y > 9) rgb(40, 30, 24) else rgb(214, 124, 50), t.jitter(0.05f)) }
+            "fox_tail" -> t.fill { x, _ -> scale(if (x > 11) rgb(240, 236, 230) else rgb(214, 124, 50), t.jitter(0.05f)) }
+            "fox_face" -> { animalFace(t, rgb(214, 124, 50), rgb(20, 20, 20), 5, rgb(30, 24, 20), 2); for (y in 9..15) for (x in 3..12) if (!(x in 7..8 && y in 9..10)) t[x, y] = scale(rgb(240, 236, 230), t.jitter(0.03f)) }
+            "turtle_shell" -> { val (_, edge) = voronoi(t.rnd, 6); t.fill { x, y -> if (edge[y][x] < 0.9f) rgb(40, 90, 40) else scale(rgb(70, 140, 60), t.jitter(0.08f)) } }
+            "turtle_skin" -> noisy(t, rgb(120, 170, 110), 0.07f, 0.2f)
+            "turtle_face" -> animalFace(t, rgb(120, 170, 110), rgb(10, 10, 10), 5, rgb(90, 130, 80), 4)
+            "bee_body" -> t.fill { x, _ -> scale(if (x % 6 < 2) rgb(50, 36, 20) else rgb(240, 196, 60), t.jitter(0.05f)) }
+            "bee_face" -> { animalFace(t, rgb(240, 196, 60), rgb(20, 20, 30), 6, null, eyeGap = 4); t[5, 1] = rgb(30, 20, 10); t[10, 1] = rgb(30, 20, 10) }
+            "bee_wing" -> t.fill { _, _ -> withAlpha(rgb(220, 240, 250), 170) }
+            "bee_sting" -> noisy(t, rgb(40, 30, 20), 0.05f, 0.1f)
+            "goat_fur" -> noisy(t, rgb(230, 225, 215), 0.05f, 0.15f)
+            "goat_leg" -> t.fill { _, y -> scale(if (y > 12) rgb(80, 70, 60) else rgb(230, 225, 215), t.jitter(0.05f)) }
+            "goat_face" -> { animalFace(t, rgb(230, 225, 215), rgb(200, 160, 40), 5, rgb(170, 150, 140), 4); for (y in 12..15) for (x in 6..9) t[x, y] = rgb(210, 205, 195) }
+            "frog_skin" -> noisy(t, rgb(210, 120, 60), 0.07f, 0.2f)
+            "frog_face" -> { noisy(t, rgb(210, 120, 60), 0.07f, 0.2f); for (x in 3..12) t[x, 11] = rgb(120, 50, 30) }
+            "frog_eye" -> { noisy(t, rgb(210, 120, 60), 0.05f, 0.1f); for (y in 4..11) for (x in 4..11) t[x, y] = if (x in 6..9 && y in 6..9) rgb(10, 10, 10) else rgb(250, 240, 200) }
+            "axolotl_skin" -> noisy(t, rgb(250, 180, 210), 0.04f, 0.1f)
+            "axolotl_face" -> { animalFace(t, rgb(250, 180, 210), rgb(20, 20, 20), 6, null, eyeGap = 5); for (x in 5..10) t[x, 11] = rgb(200, 110, 150) }
+            "axolotl_gill" -> t.fill { x, y -> scale(if ((x + y) % 3 == 0) rgb(200, 60, 120) else rgb(230, 90, 150), t.jitter(0.05f)) }
+            "parrot_red" -> noisy(t, rgb(220, 30, 30), 0.06f, 0.15f)
+            "parrot_wing" -> t.fill { _, y -> scale(when { y < 6 -> rgb(220, 30, 30); y < 11 -> rgb(40, 110, 220); else -> rgb(250, 220, 40) }, t.jitter(0.06f)) }
+            "parrot_face" -> { animalFace(t, rgb(220, 30, 30), rgb(10, 10, 10), 5, null, eyeGap = 4); for (y in 8..13) for (x in 6..9) t[x, y] = if (y > 11 && x in 7..8) rgb(50, 50, 50) else rgb(90, 90, 90) }
+            "panda_white" -> noisy(t, rgb(236, 236, 232), 0.03f, 0.08f)
+            "panda_black" -> noisy(t, rgb(30, 30, 30), 0.06f, 0.1f)
+            "panda_face" -> { noisy(t, rgb(236, 236, 232), 0.03f, 0.08f); for (y in 5..9) { for (x in 2..5) t[x, y] = rgb(30, 30, 30); for (x in 10..13) t[x, y] = rgb(30, 30, 30) }; t[4, 7] = rgb(240, 240, 240); t[11, 7] = rgb(240, 240, 240); for (x in 6..9) t[x, 11] = rgb(30, 30, 30) }
+            "bear_fur" -> noisy(t, rgb(240, 240, 234), 0.04f, 0.1f)
+            "bear_face" -> animalFace(t, rgb(240, 240, 234), rgb(20, 20, 20), 5, rgb(30, 30, 30), 4)
+            "llama_wool" -> { noisy(t, rgb(200, 170, 120), 0.05f, 0.12f); repeat(12) { t[t.rnd.nextInt(16), t.rnd.nextInt(16)] = rgb(180, 150, 100) } }
+            "llama_face" -> animalFace(t, rgb(200, 170, 120), rgb(20, 20, 20), 5, rgb(150, 120, 80), 4)
+            "mooshroom_hide" -> patchy(t, rgb(170, 30, 30), rgb(220, 210, 200), 9, 35)
+            "mooshroom_leg" -> { patchy(t, rgb(170, 30, 30), rgb(220, 210, 200), 5, 35); hoof(t, 3, rgb(52, 42, 36)) }
+            "mooshroom_face" -> {
+                t.fill { x, _ -> if (x in 6..9) scale(rgb(220, 210, 200), t.jitter(0.04f)) else scale(rgb(170, 30, 30), t.jitter(0.05f)) }
+                eyes(t, 6, 3, 11)
+                for (y in 10..15) for (x in 2..13) t[x, y] = scale(rgb(224, 188, 172), t.jitter(0.04f))
+            }
+            else -> return false
+        }
+        return true
+    }
+
     private fun buildingAndRedstone(name: String, t: Tile): Boolean {
         if (blockPack2(name, t)) return true
         if (name.startsWith("bed_")) {
@@ -1483,6 +1667,7 @@ object TextureAtlas {
     // ---------------------------------------------------------------- dispatch
 
     private fun paint(name: String, t: Tile) {
+        if (pack3Tile(name, t)) return
         if (mobSkin(name, t)) return
         if (survivalItem(name, t)) return
         when {

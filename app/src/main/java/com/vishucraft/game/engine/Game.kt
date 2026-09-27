@@ -50,7 +50,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
     private var breakKey = Long.MIN_VALUE
     private var spawned = level.hasPlayer
     private val look = FloatArray(2)
-    private val dir = FloatArray(3)
+    internal val dir = FloatArray(3)
     private val offsets: List<IntArray>
     private var redstoneTimer = 0f
 
@@ -173,7 +173,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
     /** Listener position hook for positional audio. */
     var listener: ((Float, Float, Float, Float) -> Unit)? = null
     fun sound(name: String, x: Float, y: Float, z: Float, gain: Float = 1f) { soundSink?.invoke(name, x, y, z, gain) }
-    private fun blockSound(id: Int, x: Int, y: Int, z: Int, gain: Float = 1f) =
+    internal fun blockSound(id: Int, x: Int, y: Int, z: Int, gain: Float = 1f) =
         sound("mat:$id", x + 0.5f, y + 0.5f, z + 0.5f, gain)
     private var nextStep = 1.7f
     private var digSoundTimer = 0f
@@ -199,7 +199,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
     private var potionRegen = 0f
     private var fishTimer = -1f
     private var fishSlot = -1
-    private var clockSeconds = 0f
+    internal var clockSeconds = 0f
     /** Breath left under water, 0..10 bubbles (drowning starts at 0). */
     var air = 10f
     private var drownTimer = 0f
@@ -260,7 +260,8 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
     /** The horse the player is riding, if any. */
     var mount: Mob? = null
     /** Sheep that were sheared (uid -> time when their wool grows back). */
-    private val sheared = HashMap<Int, Float>()
+    internal val sheared = HashMap<Int, Float>()
+    internal var hornCooldown = 0f
 
     init {
         if (level.hasPlayer) {
@@ -276,6 +277,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
         redstone.onPrime = { x, y, z -> sound("fuse", x + 0.5f, y + 0.5f, z + 0.5f) }
         redstone.onClick = { x, y, z -> sound("click", x + 0.5f, y + 0.5f, z + 0.5f) }
         redstone.onDoor = { x, y, z -> sound("door", x + 0.5f, y + 0.5f, z + 0.5f) }
+        redstone.onActivate = { x, y, z, id -> activated(x, y, z, id) }
         redstone.daylight = { daylight }
         redstone.occupied = { x, y, z -> occupied(x, y, z) }
         redstone.plateLoad = { x, y, z, items -> plateLoad(x, y, z, items) }
@@ -590,7 +592,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
     }
 
     /** Uses up one of the held item (survival only). */
-    private fun consumeHeld(n: Int = 1) {
+    internal fun consumeHeld(n: Int = 1) {
         if (!survival) return
         val s = heldStack() ?: return
         s.count -= n
@@ -598,7 +600,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
     }
 
     /** Wears the held tool; it breaks when worn out. */
-    private fun damageHeld(amount: Int) {
+    internal fun damageHeld(amount: Int) {
         if (!survival) return
         val s = heldStack() ?: return
         val def = Items[s.id] ?: return
@@ -643,6 +645,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
             MobType.ENDERMAN -> listOf(i("Ender Pearl") to r.nextInt(2))
             MobType.DROWNED -> listOf(i("Rotten Flesh") to r.nextInt(3), i("Trident") to (if (r.nextInt(15) == 0) 1 else 0),
                 i("Nautilus Shell") to (if (r.nextInt(30) == 0) 1 else 0), i("Copper Ingot") to (if (r.nextInt(10) == 0) 1 else 0))
+            else -> newMobDrops(m)
         }.filter { it.second > 0 }
     }
 
@@ -704,13 +707,14 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
         for ((pos, e) in world.blockEntities.map) {
             if (e !is FurnaceEntity) continue
             val x = RedstoneIds.x(pos); val y = RedstoneIds.y(pos); val z = RedstoneIds.z(pos)
-            if (!world.isLoaded(x, z) || world.getBlock(x, y, z) != Blocks.FURNACE) continue
+            val block = if (world.isLoaded(x, z)) world.getBlock(x, y, z) else Blocks.AIR
+            if (!Blocks.isFurnace(block)) continue
             val outBefore = e.output?.count ?: 0
-            val lit = e.tick(dt)
+            val lit = e.tick(dt, when (block) { Blocks.SMOKER -> 1; Blocks.BLAST_FURNACE -> 2; else -> 0 })
             if ((e.output?.count ?: 0) > outBefore) addXp(1)
             val meta = world.getMeta(x, y, z)
             val want = if (lit) meta or 8 else meta and 7
-            if (want != meta) setBlock(x, y, z, Blocks.FURNACE, want)
+            if (want != meta) setBlock(x, y, z, block, want)
         }
     }
 
@@ -876,7 +880,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
     }
 
     /** Puts a container (bowl, bottle, bucket) back after using up the held item. */
-    private fun giveBack(name: String) {
+    internal fun giveBack(name: String) {
         if (!survival) return
         val id = Items.find(name)
         val s = heldStack()
@@ -1265,6 +1269,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
             blockSound(Blocks.GRASS, tgt.x, tgt.y + 1, tgt.z, 0.7f)
             return
         }
+        if (pack3Early(tgt, item, sel)) return
         if (mount != null) { dismount(); return }
         if (boats.riding != null) { boats.riding = null; player.y += 0.8f; return }
         // Boats: tap to get in; a sword or axe breaks one back into an item.
@@ -1287,6 +1292,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
         }
         if (item != null && useItem(item)) return
         mobs.raycast(player.x, player.eyeY, player.z, dir[0], dir[1], dir[2], 4f)?.let { m ->
+            if (!isClient && pack3Mob(item, m.mob)) return
             if (item != null && useOnMob(item, m.mob)) return
             if (!isClient && petActions(item, sel, m.mob)) return
         }
@@ -1344,6 +1350,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
             Raycast.cast(world, player.x, player.eyeY, player.z, dir[0], dir[1], dir[2], REACH, hitWater = true)
         } else target
         t ?: return
+        if (pack3Block(t, item, sel)) return
 
         when (t.block) {
             Blocks.LEVER -> { redstone.toggleLever(t.x, t.y, t.z); return }
@@ -1360,7 +1367,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
                 return
             }
             Blocks.HOPPER -> { world.blockEntities.hopper(t.x, t.y, t.z); net?.openContainer(t.x, t.y, t.z, 2); uiEvents.add("open:hopper:${t.x},${t.y},${t.z}"); return }
-            Blocks.FURNACE -> { world.blockEntities.furnace(t.x, t.y, t.z); net?.openContainer(t.x, t.y, t.z, 1); uiEvents.add("open:furnace:${t.x},${t.y},${t.z}"); return }
+            Blocks.FURNACE, Blocks.SMOKER, Blocks.BLAST_FURNACE -> { world.blockEntities.furnace(t.x, t.y, t.z); net?.openContainer(t.x, t.y, t.z, 1); uiEvents.add("open:furnace:${t.x},${t.y},${t.z}"); return }
             Blocks.CHEST, Blocks.BARREL -> { world.blockEntities.chest(t.x, t.y, t.z); net?.openContainer(t.x, t.y, t.z, 0); uiEvents.add("open:chest:${t.x},${t.y},${t.z}"); return }
             Blocks.ENDER_CHEST -> { uiEvents.add("open:ender"); sound("door", t.x + 0.5f, t.y + 0.5f, t.z + 0.5f, 0.5f); return }
             Blocks.ANVIL -> { repairHeld(); return }
@@ -1425,6 +1432,10 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
             return
         }
         place(t, sel)
+        if (sel == Blocks.PUMPKIN || sel == Blocks.JACK_O_LANTERN) {
+            val replace = Blocks[t.block].render == RenderType.CROSS
+            if (replace) checkGolem(t.x, t.y, t.z) else checkGolem(t.x + t.nx, t.y + t.ny, t.z + t.nz)
+        }
     }
 
     /**

@@ -120,6 +120,21 @@ object Synth {
         make("glider", 1.0f) { tone(it, 0, it.size, { t -> 600f + 300f * sin(t * 7f) }, 0.35f, 0.5f, 0.1f, floatArrayOf(1f, 0.4f)) }
         make("ember", 0.7f) { noiseBurst(it, 0, it.size, 0.6f, 0.3f, 0.25f); tone(it, 0, it.size, { t -> 150f + 40f * sin(t * 25f) }, 0.4f, 0.35f) }
 
+        // Pack 3: note block notes (two octaves from F#3, like the classic harp), goat horn and new animals.
+        for (n in 0..24) {
+            val f = 185f * Math.pow(2.0, n / 12.0).toFloat()
+            make("note_$n", 0.7f) { tone(it, 0, it.size, { f }, 0.5f, 0.25f, 0.002f, floatArrayOf(1f, 0.45f, 0.2f, 0.1f)) }
+        }
+        make("goat_horn", 2.2f) { tone(it, 0, it.size, { t -> 220f + 12f * sin(t * 30f) + (if (t < 0.3f) t * 80f else 24f) }, 0.6f, 1.2f, 0.12f, floatArrayOf(1f, 0.8f, 0.6f, 0.4f, 0.3f, 0.2f)) }
+        make("bee", 0.6f) { tone(it, 0, it.size, { t -> 230f + 20f * sin(t * 60f) }, 0.25f, 0.4f, 0.05f, floatArrayOf(1f, 0.8f, 0.6f, 0.5f, 0.4f)) }
+        make("bat", 0.2f) { for (k in 0..2) tone(it, k * 1300, 900, { t -> 3200f - t * 4000f }, 0.2f, 0.02f, 0.002f) }
+        make("goat", 0.6f) { tone(it, 0, it.size, { t -> 450f * (1f + 0.1f * sin(t * 45f)) }, 0.45f, 0.25f, 0.02f, floatArrayOf(1f, 0.7f, 0.5f, 0.3f)) }
+        make("frog", 0.4f) { for (k in 0..1) tone(it, k * 4000, 3500, { t -> 180f + 60f * sin(t * 120f) }, 0.5f, 0.08f, 0.01f, floatArrayOf(1f, 0.9f, 0.5f)) }
+        make("parrot", 0.35f) { for (k in 0..2) tone(it, k * 2400, 2000, { t -> 1500f + 700f * sin(t * 70f) }, 0.3f, 0.05f, 0.003f, floatArrayOf(1f, 0.3f)) }
+        make("fox", 0.3f) { tone(it, 0, it.size, { t -> 800f - t * 1200f }, 0.4f, 0.08f, 0.004f, floatArrayOf(1f, 0.6f, 0.3f)) }
+        make("bear", 1.0f) { tone(it, 0, it.size, { t -> 80f + 20f * sin(t * 9f) }, 0.6f, 0.5f, 0.1f, floatArrayOf(1f, 0.9f, 0.8f, 0.6f)); noiseBurst(it, 0, it.size, 0.3f, 0.4f, 0.1f) }
+        make("llama", 0.5f) { tone(it, 0, it.size, { t -> 300f + 80f * sin(t * 20f) }, 0.4f, 0.25f, 0.03f, floatArrayOf(1f, 0.6f, 0.4f)) }
+
         // Loops.
         make("rain", 2.0f) {
             var lp = 0f

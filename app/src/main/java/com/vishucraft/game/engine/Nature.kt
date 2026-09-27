@@ -30,7 +30,25 @@ class Nature(private val world: World, private val set: (Int, Int, Int, Int, Int
     private fun randomTick(x: Int, y: Int, z: Int, id: Int, meta: Int) {
         when {
             Blocks.isCrop(id) -> if (meta < 7 && rnd.nextFloat() < 0.6f) set(x, y, z, id, meta + 1)
-            Blocks.isSapling(id) -> if (rnd.nextFloat() < 0.15f) growTree(x, y, z, id - Blocks.SAPLING_FIRST)
+            Blocks.isSapling(id) -> if (rnd.nextFloat() < 0.15f) growTree(x, y, z, saplingType(id))
+            id == Blocks.SUGAR_CANE || id == Blocks.CACTUS || id == Blocks.BAMBOO || id == Blocks.KELP -> {
+                // Tall plants grow from their top block.
+                val above = world.getBlock(x, y + 1, z)
+                val room = if (id == Blocks.KELP) above == Blocks.WATER && world.getBlock(x, y + 2, z) == Blocks.WATER else above == Blocks.AIR
+                if (!room || rnd.nextFloat() > (if (id == Blocks.BAMBOO) 0.5f else 0.25f)) return
+                var height = 1
+                while (height < 16 && world.getBlock(x, y - height, z) == id) height++
+                val max = when (id) { Blocks.BAMBOO -> 12; Blocks.KELP -> 10; else -> 3 }
+                if (height < max) set(x, y + 1, z, id, 0)
+            }
+            id == Blocks.BERRY_BUSH -> if (meta < 3 && rnd.nextFloat() < 0.3f) set(x, y, z, id, meta + 1)
+            id == Blocks.COPPER_BLOCK || id == Blocks.EXPOSED_COPPER || id == Blocks.WEATHERED_COPPER ->
+                if (rnd.nextFloat() < 0.02f) set(x, y, z, id.nextCopper(), 0)
+            id == Blocks.BEE_NEST -> if ((meta shr 3) < 5 && rnd.nextFloat() < 0.2f) set(x, y, z, id, (meta and 7) or (((meta shr 3) + 1) shl 3))
+            id == Blocks.MYCELIUM -> {
+                val nx = x + rnd.nextInt(3) - 1; val ny = y + rnd.nextInt(3) - 1; val nz = z + rnd.nextInt(3) - 1
+                if (world.getBlock(nx, ny, nz) == Blocks.DIRT && !Blocks.opaque[world.getBlock(nx, ny + 1, nz)]) set(nx, ny, nz, Blocks.MYCELIUM, 0)
+            }
             id == Blocks.DIRT -> {
                 if (Blocks.opaque[world.getBlock(x, y + 1, z)]) return
                 for (d in 0 until 4) {
@@ -47,7 +65,15 @@ class Nature(private val world: World, private val set: (Int, Int, Int, Int, Int
         val meta = world.getMeta(x, y, z)
         when {
             Blocks.isCrop(id) -> { if (meta >= 7) return false; set(x, y, z, id, minOf(7, meta + 2 + rnd.nextInt(4))) }
-            Blocks.isSapling(id) -> if (rnd.nextFloat() < 0.45f) growTree(x, y, z, id - Blocks.SAPLING_FIRST)
+            Blocks.isSapling(id) -> if (rnd.nextFloat() < 0.45f) growTree(x, y, z, saplingType(id))
+            id == Blocks.BERRY_BUSH -> { if (meta >= 3) return false; set(x, y, z, id, meta + 1) }
+            id == Blocks.BAMBOO || id == Blocks.SUGAR_CANE || id == Blocks.KELP -> {
+                var top = y
+                while (world.getBlock(x, top + 1, z) == id) top++
+                val ok = if (id == Blocks.KELP) world.getBlock(x, top + 1, z) == Blocks.WATER else world.getBlock(x, top + 1, z) == Blocks.AIR
+                if (!ok) return false
+                set(x, top + 1, z, id, 0)
+            }
             id == Blocks.GRASS -> repeat(12) {
                 val fx = x + rnd.nextInt(7) - 3; val fz = z + rnd.nextInt(7) - 3
                 if (world.getBlock(fx, y, fz) == Blocks.GRASS && world.getBlock(fx, y + 1, fz) == Blocks.AIR) {
@@ -59,6 +85,13 @@ class Nature(private val world: World, private val set: (Int, Int, Int, Int, Int
         return true
     }
 
+    private fun Int.nextCopper() = when (this) {
+        Blocks.COPPER_BLOCK -> Blocks.EXPOSED_COPPER; Blocks.EXPOSED_COPPER -> Blocks.WEATHERED_COPPER; else -> Blocks.OXIDIZED_COPPER
+    }
+
+    /** 0 oak, 1 spruce, 2 birch, 3 jungle, 4 acacia, 5 dark oak, 6 cherry. */
+    fun saplingType(id: Int) = if (id == Blocks.CHERRY_SAPLING) 6 else id - Blocks.SAPLING_FIRST
+
     /** Grows a tree of the sapling's wood type if there is room. */
     fun growTree(x: Int, y: Int, z: Int, type: Int): Boolean {
         val (log, leaves) = when (type) {
@@ -67,6 +100,7 @@ class Nature(private val world: World, private val set: (Int, Int, Int, Int, Int
             3 -> Blocks.JUNGLE_LOG to Blocks.JUNGLE_LEAVES
             4 -> Blocks.ACACIA_LOG to Blocks.ACACIA_LEAVES
             5 -> Blocks.DARK_OAK_LOG to Blocks.DARK_OAK_LEAVES
+            6 -> Blocks.CHERRY_LOG to Blocks.CHERRY_LEAVES
             else -> Blocks.LOG to Blocks.LEAVES
         }
         val trunk = when (type) { 1 -> 6 + rnd.nextInt(3); 3 -> 7 + rnd.nextInt(5); else -> 4 + rnd.nextInt(3) }

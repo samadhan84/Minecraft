@@ -286,7 +286,75 @@ object Blocks {
     /** Wall pictures: meta bits 0..2 facing, bits 3..4 which picture. */
     const val PAINTING = 323
     const val ITEM_FRAME = 324
-    const val COUNT = 325
+    // ---- Nature pack (appended so older worlds keep their ids)
+    /** Grows upwards like sugar cane, up to 12 tall. */
+    const val BAMBOO = 325
+    const val BAMBOO_PLANKS = 326
+    /** Meta = age 0..3; berries can be picked from age 2. */
+    const val BERRY_BUSH = 327
+    /** Underwater plants (the block counts as water around them). */
+    const val KELP = 328
+    const val SEAGRASS = 329
+    const val SNOW_LAYER = 330
+    /** Copper turns green over time: exposed, weathered, oxidized. An axe scrapes it back. */
+    const val EXPOSED_COPPER = 331
+    const val WEATHERED_COPPER = 332
+    const val OXIDIZED_COPPER = 333
+    const val CUT_COPPER = 334
+    const val DEEPSLATE_BRICKS = 335
+    const val DEEPSLATE_TILES = 336
+    const val POLISHED_DEEPSLATE = 337
+    /** Deepslate ores: coal, iron, gold, diamond, redstone, lapis (in that order). */
+    const val DEEPSLATE_ORE_FIRST = 338
+    const val AMETHYST_BLOCK = 344
+    const val MOSS_BLOCK = 345
+    const val MUD = 346
+    const val MUD_BRICKS = 347
+    const val DRIPSTONE = 348
+    const val LILY_PAD = 349
+    const val CHERRY_LOG = 350
+    const val CHERRY_PLANKS = 351
+    const val CHERRY_LEAVES = 352
+    const val MANGROVE_LOG = 353
+    const val MANGROVE_PLANKS = 354
+    const val MANGROVE_LEAVES = 355
+    /** Flowers: pink petals, cornflower, lily of the valley, azure bluet, oxeye daisy, allium, red tulip. */
+    const val FLOWER_FIRST = 356
+    const val RED_MUSHROOM_BLOCK = 363
+    const val BROWN_MUSHROOM_BLOCK = 364
+    const val MUSHROOM_STEM = 365
+    /** Meta = honey level 0..5; full nests give honeycomb (shears) or honey (glass bottle). */
+    const val BEE_NEST = 366
+    const val HONEYCOMB_BLOCK = 367
+    // ---- Work blocks
+    const val SMOKER = 368
+    const val BLAST_FURNACE = 369
+    const val STONECUTTER = 370
+    const val GRINDSTONE = 371
+    const val SMITHING_TABLE = 372
+    const val LOOM = 373
+    const val CARTOGRAPHY_TABLE = 374
+    const val FLETCHING_TABLE = 375
+    const val LECTERN = 376
+    /** Fire or drop their contents when powered (meta bits 0..2 facing, bit 3 powered). */
+    const val DISPENSER = 377
+    const val DROPPER = 378
+    const val SLIME_BLOCK = 379
+    const val HONEY_BLOCK = 380
+    const val TARGET = 381
+    const val CHERRY_SAPLING = 382
+    const val COUNT = 383
+
+    val DEEPSLATE_ORES = listOf("coal", "iron", "gold", "diamond", "redstone", "lapis")
+    val FLOWERS = listOf("pink_petals" to "Pink Petals", "cornflower" to "Cornflower", "lily_of_the_valley" to "Lily of the Valley",
+        "azure_bluet" to "Azure Bluet", "oxeye_daisy" to "Oxeye Daisy", "allium" to "Allium", "red_tulip" to "Red Tulip")
+
+    /** Plants that stand in water: the water keeps flowing around them. */
+    fun isWaterPlant(id: Int) = id == KELP || id == SEAGRASS
+    fun isWatery(id: Int) = id == WATER || id == KELP || id == SEAGRASS
+    /** The furnace family: all smelt, the smoker only food and the blast furnace only ores and metal, both twice as fast. */
+    fun isFurnace(id: Int) = id == FURNACE || id == SMOKER || id == BLAST_FURNACE
+    fun isDeepslateOre(id: Int) = id in DEEPSLATE_ORE_FIRST until DEEPSLATE_ORE_FIRST + 6
 
     fun isCarpet(id: Int) = id in CARPET_FIRST until CARPET_FIRST + 16
 
@@ -296,6 +364,8 @@ object Blocks {
         isCarpet(id) -> 0.12f
         id == CAKE -> 0.5f
         id == CAMPFIRE -> 0.45f
+        id == SNOW_LAYER -> 0.15f
+        id == STONECUTTER -> 0.56f
         else -> 1f
     }
     fun isBanner(id: Int) = id in BANNER_FIRST until BANNER_FIRST + 16
@@ -650,6 +720,74 @@ object Blocks {
         extraLight[SKY_PORTAL] = 11
         reg(BlockDef(PISTON_HEAD, "Piston Head", t("piston_front"), t("oak_planks"), render = RenderType.PISTON_HEAD,
             opaque = false, blocksLight = false, hardness = 0.6f, tool = P, category = R, inInventory = false, movable = false))
+
+        // ---- Nature pack
+        plant(BAMBOO, "Bamboo", "bamboo", solid = true, hardness = 0.3f, tool = A)
+        cube(BAMBOO_PLANKS, "Bamboo Planks", "bamboo_planks", 0.8f, A)
+        plant(BERRY_BUSH, "Sweet Berry Bush", "berry_bush_0")
+        for (i in 1..3) t("berry_bush_$i")
+        plant(KELP, "Kelp", "kelp")
+        plant(SEAGRASS, "Seagrass", "seagrass")
+        reg(BlockDef(SNOW_LAYER, "Snow", t("snow"), render = RenderType.BOX, opaque = false, blocksLight = false, hardness = 0.1f,
+            tool = S, category = N, needsSupport = true, box = floatArrayOf(0f, 0f, 0f, 1f, 2 / 16f, 1f)))
+        cube(EXPOSED_COPPER, "Exposed Copper", "exposed_copper", 1.5f, P)
+        cube(WEATHERED_COPPER, "Weathered Copper", "weathered_copper", 1.5f, P)
+        cube(OXIDIZED_COPPER, "Oxidized Copper", "oxidized_copper", 1.5f, P)
+        cube(CUT_COPPER, "Cut Copper", "cut_copper", 1.5f, P)
+        cube(DEEPSLATE_BRICKS, "Deepslate Bricks", "deepslate_bricks", 1.5f, P)
+        cube(DEEPSLATE_TILES, "Deepslate Tiles", "deepslate_tiles", 1.5f, P)
+        cube(POLISHED_DEEPSLATE, "Polished Deepslate", "polished_deepslate", 1.5f, P)
+        for ((i, o) in DEEPSLATE_ORES.withIndex()) cube(DEEPSLATE_ORE_FIRST + i, "Deepslate ${pretty(o)} Ore", "deepslate_${o}_ore", 1.8f, P, N)
+        cube(AMETHYST_BLOCK, "Block of Amethyst", "amethyst_block", 1.0f, P)
+        extraLight[AMETHYST_BLOCK] = 4
+        cube(MOSS_BLOCK, "Moss Block", "moss_block", 0.2f, ToolType.HOE, N)
+        cube(MUD, "Mud", "mud", 0.4f, S, N)
+        cube(MUD_BRICKS, "Mud Bricks", "mud_bricks", 1.0f, P)
+        cube(DRIPSTONE, "Dripstone Block", "dripstone", 1.0f, P, N)
+        reg(BlockDef(LILY_PAD, "Lily Pad", t("lily_pad"), render = RenderType.FLAT, opaque = false, solid = true, hardness = 0f,
+            category = N, movable = false, box = floatArrayOf(0f, 0f, 0f, 1f, 1 / 16f, 1f)))
+        column(CHERRY_LOG, "Cherry Log", "cherry_log_top", "cherry_log", "cherry_log_top", 0.9f, A, N)
+        cube(CHERRY_PLANKS, "Cherry Planks", "cherry_planks", 0.8f, A)
+        leaves(CHERRY_LEAVES, "Cherry Leaves", "cherry_leaves")
+        column(MANGROVE_LOG, "Mangrove Log", "mangrove_log_top", "mangrove_log", "mangrove_log_top", 0.9f, A, N)
+        cube(MANGROVE_PLANKS, "Mangrove Planks", "mangrove_planks", 0.8f, A)
+        leaves(MANGROVE_LEAVES, "Mangrove Leaves", "mangrove_leaves")
+        for ((i, f) in FLOWERS.withIndex()) plant(FLOWER_FIRST + i, f.second, f.first)
+        cube(RED_MUSHROOM_BLOCK, "Red Mushroom Block", "red_mushroom_block", 0.3f, A, N)
+        cube(BROWN_MUSHROOM_BLOCK, "Brown Mushroom Block", "brown_mushroom_block", 0.3f, A, N)
+        column(MUSHROOM_STEM, "Mushroom Stem", "mushroom_stem_top", "mushroom_stem", "mushroom_stem_top", 0.3f, A, N)
+        reg(BlockDef(BEE_NEST, "Bee Nest", t("bee_nest_top"), t("bee_nest_side"), t("bee_nest_top"), hardness = 0.4f, tool = A,
+            category = N, facing = Facing.HORIZONTAL, front = t("bee_nest_front")))
+        t("bee_nest_front_honey")
+        cube(HONEYCOMB_BLOCK, "Honeycomb Block", "honeycomb_block", 0.6f, ToolType.NONE)
+
+        // ---- Work blocks
+        reg(BlockDef(SMOKER, "Smoker", t("smoker_top"), t("smoker_side"), t("smoker_top"), hardness = 1.2f, tool = P,
+            facing = Facing.HORIZONTAL, front = t("smoker_front")))
+        t("smoker_front_on")
+        reg(BlockDef(BLAST_FURNACE, "Blast Furnace", t("blast_furnace_top"), t("blast_furnace_side"), t("blast_furnace_top"),
+            hardness = 1.2f, tool = P, facing = Facing.HORIZONTAL, front = t("blast_furnace_front")))
+        t("blast_furnace_front_on")
+        reg(BlockDef(STONECUTTER, "Stonecutter", t("stonecutter_top"), t("stonecutter_side"), t("smooth_stone"), render = RenderType.BOX,
+            opaque = false, blocksLight = true, hardness = 1.2f, tool = P, box = floatArrayOf(0f, 0f, 0f, 1f, 9 / 16f, 1f)))
+        reg(BlockDef(GRINDSTONE, "Grindstone", t("grindstone"), t("grindstone_side"), t("oak_planks"), render = RenderType.BOX,
+            opaque = false, blocksLight = false, hardness = 1.2f, tool = P, box = floatArrayOf(3 / 16f, 0f, 2 / 16f, 13 / 16f, 12 / 16f, 14 / 16f)))
+        column(SMITHING_TABLE, "Smithing Table", "smithing_table_top", "smithing_table_side", "dark_oak_planks", 1.0f, A)
+        column(LOOM, "Loom", "loom_top", "loom_side", "oak_planks", 0.8f, A)
+        column(CARTOGRAPHY_TABLE, "Cartography Table", "cartography_table_top", "cartography_table_side", "dark_oak_planks", 0.8f, A)
+        column(FLETCHING_TABLE, "Fletching Table", "fletching_table_top", "fletching_table_side", "birch_planks", 0.8f, A)
+        reg(BlockDef(LECTERN, "Lectern", t("lectern_top"), t("lectern_side"), t("oak_planks"), render = RenderType.BOX,
+            opaque = false, blocksLight = false, hardness = 0.8f, tool = A, box = floatArrayOf(1 / 16f, 0f, 1 / 16f, 15 / 16f, 14 / 16f, 15 / 16f)))
+        reg(BlockDef(DISPENSER, "Dispenser", t("furnace_top"), t("furnace_side"), t("furnace_top"), hardness = 1.2f, tool = P,
+            category = R, facing = Facing.ALL, front = t("dispenser_front"), back = t("furnace_side")))
+        reg(BlockDef(DROPPER, "Dropper", t("furnace_top"), t("furnace_side"), t("furnace_top"), hardness = 1.2f, tool = P,
+            category = R, facing = Facing.ALL, front = t("dropper_front"), back = t("furnace_side")))
+        reg(BlockDef(SLIME_BLOCK, "Slime Block", t("slime_block"), opaque = false, translucent = true, blocksLight = false,
+            hardness = 0f, cullSelf = true, category = R))
+        reg(BlockDef(HONEY_BLOCK, "Honey Block", t("honey_block"), opaque = false, translucent = true, blocksLight = false,
+            hardness = 0f, cullSelf = true))
+        column(TARGET, "Target", "target_top", "target_side", "target_top", 0.5f, ToolType.HOE, R)
+        plant(CHERRY_SAPLING, "Cherry Sapling", "sapling_cherry")
     }
 
     private fun pretty(c: String) = c.split('_').joinToString(" ") { it.replaceFirstChar { ch -> ch.uppercase() } }
@@ -678,7 +816,7 @@ object Blocks {
     fun lightLevel(id: Int, meta: Int): Int = when (id) {
         GLOWSTONE, SEA_LANTERN, JACK_O_LANTERN, REDSTONE_LAMP_ON -> 15
         TORCH -> 14
-        FURNACE -> if (meta and 8 != 0) 13 else 0
+        FURNACE, SMOKER, BLAST_FURNACE -> if (meta and 8 != 0) 13 else 0
         CRYING_OBSIDIAN -> 10
         REDSTONE_TORCH -> if (meta == 0) 7 else 0
         MAGMA -> 3
@@ -688,10 +826,10 @@ object Blocks {
 
     fun isLiquid(id: Int) = id == WATER || id == LAVA
     fun isCrop(id: Int) = id == WHEAT_CROP || id == CARROTS || id == POTATOES
-    fun isSapling(id: Int) = id in SAPLING_FIRST until SAPLING_FIRST + 6
+    fun isSapling(id: Int) = id in SAPLING_FIRST until SAPLING_FIRST + 6 || id == CHERRY_SAPLING
 
     fun isEmissive(id: Int, meta: Int): Boolean {
-        if (id == FURNACE) return meta and 8 != 0
+        if (isFurnace(id)) return meta and 8 != 0
         if (!all[id].emissive) return false
         return !(id == REDSTONE_TORCH && meta != 0)
     }
@@ -719,6 +857,8 @@ object Blocks {
             OBSERVER -> if (meta and 8 != 0 && face == ((meta and 7) xor 1)) return Tiles.id("observer_back_on")
             POWERED_RAIL -> return Tiles.id(if (meta and 8 != 0) "powered_rail_on" else "powered_rail")
             RAIL -> return Tiles.id(if ((meta and 15) >= 6) "rail_curve" else "rail")
+            BERRY_BUSH -> return Tiles.id("berry_bush_${meta.coerceIn(0, 3)}")
+            BEE_NEST -> if (face == (meta and 7).let { if (it < 2 || it > 5) 2 else it } && (meta shr 3) >= 5) return Tiles.id("bee_nest_front_honey")
         }
         if (d.render == RenderType.SHAPE) return when (face) { 0 -> d.top; 1 -> d.bottom; else -> d.side }
         if (d.facing != Facing.NONE) {
@@ -726,6 +866,8 @@ object Blocks {
             if (f > 5 || (d.facing == Facing.HORIZONTAL && f < 2)) f = 2
             if (face == f) {
                 if (id == FURNACE && meta and 8 != 0) return Tiles.id("furnace_front_on")
+                if (id == SMOKER && meta and 8 != 0) return Tiles.id("smoker_front_on")
+                if (id == BLAST_FURNACE && meta and 8 != 0) return Tiles.id("blast_furnace_front_on")
                 return if ((id == PISTON || id == STICKY_PISTON) && meta and 8 != 0) Tiles.id("piston_inner") else d.front
             }
             if (d.facing == Facing.ALL) return if (face == (f xor 1)) d.back else d.side

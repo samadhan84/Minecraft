@@ -77,6 +77,8 @@ class Redstone(private val world: World, private val set: (Int, Int, Int, Int, I
     var onPrime: ((Int, Int, Int) -> Unit)? = null
     var onClick: ((Int, Int, Int) -> Unit)? = null
     var onDoor: ((Int, Int, Int) -> Unit)? = null
+    /** A note block, dispenser or dropper was just powered (rising edge). */
+    var onActivate: ((Int, Int, Int, Int) -> Unit)? = null
 
     fun prime(x: Int, y: Int, z: Int, ticks: Int = 40) {
         val p = RedstoneIds.pack(x, y, z)
@@ -280,6 +282,16 @@ class Redstone(private val world: World, private val set: (Int, Int, Int, Int, I
                     else if (!on && extended) retract(p, id, facing)
                 }
                 Blocks.TNT -> if (activated(p)) prime(RedstoneIds.x(p), RedstoneIds.y(p), RedstoneIds.z(p))
+                Blocks.NOTE_BLOCK, Blocks.DISPENSER, Blocks.DROPPER -> {
+                    // Remember the power in a spare meta bit and fire on the rising edge.
+                    val bit = if (id == Blocks.NOTE_BLOCK) 32 else 8
+                    val on = if (id == Blocks.NOTE_BLOCK) activated(p) else activated(p, ignoreFace = (meta and 7).coerceIn(0, 5))
+                    val was = meta and bit != 0
+                    if (on != was) {
+                        setAt(p, id, if (on) meta or bit else meta and bit.inv())
+                        if (on) onActivate?.invoke(RedstoneIds.x(p), RedstoneIds.y(p), RedstoneIds.z(p), id)
+                    }
+                }
                 in openables -> {
                     // Opens on a rising edge, closes on a falling edge; players can still use wooden ones.
                     var on = activated(p)

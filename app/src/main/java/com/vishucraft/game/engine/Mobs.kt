@@ -55,9 +55,35 @@ enum class MobType(
     ENDERMAN("Enderman", 0.3f, 2.9f, 40, true, 3.4f),
     DROWNED("Drowned", 0.3f, 1.95f, 20, true, 2.2f),
     /** The boss of the Sky Isles: a huge winged guardian. */
-    WARDEN("Sky Warden", 1.2f, 1.6f, 200, true, 7f);
+    WARDEN("Sky Warden", 1.2f, 1.6f, 200, true, 7f),
+    // ---- Creature pack 3 (appended)
+    /** Guards villages and players: attacks monsters. */
+    IRON_GOLEM("Iron Golem", 0.6f, 2.7f, 100, false, 1.6f),
+    /** Throws snowballs at monsters; melts in the desert and the rain. */
+    SNOW_GOLEM("Snow Golem", 0.35f, 1.9f, 4, false, 1.4f),
+    BAT("Bat", 0.25f, 0.45f, 6, false, 3.5f),
+    FOX("Fox", 0.3f, 0.7f, 10, false, 3.0f),
+    TURTLE("Turtle", 0.55f, 0.4f, 30, false, 0.9f),
+    BEE("Bee", 0.2f, 0.5f, 10, false, 2.5f),
+    GOAT("Goat", 0.35f, 1.3f, 10, false, 2.0f),
+    FROG("Frog", 0.25f, 0.5f, 10, false, 1.8f),
+    AXOLOTL("Axolotl", 0.3f, 0.4f, 14, false, 2.2f),
+    PARROT("Parrot", 0.2f, 0.9f, 6, false, 3.0f),
+    PANDA("Panda", 0.6f, 1.25f, 20, false, 1.1f),
+    POLAR_BEAR("Polar Bear", 0.65f, 1.4f, 30, false, 2.3f),
+    LLAMA("Llama", 0.45f, 1.87f, 22, false, 1.8f),
+    MOOSHROOM("Mooshroom", 0.45f, 1.4f, 10, false, 1.3f);
 
-    val swims get() = this == SQUID || this == COD
+    val swims get() = this == SQUID || this == COD || this == AXOLOTL
+    /** Fly without gravity. */
+    val flies get() = this == BAT || this == BEE || this == PARROT
+    /** Peaceful until hit, then fight back. */
+    val neutral get() = this == POLAR_BEAR || this == BEE || this == LLAMA || this == GOAT || this == IRON_GOLEM || this == PANDA
+
+    companion object {
+        /** Spawn eggs exist for the first this-many types (item ids are fixed, so later types add eggs separately). */
+        const val WITH_EGGS = 39
+    }
 }
 
 class Mob(val type: MobType, var x: Float, var y: Float, var z: Float, val uid: Int = nextUid++) {
@@ -198,6 +224,14 @@ class Mobs(private val world: World) {
             MobType.HORSE -> name == "Golden Carrot" || name == "Golden Apple"
             MobType.WOLF -> m.tamed && (name == "Steak" || name == "Raw Beef" || name == "Cooked Porkchop" || name == "Cooked Chicken")
             MobType.CAT -> m.tamed && (name == "Raw Cod" || name == "Raw Salmon")
+            MobType.GOAT, MobType.MOOSHROOM -> name == "Wheat"
+            MobType.LLAMA -> slot == Blocks.HAY_BALE
+            MobType.PANDA -> slot == Blocks.BAMBOO
+            MobType.TURTLE -> slot == Blocks.SEAGRASS
+            MobType.BEE -> slot in Blocks.FLOWER_FIRST until Blocks.FLOWER_FIRST + 7 || slot == Blocks.FLOWER_RED || slot == Blocks.FLOWER_YELLOW
+            MobType.FOX -> m.tamed && name == "Sweet Berries"
+            MobType.FROG -> name == "Slimeball"
+            MobType.AXOLOTL -> name == "Raw Cod"
             else -> false
         }
     }
@@ -250,7 +284,8 @@ class Mobs(private val world: World) {
         var speed = m.type.speed
 
         // Pets and animals on a lead follow the player.
-        val follows = (m.leashed || (m.tamed && !m.sitting && (m.type == MobType.WOLF || m.type == MobType.CAT)))
+        if (m.type.flies) { flutter(m, dt, game); return }
+        val follows = (m.leashed || (m.tamed && !m.sitting && (m.type == MobType.WOLF || m.type == MobType.CAT || m.type == MobType.FOX)))
         if (follows) {
             val pl = game.player
             val fx = pl.x - m.x; val fz = pl.z - m.z
@@ -411,7 +446,26 @@ class Mobs(private val world: World) {
                 return
             }
             MobType.WARDEN -> { boss(m, dt, game); return }
-            else -> {
+            MobType.IRON_GOLEM, MobType.SNOW_GOLEM -> {
+                golem(m, dt, game).let { wantX = it.first; wantZ = it.second }
+                if (m.type == MobType.IRON_GOLEM) speed *= if (wantX != 0f || wantZ != 0f) 1.4f else 0.5f
+            }
+            else -> if (m.type.neutral && m.angry && dist < 24f && game.playerAlive && !(m.tamed && m.type == MobType.IRON_GOLEM)) {
+                // Neutral animals fight back once hit.
+                m.yaw = atan2(dx, -dz)
+                if (dist > 1f) { wantX = dx / dist; wantZ = dz / dist }
+                speed *= 1.4f
+                m.attackCooldown -= dt
+                if (dist < 1.4f + m.halfWidth && abs(p.y - m.y) < 1.8f && m.attackCooldown <= 0f) {
+                    m.attackCooldown = 1.2f
+                    game.hurtTarget(p, when (m.type) { MobType.POLAR_BEAR -> 6f; MobType.GOAT -> 3f; MobType.PANDA -> 4f; else -> 2f }, m.x, m.z)
+                }
+                if (dist > 30f) m.angry = false
+            } else if (m.type == MobType.FOX && game.daylight < 0.4f && hunt(m, dt, game, setOf(MobType.CHICKEN, MobType.RABBIT))) {
+                return
+            } else if (m.type == MobType.FROG && hunt(m, dt, game, setOf(MobType.SLIME), smallOnly = true)) {
+                return
+            } else {
                 if (m.fleeTime > 0f) {
                     m.fleeTime -= dt
                     speed *= 1.8f
@@ -432,7 +486,8 @@ class Mobs(private val world: World) {
         // Hop up single blocks; crawlers simply climb; rabbits hop everywhere.
         if (hit && m.type == MobType.CRAWLER && m.moving) m.vy = 3.5f
         else if (hit && m.onGround && m.moving) m.vy = 8.4f
-        else if (m.type == MobType.RABBIT && m.onGround && m.moving) m.vy = 5f
+        else if ((m.type == MobType.RABBIT || m.type == MobType.FROG) && m.onGround && m.moving) m.vy = if (m.type == MobType.FROG) 6f else 5f
+        else if (m.type == MobType.GOAT && m.onGround && m.moving && rnd.nextFloat() < dt * 0.3f) m.vy = 10f
         if (m.moving && m.onGround) m.walkPhase += sqrt(m.vx * m.vx + m.vz * m.vz) * dt * 3.2f
     }
 
@@ -561,6 +616,105 @@ class Mobs(private val world: World) {
         if (m.type == MobType.GLIDER && game.daylight > 0.7f) m.deathTime = 0.9f // fades away at sunrise
     }
 
+    /** Golems: the iron golem punches monsters, the snow golem throws snowballs at them. */
+    private fun golem(m: Mob, dt: Float, game: Game): Pair<Float, Float> {
+        val iron = m.type == MobType.IRON_GOLEM
+        val range = if (iron) 16f else 12f
+        val prey = list.filter { it.type.hostile && !it.dead && !it.tamed && it.type != MobType.WARDEN }
+            .minByOrNull { (it.x - m.x) * (it.x - m.x) + (it.z - m.z) * (it.z - m.z) }
+            ?.takeIf { (it.x - m.x) * (it.x - m.x) + (it.z - m.z) * (it.z - m.z) < range * range }
+        m.attackCooldown -= dt
+        if (!iron) {
+            // Snow golems melt in the rain and in hot places, and leave a trail of snow.
+            val hot = world.generator.biomeAt(floorInt(m.x), floorInt(m.z)).let { it == com.vishucraft.game.world.Biome.DESERT || it == com.vishucraft.game.world.Biome.BADLANDS }
+            if (hot || (game.rain > 0.5f && skyExposed(floorInt(m.x), floorInt(m.y + 2f), floorInt(m.z)))) {
+                m.burnTimer += dt; if (m.burnTimer > 1f) { m.burnTimer = 0f; damage(m, 1f, 0f, 0f) }
+            } else if (m.onGround && rnd.nextFloat() < dt * 2f) {
+                val bx = floorInt(m.x); val by = floorInt(m.y + 0.1f); val bz = floorInt(m.z)
+                if (world.getBlock(bx, by, bz) == Blocks.AIR && Blocks.opaque[world.getBlock(bx, by - 1, bz)]) game.setBlock(bx, by, bz, Blocks.SNOW_LAYER, 0)
+            }
+        }
+        if (prey == null) return wander(m, dt).let { (it.first * 0.6f) to (it.second * 0.6f) }
+        val dx = prey.x - m.x; val dz = prey.z - m.z
+        val d = sqrt(dx * dx + dz * dz).coerceAtLeast(0.01f)
+        m.yaw = atan2(dx, -dz)
+        if (iron) {
+            if (d < 1.8f + prey.halfWidth && m.attackCooldown <= 0f) {
+                m.attackCooldown = 1.4f
+                damage(prey, 10f, dx / d, dz / d); prey.vy = 9f
+                game.sound("hit_stone", prey.x, prey.y + 1f, prey.z)
+            }
+            return if (d > 1.5f) (dx / d) to (dz / d) else 0f to 0f
+        }
+        if (m.attackCooldown <= 0f) {
+            m.attackCooldown = 1.2f
+            val sx = m.x + dx / d; val sy = m.y + 1.5f; val sz = m.z + dz / d
+            val ty = prey.y + prey.height * 0.6f - sy
+            game.projectiles.shoot(sx, sy, sz, dx / d * 16f, ty / d * 16f + d * 0.4f, dz / d * 16f, true, 1f, Projectile.SNOWBALL)
+        }
+        return if (d > 8f) (dx / d) to (dz / d) else if (d < 4f) (-dx / d) to (-dz / d) else 0f to 0f
+    }
+
+    /** Chases the nearest mob of the given kinds. Returns true while hunting. */
+    private fun hunt(m: Mob, dt: Float, game: Game, kinds: Set<MobType>, smallOnly: Boolean = false): Boolean {
+        val prey = list.filter { it.type in kinds && !it.dead && !it.tamed && (!smallOnly || it.scale < 1f) }
+            .minByOrNull { (it.x - m.x) * (it.x - m.x) + (it.z - m.z) * (it.z - m.z) } ?: return false
+        val dx = prey.x - m.x; val dz = prey.z - m.z
+        val d = sqrt(dx * dx + dz * dz)
+        if (d > 10f) return false
+        m.yaw = atan2(dx, -dz)
+        m.attackCooldown -= dt
+        if (d < 1.2f + prey.halfWidth && m.attackCooldown <= 0f) { m.attackCooldown = 1f; damage(prey, 3f, dx / d.coerceAtLeast(0.01f), dz / d.coerceAtLeast(0.01f)) }
+        finishMove(m, dt, dx / d.coerceAtLeast(0.01f), dz / d.coerceAtLeast(0.01f), m.type.speed * 1.3f)
+        return true
+    }
+
+    /** Bats, bees and parrots flutter about; bees sting when angry, tamed parrots follow you. */
+    private fun flutter(m: Mob, dt: Float, game: Game) {
+        m.moving = true
+        m.walkPhase += dt * 14f
+        m.aiTimer -= dt
+        val pl = game.player
+        var tx = Float.NaN; var ty = 0f; var tz = 0f
+        if (m.type == MobType.PARROT && m.tamed && !m.sitting) { tx = pl.x + sin(m.walkPhase * 0.05f) * 1.5f; ty = pl.y + 2.2f; tz = pl.z + cos(m.walkPhase * 0.05f) * 1.5f }
+        if (m.type == MobType.BEE && m.angry && game.playerAlive) {
+            val p = game.nearestTarget(m.x, m.z)
+            tx = p.x; ty = p.y + 1f; tz = p.z
+            val dx = p.x - m.x; val dy = p.y + 1f - m.y; val dz = p.z - m.z
+            m.attackCooldown -= dt
+            if (dx * dx + dy * dy + dz * dz < 1.2f && m.attackCooldown <= 0f) {
+                // A bee stings once and then it is done for.
+                game.hurtTarget(p, 2f, m.x, m.z)
+                m.attackCooldown = 99f; m.angry = false; m.timer = 20f
+            }
+        }
+        if (m.type == MobType.BEE && m.timer > 0f) { m.timer -= dt; if (m.timer <= 0f) damage(m, 100f, 0f, 0f) }
+        if (m.sitting && m.tamed) { m.vx = 0f; m.vz = 0f; m.vy -= 20f * dt; if (!move(m, 1, m.vy * dt)) m.vy = 0f; m.moving = false; return }
+        if (tx.isNaN()) {
+            if (m.aiTimer <= 0f) {
+                m.aiTimer = 0.6f + rnd.nextFloat() * 1.5f
+                m.wanderYaw = rnd.nextFloat() * 6.2832f
+                // Bees and parrots stay a few blocks above the ground; bats roam the caves.
+                val ground = floorInt(m.y)
+                var below = 0
+                while (below < 8 && !Blocks.solid[world.getBlock(floorInt(m.x), ground - below - 1, floorInt(m.z))]) below++
+                m.vy = when { below > 5 -> -1.5f; below < 2 -> 1.5f; else -> (rnd.nextFloat() - 0.5f) * 2f }
+            }
+            val sp = m.type.speed * (if (m.type == MobType.BAT) 1f else 0.6f)
+            m.vx = approach(m.vx, sin(m.wanderYaw) * sp, 6f * dt); m.vz = approach(m.vz, -cos(m.wanderYaw) * sp, 6f * dt)
+        } else {
+            val ex = tx - m.x; val ey = ty - m.y; val ez = tz - m.z
+            val len = sqrt(ex * ex + ey * ey + ez * ez).coerceAtLeast(0.1f)
+            val sp = m.type.speed * (if (len > 8f) 2f else 1f)
+            if (len > 24f && m.type == MobType.PARROT) { m.x = pl.x; m.y = pl.y + 2f; m.z = pl.z }
+            m.vx = approach(m.vx, ex / len * sp, 8f * dt); m.vy = approach(m.vy, ey / len * sp, 8f * dt); m.vz = approach(m.vz, ez / len * sp, 8f * dt)
+        }
+        m.yaw = atan2(m.vx, -m.vz)
+        if (!move(m, 0, m.vx * dt)) m.wanderYaw += 2f
+        if (!move(m, 2, m.vz * dt)) m.wanderYaw += 2f
+        if (!move(m, 1, m.vy * dt)) m.vy = -m.vy * 0.5f
+    }
+
     private fun wander(m: Mob, dt: Float): Pair<Float, Float> {
         m.aiTimer -= dt
         if (m.aiTimer <= 0f) {
@@ -608,6 +762,8 @@ class Mobs(private val world: World) {
     fun voice(t: MobType) = when (t) {
         MobType.WARDEN -> "enderman"
         MobType.DROWNED -> "zombie"; MobType.RABBIT, MobType.SQUID, MobType.COD -> "none"
+        MobType.IRON_GOLEM, MobType.SNOW_GOLEM, MobType.TURTLE, MobType.AXOLOTL -> "none"
+        MobType.MOOSHROOM -> "cow"; MobType.POLAR_BEAR, MobType.PANDA -> "bear"
         else -> t.name.lowercase()
     }
 
@@ -623,7 +779,11 @@ class Mobs(private val world: World) {
         m.hurtTime = 0.35f
         m.vx += kx * 6f; m.vz += kz * 6f
         if (kx != 0f || kz != 0f) m.vy = max(m.vy, 5f)
-        if (!m.type.hostile) m.fleeTime = 5f
+        if (m.type.neutral) {
+            m.angry = true
+            // Bees and polar bears call their friends.
+            if (m.type == MobType.BEE || m.type == MobType.POLAR_BEAR) for (o in list) if (o.type == m.type && (o.x - m.x) * (o.x - m.x) + (o.z - m.z) * (o.z - m.z) < 144f) o.angry = true
+        } else if (!m.type.hostile) m.fleeTime = 5f
         if (m.type == MobType.CRAWLER || m.type == MobType.ENDERMAN) m.angry = true
         if (m.type == MobType.ENDERMAN && m.health > amount && rnd.nextInt(3) == 0) teleportNear(m, m.x, m.z)
         if (m.type == MobType.WISP && m.health > 0f) {
@@ -681,15 +841,40 @@ class Mobs(private val world: World) {
         return Blocks.solid[world.getBlock(x, y - 1, z)]
     }
 
+    private var villagersSeen = 0
+
+    /** Which animal lives where. */
+    private fun animalFor(biome: com.vishucraft.game.world.Biome, ground: Int, y: Int): MobType {
+        val r = rnd.nextInt(12)
+        return when {
+            biome == com.vishucraft.game.world.Biome.MUSHROOM -> MobType.MOOSHROOM
+            ground == Blocks.SAND && y <= 64 && r < 3 -> MobType.TURTLE
+            biome == com.vishucraft.game.world.Biome.SNOW -> when (r) { 0, 1, 2 -> MobType.POLAR_BEAR; 3, 4, 5 -> MobType.FOX; 6, 7 -> MobType.RABBIT; 8, 9 -> MobType.GOAT; else -> MobType.WOLF }
+            y > 88 -> if (r < 8) MobType.GOAT else MobType.LLAMA
+            biome == com.vishucraft.game.world.Biome.JUNGLE -> when (r) { 0, 1, 2, 3 -> MobType.PARROT; 4, 5 -> MobType.PANDA; 6, 7 -> MobType.CHICKEN; else -> MobType.PIG }
+            biome == com.vishucraft.game.world.Biome.SWAMP -> when (r) { 0, 1, 2, 3, 4 -> MobType.FROG; 5, 6 -> MobType.COW; else -> MobType.CHICKEN }
+            biome == com.vishucraft.game.world.Biome.CHERRY -> when (r) { 0, 1, 2, 3 -> MobType.BEE; 4, 5 -> MobType.RABBIT; 6, 7 -> MobType.SHEEP; else -> MobType.PIG }
+            biome == com.vishucraft.game.world.Biome.SAVANNA || biome == com.vishucraft.game.world.Biome.BADLANDS -> when (r) { 0, 1, 2 -> MobType.LLAMA; 3, 4 -> MobType.HORSE; 5 -> MobType.RABBIT; else -> MobType.COW }
+            biome == com.vishucraft.game.world.Biome.DESERT -> MobType.RABBIT
+            biome == com.vishucraft.game.world.Biome.FOREST -> when (r) { 0, 1 -> MobType.FOX; 2 -> MobType.BEE; 3, 4 -> MobType.WOLF; 5, 6 -> MobType.PIG; 7, 8 -> MobType.CHICKEN; else -> MobType.COW }
+            else -> when (r) {
+                0, 1 -> MobType.COW; 2, 3 -> MobType.PIG; 4, 5 -> MobType.SHEEP; 6, 7 -> MobType.CHICKEN
+                8 -> MobType.RABBIT; 9 -> MobType.HORSE; 10 -> if (rnd.nextBoolean()) MobType.BEE else MobType.WOLF; else -> MobType.CAT
+            }
+        }
+    }
+
     private fun trySpawn(game: Game) {
         val p = game.player
-        val passive = list.count { !it.type.hostile && it.type != MobType.VILLAGER }
+        val passive = list.count { !it.type.hostile && it.type != MobType.VILLAGER && it.type != MobType.BAT && it.type != MobType.IRON_GOLEM && !it.tamed }
         val hostile = list.count { it.type.hostile }
 
         // Villagers waiting from world generation.
         while (true) {
             val (x, y, z) = world.pendingVillagers.poll() ?: break
             list.add(Mob(MobType.VILLAGER, x + 0.5f, y.toFloat(), z + 0.5f))
+            // Every few villagers come with an iron golem to guard them.
+            if (++villagersSeen % 4 == 0) list.add(Mob(MobType.IRON_GOLEM, x + 1.5f, y.toFloat(), z + 0.5f))
         }
 
         if (game.dimension == com.vishucraft.game.world.Dimension.SKY && hostileEnabled && !game.level.bossDefeated &&
@@ -716,13 +901,12 @@ class Mobs(private val world: World) {
                 val ground = world.getBlock(x, y, z)
                 if (y > 0 && ground == Blocks.WATER && rnd.nextInt(2) == 0) {
                     // Squid and fish in lakes and seas.
-                    val type = if (rnd.nextInt(3) == 0) MobType.SQUID else MobType.COD
+                    val type = when (rnd.nextInt(8)) { 0, 1 -> MobType.SQUID; 2 -> MobType.AXOLOTL; else -> MobType.COD }
                     repeat(if (type == MobType.COD) 3 else 1) { list.add(Mob(type, x + 0.5f + it * 0.4f, y - 1.5f, z + 0.5f)) }
-                } else if (y > 0 && (ground == Blocks.GRASS || ground == Blocks.SNOW_GRASS || ground == Blocks.SAND) && roomAt(x, y + 1, z, 2)) {
-                    val type = when (rnd.nextInt(12)) {
-                        0, 1 -> MobType.COW; 2, 3 -> MobType.PIG; 4, 5 -> MobType.SHEEP; 6, 7 -> MobType.CHICKEN
-                        8 -> MobType.RABBIT; 9 -> MobType.HORSE; 10 -> MobType.WOLF; else -> MobType.CAT
-                    }
+                } else if (y > 0 && (ground == Blocks.GRASS || ground == Blocks.SNOW_GRASS || ground == Blocks.SAND || ground == Blocks.MYCELIUM ||
+                        ground == Blocks.RED_SAND || ground == Blocks.PODZOL || ground == Blocks.MUD || ground == Blocks.SNOW_LAYER || ground == Blocks.STONE) &&
+                    roomAt(x, y + 1, z, 2)) {
+                    val type = animalFor(world.generator.biomeAt(x, z), ground, y)
                     repeat(1 + rnd.nextInt(3)) {
                         val ox = x + rnd.nextInt(3) - 1; val oz = z + rnd.nextInt(3) - 1
                         val oy = surfaceY(ox, oz)
@@ -732,6 +916,12 @@ class Mobs(private val world: World) {
             }
         }
 
+        // Bats flutter about in dark caves.
+        if (rnd.nextInt(6) == 0 && list.count { it.type == MobType.BAT } < 4) {
+            val (x, z) = ringPoint(p.x, p.z, 10f, 32f)
+            val y = 8 + rnd.nextInt(45)
+            if (world.isLoaded(x, z) && roomAt(x, y, z, 2) && !skyExposed(x, y, z)) list.add(Mob(MobType.BAT, x + 0.5f, y + 0.5f, z + 0.5f))
+        }
         if (hostileEnabled && hostile < 8) {
             val (x, z) = ringPoint(p.x, p.z, 18f, 48f)
             if (!world.isLoaded(x, z)) return

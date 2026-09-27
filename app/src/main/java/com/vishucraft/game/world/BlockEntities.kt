@@ -55,9 +55,13 @@ class FurnaceEntity : BlockEntity() {
 
     companion object { const val SMELT_SECONDS = 4f }
 
-    /** Advances smelting. Returns true while burning. */
-    fun tick(dt: Float): Boolean {
-        val result = input?.let { Recipes.smelting[it.id] }
+    /** Advances smelting. [kind]: 0 furnace, 1 smoker (food only), 2 blast furnace (ores and metal only); the last two are twice as fast. Returns true while burning. */
+    fun tick(dt0: Float, kind: Int = 0): Boolean {
+        val dt = if (kind == 0) dt0 else dt0 * 2f
+        val result = input?.let { Recipes.smelting[it.id] }?.takeIf { r ->
+            val food = (Items[r]?.food ?: 0) > 0
+            when (kind) { 1 -> food; 2 -> Items.displayName(input!!.id).let { n -> n.startsWith("Raw ") || n.endsWith("Ore") || n == "Ancient Debris" }; else -> true }
+        }
         val out = output
         val canOutput = result != null && (out == null || (out.id == result && out.count < Items.maxStack(result)))
         if (burnLeft <= 0f && canOutput) {

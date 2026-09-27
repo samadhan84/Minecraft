@@ -228,7 +228,7 @@ class ChunkMesher {
                 }
                 RenderType.LIQUID -> {
                     val above = block(px, y + 1, pz)
-                    val surface = above != id
+                    val surface = above != id && !(id == Blocks.WATER && Blocks.isWaterPlant(above))
                     // Flowing liquid gets lower the further it is from its source.
                     val h = if (!surface) 1f else if (meta == 0) 0.875f else ((8 - meta.coerceIn(1, 7)) / 9f).coerceAtLeast(0.12f)
                     val out = if (def.translucent) transOut else opaqueOut
@@ -236,6 +236,7 @@ class ChunkMesher {
                         val n = NORMALS[f]
                         val nb = block(px + n[0], y + n[1], pz + n[2])
                         if (nb == id || opaque[nb]) continue
+                        if (id == Blocks.WATER && Blocks.isWaterPlant(nb)) continue
                         if (f != 0 && nb != Blocks.AIR && Blocks[nb].translucent) continue
                         emitFace(out, px, y, pz, f, def.top, emissive, h)
                     }

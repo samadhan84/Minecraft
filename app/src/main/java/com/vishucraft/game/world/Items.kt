@@ -4,6 +4,8 @@ enum class ItemUse {
     NONE, TILL, PATH, IGNITE, BUCKET, WATER_BUCKET, EAT, BOW, GROW, LAVA_BUCKET, CART,
     /** Snowballs, eggs and ender pearls. */
     THROW, DRINK, FISH, SHEAR, COMPASS, CLOCK, SPYGLASS, ROCKET, BOAT,
+    /** Spawn eggs (creative) and the goat horn. */
+    SPAWN, HORN,
 }
 
 /** 0 helmet, 1 chestplate, 2 leggings, 3 boots; -1 when not armor. */
@@ -270,6 +272,16 @@ object Items {
         // ---- Block pack 2 items (appended)
         add("Oak Boat", "boat", use = ItemUse.BOAT, maxStack = 1, fuel = 60f)
         for (d in DISCS) add("Music Disc ($d)", "disc_${d.lowercase()}", maxStack = 1)
+        // ---- Nature and creature pack 3 (appended)
+        add("Goat Horn", "goat_horn", use = ItemUse.HORN, maxStack = 1)
+        add("Bamboo Raft", "raft", use = ItemUse.BOAT, maxStack = 1, fuel = 60f)
+        add("Axolotl Bucket", "axolotl_bucket", use = ItemUse.SPAWN, maxStack = 1)
+        add("Cod Bucket", "cod_bucket", use = ItemUse.SPAWN, maxStack = 1)
+        // Spawn eggs for every creature (creative mode).
+        for (t in com.vishucraft.game.engine.MobType.values().take(com.vishucraft.game.engine.MobType.WITH_EGGS)) {
+            if (t == com.vishucraft.game.engine.MobType.EXPLORER) continue
+            add("${t.displayName} Spawn Egg", "spawn_egg_${t.name.lowercase()}", use = ItemUse.SPAWN)
+        }
 
         all = list
         for (i in all) { byId[i.id] = i; byName[i.name] = i.id }
@@ -286,6 +298,16 @@ object Items {
     fun find(name: String): Int = byName[name] ?: error("unknown item $name")
 
     fun maxStack(slot: Int): Int = get(slot)?.maxStack ?: 64
+
+    /** The creature a spawn egg or mob bucket places. */
+    fun spawnType(slot: Int): com.vishucraft.game.engine.MobType? {
+        val name = get(slot)?.name ?: return null
+        return when (name) {
+            "Axolotl Bucket" -> com.vishucraft.game.engine.MobType.AXOLOTL
+            "Cod Bucket" -> com.vishucraft.game.engine.MobType.COD
+            else -> com.vishucraft.game.engine.MobType.values().firstOrNull { "${it.displayName} Spawn Egg" == name }
+        }
+    }
 
     /** Furnace fuel seconds for any slot value (logs and planks burn too). */
     fun fuel(slot: Int): Float {

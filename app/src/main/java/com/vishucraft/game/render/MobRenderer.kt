@@ -194,6 +194,97 @@ object MobModels {
             box(-0.3f, 1.1f, -0.3f, 0.3f, 1.2f, 0.3f, tiles("boomling_shell")),
             box(-0.05f, 1.2f, -0.05f, 0.05f, 1.45f, 0.05f, tiles("boomling_fuse")),
         ) + legs(0.22f, 0.22f, 0.25f, 0.35f, "boomling_leg"),
+        // ---- Creature pack 3
+        MobType.IRON_GOLEM to listOf(
+            box(-0.3f, 0f, -0.15f, -0.05f, 1.0f, 0.15f, tiles("golem_iron"), 1),
+            box(0.05f, 0f, -0.15f, 0.3f, 1.0f, 0.15f, tiles("golem_iron"), -1),
+            box(-0.55f, 1.0f, -0.3f, 0.55f, 2.1f, 0.3f, tiles("golem_iron", front = "golem_chest")),
+            box(-0.22f, 2.0f, -0.35f, 0.22f, 2.6f, 0.1f, tiles("golem_iron", front = "golem_face")),
+            box(-0.8f, 0.3f, -0.15f, -0.55f, 2.05f, 0.15f, tiles("golem_iron"), -1, pivotY = 2.0f),
+            box(0.55f, 0.3f, -0.15f, 0.8f, 2.05f, 0.15f, tiles("golem_iron"), 1, pivotY = 2.0f),
+        ),
+        MobType.SNOW_GOLEM to listOf(
+            box(-0.35f, 0f, -0.35f, 0.35f, 0.7f, 0.35f, tiles("snow_body")),
+            box(-0.28f, 0.7f, -0.28f, 0.28f, 1.25f, 0.28f, tiles("snow_body")),
+            box(-0.25f, 1.25f, -0.25f, 0.25f, 1.75f, 0.25f, tiles("pumpkin_side", front = "jack_o_lantern_front", top = "pumpkin_top")),
+            box(-0.75f, 1.0f, -0.03f, -0.28f, 1.06f, 0.03f, tiles("oak_log")),
+            box(0.28f, 1.0f, -0.03f, 0.75f, 1.06f, 0.03f, tiles("oak_log")),
+        ),
+        MobType.BAT to listOf(
+            box(-0.12f, 0.1f, -0.12f, 0.12f, 0.4f, 0.12f, tiles("bat_fur", front = "bat_face")),
+            box(-0.55f, 0.25f, -0.08f, -0.12f, 0.28f, 0.15f, tiles("bat_wing"), 1, pivotY = 0.26f),
+            box(0.12f, 0.25f, -0.08f, 0.55f, 0.28f, 0.15f, tiles("bat_wing"), -1, pivotY = 0.26f),
+        ),
+        MobType.FOX to listOf(
+            box(-0.16f, 0.3f, -0.35f, 0.16f, 0.58f, 0.3f, tiles("fox_fur")),
+            box(-0.18f, 0.35f, -0.62f, 0.18f, 0.68f, -0.35f, tiles("fox_fur", front = "fox_face")),
+            box(-0.16f, 0.68f, -0.52f, -0.06f, 0.8f, -0.45f, tiles("fox_fur")),
+            box(0.06f, 0.68f, -0.52f, 0.16f, 0.8f, -0.45f, tiles("fox_fur")),
+            box(-0.09f, 0.3f, 0.3f, 0.09f, 0.48f, 0.75f, tiles("fox_tail")),
+        ) + legs(0.1f, 0.22f, 0.08f, 0.3f, "fox_leg"),
+        MobType.TURTLE to listOf(
+            box(-0.55f, 0.1f, -0.5f, 0.55f, 0.4f, 0.5f, tiles("turtle_shell")),
+            box(-0.15f, 0.12f, -0.8f, 0.15f, 0.35f, -0.5f, tiles("turtle_skin", front = "turtle_face")),
+        ) + legs(0.5f, 0.35f, 0.18f, 0.12f, "turtle_skin"),
+        MobType.BEE to listOf(
+            box(-0.15f, 0.12f, -0.25f, 0.15f, 0.42f, 0.25f, tiles("bee_body", front = "bee_face")),
+            box(-0.35f, 0.42f, -0.05f, -0.02f, 0.44f, 0.2f, tiles("bee_wing"), 1, pivotY = 0.43f),
+            box(0.02f, 0.42f, -0.05f, 0.35f, 0.44f, 0.2f, tiles("bee_wing"), -1, pivotY = 0.43f),
+            box(-0.02f, 0.2f, 0.25f, 0.02f, 0.24f, 0.33f, tiles("bee_sting")),
+        ),
+        MobType.GOAT to listOf(
+            box(-0.3f, 0.55f, -0.45f, 0.3f, 1.05f, 0.45f, tiles("goat_fur")),
+            box(-0.16f, 0.9f, -0.78f, 0.16f, 1.3f, -0.45f, tiles("goat_fur", front = "goat_face")),
+            box(-0.14f, 1.3f, -0.62f, -0.06f, 1.55f, -0.54f, tiles("horn")),
+            box(0.06f, 1.3f, -0.62f, 0.14f, 1.55f, -0.54f, tiles("horn")),
+            box(-0.05f, 0.7f, -0.8f, 0.05f, 0.9f, -0.72f, tiles("goat_fur")),
+        ) + legs(0.18f, 0.3f, 0.14f, 0.55f, "goat_leg"),
+        MobType.FROG to listOf(
+            box(-0.22f, 0.05f, -0.28f, 0.22f, 0.3f, 0.22f, tiles("frog_skin", front = "frog_face")),
+            box(-0.2f, 0.3f, -0.26f, -0.06f, 0.4f, -0.14f, tiles("frog_eye")),
+            box(0.06f, 0.3f, -0.26f, 0.2f, 0.4f, -0.14f, tiles("frog_eye")),
+        ) + legs(0.2f, 0.18f, 0.1f, 0.08f, "frog_skin"),
+        MobType.AXOLOTL to listOf(
+            box(-0.15f, 0.05f, -0.3f, 0.15f, 0.28f, 0.25f, tiles("axolotl_skin")),
+            box(-0.2f, 0.05f, -0.55f, 0.2f, 0.32f, -0.3f, tiles("axolotl_skin", front = "axolotl_face")),
+            box(-0.3f, 0.2f, -0.45f, -0.2f, 0.4f, -0.4f, tiles("axolotl_gill")),
+            box(0.2f, 0.2f, -0.45f, 0.3f, 0.4f, -0.4f, tiles("axolotl_gill")),
+            box(-0.02f, 0.08f, 0.25f, 0.02f, 0.3f, 0.6f, tiles("axolotl_skin"), 1),
+        ) + legs(0.18f, 0.2f, 0.06f, 0.06f, "axolotl_skin"),
+        MobType.PARROT to listOf(
+            box(-0.12f, 0.3f, -0.12f, 0.12f, 0.7f, 0.12f, tiles("parrot_red")),
+            box(-0.1f, 0.65f, -0.2f, 0.1f, 0.88f, 0.06f, tiles("parrot_red", front = "parrot_face")),
+            box(-0.22f, 0.4f, -0.08f, -0.12f, 0.68f, 0.12f, tiles("parrot_wing"), 1, pivotY = 0.68f),
+            box(0.12f, 0.4f, -0.08f, 0.22f, 0.68f, 0.12f, tiles("parrot_wing"), -1, pivotY = 0.68f),
+            box(-0.06f, 0.1f, 0.05f, 0.06f, 0.3f, 0.2f, tiles("parrot_wing")),
+        ),
+        MobType.PANDA to listOf(
+            box(-0.55f, 0.45f, -0.75f, 0.55f, 1.2f, 0.75f, tiles("panda_white", top = "panda_black")),
+            box(-0.35f, 0.55f, -1.15f, 0.35f, 1.1f, -0.75f, tiles("panda_white", front = "panda_face")),
+            box(-0.35f, 1.1f, -1.0f, -0.2f, 1.25f, -0.9f, tiles("panda_black")),
+            box(0.2f, 1.1f, -1.0f, 0.35f, 1.25f, -0.9f, tiles("panda_black")),
+        ) + legs(0.35f, 0.5f, 0.3f, 0.45f, "panda_black"),
+        MobType.POLAR_BEAR to listOf(
+            box(-0.55f, 0.55f, -0.8f, 0.55f, 1.35f, 0.8f, tiles("bear_fur")),
+            box(-0.3f, 0.75f, -1.25f, 0.3f, 1.25f, -0.8f, tiles("bear_fur", front = "bear_face")),
+            box(-0.3f, 1.25f, -1.05f, -0.15f, 1.38f, -0.95f, tiles("bear_fur")),
+            box(0.15f, 1.25f, -1.05f, 0.3f, 1.38f, -0.95f, tiles("bear_fur")),
+        ) + legs(0.35f, 0.55f, 0.28f, 0.55f, "bear_fur"),
+        MobType.LLAMA to listOf(
+            box(-0.35f, 0.8f, -0.55f, 0.35f, 1.35f, 0.6f, tiles("llama_wool")),
+            box(-0.12f, 1.2f, -0.72f, 0.12f, 1.95f, -0.5f, tiles("llama_wool")),
+            box(-0.15f, 1.7f, -1.0f, 0.15f, 1.98f, -0.55f, tiles("llama_wool", front = "llama_face")),
+            box(-0.14f, 1.98f, -0.65f, -0.06f, 2.12f, -0.58f, tiles("llama_wool")),
+            box(0.06f, 1.98f, -0.65f, 0.14f, 2.12f, -0.58f, tiles("llama_wool")),
+        ) + legs(0.2f, 0.4f, 0.14f, 0.8f, "llama_wool"),
+        MobType.MOOSHROOM to listOf(
+            box(-0.45f, 0.6f, -0.65f, 0.45f, 1.35f, 0.65f, tiles("mooshroom_hide")),
+            box(-0.28f, 1.0f, -1.05f, 0.28f, 1.5f, -0.65f, tiles("mooshroom_hide", front = "mooshroom_face")),
+            box(-0.32f, 1.45f, -0.95f, -0.2f, 1.6f, -0.85f, tiles("horn")),
+            box(0.2f, 1.45f, -0.95f, 0.32f, 1.6f, -0.85f, tiles("horn")),
+            box(-0.2f, 1.35f, -0.2f, 0.0f, 1.55f, 0.0f, tiles("red_mushroom_block")),
+            box(0.1f, 1.35f, 0.2f, 0.3f, 1.55f, 0.4f, tiles("red_mushroom_block")),
+        ) + legs(0.25f, 0.45f, 0.22f, 0.6f, "mooshroom_leg"),
     )
 }
 

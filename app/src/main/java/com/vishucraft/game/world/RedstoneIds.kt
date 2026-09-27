@@ -15,6 +15,7 @@ object RedstoneIds {
             Blocks.REDSTONE_LAMP_ON, Blocks.PISTON, Blocks.STICKY_PISTON, Blocks.REDSTONE_BLOCK, Blocks.TNT,
             Blocks.OAK_DOOR, Blocks.IRON_DOOR, Blocks.OAK_TRAPDOOR, Blocks.OAK_FENCE_GATE, Blocks.REPEATER, Blocks.OBSERVER,
             Blocks.DAYLIGHT_SENSOR, Blocks.PRESSURE_PLATE, Blocks.POWERED_RAIL,
+            Blocks.NOTE_BLOCK, Blocks.DISPENSER, Blocks.DROPPER,
         )) it[id] = true
         for (id in 0 until Blocks.COUNT) if (Blocks.isDoor(id) || Blocks.isTrapdoor(id) || Blocks.isGate(id) ||
             Blocks.isButton(id) || Blocks.isPlate(id)) it[id] = true
