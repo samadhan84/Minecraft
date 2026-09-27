@@ -85,6 +85,16 @@ procedurally in code when the game starts. It runs on Android phones, tablets an
   creative inventory with isometric block icons.
 - **Saving**: modified chunks, player position, time of day and hotbar are saved automatically. You can create worlds from a seed.
 
+- **More creatures**: chickens (lay eggs; eggs can hatch), rabbits, horses (saddle and ride), wolves and cats (tame and
+  they follow you; wolves fight monsters), squid and cod, skeletons, slimes, witches, endermen and drowned. Name tags
+  and leads work, and animals, pets and minecarts are saved with the world.
+- **Progress**: experience levels, 22 achievements, villager trading with emeralds, drowning with an air bar.
+- **More blocks**: boats, signs, cake, carpets, banners, paintings, item frames, campfires, lanterns, barrels, ender
+  chests, anvils (repair), composters, bells, scaffolding, brewing stands and music discs for the jukebox.
+- **The Sky Warden**: the boss of the Sky Isles, with an ending when you beat it.
+- **Internet play**: see "Play over the internet" in the pause menu (a VPN app like Tailscale / ZeroTier, or forward
+  TCP port 25580 on the host's router, then Join → Enter address).
+
 ## Controls
 
 | Action | Touch |

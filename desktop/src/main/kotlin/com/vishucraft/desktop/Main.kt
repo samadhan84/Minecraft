@@ -75,7 +75,7 @@ const val CONTROLS_HELP =
 
 class App(private val demo: File?) {
     private enum class Menu { TITLE, WORLDS, CREATE, JOIN, SETTINGS, CONTROLS, CONFIRM_DELETE, UNLOCK }
-    private enum class Overlay { NONE, PAUSE, CREATIVE, CONTAINER, SETTINGS, CONTROLS, SAVE_QUIT, NAME_MOB, TRADE, ACHIEVEMENTS, SIGN, ENDING }
+    private enum class Overlay { NONE, PAUSE, CREATIVE, CONTAINER, SETTINGS, CONTROLS, SAVE_QUIT, NAME_MOB, TRADE, ACHIEVEMENTS, SIGN, ENDING, INTERNET }
 
     private var window = NULL
     private val prefs = Prefs()
@@ -106,7 +106,7 @@ class App(private val demo: File?) {
     private var joinAddress = ""
 
     // Join form
-    private val addressField = Ui.Field("", "Host address, e.g. 192.168.1.23")
+    private val addressField = Ui.Field("", "Host address: 192.168.1.23, a VPN or internet address")
     @Volatile private var hosts: List<Discovery.Host> = emptyList()
     @Volatile private var scanning = false
     @Volatile private var joining: String? = null
@@ -221,6 +221,7 @@ class App(private val demo: File?) {
             Overlay.ACHIEVEMENTS -> achievementsScreen(s)
             Overlay.SIGN -> signScreen(s)
             Overlay.ENDING -> endingScreen()
+            Overlay.INTERNET -> internetScreen()
         }
         ui.end()
     }
@@ -513,6 +514,25 @@ class App(private val demo: File?) {
     private var signPos = listOf(0, 0, 0)
     private val signField = Ui.Field("", "Text on the sign", 60)
 
+    @Volatile private var internetText = ""
+
+    private fun internetScreen() {
+        ui.rect(0f, 0f, ui.width, ui.height, rgba(0, 0, 0, 200))
+        title("Play over the internet", 50f)
+        var y = 110f
+        val words = internetText.ifEmpty { "Checking your internet address…" }
+        // Simple word wrap.
+        for (para in words.split('\n')) {
+            var line = ""
+            for (w in para.split(' ')) {
+                if (ui.textWidth("$line $w", 17f) > minOf(900f, ui.width - 80)) { ui.text(line, ui.width / 2, y, 17f, -1, 1); y += 24; line = w }
+                else line = if (line.isEmpty()) w else "$line $w"
+            }
+            ui.text(line, ui.width / 2, y, 17f, -1, 1); y += 24
+        }
+        if (ui.button("Back", ui.width / 2 - 120, y + 20, 240f, 44f)) overlay = Overlay.PAUSE
+    }
+
     private fun endingScreen() {
         ui.rect(0f, 0f, ui.width, ui.height, rgba(0, 0, 0, 220))
         title("The End", ui.height * 0.15f)
@@ -720,6 +740,10 @@ class App(private val demo: File?) {
                 } catch (e: Exception) { hud?.toast("Could not open the game: ${e.message}", 4f) }
             }
         }
+        b("Play over the internet") {
+            internetText = ""; overlay = Overlay.INTERNET
+            Thread { internetText = Net.internetHelp(Net.internetAddress()) }.start()
+        }
         b("Achievements") { overlay = Overlay.ACHIEVEMENTS }
         b("Settings") { overlay = Overlay.SETTINGS }
         b("Controls") { overlay = Overlay.CONTROLS }
@@ -790,6 +814,7 @@ class App(private val demo: File?) {
             Overlay.TRADE -> if (key == GLFW_KEY_ESCAPE || key == GLFW_KEY_E) overlay = Overlay.NONE
             Overlay.SIGN -> if (key == GLFW_KEY_ESCAPE) { ui.focus = null; overlay = Overlay.NONE }
             Overlay.ENDING -> if (key == GLFW_KEY_ESCAPE) overlay = Overlay.NONE
+            Overlay.INTERNET -> if (key == GLFW_KEY_ESCAPE) overlay = Overlay.PAUSE
             Overlay.SETTINGS, Overlay.CONTROLS, Overlay.SAVE_QUIT, Overlay.NAME_MOB, Overlay.ACHIEVEMENTS -> if (key == GLFW_KEY_ESCAPE) { ui.focus = null; overlay = Overlay.PAUSE }
             Overlay.CREATIVE, Overlay.CONTAINER -> when (key) {
                 GLFW_KEY_ESCAPE, GLFW_KEY_E, GLFW_KEY_I -> closeOverlay()

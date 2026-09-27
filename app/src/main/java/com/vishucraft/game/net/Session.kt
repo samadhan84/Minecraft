@@ -251,7 +251,8 @@ class ClientSession private constructor(private val conn: Connection) : Session(
         /** Connects and waits for the host's welcome (call off the main thread). */
         fun connect(address: String, name: String, password: String = "", timeoutMs: Int = 5000): ClientSession {
             val socket = Socket()
-            socket.connect(InetSocketAddress(address, Msg.PORT), timeoutMs)
+            val (host, port) = Net.splitAddress(address)
+            socket.connect(InetSocketAddress(host, port), timeoutMs)
             val inbox = ConcurrentLinkedQueue<Packet>()
             val c = Connection(socket, inbox)
             val s = ClientSession(c)
@@ -422,6 +423,42 @@ class ClientSession private constructor(private val conn: Connection) : Session(
 /** Hands a connected client from the title screen to the game screen. */
 object Net {
     @Volatile var pendingClient: ClientSession? = null
+
+    /** "host", "host:port" or "[ipv6]:port" -> (host, port). Hosts can be names (e.g. from a VPN app) or addresses. */
+    fun splitAddress(address: String): Pair<String, Int> {
+        val a = address.trim()
+        if (a.startsWith("[")) {
+            val end = a.indexOf(']')
+            val port = a.substring(end + 1).removePrefix(":").toIntOrNull() ?: Msg.PORT
+            return a.substring(1, end) to port
+        }
+        if (a.count { it == ':' } == 1) {
+            val port = a.substringAfter(':').toIntOrNull()
+            if (port != null) return a.substringBefore(':') to port
+        }
+        return a to Msg.PORT
+    }
+
+    /**
+     * This network's address on the internet, asked from a public "what is my IP" service (api.ipify.org).
+     * Only called when the player asks for it. Call off the main thread; null when offline.
+     */
+    fun internetAddress(): String? = try {
+        val c = java.net.URL("https://api.ipify.org").openConnection() as java.net.HttpURLConnection
+        c.connectTimeout = 4000; c.readTimeout = 4000
+        c.inputStream.bufferedReader().use { it.readLine()?.trim() }?.takeIf { it.isNotEmpty() && it.length < 60 }
+    } catch (_: Exception) { null }
+
+    /** How to play with friends who are not on the same Wi-Fi. */
+    fun internetHelp(internet: String?): String =
+        "Friends on the same Wi-Fi find your game by themselves.\n\n" +
+            "To play over the internet, choose one:\n\n" +
+            "1. Easiest: both install a free VPN app such as Tailscale or ZeroTier and join the same network. " +
+            "Then your friend chooses Join Wi-Fi game → Enter address and types your VPN address.\n\n" +
+            "2. Or open port ${Msg.PORT} (TCP) on your router and forward it to this device " +
+            "(${localAddress()}). Your friend then types your internet address" +
+            (if (internet != null) ": $internet" else " (not available right now)") + ".\n\n" +
+            "Give the world a password (Save and quit) before opening it to the internet."
 
     /** This device's Wi-Fi address, to show to friends who want to join. */
     fun localAddress(): String {

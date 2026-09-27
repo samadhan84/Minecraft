@@ -194,7 +194,7 @@ class MenuActivity : Activity() {
     }
 
     private fun enterAddress() {
-        val input = EditText(this).apply { hint = "e.g. 192.168.1.23"; inputType = InputType.TYPE_CLASS_PHONE }
+        val input = EditText(this).apply { hint = "e.g. 192.168.1.23 or a VPN / internet address"; inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI }
         AlertDialog.Builder(this).setTitle("Host address").setView(input)
             .setPositiveButton("Join") { _, _ -> connect(input.text.toString().trim()) }
             .setNegativeButton("Cancel", null).show()

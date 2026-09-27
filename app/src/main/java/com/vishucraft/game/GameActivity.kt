@@ -292,6 +292,16 @@ class GameActivity : Activity() {
                 runOnUiThread { showToast(result); b.text = if (game.net != null) "Wi-Fi: open" else "Open to Wi-Fi" }
             }
         }
+        addMenu("Play over the internet") {
+            showToast("Checking your internet address…")
+            Thread {
+                val help = com.vishucraft.game.net.Net.internetHelp(com.vishucraft.game.net.Net.internetAddress())
+                runOnUiThread {
+                    android.app.AlertDialog.Builder(this).setTitle("Play over the internet").setMessage(help)
+                        .setPositiveButton("OK", null).show()
+                }
+            }.start()
+        }
         addMenu("Achievements") { showAchievements() }
         addMenu("Settings") { settingsDialog(this) { applySettings() } }
         addMenu("Controls") { showControls() }
