@@ -75,7 +75,7 @@ const val CONTROLS_HELP =
 
 class App(private val demo: File?) {
     private enum class Menu { TITLE, WORLDS, CREATE, JOIN, SETTINGS, CONTROLS, CONFIRM_DELETE, UNLOCK }
-    private enum class Overlay { NONE, PAUSE, CREATIVE, CONTAINER, SETTINGS, CONTROLS, SAVE_QUIT, NAME_MOB }
+    private enum class Overlay { NONE, PAUSE, CREATIVE, CONTAINER, SETTINGS, CONTROLS, SAVE_QUIT, NAME_MOB, TRADE, ACHIEVEMENTS }
 
     private var window = NULL
     private val prefs = Prefs()
@@ -217,6 +217,8 @@ class App(private val demo: File?) {
             Overlay.CONTROLS -> controlsScreen { overlay = Overlay.PAUSE }
             Overlay.SAVE_QUIT -> saveQuitScreen(s)
             Overlay.NAME_MOB -> nameMobScreen(s)
+            Overlay.TRADE -> tradeScreen(s)
+            Overlay.ACHIEVEMENTS -> achievementsScreen(s)
         }
         ui.end()
     }
@@ -278,6 +280,8 @@ class App(private val demo: File?) {
             e == "sleep" -> hud.sleep = 3f
             e.startsWith("toast:") -> hud.toast(e.removePrefix("toast:"), 3f)
             e == "craft" -> audio.play("craft")
+            e.startsWith("achievement:") -> hud.toast("Achievement unlocked!\n" + e.removePrefix("achievement:"), 4f)
+            e.startsWith("trade:") -> { tradeUid = e.removePrefix("trade:").toIntOrNull() ?: -1; tradeMessage = ""; overlay = Overlay.TRADE }
             e.startsWith("name:") -> { namingUid = e.removePrefix("name:").toIntOrNull() ?: -1; nameField.text = ""; ui.focus = nameField; overlay = Overlay.NAME_MOB }
             e == "open:craft" -> openContainer(ContainerScreen.Mode.CRAFTING)
             e.startsWith("open:hopper:") -> { val (x, y, z) = pos(); openContainer(ContainerScreen.Mode.CHEST, chest = world.blockEntities.hopper(x, y, z)) }
@@ -498,6 +502,47 @@ class App(private val demo: File?) {
     }
 
     private var namingUid = -1
+    private var tradeUid = -1
+    private var tradeMessage = ""
+
+    /** A villager's offers: click one to trade. */
+    private fun tradeScreen(s: GameSession) {
+        val job = com.vishucraft.game.world.Trades.jobFor(tradeUid)
+        val cx = ui.width / 2; val w = 560f
+        ui.rect(0f, 0f, ui.width, ui.height, rgba(0, 0, 0, 160))
+        title("${job.title} · trades", 50f)
+        var y = 100f
+        for ((i, t) in job.offers.withIndex()) {
+            val have = s.game.inventory.count(t.give)
+            val ok = !s.game.survival || have >= t.giveCount
+            val x = cx - w / 2
+            if (ui.button("", x, y, w, 42f, ok)) tradeMessage = s.game.trade(tradeUid, i)
+            ui.stack(com.vishucraft.game.world.ItemStack(t.give, t.giveCount), x + 10, y + 3, 36f)
+            ui.text("→", x + 70, y + 9, 20f, -1)
+            ui.stack(com.vishucraft.game.world.ItemStack(t.get, t.getCount), x + 100, y + 3, 36f)
+            ui.text("${t.giveCount} ${com.vishucraft.game.world.Items.displayName(t.give)} for ${t.getCount} ${com.vishucraft.game.world.Items.displayName(t.get)}" +
+                if (s.game.survival) "  (you have $have)" else "", x + 150, y + 11, 15f, if (ok) -1 else rgba(180, 180, 180))
+            y += 48
+        }
+        if (tradeMessage.isNotEmpty()) ui.text(tradeMessage, cx, y + 8, 18f, rgba(255, 230, 150), 1)
+        if (ui.button("Done", cx - 120, y + 40, 240f, 42f)) overlay = Overlay.NONE
+    }
+
+    private fun achievementsScreen(s: GameSession) {
+        val got = s.level.achievements
+        val list = com.vishucraft.game.world.Achievements.all
+        ui.rect(0f, 0f, ui.width, ui.height, rgba(0, 0, 0, 170))
+        title("Achievements ${list.count { it.key in got }} / ${list.size}", 40f)
+        val colW = 440f
+        for ((i, a) in list.withIndex()) {
+            val col = i / 12; val row = i % 12
+            val x = ui.width / 2 - colW + col * colW + 10; val y = 90f + row * 36
+            val done = a.key in got
+            ui.text((if (done) "✓ " else "○ ") + a.title, x, y, 17f, if (done) rgba(140, 255, 120) else rgba(200, 200, 200))
+            ui.text(a.hint, x + 24, y + 18, 12f, rgba(170, 170, 170))
+        }
+        if (ui.button("Back", ui.width / 2 - 120, ui.height - 70, 240f, 42f)) overlay = Overlay.PAUSE
+    }
 
     /** Name tag: type a name for the creature. */
     private fun nameMobScreen(s: GameSession) {
@@ -639,6 +684,7 @@ class App(private val demo: File?) {
                 } catch (e: Exception) { hud?.toast("Could not open the game: ${e.message}", 4f) }
             }
         }
+        b("Achievements") { overlay = Overlay.ACHIEVEMENTS }
         b("Settings") { overlay = Overlay.SETTINGS }
         b("Controls") { overlay = Overlay.CONTROLS }
         b("Save and quit to title") {
@@ -705,7 +751,8 @@ class App(private val demo: File?) {
                 in GLFW_KEY_1..GLFW_KEY_9 -> input.selectedSlot = key - GLFW_KEY_1
             }
             Overlay.PAUSE -> if (key == GLFW_KEY_ESCAPE) overlay = Overlay.NONE
-            Overlay.SETTINGS, Overlay.CONTROLS, Overlay.SAVE_QUIT, Overlay.NAME_MOB -> if (key == GLFW_KEY_ESCAPE) { ui.focus = null; overlay = Overlay.PAUSE }
+            Overlay.TRADE -> if (key == GLFW_KEY_ESCAPE || key == GLFW_KEY_E) overlay = Overlay.NONE
+            Overlay.SETTINGS, Overlay.CONTROLS, Overlay.SAVE_QUIT, Overlay.NAME_MOB, Overlay.ACHIEVEMENTS -> if (key == GLFW_KEY_ESCAPE) { ui.focus = null; overlay = Overlay.PAUSE }
             Overlay.CREATIVE, Overlay.CONTAINER -> when (key) {
                 GLFW_KEY_ESCAPE, GLFW_KEY_E, GLFW_KEY_I -> closeOverlay()
                 in GLFW_KEY_1..GLFW_KEY_9 -> input.selectedSlot = key - GLFW_KEY_1

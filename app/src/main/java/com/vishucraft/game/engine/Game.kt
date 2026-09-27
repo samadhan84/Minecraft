@@ -196,6 +196,63 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
     private var fishTimer = -1f
     private var fishSlot = -1
     private var clockSeconds = 0f
+    /** Breath left under water, 0..10 bubbles (drowning starts at 0). */
+    var air = 10f
+    private var drownTimer = 0f
+    private var achievementTimer = 0f
+
+    val xpLevel get() = com.vishucraft.game.world.Xp.levelOf(level.xp).first
+    val xpProgress get() = com.vishucraft.game.world.Xp.levelOf(level.xp).second
+
+    fun addXp(points: Int) {
+        if (points <= 0 || !survival) return
+        val before = xpLevel
+        level.xp += points
+        sound("pop", player.x, player.y + 1f, player.z, 0.25f)
+        if (xpLevel > before) {
+            sound("level_up", player.x, player.y + 1f, player.z)
+            uiEvents.add("toast:Level ${xpLevel}!")
+            if (xpLevel >= 10) award("level10")
+        }
+    }
+
+    /** Unlocks an achievement once and tells the player. */
+    fun award(key: String) {
+        if (!level.achievements.add(key)) return
+        uiEvents.add("achievement:" + com.vishucraft.game.world.Achievements.title(key))
+        sound("level_up", player.x, player.y + 1f, player.z, 0.7f)
+    }
+
+    /** Things in your inventory that earn achievements. */
+    private fun checkInventoryAchievements() {
+        fun has(name: String) = inventory.count(Items.find(name)) > 0
+        val logs = intArrayOf(Blocks.LOG, Blocks.SPRUCE_LOG, Blocks.BIRCH_LOG, Blocks.JUNGLE_LOG, Blocks.ACACIA_LOG, Blocks.DARK_OAK_LOG)
+        if (logs.any { inventory.count(it) > 0 }) award("wood")
+        if (inventory.count(Blocks.CRAFTING_TABLE) > 0) award("bench")
+        if (inventory.slots.any { s -> s != null && Items[s.id]?.tool == ToolType.PICKAXE }) award("pickaxe")
+        if (inventory.count(Blocks.FURNACE) > 0) award("furnace")
+        if (has("Iron Ingot")) award("iron")
+        if (has("Diamond")) award("diamond")
+        if (has("Bread")) award("bread")
+        if (has("Leather")) award("leather")
+        if (carts.riding != null) award("cart")
+        if (mount != null) award("ride")
+        if (gliding) award("elytra")
+        if (dimension == com.vishucraft.game.world.Dimension.EMBER) award("ember")
+        if (dimension == com.vishucraft.game.world.Dimension.SKY) award("sky")
+    }
+
+    /** Air under water: 15 seconds of breath, then 1 heart of damage a second. */
+    private fun updateAir(dt: Float) {
+        if (player.headInWater && !player.flying) {
+            air = maxOf(0f, air - dt / 1.5f)
+            if (air <= 0f) {
+                drownTimer += dt
+                if (drownTimer >= 1f) { drownTimer = 0f; hurtPlayer(2f, player.x, player.z, knockback = false, ignoreArmor = true) }
+            }
+        } else { air = minOf(10f, air + dt * 5f); drownTimer = 0f }
+    }
+
     /** The horse the player is riding, if any. */
     var mount: Mob? = null
     /** Sheep that were sheared (uid -> time when their wool grows back). */
@@ -219,7 +276,14 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
         redstone.occupied = { x, y, z -> occupied(x, y, z) }
         redstone.plateLoad = { x, y, z, items -> plateLoad(x, y, z, items) }
         if (net == null) loadEntities()
-        mobs.onDeath = { m -> if (survival) for ((id, n) in mobDrops(m)) drops.spawn(ItemStack(id, n), m.x, m.y + 0.5f, m.z) }
+        mobs.onDeath = { m ->
+            if (survival) for ((id, n) in mobDrops(m)) drops.spawn(ItemStack(id, n), m.x, m.y + 0.5f, m.z)
+            val near = (m.x - player.x) * (m.x - player.x) + (m.z - player.z) * (m.z - player.z) < 24f * 24f
+            if (near) {
+                addXp(if (m.type.hostile) 5 else 1 + java.util.Random().nextInt(3))
+                if (m.type.hostile) award("kill")
+            }
+        }
         // Chunk offsets sorted nearest first, so the area around the player streams in first.
         val r = 16
         offsets = buildList {
@@ -369,6 +433,9 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
         }
 
         updateEffects(dt)
+        if (survival) updateAir(dt) else air = 10f
+        achievementTimer += dt
+        if (achievementTimer >= 1f) { achievementTimer = 0f; checkInventoryAchievements() }
         if (!survival && health < 20f) health = 20f
         if (!isClient) {
             fluids.tick(dt)
@@ -434,6 +501,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
                 health = 2f
                 effects["regeneration"] = 40f
                 uiEvents.add("toast:Your Totem of Undying saved you!")
+                award("totem")
                 sound("pop", player.x, player.y + 1f, player.z)
                 return
             }
@@ -447,6 +515,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
         for (s in inventory.armor) if (s != null) drops.spawn(s, player.x, player.y + 1f, player.z)
         inventory.clear()
         food = 20f; saturation = 5f; exhaustion = 0f
+        level.xp = 0; air = 10f; effects.clear()
         val bed = level.hasBedSpawn && dimension == com.vishucraft.game.world.Dimension.OVERWORLD &&
             world.isLoaded(level.bedX, level.bedZ) && Blocks.isBed(world.getBlock(level.bedX, level.bedY, level.bedZ))
         if (bed) {
@@ -617,7 +686,9 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
             if (e !is FurnaceEntity) continue
             val x = RedstoneIds.x(pos); val y = RedstoneIds.y(pos); val z = RedstoneIds.z(pos)
             if (!world.isLoaded(x, z) || world.getBlock(x, y, z) != Blocks.FURNACE) continue
+            val outBefore = e.output?.count ?: 0
             val lit = e.tick(dt)
+            if ((e.output?.count ?: 0) > outBefore) addXp(1)
             val meta = world.getMeta(x, y, z)
             val want = if (lit) meta or 8 else meta and 7
             if (want != meta) setBlock(x, y, z, Blocks.FURNACE, want)
@@ -667,7 +738,11 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
         blockSound(id, x, y, z)
         val be = world.blockEntities.remove(x, y, z)
         if (survival) {
-            for ((dropId, n) in Drops.forBlock(id, heldItem(), meta)) drops.spawn(ItemStack(dropId, n), x + 0.5f, y + 0.3f, z + 0.5f)
+            val dropped = Drops.forBlock(id, heldItem(), meta)
+            for ((dropId, n) in dropped) drops.spawn(ItemStack(dropId, n), x + 0.5f, y + 0.3f, z + 0.5f)
+            if (dropped.isNotEmpty()) addXp(when (id) {
+                Blocks.COAL_ORE -> 1; Blocks.REDSTONE_ORE, Blocks.LAPIS_ORE -> 3; Blocks.DIAMOND_ORE, Blocks.EMERALD_ORE -> 5; else -> 0
+            })
             when (be) {
                 is ChestEntity -> be.slots.forEach { s -> if (s != null) drops.spawn(s, x + 0.5f, y + 0.5f, z + 0.5f) }
                 is FurnaceEntity -> be.contents().forEach { s -> drops.spawn(s, x + 0.5f, y + 0.5f, z + 0.5f) }
@@ -774,6 +849,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
                 damageHeld(1)
                 sound("splash", player.x, player.y, player.z, 0.7f)
                 uiEvents.add("toast:You caught a ${Items.displayName(catch)}!")
+                award("fish"); addXp(1 + java.util.Random().nextInt(3))
                 uiEvents.add("pickup")
             }
         }
@@ -792,6 +868,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
         when {
             item.name == "Milk Bucket" -> { effects.clear(); uiEvents.add("toast:All effects cleared") }
             item.name.startsWith("Potion of ") -> {
+                award("potion")
                 val key = Items.POTIONS.first { "Potion of ${it.first}" == item.name }.second
                 if (key == "healing") health = minOf(20f, health + 8f)
                 else {
@@ -860,6 +937,20 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
         player.y = h.y + 1.2f; player.x += 0.8f
     }
 
+    /** Villager trade [index] with the villager [uid]. Returns a message for the screen. */
+    fun trade(uid: Int, index: Int): String {
+        val v = mobs.list.firstOrNull { it.uid == uid && it.type == MobType.VILLAGER } ?: return "The villager walked away"
+        val t = com.vishucraft.game.world.Trades.jobFor(v.uid).offers.getOrNull(index) ?: return ""
+        if (survival && inventory.count(t.give) < t.giveCount) return "You need ${t.giveCount} ${Items.displayName(t.give)}"
+        if (survival) inventory.remove(t.give, t.giveCount)
+        val left = inventory.add(t.get, t.getCount)
+        if (left > 0) drops.spawn(ItemStack(t.get, left), player.x, player.y + 1f, player.z)
+        sound("pop", v.x, v.y + 1.5f, v.z)
+        addXp(2)
+        award("trade")
+        return "Got ${t.getCount} ${Items.displayName(t.get)}"
+    }
+
     /** Gives a mob a name (from a name tag). */
     fun nameMob(uid: Int, name: String) {
         val m = mobs.list.firstOrNull { it.uid == uid } ?: return
@@ -896,6 +987,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
         val name = item?.name
         val weapon = item?.tool == ToolType.SWORD || item?.tool == ToolType.AXE
         if (name == "Name Tag") { uiEvents.add("name:${mob.uid}"); return true }
+        if (mob.type == MobType.VILLAGER && !weapon) { uiEvents.add("trade:${mob.uid}"); return true }
         if (name == "Lead" && !mob.type.hostile) {
             mob.leashed = !mob.leashed
             uiEvents.add("toast:" + if (mob.leashed) "The ${mob.type.displayName.lowercase()} follows you on the lead" else "Let go of the lead")
@@ -914,6 +1006,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
             consumeHeld()
             if (rnd.nextInt(3) == 0) {
                 mob.tamed = true; mob.sitting = false
+                award("tame")
                 uiEvents.add("toast:You tamed the ${mob.type.displayName.lowercase()}! Tap it to make it sit or follow")
                 sound(mobs.voice(mob.type), mob.x, mob.y + 0.5f, mob.z)
             } else uiEvents.add("toast:The ${mob.type.displayName.lowercase()} isn't sure yet… try again")
@@ -1208,6 +1301,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
                 uiEvents.add("toast:You may not rest now, there are monsters nearby")
             else -> {
                 uiEvents.add("sleep")
+                award("sleep")
                 timeOfDay = 0.02f // sunrise
                 setWeather(false, false); rain = 0f
                 if (health < 20f && survival) health = minOf(20f, health + 4f)

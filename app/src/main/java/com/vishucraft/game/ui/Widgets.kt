@@ -336,8 +336,24 @@ class StatusView(ctx: Context) : View(ctx) {
     private val outline = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = ctx.dp(1.5f); color = Color.rgb(30, 10, 10) }
     private val path = android.graphics.Path()
 
+    var air = 10f
+    var level = 0
+    var xp = 0f
+    private val bubble = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(120, 190, 255) }
+    private val xpBack = Paint().apply { color = Color.argb(160, 20, 30, 10) }
+    private val xpFill = Paint().apply { color = Color.rgb(128, 230, 60) }
+    private val xpText = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.rgb(128, 255, 60); textAlign = Paint.Align.CENTER; typeface = android.graphics.Typeface.DEFAULT_BOLD
+        setShadowLayer(2f, 1f, 1f, Color.BLACK)
+    }
+
     fun update(h: Float, f: Float, a: Int) {
         if (h != health || f != food || a != armor) { health = h; food = f; armor = a; invalidate() }
+    }
+
+    /** Air bubbles under water and the experience bar. */
+    fun updateExtra(airLeft: Float, xpLevel: Int, progress: Float) {
+        if (airLeft != air || xpLevel != level || progress != xp) { air = airLeft; level = xpLevel; xp = progress; invalidate() }
     }
 
     private fun heart(cx: Float, cy: Float, s: Float) {
@@ -388,6 +404,15 @@ class StatusView(ctx: Context) : View(ctx) {
         row(canvas, 0f, cy, step, s, health, red, ::heart, false)
         row(canvas, width - half, cy, step, s, food, meat, ::shank, true)
         if (armor > 0) row(canvas, 0f, rowH * 0.5f, step, s, armor.toFloat(), steel, ::shield, false)
+        // Bubbles (right, top row) while under water.
+        if (air < 10f) for (i in 0 until 10) {
+            if (air > 9 - i) canvas.drawCircle(width - half + step * i + step / 2, rowH * 0.5f, s * 0.35f, bubble)
+        }
+        // Experience bar across the bottom with the level in the middle.
+        val barY = height - context.dp(3f)
+        canvas.drawRect(0f, barY, width.toFloat(), height.toFloat(), xpBack)
+        canvas.drawRect(0f, barY, width * xp.coerceIn(0f, 1f), height.toFloat(), xpFill)
+        if (level > 0) { xpText.textSize = rowH * 0.8f; canvas.drawText(level.toString(), width / 2f, rowH * 0.85f, xpText) }
     }
 }
 

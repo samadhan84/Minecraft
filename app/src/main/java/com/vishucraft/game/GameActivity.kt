@@ -292,6 +292,7 @@ class GameActivity : Activity() {
                 runOnUiThread { showToast(result); b.text = if (game.net != null) "Wi-Fi: open" else "Open to Wi-Fi" }
             }
         }
+        addMenu("Achievements") { showAchievements() }
         addMenu("Settings") { settingsDialog(this) { applySettings() } }
         addMenu("Controls") { showControls() }
         addMenu("Save and quit") { saveAndQuit() }
@@ -363,6 +364,34 @@ class GameActivity : Activity() {
         input.lookStickX = 0f; input.lookStickY = 0f
         input.moveForward = 0f; input.moveStrafe = 0f
         input.jumpHeld = false; input.descendHeld = false; input.breakHeld = false
+    }
+
+    /** A villager's offers; tap one to trade (the list stays open for more). */
+    private fun showTrades(uid: Int) {
+        releaseInputs()
+        val job = com.vishucraft.game.world.Trades.jobFor(uid)
+        val inv = game.inventory
+        val labels = job.offers.map { t ->
+            val have = inv.count(t.give)
+            "${t.giveCount} ${Items.displayName(t.give)}  →  ${t.getCount} ${Items.displayName(t.get)}" +
+                if (game.survival) "   (you have $have)" else ""
+        }.toTypedArray()
+        android.app.AlertDialog.Builder(this).setTitle("${job.title} · trades")
+            .setItems(labels) { _, i ->
+                glView.queueEvent {
+                    val msg = game.trade(uid, i)
+                    runOnUiThread { showToast(msg); showTrades(uid) }
+                }
+            }
+            .setNegativeButton("Done", null).show()
+    }
+
+    private fun showAchievements() {
+        val got = level.achievements
+        val list = com.vishucraft.game.world.Achievements.all
+        val text = list.joinToString("\n") { a -> (if (a.key in got) "✓ " else "○ ") + a.title + "  —  " + a.hint }
+        android.app.AlertDialog.Builder(this).setTitle("Achievements ${list.count { it.key in got }} / ${list.size}")
+            .setMessage(text).setPositiveButton("OK", null).show()
     }
 
     /** Save and quit, choosing (or changing / removing) the world's password on the way out. */
@@ -455,6 +484,8 @@ class GameActivity : Activity() {
                 else screen.open(ContainerScreen.Mode.FURNACE, furnaceEntity = world.blockEntities.furnace(x, y, z))
             }
             e == "craft" -> { sounds.play("craft"); updateHand() }
+            e.startsWith("achievement:") -> showToast("Achievement unlocked!\n" + e.removePrefix("achievement:"))
+            e.startsWith("trade:") -> e.removePrefix("trade:").toIntOrNull()?.let { showTrades(it) }
             e.startsWith("name:") -> {
                 // Name tag: ask for the name.
                 val uid = e.removePrefix("name:").toIntOrNull() ?: return
@@ -468,12 +499,14 @@ class GameActivity : Activity() {
             e == "place" || e == "eat" || e == "pickup" || e == "break_tool" -> updateHand()
         }
         status.update(game.health, game.food, game.inventory.armorPoints())
+        status.updateExtra(game.air, game.xpLevel, game.xpProgress)
     }
 
     private fun onStats(text: String) {
         val exposed = game.mobs.skyExposed(game.player.blockX(), game.player.blockY(), game.player.blockZ())
         sounds.setRain(game.rain > 0.05f, game.rain * (if (exposed) 1f else 0.3f))
         status.update(game.health, game.food, game.inventory.armorPoints())
+        status.updateExtra(game.air, game.xpLevel, game.xpProgress)
         updateHand()
         stats.text = text
         // Potion effects with the time left, top right.

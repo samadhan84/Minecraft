@@ -206,13 +206,17 @@ class LevelData(
     var bedX: Int = 0, var bedY: Int = 0, var bedZ: Int = 0,
     /** SHA-256 of the world password ("" = no password). Needed to open the world and to join it over Wi-Fi. */
     var passwordHash: String = "",
+    /** Experience points collected in total (the level is worked out from this). */
+    var xp: Int = 0,
+    /** Keys of the achievements already earned (see Achievements). */
+    val achievements: MutableSet<String> = LinkedHashSet(),
 ) {
     val hasPassword get() = passwordHash.isNotEmpty()
     fun checkPassword(password: String) = !hasPassword || hashPassword(password) == passwordHash
     fun setPassword(password: String) { passwordHash = if (password.isEmpty()) "" else hashPassword(password) }
 
     companion object {
-        private const val VERSION = 5
+        private const val VERSION = 6
 
         /** Passwords are never stored or sent as plain text. */
         fun hashPassword(password: String): String {
@@ -265,6 +269,10 @@ class LevelData(
                             l.bedX = d.readInt(); l.bedY = d.readInt(); l.bedZ = d.readInt()
                         }
                         if (version >= 5) l.passwordHash = d.readUTF()
+                        if (version >= 6) {
+                            l.xp = d.readInt()
+                            repeat(d.readInt()) { l.achievements.add(d.readUTF()) }
+                        }
                     }
                     l.hasPlayer = true
                     l
@@ -296,6 +304,9 @@ class LevelData(
             d.writeBoolean(hasBedSpawn)
             d.writeInt(bedX); d.writeInt(bedY); d.writeInt(bedZ)
             d.writeUTF(passwordHash)
+            d.writeInt(xp)
+            d.writeInt(achievements.size)
+            for (a in achievements) d.writeUTF(a)
         }
         tmp.renameTo(f)
     }

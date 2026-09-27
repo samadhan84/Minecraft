@@ -94,6 +94,12 @@ class Hud(private val game: Game) {
                 }
                 val armor = game.inventory.armorPoints()
                 for (i in 0 until 10) if (armor > i * 2) ui.text("◆", x0 + i * 19, y - 22, 18f, rgba(210, 214, 222))
+                // Air bubbles while under water.
+                if (game.air < 10f) for (i in 0 until 10) if (game.air > 9 - i) ui.text("●", x0 + cell * 9 - 18 - i * 19, y - 22, 16f, rgba(120, 190, 255))
+                // Experience bar and level.
+                ui.rect(x0, y0 - 7, cell * 9, 5f, rgba(20, 30, 10, 180))
+                ui.rect(x0, y0 - 7, cell * 9 * game.xpProgress.coerceIn(0f, 1f), 5f, rgba(128, 230, 60))
+                if (game.xpLevel > 0) ui.text(game.xpLevel.toString(), w / 2, y0 - 26, 16f, rgba(128, 255, 60), 1)
             }
 
             // The held item, bottom right, dips when you swing.
