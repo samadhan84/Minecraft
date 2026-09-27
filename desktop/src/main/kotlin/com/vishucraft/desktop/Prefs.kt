@@ -37,6 +37,8 @@ class Prefs {
     var soundVolume: Int get() = i("soundVolume", 80); set(v) { p.setProperty("soundVolume", v.toString()); save() }
     var musicVolume: Int get() = i("musicVolume", 50); set(v) { p.setProperty("musicVolume", v.toString()); save() }
     var showDebug: Boolean get() = b("showDebug", false); set(v) { p.setProperty("showDebug", v.toString()); save() }
+    /** Rain, snow and thunderstorms. Off by default. */
+    var weather: Boolean get() = b("weather", false); set(v) { p.setProperty("weather", v.toString()); save() }
     var fullscreen: Boolean get() = b("fullscreen", false); set(v) { p.setProperty("fullscreen", v.toString()); save() }
     var playerName: String
         get() = p.getProperty("playerName") ?: ("Player" + (100..999).random()).also { p.setProperty("playerName", it); save() }
@@ -51,6 +53,7 @@ class Prefs {
         { "Render distance: $renderDistance chunks" } to { renderDistance = next(listOf(4, 6, 8, 10, 12), renderDistance) },
         { "Sound effects: $soundVolume%" } to { soundVolume = next(listOf(0, 40, 80, 100), soundVolume) },
         { "Music: $musicVolume%" } to { musicVolume = next(listOf(0, 25, 50, 100), musicVolume) },
+        { "Weather (rain, snow, storms): ${if (weather) "On" else "Off"}" } to { weather = !weather },
         { "Fullscreen: ${if (fullscreen) "On" else "Off"} (F11)" } to { fullscreen = !fullscreen },
         { "FPS & coordinates: ${if (showDebug) "On" else "Off"} (F3)" } to { showDebug = !showDebug },
     )

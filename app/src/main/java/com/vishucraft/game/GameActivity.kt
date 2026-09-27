@@ -273,13 +273,10 @@ class GameActivity : Activity() {
             glView.queueEvent { game.mobs.hostileEnabled = hostile }
             b.text = if (hostile) "Mobs: Normal" else "Mobs: Peaceful (no monsters)"
         }
-        addMenu("Weather: change") { b ->
-            glView.queueEvent {
-                val next = when { game.rain < 0.5f -> 1; !game.thunder -> 2; else -> 0 }
-                game.setWeather(next > 0, next == 2)
-            }
-            b.text = "Weather: changing…"
-            handler.postDelayed({ b.text = "Weather: change" }, 1500)
+        addMenu(if (settings.weather) "Weather: On" else "Weather: Off") { b ->
+            settings.weather = !settings.weather
+            applySettings()
+            b.text = if (settings.weather) "Weather: On" else "Weather: Off"
         }
         addMenu(if (game.isClient) "Wi-Fi: joined" else "Open to Wi-Fi") { b ->
             if (game.net != null) { showToast(game.net!!.status); return@addMenu }
@@ -355,6 +352,7 @@ class GameActivity : Activity() {
         game.lookScale = settings.sensitivity
         game.fov = settings.fov.toFloat()
         game.renderDistance = settings.renderDistance
+        game.weatherEnabled = settings.weather
         sounds.volume = settings.soundVolume / 100f
         sounds.musicVolume = settings.musicVolume / 100f
         if (::stats.isInitialized) stats.visibility = if (settings.showDebug) View.VISIBLE else View.GONE

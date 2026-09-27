@@ -357,6 +357,7 @@ class App(private val demo: File?) {
             g.lookScale = prefs.sensitivity
             g.fov = prefs.fov.toFloat()
             g.renderDistance = prefs.renderDistance
+            g.weatherEnabled = prefs.weather
         }
     }
 
@@ -727,10 +728,7 @@ class App(private val demo: File?) {
         b("Back to game") { overlay = Overlay.NONE }
         b("Skip to next morning / night") { game.timeOfDay = if (game.daylight > 0.5f) 0.52f else 0.0f }
         b(if (game.mobs.hostileEnabled) "Mobs: Normal" else "Mobs: Peaceful (no monsters)") { game.mobs.hostileEnabled = !game.mobs.hostileEnabled }
-        b("Weather: " + when { game.rain < 0.5f -> "clear"; !game.thunder -> "rain"; else -> "thunderstorm" } + " (click to change)") {
-            val next = when { game.rain < 0.5f -> 1; !game.thunder -> 2; else -> 0 }
-            game.setWeather(next > 0, next == 2)
-        }
+        b(if (prefs.weather) "Weather: On" else "Weather: Off") { prefs.weather = !prefs.weather; applySettings() }
         b(when { game.isClient -> "Wi-Fi: joined"; game.net != null -> "Wi-Fi: open (${Net.localAddress()})"; else -> "Open to Wi-Fi" }) {
             if (game.net != null) hud?.toast(game.net!!.status)
             else {

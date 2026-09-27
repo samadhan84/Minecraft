@@ -27,6 +27,10 @@ class Settings(context: Context) {
     var playerName: String
         get() = prefs.getString("playerName", null) ?: ("Player" + (100..999).random()).also { n -> prefs.edit().putString("playerName", n).apply() }
         set(v) = prefs.edit().putString("playerName", v).apply()
+    /** Rain, snow and thunderstorms. Off by default. */
+    var weather: Boolean
+        get() = prefs.getBoolean("weather", false)
+        set(v) = prefs.edit().putBoolean("weather", v).apply()
     var largeButtons: Boolean
         get() = prefs.getBoolean("largeButtons", false)
         set(v) = prefs.edit().putBoolean("largeButtons", v).apply()
@@ -41,6 +45,7 @@ class Settings(context: Context) {
             { "Render distance: ${s.renderDistance} chunks" } to { s.renderDistance = next(listOf(4, 6, 8, 10), s.renderDistance) },
             { "Sound effects: ${s.soundVolume}%" } to { s.soundVolume = next(listOf(0, 40, 80, 100), s.soundVolume) },
             { "Music: ${s.musicVolume}%" } to { s.musicVolume = next(listOf(0, 25, 50, 100), s.musicVolume) },
+            { "Weather (rain, snow, storms): ${if (s.weather) "On" else "Off"}" } to { s.weather = !s.weather },
             { "Touch buttons: ${if (s.largeButtons) "Large" else "Normal"}" } to { s.largeButtons = !s.largeButtons },
             { "Show FPS & coordinates: ${if (s.showDebug) "On" else "Off"}" } to { s.showDebug = !s.showDebug },
         )

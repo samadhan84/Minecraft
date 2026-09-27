@@ -79,6 +79,9 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
     var flash = 0f
         private set
     private var raining = false
+    /** Rain, snow and thunderstorms (off unless turned on in the settings). */
+    var weatherEnabled = false
+    private var autosaveTimer = 0f
     private var weatherTimer = 240f + java.util.Random().nextFloat() * 400f
     private var thunderDelay = -1f
     private var lavaTimer = 0f
@@ -450,7 +453,8 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
         if (!isClient) {
             fluids.tick(dt)
             nature.tick(dt, player.blockX(), player.blockZ())
-            if (dimension == com.vishucraft.game.world.Dimension.OVERWORLD) updateWeather(dt) else rain = 0f
+            if (dimension == com.vishucraft.game.world.Dimension.OVERWORLD && weatherEnabled) updateWeather(dt)
+            else { rain = maxOf(0f, rain - dt * 0.5f); raining = false; thunder = false }
         }
         projectiles.update(dt, this)
         carts.update(dt, this)
@@ -489,6 +493,9 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
         if (shake > 0f) shake = max(0f, shake - dt)
 
         timeOfDay = (timeOfDay + dt / DAY_LENGTH_SECONDS) % 1f
+        // Autosave every minute so a crash or a closed app never loses much.
+        autosaveTimer += dt
+        if (autosaveTimer >= 60f && spawned) { autosaveTimer = 0f; if (!isClient) save() }
     }
 
     fun hurtPlayer(amount: Float, fromX: Float, fromZ: Float, knockback: Boolean = true, ignoreArmor: Boolean = false) {

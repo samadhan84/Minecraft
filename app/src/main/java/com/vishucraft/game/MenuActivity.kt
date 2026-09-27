@@ -63,6 +63,7 @@ class MenuActivity : Activity() {
         col.addView(playButton, LinearLayout.LayoutParams(dpi(320f), -2).apply { bottomMargin = dpi(10f) })
         col.addView(menuButton(this, "Join Wi-Fi game") { joinGame() }, LinearLayout.LayoutParams(dpi(320f), -2).apply { bottomMargin = dpi(10f) })
         col.addView(menuButton(this, "Settings") { settingsDialog(this) }, LinearLayout.LayoutParams(dpi(320f), -2).apply { bottomMargin = dpi(10f) })
+        col.addView(menuButton(this, "Back up / restore worlds") { backupMenu() }, LinearLayout.LayoutParams(dpi(320f), -2).apply { bottomMargin = dpi(10f) })
         col.addView(menuButton(this, "How to play") { help() }, LinearLayout.LayoutParams(dpi(320f), -2))
 
         root.addView(col, FrameLayout.LayoutParams(-2, -2, Gravity.CENTER))
@@ -85,6 +86,55 @@ class MenuActivity : Activity() {
         @Suppress("DEPRECATION")
         window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY or
             View.SYSTEM_UI_FLAG_FULLSCREEN or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+    }
+
+    // ---------------------------------------------------------------- backup
+
+    private val requestBackup = 41
+    private val requestRestore = 42
+
+    /** Save all worlds to a zip file the player chooses (e.g. in Downloads), or bring them back from one. */
+    private fun backupMenu() {
+        buttonDialog("Back up / restore worlds", listOf(
+            "Back up all worlds to a file" to {
+                val name = "DhruvVishu-worlds-" + java.text.SimpleDateFormat("yyyy-MM-dd-HHmm", java.util.Locale.US).format(java.util.Date()) + ".zip"
+                val i = Intent(Intent.ACTION_CREATE_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("application/zip").putExtra(Intent.EXTRA_TITLE, name)
+                try { startActivityForResult(i, requestBackup) } catch (e: Exception) { noFilePicker() }
+            },
+            "Restore worlds from a file" to {
+                val i = Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("*/*")
+                try { startActivityForResult(i, requestRestore) } catch (e: Exception) { noFilePicker() }
+            },
+        ))
+    }
+
+    private fun noFilePicker() {
+        AlertDialog.Builder(this).setTitle("No file picker")
+            .setMessage("This device has no file picker. Your worlds are still kept safe when the app is updated.")
+            .setPositiveButton("OK", null).show()
+    }
+
+    @Deprecated("Deprecated in Java")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        val uri = data?.data ?: return
+        if (resultCode != RESULT_OK) return
+        val root = GameActivity.worldsRoot(this)
+        Thread {
+            val msg = try {
+                if (requestCode == requestBackup) {
+                    val n = contentResolver.openOutputStream(uri)!!.use { com.vishucraft.game.world.Backup.write(root, it) }
+                    "Saved $n world${if (n == 1) "" else "s"} to the backup file."
+                } else {
+                    val names = contentResolver.openInputStream(uri)!!.use { com.vishucraft.game.world.Backup.restore(it, root) }
+                    if (names.isEmpty()) "No worlds found in that file." else "Restored ${names.size} world${if (names.size == 1) "" else "s"}."
+                }
+            } catch (e: Exception) { "Something went wrong: ${e.message}" }
+            runOnUiThread {
+                AlertDialog.Builder(this).setTitle("Backup").setMessage(msg).setPositiveButton("OK", null).show()
+                playButton.text = if (hasWorld()) "Play" else "Create world"
+            }
+        }.start()
     }
 
     /** Moves the single world from older versions into the save-slot folder. */
