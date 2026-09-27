@@ -3,16 +3,19 @@ package com.vishucraft.desktop
 import java.io.File
 import java.util.Properties
 
-/** Where DhruvilCraft keeps worlds, settings and crash logs on this computer. */
+/** Where DhruvVishu keeps worlds, settings and crash logs on this computer. */
 object Paths {
     val home: File by lazy {
         val override = System.getProperty("vishucraft.home")
         val appData = System.getenv("APPDATA")
         val base = if (appData != null) File(appData) else File(System.getProperty("user.home"))
-        val dir = override?.let { File(it) } ?: File(base, if (appData != null) "DhruvilCraft" else ".dhruvilcraft")
-        // The game used to be called VishuCraft: keep the worlds made before the rename.
-        val old = File(base, if (appData != null) "VishuCraft" else ".vishucraft")
-        if (override == null && !dir.exists() && old.isDirectory) old.renameTo(dir)
+        val dir = override?.let { File(it) } ?: File(base, if (appData != null) "DhruvVishu" else ".dhruvvishu")
+        // The game used to be called DhruvilCraft and VishuCraft: keep the worlds made before the renames.
+        if (override == null && !dir.exists()) {
+            val older = listOf("DhruvilCraft" to ".dhruvilcraft", "VishuCraft" to ".vishucraft")
+                .map { (win, other) -> File(base, if (appData != null) win else other) }
+            older.firstOrNull { it.isDirectory }?.renameTo(dir)
+        }
         dir.apply { mkdirs() }
     }
     val worlds: File get() = File(home, "worlds").apply { mkdirs() }
@@ -23,7 +26,7 @@ class Prefs {
     private val file = File(Paths.home, "settings.properties")
     private val p = Properties().apply { if (file.exists()) file.inputStream().use { load(it) } }
 
-    private fun save() = file.outputStream().use { p.store(it, "DhruvilCraft settings") }
+    private fun save() = file.outputStream().use { p.store(it, "DhruvVishu settings") }
     private fun f(k: String, d: Float) = p.getProperty(k)?.toFloatOrNull() ?: d
     private fun i(k: String, d: Int) = p.getProperty(k)?.toIntOrNull() ?: d
     private fun b(k: String, d: Boolean) = p.getProperty(k)?.toBooleanStrictOrNull() ?: d

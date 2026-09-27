@@ -1,10 +1,10 @@
-# DhruvilCraft
+# DhruvVishu
 
 An open-world voxel sandbox game for Android (building and exploring with blocks), written from scratch in
 Kotlin and OpenGL ES 3.0. It has no third-party game engine and no image assets: every texture is generated
 procedurally in code when the game starts. It runs on Android phones, tablets and TVs, and on Windows.
 
-(The game used to be called VishuCraft; the Android package id is unchanged, so updating keeps your worlds.)
+(The game used to be called VishuCraft and then DhruvilCraft; the Android package id is unchanged, so updating keeps your worlds.)
 
 ## Features
 
@@ -109,21 +109,25 @@ adb install app/build/outputs/apk/debug/app-debug.apk
 ```
 
 Every push is built by GitHub Actions (`.github/workflows/android.yml`). The resulting debug and release APKs are uploaded as the
-`DhruvilCraft-apk` workflow artifact, so you can download and sideload them without building locally.
+`DhruvVishu-apk` workflow artifact, so you can download and sideload them without building locally.
+
+**Updating**: every APK is signed with the same key (`app/dhruvvishu.keystore`) and gets a higher version number
+(100 + the GitHub build number), so a new APK installs over the old one and keeps your worlds. APKs built before this
+change were signed with a random per-build key, so the very first time you must uninstall the old app once.
 
 Minimum Android version: 7.0 (API 24) with OpenGL ES 2.0. Runs on phones, tablets and **Android TV**
 (it appears on the TV home screen, and every menu can be used with the remote).
 
 ## Windows (laptop / PC)
 
-Every push also builds a Windows version (`.github/workflows/windows.yml`), uploaded as the `DhruvilCraft-windows` artifact:
+A Windows version is built on request (`.github/workflows/windows.yml`: Actions tab → "Windows build" → "Run workflow"), uploaded as the `DhruvVishu-windows` artifact:
 
-- **DhruvilCraft-Setup.exe** – installer. Installs for the current user (no administrator needed), adds a Start-menu entry
+- **DhruvVishu-Setup.exe** – installer. Installs for the current user (no administrator needed), adds a Start-menu entry
   and a desktop shortcut. Java is bundled, nothing else to install.
-- **DhruvilCraft-portable.zip** – unzip anywhere and run `DhruvilCraft.exe`.
+- **DhruvVishu-portable.zip** – unzip anywhere and run `DhruvVishu.exe`.
 
 Windows may show "Windows protected your PC" because the installer is not code-signed: click *More info* → *Run anyway*.
-Worlds and settings are kept in `%APPDATA%\DhruvilCraft`. Wi-Fi games work between the PC and phones/TVs on the same network.
+Worlds and settings are kept in `%APPDATA%\DhruvVishu`. Wi-Fi games work between the PC and phones/TVs on the same network.
 
 Keyboard and mouse: W A S D walk, mouse looks, left click mines / attacks, right click places / uses, Space jumps
 (double-tap to fly in Creative), Shift flies down, Ctrl sprints, 1-9 or the wheel pick a hotbar slot, middle click picks

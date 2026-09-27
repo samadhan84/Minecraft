@@ -34,8 +34,8 @@ fun main(args: Array<String>) {
         try { File(Paths.home, "crash.txt").writeText(sw.toString()) } catch (_: Exception) {}
         System.err.println(sw)
         try {
-            javax.swing.JOptionPane.showMessageDialog(null, "DhruvilCraft stopped because of an error:\n\n${e}\n\nDetails were saved to ${File(Paths.home, "crash.txt")}",
-                "DhruvilCraft", javax.swing.JOptionPane.ERROR_MESSAGE)
+            javax.swing.JOptionPane.showMessageDialog(null, "DhruvVishu stopped because of an error:\n\n${e}\n\nDetails were saved to ${File(Paths.home, "crash.txt")}",
+                "DhruvVishu", javax.swing.JOptionPane.ERROR_MESSAGE)
         } catch (_: Throwable) {}
         kotlin.system.exitProcess(1)
     }
@@ -130,7 +130,7 @@ class App(private val demo: File?) {
         glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 1)
         glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE)
         glfwWindowHint(GLFW_DEPTH_BITS, 24)
-        window = glfwCreateWindow(1280, 720, "DhruvilCraft", NULL, NULL)
+        window = glfwCreateWindow(1280, 720, "DhruvVishu", NULL, NULL)
         if (window == NULL) error("Could not open a window. Please update your graphics driver (OpenGL 2.1 is needed).")
         glfwMakeContextCurrent(window)
         GL.createCapabilities()
@@ -363,7 +363,7 @@ class App(private val demo: File?) {
         val bw = 400f
         when (menu) {
             Menu.TITLE -> {
-                ui.text("DhruvilCraft", cx, ui.height * 0.16f, 72f, rgba(255, 220, 90), 1)
+                ui.text("DhruvVishu", cx, ui.height * 0.16f, 72f, rgba(255, 220, 90), 1)
                 ui.text("Build, explore and survive", cx, ui.height * 0.16f + 84, 20f, rgba(220, 220, 220), 1)
                 var y = ui.height * 0.42f
                 if (ui.button("Play", cx - bw / 2, y, bw, 44f)) menu = Menu.WORLDS

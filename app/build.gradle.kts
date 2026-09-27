@@ -11,16 +11,31 @@ android {
         applicationId = "com.vishucraft.game"
         minSdk = 24
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0"
+        // Every GitHub build gets a higher version number, so Android sees it as an update.
+        val build = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 1
+        versionCode = 100 + build
+        versionName = "1.$build"
+    }
+
+    // One fixed signing key for every build (debug and release, on any computer). Android only installs an
+    // update over an app signed with the same key; the default debug key is different on every build machine.
+    signingConfigs {
+        create("dhruvvishu") {
+            storeFile = file("dhruvvishu.keystore")
+            storePassword = "dhruvvishu"
+            keyAlias = "dhruvvishu"
+            keyPassword = "dhruvvishu"
+        }
     }
 
     buildTypes {
+        debug {
+            signingConfig = signingConfigs.getByName("dhruvvishu")
+        }
         release {
             isMinifyEnabled = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"))
-            // Signed with the debug key so the release APK is installable out of the box.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("dhruvvishu")
         }
     }
 

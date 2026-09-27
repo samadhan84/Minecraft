@@ -41,7 +41,7 @@ sourceSets {
 
 application {
     mainClass.set("com.vishucraft.desktop.MainKt")
-    applicationName = "DhruvilCraft"
+    applicationName = "DhruvVishu"
 }
 
 tasks.jar {
