@@ -93,6 +93,7 @@ class GameActivity : Activity() {
     private lateinit var runButton: HudButton
     private var sprinting = false
     private lateinit var effectsText: TextView
+    private lateinit var lookLabel: TextView
     private lateinit var downButton: HudButton
     private lateinit var root: FrameLayout
     private lateinit var settings: Settings
@@ -187,6 +188,11 @@ class GameActivity : Activity() {
         if (touch) bar.addView(drop, LinearLayout.LayoutParams(dpi(52f), dpi(42f)).apply { leftMargin = dpi(4f) })
         root.addView(bar, lp(-2f, -2f, Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL, b = 4f))
 
+        lookLabel = TextView(this).apply {
+            setTextColor(Color.WHITE); textSize = 15f
+            setShadowLayer(3f, 2f, 2f, Color.BLACK); gravity = Gravity.CENTER
+        }
+        root.addView(lookLabel, lp(-2f, -2f, Gravity.TOP or Gravity.CENTER_HORIZONTAL, t = 60f))
         effectsText = TextView(this).apply {
             setTextColor(Color.rgb(200, 230, 255)); textSize = 13f
             setShadowLayer(2f, 1f, 1f, Color.BLACK); gravity = Gravity.END
@@ -449,6 +455,16 @@ class GameActivity : Activity() {
                 else screen.open(ContainerScreen.Mode.FURNACE, furnaceEntity = world.blockEntities.furnace(x, y, z))
             }
             e == "craft" -> { sounds.play("craft"); updateHand() }
+            e.startsWith("name:") -> {
+                // Name tag: ask for the name.
+                val uid = e.removePrefix("name:").toIntOrNull() ?: return
+                releaseInputs()
+                val input = android.widget.EditText(this).apply { hint = "Name"; setSingleLine() }
+                android.app.AlertDialog.Builder(this).setTitle("Name this creature").setView(input)
+                    .setPositiveButton("OK") { _, _ -> val n = input.text.toString(); glView.queueEvent { game.nameMob(uid, n) } }
+                    .setNegativeButton("Cancel", null).show()
+                input.requestFocus()
+            }
             e == "place" || e == "eat" || e == "pickup" || e == "break_tool" -> updateHand()
         }
         status.update(game.health, game.food, game.inventory.armorPoints())
@@ -466,6 +482,7 @@ class GameActivity : Activity() {
             "$name ${left.toInt() / 60}:${"%02d".format(left.toInt() % 60)}"
         }
         effectsText.text = (fx + (if (game.gliding) listOf("Gliding") else emptyList())).joinToString("\n")
+        lookLabel.text = game.lookedAtLabel() ?: ""
         val flying = game.player.flying
         flyButton.toggled = flying
         downButton.visibility = if (flying) View.VISIBLE else View.GONE

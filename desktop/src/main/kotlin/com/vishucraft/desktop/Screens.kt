@@ -126,6 +126,7 @@ class Hud(private val game: Game) {
             }
         }
         if (game.gliding) ui.text("Gliding", w / 2, 40f, 18f, rgba(220, 220, 255), 1)
+        game.lookedAtLabel()?.let { ui.text(it, w / 2, h / 2 - 50, 18f, -1, 1) }
         if (debug != null) {
             var y = 8f
             for (line in debug.split('\n')) { ui.text(line, 10f, y, 16f); y += 20f }

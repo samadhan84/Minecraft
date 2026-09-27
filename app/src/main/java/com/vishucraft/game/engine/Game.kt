@@ -196,6 +196,8 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
     private var fishTimer = -1f
     private var fishSlot = -1
     private var clockSeconds = 0f
+    /** The horse the player is riding, if any. */
+    var mount: Mob? = null
     /** Sheep that were sheared (uid -> time when their wool grows back). */
     private val sheared = HashMap<Int, Float>()
 
@@ -325,7 +327,8 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
             val jumpPressed = input.jumpHeld && !lastJump
             val crouchPressed = input.descendHeld && !lastCrouch
             lastJump = input.jumpHeld; lastCrouch = input.descendHeld
-            if (carts.riding != null && crouchPressed) { carts.riding = null; player.y += 0.6f }
+            if (mount != null && crouchPressed) dismount()
+            else if (carts.riding != null && crouchPressed) { carts.riding = null; player.y += 0.6f }
             else if (carts.riding == null && jumpPressed && !player.flying) {
                 val len = sqrt(dir[0] * dir[0] + dir[2] * dir[2]).coerceAtLeast(0.01f)
                 carts.nearby(player.x, player.y, player.z, dir[0] / len, dir[2] / len)?.let { carts.enter(it, dir[0], dir[2]) }
@@ -333,7 +336,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
             lastVy = player.vy
             player.speedMul = (if (input.sprint && !player.flying) 1.3f else 1f) * (if (hasEffect("swiftness")) 1.4f else 1f)
             player.jumpMul = if (hasEffect("leaping")) 1.22f else 1f
-            if (carts.riding == null) player.update(dt, world, input.moveForward, input.moveStrafe, input.jumpHeld, input.descendHeld)
+            if (carts.riding == null && mount == null) player.update(dt, world, input.moveForward, input.moveStrafe, input.jumpHeld, input.descendHeld)
             updateFlight(dt)
             // Fall damage when landing hard (not while flying or in water).
             if (player.onGround && !wasOnGround && !player.flying && !player.inWater && lastVy < -14f && !hasEffect("slow_falling")) {
@@ -350,6 +353,10 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
             wasInWater = player.inWater
             if (player.y < -20f) hurtPlayer(100f, player.x, player.z, knockback = false)
             if (!isClient) mobs.update(dt, this)
+            mount?.let { h ->
+                if (h.dead || h !in mobs.list) dismount()
+                else { player.x = h.x; player.y = h.y + 1.05f; player.z = h.z; player.vx = 0f; player.vy = 0f; player.vz = 0f }
+            }
             drops.update(dt, this)
             // Lava burns.
             val inLava = world.getBlock(player.blockX(), floorInt(player.y + 0.3f), player.blockZ()) == Blocks.LAVA ||
@@ -536,7 +543,18 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
                 i("Blaze Rod") to r.nextInt(2), i("Magma Cream") to (if (r.nextInt(3) == 0) 1 else 0), i("Ghast Tear") to (if (r.nextInt(6) == 0) 1 else 0))
             MobType.WISP -> listOf(i("Emerald") to r.nextInt(2), Blocks.PURPUR to r.nextInt(2), i("Ender Pearl") to r.nextInt(2),
                 i("Amethyst Shard") to r.nextInt(2))
-            MobType.VILLAGER, MobType.EXPLORER -> emptyList()
+            MobType.VILLAGER, MobType.EXPLORER, MobType.WOLF, MobType.HORSE -> if (m.type == MobType.HORSE) listOf(i("Leather") to r.nextInt(3)) else emptyList()
+            MobType.CHICKEN -> listOf(i("Feather") to r.nextInt(3), i("Raw Chicken") to 1)
+            MobType.RABBIT -> listOf(i("Rabbit Hide") to r.nextInt(2), i("Raw Rabbit") to 1, i("Rabbit's Foot") to (if (r.nextInt(10) == 0) 1 else 0))
+            MobType.CAT -> listOf(i("String") to r.nextInt(3))
+            MobType.SQUID -> listOf(i("Ink Sac") to 1 + r.nextInt(3))
+            MobType.COD -> listOf(i("Raw Cod") to 1, i("Bone Meal") to (if (r.nextInt(20) == 0) 1 else 0))
+            MobType.SKELETON -> listOf(i("Bone") to r.nextInt(3), i("Arrow") to r.nextInt(3))
+            MobType.SLIME -> if (m.age < 0f) listOf(i("Slimeball") to r.nextInt(3)) else emptyList()
+            MobType.WITCH -> listOf(listOf(i("Glass Bottle"), Blocks.REDSTONE_DUST, i("Sugar"), i("Gunpowder"), i("Spider Eye"))[r.nextInt(5)] to 1 + r.nextInt(2))
+            MobType.ENDERMAN -> listOf(i("Ender Pearl") to r.nextInt(2))
+            MobType.DROWNED -> listOf(i("Rotten Flesh") to r.nextInt(3), i("Trident") to (if (r.nextInt(15) == 0) 1 else 0),
+                i("Nautilus Shell") to (if (r.nextInt(30) == 0) 1 else 0), i("Copper Ingot") to (if (r.nextInt(10) == 0) 1 else 0))
         }.filter { it.second > 0 }
     }
 
@@ -836,6 +854,79 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
         }
     }
 
+    fun dismount() {
+        val h = mount ?: return
+        mount = null
+        player.y = h.y + 1.2f; player.x += 0.8f
+    }
+
+    /** Gives a mob a name (from a name tag). */
+    fun nameMob(uid: Int, name: String) {
+        val m = mobs.list.firstOrNull { it.uid == uid } ?: return
+        val clean = name.trim().take(24)
+        if (clean.isEmpty()) return
+        if (survival && !inventory.remove(Items.find("Name Tag"), 1)) return
+        m.customName = clean
+        uiEvents.add("toast:This ${m.type.displayName.lowercase()} is now called $clean")
+    }
+
+    /** What the crosshair is on: a named or tamed mob's label for the HUD. */
+    fun lookedAtLabel(): String? {
+        val hit = mobs.raycast(player.x, player.eyeY, player.z, dir[0], dir[1], dir[2], 8f) ?: return null
+        val m = hit.mob
+        val name = m.customName
+        return when {
+            name != null && m.tamed -> "$name (your ${m.type.displayName.lowercase()}${if (m.sitting) ", sitting" else ""})"
+            name != null -> name
+            m.tamed -> "Your ${m.type.displayName.lowercase()}${if (m.sitting) " (sitting)" else ""}"
+            m.type == MobType.HORSE && m.saddled -> "Saddled horse"
+            else -> null
+        }
+    }
+
+    /** An egg broke: sometimes a chick hatches. */
+    fun eggLanded(x: Float, y: Float, z: Float) {
+        if (isClient || java.util.Random().nextInt(8) != 0) return
+        mobs.list.add(Mob(MobType.CHICKEN, x, y, z).also { it.age = -600f })
+    }
+
+    /** Pets, horses, name tags and leads. Returns true when the tap was used. */
+    private fun petActions(item: ItemDef?, held: Int, mob: Mob): Boolean {
+        val rnd = java.util.Random()
+        val name = item?.name
+        val weapon = item?.tool == ToolType.SWORD || item?.tool == ToolType.AXE
+        if (name == "Name Tag") { uiEvents.add("name:${mob.uid}"); return true }
+        if (name == "Lead" && !mob.type.hostile) {
+            mob.leashed = !mob.leashed
+            uiEvents.add("toast:" + if (mob.leashed) "The ${mob.type.displayName.lowercase()} follows you on the lead" else "Let go of the lead")
+            return true
+        }
+        if (mob.type == MobType.HORSE) {
+            if (name == "Saddle" && !mob.saddled) { mob.saddled = true; mob.tamed = true; consumeHeld(); uiEvents.add("toast:Saddled! Tap the horse to ride it"); return true }
+            if (mob.saddled && !weapon && !mobs.wantsFood(mob, held)) {
+                mount = mob; carts.riding = null
+                uiEvents.add("toast:Riding. Crouch (Shift / ▼) to get off")
+                return true
+            }
+        }
+        val tameFood = when (mob.type) { MobType.WOLF -> name == "Bone"; MobType.CAT -> name == "Raw Cod" || name == "Raw Salmon"; else -> false }
+        if (tameFood && !mob.tamed) {
+            consumeHeld()
+            if (rnd.nextInt(3) == 0) {
+                mob.tamed = true; mob.sitting = false
+                uiEvents.add("toast:You tamed the ${mob.type.displayName.lowercase()}! Tap it to make it sit or follow")
+                sound(mobs.voice(mob.type), mob.x, mob.y + 0.5f, mob.z)
+            } else uiEvents.add("toast:The ${mob.type.displayName.lowercase()} isn't sure yet… try again")
+            return true
+        }
+        if (mob.tamed && (mob.type == MobType.WOLF || mob.type == MobType.CAT) && !mobs.wantsFood(mob, held)) {
+            mob.sitting = !mob.sitting
+            uiEvents.add("toast:" + if (mob.sitting) "Sit!" else "Come on!")
+            return true
+        }
+        return false
+    }
+
     /** Shears on a sheep and a bucket on a cow. Returns true when used. */
     private fun useOnMob(item: ItemDef, mob: Mob): Boolean {
         if (item.use == ItemUse.SHEAR && mob.type == MobType.SHEEP) {
@@ -904,9 +995,11 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
             blockSound(Blocks.GRASS, tgt.x, tgt.y + 1, tgt.z, 0.7f)
             return
         }
+        if (mount != null) { dismount(); return }
         if (item != null && useItem(item)) return
         mobs.raycast(player.x, player.eyeY, player.z, dir[0], dir[1], dir[2], 4f)?.let { m ->
             if (item != null && useOnMob(item, m.mob)) return
+            if (!isClient && petActions(item, sel, m.mob)) return
         }
         // Eating works without looking at anything.
         if (item != null && item.use == ItemUse.EAT && mobs.raycast(player.x, player.eyeY, player.z, dir[0], dir[1], dir[2], 4f)?.let { mobs.wantsFood(it.mob, sel) } != true) {

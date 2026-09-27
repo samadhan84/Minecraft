@@ -75,7 +75,7 @@ const val CONTROLS_HELP =
 
 class App(private val demo: File?) {
     private enum class Menu { TITLE, WORLDS, CREATE, JOIN, SETTINGS, CONTROLS, CONFIRM_DELETE, UNLOCK }
-    private enum class Overlay { NONE, PAUSE, CREATIVE, CONTAINER, SETTINGS, CONTROLS, SAVE_QUIT }
+    private enum class Overlay { NONE, PAUSE, CREATIVE, CONTAINER, SETTINGS, CONTROLS, SAVE_QUIT, NAME_MOB }
 
     private var window = NULL
     private val prefs = Prefs()
@@ -216,6 +216,7 @@ class App(private val demo: File?) {
             Overlay.SETTINGS -> settingsScreen { overlay = Overlay.PAUSE }
             Overlay.CONTROLS -> controlsScreen { overlay = Overlay.PAUSE }
             Overlay.SAVE_QUIT -> saveQuitScreen(s)
+            Overlay.NAME_MOB -> nameMobScreen(s)
         }
         ui.end()
     }
@@ -277,6 +278,7 @@ class App(private val demo: File?) {
             e == "sleep" -> hud.sleep = 3f
             e.startsWith("toast:") -> hud.toast(e.removePrefix("toast:"), 3f)
             e == "craft" -> audio.play("craft")
+            e.startsWith("name:") -> { namingUid = e.removePrefix("name:").toIntOrNull() ?: -1; nameField.text = ""; ui.focus = nameField; overlay = Overlay.NAME_MOB }
             e == "open:craft" -> openContainer(ContainerScreen.Mode.CRAFTING)
             e.startsWith("open:hopper:") -> { val (x, y, z) = pos(); openContainer(ContainerScreen.Mode.CHEST, chest = world.blockEntities.hopper(x, y, z)) }
             e.startsWith("open:chest:") -> { val (x, y, z) = pos(); openContainer(ContainerScreen.Mode.CHEST, chest = world.blockEntities.chest(x, y, z)) }
@@ -495,6 +497,19 @@ class App(private val demo: File?) {
         if (ui.button("Cancel", cx + 5, y, w / 2 - 5, 44f)) { ui.focus = null; message = null; menu = Menu.WORLDS }
     }
 
+    private var namingUid = -1
+
+    /** Name tag: type a name for the creature. */
+    private fun nameMobScreen(s: GameSession) {
+        val cx = ui.width / 2; val w = 420f
+        ui.rect(0f, 0f, ui.width, ui.height, rgba(0, 0, 0, 150))
+        title("Name this creature", ui.height * 0.25f)
+        ui.field(nameField, cx - w / 2, ui.height * 0.4f, w)
+        val y = ui.height * 0.4f + 60
+        if (ui.button("OK", cx - w / 2, y, w / 2 - 5, 44f) || ui.takeSubmit()) { s.game.nameMob(namingUid, nameField.text); ui.focus = null; overlay = Overlay.NONE }
+        if (ui.button("Cancel", cx + 5, y, w / 2 - 5, 44f)) { ui.focus = null; overlay = Overlay.NONE }
+    }
+
     /** Save and quit, choosing (or changing / removing) the world's password on the way out. */
     private fun saveQuitScreen(s: GameSession) {
         val cx = ui.width / 2; val w = 460f
@@ -690,7 +705,7 @@ class App(private val demo: File?) {
                 in GLFW_KEY_1..GLFW_KEY_9 -> input.selectedSlot = key - GLFW_KEY_1
             }
             Overlay.PAUSE -> if (key == GLFW_KEY_ESCAPE) overlay = Overlay.NONE
-            Overlay.SETTINGS, Overlay.CONTROLS, Overlay.SAVE_QUIT -> if (key == GLFW_KEY_ESCAPE) { ui.focus = null; overlay = Overlay.PAUSE }
+            Overlay.SETTINGS, Overlay.CONTROLS, Overlay.SAVE_QUIT, Overlay.NAME_MOB -> if (key == GLFW_KEY_ESCAPE) { ui.focus = null; overlay = Overlay.PAUSE }
             Overlay.CREATIVE, Overlay.CONTAINER -> when (key) {
                 GLFW_KEY_ESCAPE, GLFW_KEY_E, GLFW_KEY_I -> closeOverlay()
                 in GLFW_KEY_1..GLFW_KEY_9 -> input.selectedSlot = key - GLFW_KEY_1
@@ -823,12 +838,35 @@ class App(private val demo: File?) {
                 }
             }
             f == 440 -> shot("04d-minecart")
-            f == 441 -> overlay = Overlay.PAUSE
-            f == 443 -> shot("05-pause")
-            f == 444 -> { passwordField.text = "secret"; overlay = Overlay.SAVE_QUIT }
-            f == 446 -> shot("05b-save-and-quit")
-            f == 447 -> { overlay = Overlay.NONE; leaveWorld(); menu = Menu.CREATE; nameField.text = "Demo survival"; seedField.text = "777"; survival = true }
-            f == 449 -> demoCreate = true
+            f == 441 -> session?.game?.let { g ->
+                // A line-up of the new creatures in front of the player.
+                g.carts.list.clear()
+                val p = g.player
+                p.pitch = -0.15f
+                val fx = kotlin.math.sin(p.yaw); val fz = -kotlin.math.cos(p.yaw)
+                val rx = kotlin.math.cos(p.yaw); val rz = kotlin.math.sin(p.yaw)
+                val types = listOf(com.vishucraft.game.engine.MobType.CHICKEN, com.vishucraft.game.engine.MobType.RABBIT, com.vishucraft.game.engine.MobType.HORSE,
+                    com.vishucraft.game.engine.MobType.WOLF, com.vishucraft.game.engine.MobType.CAT, com.vishucraft.game.engine.MobType.SKELETON,
+                    com.vishucraft.game.engine.MobType.SLIME, com.vishucraft.game.engine.MobType.WITCH, com.vishucraft.game.engine.MobType.ENDERMAN,
+                    com.vishucraft.game.engine.MobType.DROWNED)
+                g.mobs.list.clear(); g.mobs.hostileEnabled = true
+                for ((i, t) in types.withIndex()) {
+                    val side = (i - 4.5f) * 1.5f
+                    val x = p.x + fx * 7f + rx * side; val z = p.z + fz * 7f + rz * side
+                    var y = p.y.toInt() + 6
+                    while (y > 1 && !Blocks.solid[g.world.getBlock(kotlin.math.floor(x).toInt(), y - 1, kotlin.math.floor(z).toInt())]) y--
+                    g.mobs.list.add(com.vishucraft.game.engine.Mob(t, x, y.toFloat(), z).also { it.yaw = p.yaw + 3.14159f; it.customName = "demo" })
+                }
+                g.timeOfDay = 0.25f
+            }
+            f == 443 -> session?.game?.mobs?.list?.forEach { it.vx = 0f; it.vz = 0f }
+            f == 470 -> shot("04e-creatures")
+            f == 471 -> overlay = Overlay.PAUSE
+            f == 473 -> shot("05-pause")
+            f == 474 -> { passwordField.text = "secret"; overlay = Overlay.SAVE_QUIT }
+            f == 476 -> shot("05b-save-and-quit")
+            f == 477 -> { overlay = Overlay.NONE; leaveWorld(); menu = Menu.CREATE; nameField.text = "Demo survival"; seedField.text = "777"; survival = true }
+            f == 479 -> demoCreate = true
             f == 800 -> shot("06-survival-world")
             f == 802 -> session?.let {
                 it.game.inventory.add(com.vishucraft.game.world.Items.find("Minecart"), 1)

@@ -18,6 +18,9 @@ class Projectile(var x: Float, var y: Float, var z: Float, var vx: Float, var vy
         const val SNOWBALL = 1
         const val EGG = 2
         const val PEARL = 3
+        /** A Rattler's thorn and a witch's splash potion (monster projectiles). */
+        const val THORN = 4
+        const val POTION = 5
     }
 }
 
@@ -51,6 +54,7 @@ class Projectiles(private val world: World) {
                         game.mobs.damage(m, a.damage, a.vx / len * 0.6f, a.vz / len * 0.6f)
                         game.sound("arrow_hit", a.x, a.y, a.z, 0.8f)
                         if (a.kind == Projectile.PEARL) game.pearlLanded(a.x, m.y, a.z)
+                        if (a.kind == Projectile.EGG) game.eggLanded(a.x, m.y, a.z)
                         hit = true; break
                     }
                 } else {
@@ -63,6 +67,7 @@ class Projectiles(private val world: World) {
                 val b = world.getBlock(floorInt(a.x), floorInt(a.y), floorInt(a.z))
                 if (Blocks.solid[b]) {
                     game.sound("arrow_hit", a.x, a.y, a.z, 0.5f)
+                    if (a.kind == Projectile.EGG) game.eggLanded(a.x - a.vx * 0.03f, a.y - a.vy * 0.03f, a.z - a.vz * 0.03f)
                     if (a.kind == Projectile.PEARL) {
                         // Land on top of (or just in front of) the block that was hit.
                         val bx = a.x - a.vx * 0.03f; val bz = a.z - a.vz * 0.03f

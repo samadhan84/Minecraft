@@ -109,6 +109,79 @@ object MobModels {
             box(-0.45f, 0.75f, -0.11f, -0.25f, 1.45f, 0.11f, tiles("explorer_jacket"), -1, pivotY = 1.4f),
             box(0.25f, 0.75f, -0.11f, 0.45f, 1.45f, 0.11f, tiles("explorer_jacket"), 1, pivotY = 1.4f),
         ),
+        // ---- Creature pack
+        MobType.CHICKEN to listOf(
+            box(-0.18f, 0.25f, -0.25f, 0.18f, 0.6f, 0.25f, tiles("chicken_feathers")),
+            box(-0.12f, 0.5f, -0.45f, 0.12f, 0.82f, -0.22f, tiles("chicken_feathers", front = "chicken_face")),
+            box(-0.12f, 0f, -0.04f, -0.06f, 0.25f, 0.04f, tiles("chicken_leg"), 1),
+            box(0.06f, 0f, -0.04f, 0.12f, 0.25f, 0.04f, tiles("chicken_leg"), -1),
+        ),
+        MobType.RABBIT to listOf(
+            box(-0.15f, 0.1f, -0.2f, 0.15f, 0.35f, 0.25f, tiles("rabbit_fur")),
+            box(-0.12f, 0.25f, -0.4f, 0.12f, 0.47f, -0.18f, tiles("rabbit_fur", front = "rabbit_face")),
+            box(-0.1f, 0.47f, -0.32f, -0.04f, 0.72f, -0.26f, tiles("rabbit_fur")),
+            box(0.04f, 0.47f, -0.32f, 0.1f, 0.72f, -0.26f, tiles("rabbit_fur")),
+        ) + legs(0.1f, 0.15f, 0.08f, 0.12f, "rabbit_fur"),
+        MobType.HORSE to listOf(
+            box(-0.35f, 0.8f, -0.75f, 0.35f, 1.35f, 0.75f, tiles("horse_hide")),
+            box(-0.18f, 1.2f, -1.2f, 0.18f, 1.8f, -0.72f, tiles("horse_hide", front = "horse_face", top = "horse_mane")),
+            box(-0.05f, 0.9f, 0.75f, 0.05f, 1.3f, 0.95f, tiles("horse_mane")),
+        ) + legs(0.24f, 0.55f, 0.18f, 0.85f, "horse_leg"),
+        MobType.WOLF to listOf(
+            box(-0.2f, 0.35f, -0.45f, 0.2f, 0.7f, 0.35f, tiles("wolf_fur")),
+            box(-0.17f, 0.45f, -0.75f, 0.17f, 0.8f, -0.45f, tiles("wolf_fur", front = "wolf_face")),
+            box(-0.05f, 0.5f, 0.35f, 0.05f, 0.6f, 0.7f, tiles("wolf_fur")),
+        ) + legs(0.12f, 0.28f, 0.1f, 0.38f, "wolf_fur"),
+        MobType.CAT to listOf(
+            box(-0.13f, 0.25f, -0.35f, 0.13f, 0.5f, 0.35f, tiles("cat_fur")),
+            box(-0.14f, 0.35f, -0.6f, 0.14f, 0.62f, -0.35f, tiles("cat_fur", front = "cat_face")),
+            box(-0.03f, 0.35f, 0.35f, 0.03f, 0.43f, 0.75f, tiles("cat_fur")),
+        ) + legs(0.08f, 0.25f, 0.07f, 0.28f, "cat_fur"),
+        MobType.SQUID to listOf(
+            box(-0.35f, 0.35f, -0.35f, 0.35f, 0.85f, 0.35f, tiles("squid_skin", front = "squid_face")),
+        ) + listOf(-0.2f, 0.2f).flatMap { x -> listOf(-0.2f, 0.2f).map { z ->
+            box(x - 0.06f, 0f, z - 0.06f, x + 0.06f, 0.35f, z + 0.06f, tiles("squid_skin"), if (x == z) 1 else -1, pivotY = 0.35f)
+        } },
+        MobType.COD to listOf(
+            box(-0.08f, 0.05f, -0.3f, 0.08f, 0.25f, 0.2f, tiles("cod_scales", front = "cod_face")),
+            box(-0.02f, 0.05f, 0.2f, 0.02f, 0.25f, 0.4f, tiles("cod_scales"), 1),
+        ),
+        MobType.SKELETON to listOf(
+            box(-0.2f, 0f, -0.06f, -0.08f, 0.75f, 0.06f, tiles("skeleton_bone"), 1),
+            box(0.08f, 0f, -0.06f, 0.2f, 0.75f, 0.06f, tiles("skeleton_bone"), -1),
+            box(-0.22f, 0.75f, -0.1f, 0.22f, 1.45f, 0.1f, tiles("skeleton_ribs")),
+            box(-0.25f, 1.45f, -0.25f, 0.25f, 1.95f, 0.25f, tiles("skeleton_skull", front = "skeleton_face")),
+            box(-0.36f, 0.8f, -0.06f, -0.24f, 1.45f, 0.06f, tiles("skeleton_bone"), 2, pivotY = 1.4f),
+            box(0.24f, 0.8f, -0.06f, 0.36f, 1.45f, 0.06f, tiles("skeleton_bone"), 2, pivotY = 1.4f),
+        ),
+        MobType.SLIME to listOf(
+            box(-0.5f, 0f, -0.5f, 0.5f, 1f, 0.5f, tiles("slime_skin", front = "slime_face")),
+        ),
+        MobType.WITCH to listOf(
+            box(-0.25f, 0f, -0.14f, 0.25f, 1.45f, 0.14f, tiles("witch_robe")),
+            box(-0.25f, 1.45f, -0.25f, 0.25f, 1.95f, 0.25f, tiles("witch_skin", front = "witch_face", top = "witch_hat")),
+            box(-0.4f, 1.9f, -0.4f, 0.4f, 1.96f, 0.4f, tiles("witch_hat")),
+            box(-0.18f, 1.96f, -0.18f, 0.18f, 2.25f, 0.18f, tiles("witch_hat")),
+            box(-0.08f, 2.25f, -0.08f, 0.08f, 2.45f, 0.08f, tiles("witch_hat")),
+            box(-0.46f, 0.8f, -0.1f, -0.25f, 1.45f, 0.1f, tiles("witch_robe"), -1, pivotY = 1.4f),
+            box(0.25f, 0.8f, -0.1f, 0.46f, 1.45f, 0.1f, tiles("witch_robe"), 1, pivotY = 1.4f),
+        ),
+        MobType.ENDERMAN to listOf(
+            box(-0.16f, 0f, -0.06f, -0.04f, 1.6f, 0.06f, tiles("ender_skin"), 1),
+            box(0.04f, 0f, -0.06f, 0.16f, 1.6f, 0.06f, tiles("ender_skin"), -1),
+            box(-0.22f, 1.6f, -0.12f, 0.22f, 2.35f, 0.12f, tiles("ender_skin")),
+            box(-0.24f, 2.35f, -0.24f, 0.24f, 2.85f, 0.24f, tiles("ender_skin", front = "ender_face")),
+            box(-0.34f, 1.0f, -0.05f, -0.22f, 2.3f, 0.05f, tiles("ender_skin"), -1, pivotY = 2.25f),
+            box(0.22f, 1.0f, -0.05f, 0.34f, 2.3f, 0.05f, tiles("ender_skin"), 1, pivotY = 2.25f),
+        ),
+        MobType.DROWNED to listOf(
+            box(-0.25f, 0f, -0.125f, 0f, 0.75f, 0.125f, tiles("drowned_shirt"), 1),
+            box(0f, 0f, -0.125f, 0.25f, 0.75f, 0.125f, tiles("drowned_shirt"), -1),
+            box(-0.25f, 0.75f, -0.14f, 0.25f, 1.45f, 0.14f, tiles("drowned_shirt")),
+            box(-0.25f, 1.45f, -0.25f, 0.25f, 1.95f, 0.25f, tiles("drowned_skin", front = "drowned_face")),
+            box(-0.5f, 0.75f, -0.125f, -0.25f, 1.45f, 0.125f, tiles("drowned_skin"), 2, pivotY = 1.35f),
+            box(0.25f, 0.75f, -0.125f, 0.5f, 1.45f, 0.125f, tiles("drowned_skin"), 2, pivotY = 1.35f),
+        ),
         MobType.BOOMLING to listOf(
             box(-0.4f, 0.35f, -0.4f, 0.4f, 1.1f, 0.4f, tiles("boomling_shell", front = "boomling_face")),
             box(-0.3f, 1.1f, -0.3f, 0.3f, 1.2f, 0.3f, tiles("boomling_shell")),

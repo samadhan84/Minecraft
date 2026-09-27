@@ -40,6 +40,22 @@ enum class MobType(
     VILLAGER("Villager", 0.3f, 1.9f, 20, false, 1.0f),
     /** Other players in a Wi-Fi game (never spawned naturally). */
     EXPLORER("Explorer", 0.3f, 1.8f, 20, false, 0f),
+    // ---- Added in the creature pack (appended so saves and Wi-Fi stay compatible)
+    CHICKEN("Chicken", 0.25f, 0.8f, 4, false, 1.2f),
+    RABBIT("Rabbit", 0.2f, 0.5f, 3, false, 2.6f),
+    HORSE("Horse", 0.6f, 1.6f, 22, false, 2.0f),
+    WOLF("Wolf", 0.3f, 0.85f, 8, false, 2.8f),
+    CAT("Cat", 0.25f, 0.7f, 10, false, 2.4f),
+    SQUID("Squid", 0.4f, 0.8f, 10, false, 1.5f),
+    COD("Cod", 0.2f, 0.3f, 3, false, 2.2f),
+    SKELETON("Skeleton", 0.3f, 1.95f, 20, true, 2.4f),
+    SLIME("Slime", 0.5f, 1.0f, 16, true, 2.4f),
+    WITCH("Witch", 0.3f, 1.95f, 26, true, 2.0f),
+    /** Tall and quiet: leaves you alone until you hit it, then teleports around and hits hard. */
+    ENDERMAN("Enderman", 0.3f, 2.9f, 40, true, 3.4f),
+    DROWNED("Drowned", 0.3f, 1.95f, 20, true, 2.2f);
+
+    val swims get() = this == SQUID || this == COD
 }
 
 class Mob(val type: MobType, var x: Float, var y: Float, var z: Float, val uid: Int = nextUid++) {
@@ -83,6 +99,8 @@ class Mob(val type: MobType, var x: Float, var y: Float, var z: Float, val uid: 
     var sitting = false
     /** Chickens: seconds until the next egg. Sheep: seconds until the wool grows back. */
     var timer = 0f
+    /** On a lead: follows the player who holds it. */
+    var leashed = false
 
     val dead get() = deathTime >= 0f
 }
@@ -173,6 +191,11 @@ class Mobs(private val world: World) {
         return when (m.type) {
             MobType.COW, MobType.SHEEP -> name == "Wheat"
             MobType.PIG -> name == "Carrot" || name == "Potato"
+            MobType.CHICKEN -> name == "Wheat Seeds"
+            MobType.RABBIT -> name == "Carrot" || name == "Golden Carrot"
+            MobType.HORSE -> name == "Golden Carrot" || name == "Golden Apple"
+            MobType.WOLF -> m.tamed && (name == "Steak" || name == "Raw Beef" || name == "Cooked Porkchop" || name == "Cooked Chicken")
+            MobType.CAT -> m.tamed && (name == "Raw Cod" || name == "Raw Salmon")
             else -> false
         }
     }
@@ -216,14 +239,98 @@ class Mobs(private val world: World) {
             physics(m, dt)
             return
         }
+        if (m.type.swims) { swim(m, dt, game); return }
+        if (game.mount === m) { ridden(m, dt, game); return }
         val p = game.nearestTarget(m.x, m.z)
-        val dx = p.x - m.x; val dz = p.z - m.z
-        val dist = sqrt(dx * dx + dz * dz)
+        var dx = p.x - m.x; var dz = p.z - m.z
+        var dist = sqrt(dx * dx + dz * dz)
         var wantX = 0f; var wantZ = 0f
         var speed = m.type.speed
 
+        // Pets and animals on a lead follow the player.
+        val follows = (m.leashed || (m.tamed && !m.sitting && (m.type == MobType.WOLF || m.type == MobType.CAT)))
+        if (follows) {
+            val pl = game.player
+            val fx = pl.x - m.x; val fz = pl.z - m.z
+            val fd = sqrt(fx * fx + fz * fz)
+            if (fd > 20f && !m.leashed) { m.x = pl.x; m.y = pl.y; m.z = pl.z; m.vx = 0f; m.vz = 0f }
+            else if (m.leashed && fd > 10f) m.leashed = false // the lead snaps
+            // Tamed wolves go for the monster nearest to their owner.
+            val prey = if (m.type == MobType.WOLF && m.tamed) list.filter { it.type.hostile && !it.dead && !it.tamed &&
+                (it.x - pl.x) * (it.x - pl.x) + (it.z - pl.z) * (it.z - pl.z) < 100f }.minByOrNull { (it.x - m.x) * (it.x - m.x) + (it.z - m.z) * (it.z - m.z) } else null
+            if (prey != null) {
+                val px = prey.x - m.x; val pz = prey.z - m.z; val pd = sqrt(px * px + pz * pz).coerceAtLeast(0.01f)
+                m.yaw = atan2(px, -pz); wantX = px / pd; wantZ = pz / pd; speed *= 1.3f
+                m.attackCooldown -= dt
+                if (pd < 1.3f && m.attackCooldown <= 0f) { m.attackCooldown = 0.8f; damage(prey, 4f, px / pd, pz / pd); game.sound("hurt", prey.x, prey.y + 1f, prey.z, 0.6f) }
+            } else if (fd > 3f) { m.yaw = atan2(fx, -fz); wantX = fx / fd; wantZ = fz / fd; speed *= if (fd > 6f) 1.5f else 1f }
+            finishMove(m, dt, wantX, wantZ, speed)
+            return
+        }
+        if (m.tamed && m.sitting) { finishMove(m, dt, 0f, 0f, 0f); return }
+
         when (m.type) {
-            MobType.ZOMBIE -> {
+            MobType.ENDERMAN -> {
+                if (m.angry && dist < 40f && game.playerAlive) {
+                    m.yaw = atan2(dx, -dz)
+                    if (dist > 1f) { wantX = dx / dist; wantZ = dz / dist }
+                    m.attackCooldown -= dt
+                    if (dist < 1.6f && abs(p.y - m.y) < 2.5f && m.attackCooldown <= 0f) {
+                        m.attackCooldown = 1.1f
+                        game.hurtTarget(p, 6f, m.x, m.z)
+                    }
+                    // Now and then it blinks right next to you.
+                    if (dist > 8f && rnd.nextFloat() < dt / 3f) teleportNear(m, p.x, p.z)
+                } else wander(m, dt).let { wantX = it.first; wantZ = it.second; speed *= 0.4f }
+                // Water hurts endermen.
+                if (world.getBlock(floorInt(m.x), floorInt(m.y + 1f), floorInt(m.z)) == Blocks.WATER || (game.rain > 0.5f && skyExposed(floorInt(m.x), floorInt(m.y + 3f), floorInt(m.z)))) {
+                    m.burnTimer += dt; if (m.burnTimer > 1f) { m.burnTimer = 0f; damage(m, 1f, 0f, 0f); teleportNear(m, m.x, m.z) }
+                }
+            }
+            MobType.SLIME -> {
+                m.attackCooldown -= dt
+                if (dist < 16f && game.playerAlive) {
+                    m.yaw = atan2(dx, -dz)
+                    // Slimes move in hops.
+                    if (m.onGround && m.attackCooldown <= 0f) { m.attackCooldown = 1f + rnd.nextFloat(); m.vy = 7f; m.vx = dx / dist * 4f; m.vz = dz / dist * 4f }
+                    if (dist < 1f + m.halfWidth && abs(p.y - m.y) < 1.2f && m.timer <= 0f) { m.timer = 1f; game.hurtTarget(p, if (m.scale < 1f) 1f else 3f, m.x, m.z) }
+                } else if (m.onGround && m.attackCooldown <= 0f) { m.attackCooldown = 2f + rnd.nextFloat() * 2f; m.vy = 6f; m.yaw = rnd.nextFloat() * 6.28f; m.vx = sin(m.yaw) * 2f; m.vz = -cos(m.yaw) * 2f }
+                if (m.timer > 0f) m.timer -= dt
+                m.moving = !m.onGround
+                physics(m, dt)
+                return
+            }
+            MobType.WITCH -> {
+                if (dist < 18f && game.playerAlive) {
+                    m.yaw = atan2(dx, -dz)
+                    if (dist < 5f) { wantX = -dx / dist; wantZ = -dz / dist } else if (dist > 10f) { wantX = dx / dist; wantZ = dz / dist }
+                    m.shootTimer -= dt
+                    if (m.shootTimer <= 0f && dist < 14f) {
+                        // Throws a harmful splash potion.
+                        m.shootTimer = 3f + rnd.nextFloat()
+                        val sx = m.x; val sy = m.y + 1.6f; val sz = m.z
+                        val tx = p.x - sx; val ty = p.eyeY - 0.5f - sy; val tz = p.z - sz
+                        val len = sqrt(tx * tx + ty * ty + tz * tz)
+                        game.projectiles.shoot(sx, sy, sz, tx / len * 14f, ty / len * 14f + len * 0.45f, tz / len * 14f, false, 4f, Projectile.POTION)
+                    }
+                    // Drinks a healing potion when hurt.
+                    m.timer -= dt
+                    if (m.health < 10f && m.timer <= 0f) { m.timer = 12f; m.health = minOf(m.type.maxHealth.toFloat(), m.health + 8f); game.sound("eat", m.x, m.y + 1.5f, m.z, 0.6f) }
+                } else wander(m, dt).let { wantX = it.first; wantZ = it.second; speed *= 0.5f }
+            }
+            MobType.CHICKEN -> {
+                // Lays an egg every few minutes.
+                if (m.timer == 0f) m.timer = 300f + rnd.nextFloat() * 300f
+                m.timer -= dt
+                if (m.timer <= 0f) {
+                    if (m.age >= 0f) game.drops.spawn(com.vishucraft.game.world.ItemStack(com.vishucraft.game.world.Items.find("Egg")), m.x, m.y + 0.3f, m.z)
+                    m.timer = 300f + rnd.nextFloat() * 300f
+                }
+                if (m.fleeTime > 0f) { m.fleeTime -= dt; speed *= 1.8f; if (dist > 0.01f) { wantX = -dx / dist; wantZ = -dz / dist; m.yaw = atan2(wantX, -wantZ) } }
+                else wander(m, dt).let { wantX = it.first; wantZ = it.second }
+                if (m.vy < -2.5f) m.vy = -2.5f // flutters down
+            }
+            MobType.ZOMBIE, MobType.DROWNED -> {
                 if (dist < 28f && game.playerAlive) {
                     m.yaw = atan2(dx, -dz)
                     if (dist > 0.9f) { wantX = dx / dist; wantZ = dz / dist }
@@ -262,8 +369,9 @@ class Mobs(private val world: World) {
                     }
                 } else { m.fuse = -1f; wander(m, dt).let { wantX = it.first; wantZ = it.second; speed *= 0.5f } }
             }
-            MobType.RATTLER -> {
-                val burning = game.daylight > 0.6f && skyExposed(floorInt(m.x), floorInt(m.y + 1.7f), floorInt(m.z))
+            MobType.RATTLER, MobType.SKELETON -> {
+                val burning = game.daylight > 0.6f && skyExposed(floorInt(m.x), floorInt(m.y + 1.7f), floorInt(m.z)) &&
+                    world.getBlock(floorInt(m.x), floorInt(m.y + 0.2f), floorInt(m.z)) != Blocks.WATER
                 m.burning = burning
                 if (burning) { m.burnTimer += dt; if (m.burnTimer >= 1f) { m.burnTimer = 0f; damage(m, 1f, 0f, 0f) } }
                 if (dist < 18f && game.playerAlive) {
@@ -278,7 +386,8 @@ class Mobs(private val world: World) {
                         val tx = p.x - sx; val ty = p.eyeY - 0.3f - sy; val tz = p.z - sz
                         val len = sqrt(tx * tx + ty * ty + tz * tz)
                         val speed = 20f
-                        game.projectiles.shoot(sx, sy, sz, tx / len * speed, ty / len * speed + len * 0.28f, tz / len * speed, false, 3f)
+                        game.projectiles.shoot(sx, sy, sz, tx / len * speed, ty / len * speed + len * 0.28f, tz / len * speed, false, 3f,
+                            if (m.type == MobType.SKELETON) Projectile.ARROW else Projectile.THORN)
                         game.sound("bow", sx, sy, sz, 0.7f)
                     }
                 } else wander(m, dt).let { wantX = it.first; wantZ = it.second; speed *= 0.5f }
@@ -308,15 +417,70 @@ class Mobs(private val world: World) {
             }
         }
 
+        finishMove(m, dt, wantX, wantZ, speed)
+    }
+
+    private fun finishMove(m: Mob, dt: Float, wantX: Float, wantZ: Float, speed: Float) {
         val accel = if (m.onGround) 20f else 5f
         m.vx = approach(m.vx, wantX * speed, accel * dt)
         m.vz = approach(m.vz, wantZ * speed, accel * dt)
         m.moving = abs(wantX) + abs(wantZ) > 0.01f
         val hit = physics(m, dt)
-        // Hop up single blocks; crawlers simply climb.
+        // Hop up single blocks; crawlers simply climb; rabbits hop everywhere.
         if (hit && m.type == MobType.CRAWLER && m.moving) m.vy = 3.5f
         else if (hit && m.onGround && m.moving) m.vy = 8.4f
+        else if (m.type == MobType.RABBIT && m.onGround && m.moving) m.vy = 5f
         if (m.moving && m.onGround) m.walkPhase += sqrt(m.vx * m.vx + m.vz * m.vz) * dt * 3.2f
+    }
+
+    /** A horse with a saddle, steered by the player on its back. */
+    private fun ridden(m: Mob, dt: Float, game: Game) {
+        val pl = game.player
+        m.yaw = pl.yaw
+        val f = game.input.moveForward; val s = game.input.moveStrafe
+        val wx = sin(pl.yaw) * f + cos(pl.yaw) * s; val wz = -cos(pl.yaw) * f + sin(pl.yaw) * s
+        val len = sqrt(wx * wx + wz * wz).coerceAtLeast(1f)
+        if (game.input.jumpHeld && m.onGround) m.vy = 10f
+        finishMove(m, dt, wx / len, wz / len, 8.5f)
+    }
+
+    /** Squid and fish: drift around under water; out of water they flop and slowly suffocate. */
+    private fun swim(m: Mob, dt: Float, game: Game) {
+        val inWater = world.getBlock(floorInt(m.x), floorInt(m.y + 0.2f), floorInt(m.z)) == Blocks.WATER
+        m.moving = true
+        m.walkPhase += dt * 6f
+        if (!inWater) {
+            m.vy -= 25f * dt
+            m.timer += dt
+            if (m.timer > 2f) { m.timer = 0f; damage(m, 1f, 0f, 0f) }
+            physics(m, dt)
+            return
+        }
+        m.timer = 0f
+        m.aiTimer -= dt
+        if (m.aiTimer <= 0f) {
+            m.aiTimer = 2f + rnd.nextFloat() * 3f
+            m.wanderYaw = rnd.nextFloat() * 6.28f
+            m.vy = (rnd.nextFloat() - 0.5f) * 2f
+        }
+        if (m.fleeTime > 0f) m.fleeTime -= dt
+        val sp = m.type.speed * (if (m.fleeTime > 0f) 2f else 1f)
+        m.yaw = turn(m.yaw, m.wanderYaw, dt * 2f)
+        m.vx = approach(m.vx, sin(m.yaw) * sp, 6f * dt); m.vz = approach(m.vz, -cos(m.yaw) * sp, 6f * dt)
+        // Stay in the water.
+        if (world.getBlock(floorInt(m.x), floorInt(m.y + m.height + 0.2f), floorInt(m.z)) != Blocks.WATER && m.vy > 0f) m.vy = -0.5f
+        if (!move(m, 0, m.vx * dt)) m.wanderYaw += 3.14f
+        if (!move(m, 2, m.vz * dt)) m.wanderYaw += 3.14f
+        move(m, 1, m.vy * dt)
+    }
+
+    /** Endermen: vanish and reappear a few blocks away. */
+    private fun teleportNear(m: Mob, cx: Float, cz: Float) {
+        repeat(10) {
+            val x = floorInt(cx) + rnd.nextInt(13) - 6; val z = floorInt(cz) + rnd.nextInt(13) - 6
+            val y = surfaceY(x, z)
+            if (y > 0 && roomAt(x, y + 1, z, 3) && world.getBlock(x, y, z) != Blocks.WATER) { m.x = x + 0.5f; m.y = y + 1f; m.z = z + 0.5f; return }
+        }
     }
 
     /** Flying mobs: hover around, then dive at the player. No gravity. */
@@ -396,7 +560,10 @@ class Mobs(private val world: World) {
         return ok
     }
 
-    fun voice(t: MobType) = t.name.lowercase()
+    fun voice(t: MobType) = when (t) {
+        MobType.DROWNED -> "zombie"; MobType.RABBIT, MobType.SQUID, MobType.COD -> "none"
+        else -> t.name.lowercase()
+    }
 
     fun skyExposed(x: Int, y: Int, z: Int): Boolean {
         for (yy in max(y, 0) until Chunk.HEIGHT) if (Blocks.blocksLight[world.getBlock(x, yy, z)]) return false
@@ -411,12 +578,19 @@ class Mobs(private val world: World) {
         m.vx += kx * 6f; m.vz += kz * 6f
         if (kx != 0f || kz != 0f) m.vy = max(m.vy, 5f)
         if (!m.type.hostile) m.fleeTime = 5f
-        if (m.type == MobType.CRAWLER) m.angry = true
+        if (m.type == MobType.CRAWLER || m.type == MobType.ENDERMAN) m.angry = true
+        if (m.type == MobType.ENDERMAN && m.health > amount && rnd.nextInt(3) == 0) teleportNear(m, m.x, m.z)
         if (m.type == MobType.WISP && m.health > 0f) {
             // Blink a few blocks away.
             m.x += (rnd.nextFloat() - 0.5f) * 8f; m.y += rnd.nextFloat() * 3f; m.z += (rnd.nextFloat() - 0.5f) * 8f
         }
-        if (m.health <= 0f) { m.deathTime = 0f; m.fuse = -1f; onDeath?.invoke(m) }
+        if (m.health <= 0f) {
+            m.deathTime = 0f; m.fuse = -1f; onDeath?.invoke(m)
+            // Big slimes split into small ones.
+            if (m.type == MobType.SLIME && m.age >= 0f) repeat(2 + rnd.nextInt(2)) {
+                list.add(Mob(MobType.SLIME, m.x + rnd.nextFloat() - 0.5f, m.y + 0.3f, m.z + rnd.nextFloat() - 0.5f).also { s -> s.age = -1e9f; s.health = 4f })
+            }
+        }
     }
 
     /** Ray against every mob's box (slab test). */
@@ -487,8 +661,15 @@ class Mobs(private val world: World) {
             if (world.isLoaded(x, z)) {
                 val y = surfaceY(x, z)
                 val ground = world.getBlock(x, y, z)
-                if (y > 0 && (ground == Blocks.GRASS || ground == Blocks.SNOW_GRASS) && roomAt(x, y + 1, z, 2)) {
-                    val type = when (rnd.nextInt(3)) { 0 -> MobType.COW; 1 -> MobType.PIG; else -> MobType.SHEEP }
+                if (y > 0 && ground == Blocks.WATER && rnd.nextInt(2) == 0) {
+                    // Squid and fish in lakes and seas.
+                    val type = if (rnd.nextInt(3) == 0) MobType.SQUID else MobType.COD
+                    repeat(if (type == MobType.COD) 3 else 1) { list.add(Mob(type, x + 0.5f + it * 0.4f, y - 1.5f, z + 0.5f)) }
+                } else if (y > 0 && (ground == Blocks.GRASS || ground == Blocks.SNOW_GRASS || ground == Blocks.SAND) && roomAt(x, y + 1, z, 2)) {
+                    val type = when (rnd.nextInt(12)) {
+                        0, 1 -> MobType.COW; 2, 3 -> MobType.PIG; 4, 5 -> MobType.SHEEP; 6, 7 -> MobType.CHICKEN
+                        8 -> MobType.RABBIT; 9 -> MobType.HORSE; 10 -> MobType.WOLF; else -> MobType.CAT
+                    }
                     repeat(1 + rnd.nextInt(3)) {
                         val ox = x + rnd.nextInt(3) - 1; val oz = z + rnd.nextInt(3) - 1
                         val oy = surfaceY(ox, oz)
@@ -501,9 +682,11 @@ class Mobs(private val world: World) {
         if (hostileEnabled && hostile < 8) {
             val (x, z) = ringPoint(p.x, p.z, 18f, 48f)
             if (!world.isLoaded(x, z)) return
-            val type = when (rnd.nextInt(8)) {
-                0, 1 -> MobType.BOOMLING; 2, 3 -> MobType.RATTLER; 4 -> MobType.CRAWLER; else -> MobType.ZOMBIE
+            var type = when (rnd.nextInt(14)) {
+                0, 1 -> MobType.BOOMLING; 2 -> MobType.RATTLER; 3, 4 -> MobType.SKELETON; 5 -> MobType.CRAWLER
+                6 -> MobType.SLIME; 7 -> MobType.WITCH; 8 -> MobType.ENDERMAN; else -> MobType.ZOMBIE
             }
+            if (type == MobType.ZOMBIE && world.getBlock(x, surfaceY(x, z), z) == Blocks.WATER) type = MobType.DROWNED
             if (game.daylight < 0.3f && rnd.nextInt(6) == 0 && list.count { it.type == MobType.GLIDER } < 2) {
                 val y = surfaceY(x, z)
                 if (y > 0) list.add(Mob(MobType.GLIDER, x + 0.5f, y + 12f, z + 0.5f))

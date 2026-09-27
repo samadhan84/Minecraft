@@ -90,6 +90,15 @@ object Synth {
         make("cow", 1.1f) { tone(it, 0, it.size, { t -> 110f + 25f * sin(t * 5f) + (if (t < 0.2f) t * 150f else 30f) }, 0.6f, 0.6f, 0.08f, floatArrayOf(1f, 0.7f, 0.5f, 0.35f, 0.2f)) }
         make("pig", 0.35f) { for (k in 0..1) tone(it, k * 3500, 3500, { t -> 330f - t * 400f }, 0.5f, 0.07f, 0.01f, floatArrayOf(1f, 0.8f, 0.6f, 0.4f)) }
         make("sheep", 0.8f) { tone(it, 0, it.size, { t -> 380f * (1f + 0.06f * sin(t * 50f)) }, 0.5f, 0.35f, 0.03f, floatArrayOf(1f, 0.6f, 0.4f, 0.3f)) }
+        // Creature pack voices.
+        make("chicken", 0.3f) { for (k in 0..2) tone(it, k * 2200, 1800, { t -> 900f + 300f * sin(t * 90f) }, 0.35f, 0.04f, 0.005f, floatArrayOf(1f, 0.5f, 0.3f)) }
+        make("wolf", 0.4f) { for (k in 0..1) { tone(it, k * 4400, 3000, { t -> 420f - t * 600f }, 0.6f, 0.06f, 0.004f, floatArrayOf(1f, 0.8f, 0.5f, 0.3f)); noiseBurst(it, k * 4400, 1500, 0.3f, 0.03f, 0.3f) } }
+        make("cat", 0.6f) { tone(it, 0, it.size, { t -> 600f + 250f * sin(t * 6f) }, 0.4f, 0.3f, 0.05f, floatArrayOf(1f, 0.5f, 0.35f, 0.2f)) }
+        make("horse", 1.0f) { tone(it, 0, it.size, { t -> 500f + 180f * sin(t * 40f) * (1f - t) - t * 200f }, 0.5f, 0.5f, 0.03f, floatArrayOf(1f, 0.7f, 0.5f, 0.3f)) }
+        make("slime", 0.3f) { noiseBurst(it, 0, it.size, 0.8f, 0.08f, 0.06f); tone(it, 0, it.size, { t -> 140f - t * 200f }, 0.4f, 0.08f) }
+        make("skeleton", 0.35f) { for (k in 0..4) noiseBurst(it, k * 1400, 900, 0.7f, 0.01f, 0.8f) }
+        make("enderman", 1.0f) { tone(it, 0, it.size, { t -> 70f + 400f * t * t }, 0.5f, 0.6f, 0.2f, floatArrayOf(1f, 0.5f, 0.8f)); noiseBurst(it, 0, it.size, 0.2f, 0.5f, 0.2f) }
+        make("witch", 0.7f) { for (k in 0..3) tone(it, k * 3500, 3000, { t -> 700f + k * 60f - t * 300f }, 0.35f, 0.08f, 0.01f, floatArrayOf(1f, 0.6f, 0.4f)) }
         make("zombie", 1.3f) {
             tone(it, 0, it.size, { t -> 90f + 15f * sin(t * 3f) }, 0.6f, 0.7f, 0.2f, floatArrayOf(1f, 0.9f, 0.7f, 0.5f, 0.4f))
             noiseBurst(it, 0, it.size, 0.25f, 0.6f, 0.08f)

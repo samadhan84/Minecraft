@@ -846,7 +846,54 @@ object TextureAtlas {
     }
 
     /** Skins for the Stage 3 creatures (all original designs). */
+    /** A face tile: fur/skin colour with two eyes and an optional nose/mouth colour. */
+    private fun animalFace(t: Tile, base: Int, eye: Int, eyeY: Int = 6, nose: Int? = null, noseW: Int = 4, eyeGap: Int = 3) {
+        noisy(t, base, 0.05f, 0.12f)
+        for (dy in 0..1) { t[7 - eyeGap, eyeY + dy] = eye; t[8 + eyeGap, eyeY + dy] = eye }
+        if (nose != null) for (x in 8 - noseW / 2 until 8 + noseW / 2) { t[x, eyeY + 4] = nose; t[x, eyeY + 5] = nose }
+    }
+
+    private fun creatureSkin(name: String, t: Tile): Boolean {
+        when (name) {
+            "chicken_feathers" -> noisy(t, rgb(240, 240, 236), 0.03f, 0.08f)
+            "chicken_face" -> { animalFace(t, rgb(240, 240, 236), rgb(20, 20, 20), 4, rgb(240, 180, 40), 4); for (x in 7..8) for (y in 11..13) t[x, y] = rgb(210, 40, 40) }
+            "chicken_leg" -> noisy(t, rgb(236, 180, 40), 0.05f, 0.1f)
+            "rabbit_fur" -> noisy(t, rgb(160, 120, 80), 0.08f, 0.2f)
+            "rabbit_face" -> { animalFace(t, rgb(160, 120, 80), rgb(20, 20, 20), 6, rgb(230, 150, 150), 2) }
+            "horse_hide" -> noisy(t, rgb(120, 76, 40), 0.06f, 0.15f)
+            "horse_mane" -> noisy(t, rgb(50, 34, 20), 0.1f, 0.2f)
+            "horse_face" -> { animalFace(t, rgb(120, 76, 40), rgb(20, 20, 20), 4, rgb(60, 40, 24), 6); for (x in 5..10) t[x, 1] = rgb(230, 220, 200) }
+            "horse_leg" -> t.fill { _, y -> scale(if (y > 12) rgb(50, 40, 30) else rgb(120, 76, 40), t.jitter(0.05f)) }
+            "wolf_fur" -> noisy(t, rgb(200, 196, 190), 0.07f, 0.2f)
+            "wolf_face" -> animalFace(t, rgb(200, 196, 190), rgb(30, 30, 30), 5, rgb(40, 34, 30), 4)
+            "cat_fur" -> t.fill { x, y -> scale(if ((x + y / 3) % 5 < 2) rgb(170, 110, 50) else rgb(220, 150, 70), t.jitter(0.05f)) }
+            "cat_face" -> { animalFace(t, rgb(220, 150, 70), rgb(60, 180, 60), 6, rgb(230, 140, 140), 2, 4); t[1, 0] = rgb(170, 110, 50); t[14, 0] = rgb(170, 110, 50) }
+            "squid_skin" -> noisy(t, rgb(50, 70, 110), 0.08f, 0.2f)
+            "squid_face" -> animalFace(t, rgb(50, 70, 110), rgb(240, 240, 240), 7, null)
+            "cod_scales" -> t.fill { x, y -> scale(if (y < 5) rgb(150, 130, 90) else rgb(200, 180, 140), t.jitter(0.06f)) }
+            "cod_face" -> animalFace(t, rgb(180, 160, 120), rgb(10, 10, 10), 6, null, eyeGap = 5)
+            "skeleton_bone" -> noisy(t, rgb(210, 210, 204), 0.04f, 0.1f)
+            "skeleton_ribs" -> t.fill { x, y -> if (y % 3 == 0 || x == 7 || x == 8) scale(rgb(210, 210, 204), t.jitter(0.04f)) else rgb(40, 40, 40) }
+            "skeleton_skull" -> noisy(t, rgb(214, 214, 208), 0.03f, 0.08f)
+            "skeleton_face" -> { noisy(t, rgb(214, 214, 208), 0.03f, 0.08f); for (y in 5..8) for (x in listOf(3, 4, 5, 10, 11, 12)) t[x, y] = rgb(30, 30, 30); for (x in 4..11) t[x, 12] = if (x % 2 == 0) rgb(30, 30, 30) else rgb(180, 180, 176) }
+            "slime_skin" -> noisy(t, rgb(110, 190, 90), 0.05f, 0.15f)
+            "slime_face" -> { noisy(t, rgb(110, 190, 90), 0.05f, 0.15f); for (y in 5..7) for (x in listOf(3, 4, 11, 12)) t[x, y] = rgb(30, 60, 30); for (x in 7..9) t[x, 11] = rgb(30, 60, 30) }
+            "witch_robe" -> noisy(t, rgb(80, 40, 110), 0.07f, 0.15f)
+            "witch_hat" -> noisy(t, rgb(40, 30, 40), 0.08f, 0.15f)
+            "witch_skin" -> noisy(t, rgb(170, 190, 130), 0.04f, 0.1f)
+            "witch_face" -> { animalFace(t, rgb(170, 190, 130), rgb(90, 40, 120), 6, rgb(120, 150, 90), 2); t[8, 12] = rgb(80, 60, 60) }
+            "ender_skin" -> noisy(t, rgb(24, 20, 30), 0.1f, 0.2f)
+            "ender_face" -> { noisy(t, rgb(24, 20, 30), 0.1f, 0.2f); for (x in 2..6) t[x, 8] = rgb(210, 120, 250); for (x in 9..13) t[x, 8] = rgb(210, 120, 250); t[4, 8] = rgb(250, 220, 255); t[11, 8] = rgb(250, 220, 255) }
+            "drowned_skin" -> noisy(t, rgb(80, 150, 140), 0.07f, 0.2f)
+            "drowned_face" -> animalFace(t, rgb(80, 150, 140), rgb(120, 240, 230), 6, rgb(40, 80, 70), 6)
+            "drowned_shirt" -> noisy(t, rgb(60, 110, 100), 0.1f, 0.25f)
+            else -> return false
+        }
+        return true
+    }
+
     private fun newMobSkin(name: String, t: Tile): Boolean {
+        if (creatureSkin(name, t)) return true
         when (name) {
             "rattler_bark" -> { logSide(t, rgb(92, 70, 46), rgb(60, 44, 28), false); repeat(6) { t[t.rnd.nextInt(16), t.rnd.nextInt(16)] = rgb(80, 120, 50) } }
             "rattler_chest" -> { logSide(t, rgb(92, 70, 46), rgb(60, 44, 28), false); for (y in 3..12) t[7, y] = rgb(60, 150, 140); t[6, 6] = rgb(60, 150, 140); t[8, 9] = rgb(60, 150, 140) }
