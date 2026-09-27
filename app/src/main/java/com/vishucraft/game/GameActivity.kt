@@ -484,6 +484,16 @@ class GameActivity : Activity() {
                 else screen.open(ContainerScreen.Mode.FURNACE, furnaceEntity = world.blockEntities.furnace(x, y, z))
             }
             e == "craft" -> { sounds.play("craft"); updateHand() }
+            e == "open:ender" -> { releaseInputs(); screen.open(ContainerScreen.Mode.CHEST, chestEntity = level.enderChest) }
+            e.startsWith("signedit:") -> {
+                val (x, y, z) = e.removePrefix("signedit:").split(',').map { it.toInt() }
+                releaseInputs()
+                val input = android.widget.EditText(this).apply { hint = "Text on the sign"; setText(game.signText(x, y, z)) }
+                android.app.AlertDialog.Builder(this).setTitle("Sign").setView(input)
+                    .setPositiveButton("OK") { _, _ -> val txt = input.text.toString(); glView.queueEvent { game.setSignText(x, y, z, txt) } }
+                    .setNegativeButton("Cancel", null).show()
+                input.requestFocus()
+            }
             e.startsWith("achievement:") -> showToast("Achievement unlocked!\n" + e.removePrefix("achievement:"))
             e.startsWith("trade:") -> e.removePrefix("trade:").toIntOrNull()?.let { showTrades(it) }
             e.startsWith("name:") -> {

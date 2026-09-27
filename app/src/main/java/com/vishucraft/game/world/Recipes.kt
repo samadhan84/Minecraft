@@ -258,6 +258,27 @@ object Recipes {
         r(dye("purple"), 2, false, dye("blue") to 1, dye("red") to 1)
         r(dye("magenta"), 2, false, dye("purple") to 1, dye("pink") to 1)
         for (c in Blocks.DYES) if (c != "white") r(woolIds.getValue(c), 1, false, Blocks.WOOL_WHITE to 1, dye(c) to 1)
+
+        // ---- Block pack 2
+        val logs = intArrayOf(Blocks.LOG, Blocks.SPRUCE_LOG, Blocks.BIRCH_LOG, Blocks.JUNGLE_LOG, Blocks.ACACIA_LOG, Blocks.DARK_OAK_LOG)
+        for ((k, c) in Blocks.DYES.withIndex()) {
+            sh(Blocks.CARPET_FIRST + k, 3, listOf("WW"), 'W' to woolIds.getValue(c))
+            sh(Blocks.BANNER_FIRST + k, 1, listOf("WWW", "WWW", " S "), 'W' to woolIds.getValue(c), 'S' to stick)
+        }
+        sh(Blocks.LANTERN, 1, listOf("NNN", "NTN", "NNN"), 'N' to i("Iron Nugget"), 'T' to Blocks.TORCH)
+        sh(Blocks.CAMPFIRE, 1, listOf(" S ", "SCS", "LLL"), 'S' to stick, 'C' to coal, 'L' to logs)
+        sh(Blocks.BARREL, 1, listOf("PSP", "P P", "PSP"), 'P' to planks, 'S' to Blocks.OAK_SLAB)
+        sh(Blocks.ENDER_CHEST, 1, listOf("OOO", "OEO", "OOO"), 'O' to Blocks.OBSIDIAN, 'E' to i("Eye of Ender"))
+        sh(Blocks.ANVIL, 1, listOf("BBB", " I ", "III"), 'B' to Blocks.IRON_BLOCK, 'I' to iron)
+        sh(Blocks.COMPOSTER, 1, listOf("S S", "S S", "SSS"), 'S' to Blocks.OAK_SLAB)
+        sh(Blocks.BELL, 1, listOf("SSS", "GGG", "G G"), 'S' to stick, 'G' to gold)
+        sh(Blocks.SCAFFOLDING, 6, listOf("SWS", "S S", "S S"), 'S' to stick, 'W' to i("String"))
+        sh(Blocks.BREWING_STAND, 1, listOf(" B ", "CCC"), 'B' to i("Blaze Rod"), 'C' to cobble)
+        sh(Blocks.CAKE, 1, listOf("MMM", "SES", "WWW"), 'M' to i("Milk Bucket"), 'S' to i("Sugar"), 'E' to i("Egg"), 'W' to i("Wheat"))
+        sh(Blocks.SIGN, 3, listOf("PPP", "PPP", " S "), 'P' to planks, 'S' to stick)
+        sh(Blocks.PAINTING, 1, listOf("SSS", "SWS", "SSS"), 'S' to stick, 'W' to woolIds.values.toIntArray())
+        sh(Blocks.ITEM_FRAME, 1, listOf("SSS", "SLS", "SSS"), 'S' to stick, 'L' to i("Leather"))
+        sh(i("Oak Boat"), 1, listOf("P P", "PPP"), 'P' to planks)
         crafting = list
 
         smelting = mapOf(

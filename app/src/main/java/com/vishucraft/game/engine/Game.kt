@@ -63,6 +63,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
     val drops = ItemEntities(world)
     val projectiles = Projectiles(world)
     val carts = Carts(world)
+    val boats = Boats(world)
     val dimension get() = world.dimension
     private var portalTime = 0f
     private var bowCooldown = 0f
@@ -90,7 +91,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
         private set
     /** Hunger (20 = full) and hidden saturation, as in the usual survival rules. */
     var food = level.food.coerceIn(0f, 20f)
-        private set
+        internal set
     private var saturation = level.saturation
     private var exhaustion = 0f
     private var starveTimer = 0f
@@ -391,7 +392,8 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
             val jumpPressed = input.jumpHeld && !lastJump
             val crouchPressed = input.descendHeld && !lastCrouch
             lastJump = input.jumpHeld; lastCrouch = input.descendHeld
-            if (mount != null && crouchPressed) dismount()
+            if (boats.riding != null && crouchPressed) { boats.riding = null; player.y += 0.8f }
+            else if (mount != null && crouchPressed) dismount()
             else if (carts.riding != null && crouchPressed) { carts.riding = null; player.y += 0.6f }
             else if (carts.riding == null && jumpPressed && !player.flying) {
                 val len = sqrt(dir[0] * dir[0] + dir[2] * dir[2]).coerceAtLeast(0.01f)
@@ -400,7 +402,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
             lastVy = player.vy
             player.speedMul = (if (input.sprint && !player.flying) 1.3f else 1f) * (if (hasEffect("swiftness")) 1.4f else 1f)
             player.jumpMul = if (hasEffect("leaping")) 1.22f else 1f
-            if (carts.riding == null && mount == null) player.update(dt, world, input.moveForward, input.moveStrafe, input.jumpHeld, input.descendHeld)
+            if (carts.riding == null && mount == null && boats.riding == null) player.update(dt, world, input.moveForward, input.moveStrafe, input.jumpHeld, input.descendHeld)
             updateFlight(dt)
             // Fall damage when landing hard (not while flying or in water).
             if (player.onGround && !wasOnGround && !player.flying && !player.inWater && lastVy < -14f && !hasEffect("slow_falling")) {
@@ -433,6 +435,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
         }
 
         updateEffects(dt)
+        updateCampfires(dt)
         if (survival) updateAir(dt) else air = 10f
         achievementTimer += dt
         if (achievementTimer >= 1f) { achievementTimer = 0f; checkInventoryAchievements() }
@@ -444,6 +447,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
         }
         projectiles.update(dt, this)
         carts.update(dt, this)
+        boats.update(dt, this)
         if (bowCooldown > 0f) bowCooldown -= dt
         // Standing in a portal for two seconds travels to the other world.
         val here = world.getBlock(player.blockX(), floorInt(player.y + 0.5f), player.blockZ())
@@ -746,6 +750,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
             when (be) {
                 is ChestEntity -> be.slots.forEach { s -> if (s != null) drops.spawn(s, x + 0.5f, y + 0.5f, z + 0.5f) }
                 is FurnaceEntity -> be.contents().forEach { s -> drops.spawn(s, x + 0.5f, y + 0.5f, z + 0.5f) }
+                is com.vishucraft.game.world.ItemHolderEntity -> be.stack?.let { drops.spawn(it, x + 0.5f, y + 0.5f, z + 0.5f) }
                 else -> {}
             }
             if (Blocks[id].hardness > 0f) damageHeld(if (heldItem()?.tool == ToolType.SWORD) 2 else 1)
@@ -937,6 +942,158 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
         player.y = h.y + 1.2f; player.x += 0.8f
     }
 
+    // ---------------------------------------------------------------- block pack 2
+
+    /** Anvil: repairs the held tool or armor with iron ingots (a quarter per ingot) for one level. */
+    private fun repairHeld() {
+        val s = heldStack(); val def = s?.let { Items[it.id] }
+        if (s == null || def == null || def.durability <= 0 || s.damage <= 0) { uiEvents.add("toast:Hold a damaged tool, weapon or armor and tap the anvil"); return }
+        if (!survival) { s.damage = 0; uiEvents.add("toast:Repaired!"); sound("click", player.x, player.y, player.z); return }
+        if (xpLevel < 1) { uiEvents.add("toast:Repairing costs 1 level"); return }
+        val iron = Items.find("Iron Ingot")
+        val quarter = (def.durability + 3) / 4
+        val need = ((s.damage + quarter - 1) / quarter).coerceAtLeast(1)
+        val use = minOf(need, inventory.count(iron))
+        if (use == 0) { uiEvents.add("toast:You need iron ingots to repair it"); return }
+        inventory.remove(iron, use)
+        s.damage = maxOf(0, s.damage - use * quarter)
+        // One level less.
+        var total = 0; for (l in 0 until xpLevel - 1) total += com.vishucraft.game.world.Xp.needed(l)
+        level.xp = total
+        sound("click", player.x, player.y, player.z)
+        uiEvents.add("toast:" + if (s.damage == 0) "Repaired!" else "Partly repaired (more iron needed)")
+    }
+
+    /** Composter: plant scraps fill it up; when full it gives bone meal. */
+    private fun compost(x: Int, y: Int, z: Int, item: ItemDef?) {
+        val m = world.getMeta(x, y, z)
+        if (m >= 7) {
+            drops.spawn(ItemStack(Items.find("Bone Meal")), x + 0.5f, y + 1.1f, z + 0.5f)
+            setBlock(x, y, z, Blocks.COMPOSTER, 0)
+            return
+        }
+        val held = heldId()
+        val plant = item?.name in setOf("Wheat Seeds", "Wheat", "Carrot", "Potato", "Apple", "Melon Slice", "Beetroot", "Sweet Berries", "Glow Berries", "Cookie", "Bread", "Pumpkin Pie") ||
+            (!Items.isItem(held) && held != 0 && (Blocks[held].category == com.vishucraft.game.world.Category.NATURE && Blocks[held].tool != ToolType.PICKAXE))
+        if (!plant) { uiEvents.add("toast:Put plants, seeds or food in the composter"); return }
+        consumeHeld()
+        if (java.util.Random().nextInt(100) < 60) setBlock(x, y, z, Blocks.COMPOSTER, m + 1)
+        blockSound(Blocks.GRASS, x, y, z, 0.6f)
+        if (m + 1 >= 7) uiEvents.add("toast:The composter is full: tap it for bone meal")
+    }
+
+    /** Brewing stand: a glass bottle in hand plus an ingredient in the inventory makes a potion. */
+    private fun brew() {
+        val bottle = Items.find("Glass Bottle")
+        if (heldId() != bottle) { uiEvents.add("toast:Hold a glass bottle. Ingredients: golden carrot, ghast tear, sugar, rabbit's foot, magma cream, blaze powder or phantom membrane"); return }
+        val recipes = listOf("Golden Carrot" to "Healing", "Ghast Tear" to "Regeneration", "Sugar" to "Swiftness", "Rabbit's Foot" to "Leaping",
+            "Magma Cream" to "Fire Resistance", "Blaze Powder" to "Strength", "Phantom Membrane" to "Slow Falling")
+        val (ing, potion) = recipes.firstOrNull { inventory.count(Items.find(it.first)) > 0 } ?: run { uiEvents.add("toast:You need an ingredient in your inventory"); return }
+        inventory.remove(Items.find(ing), 1)
+        consumeHeld()
+        val p = Items.find("Potion of $potion")
+        if (inventory.add(p, 1) > 0) drops.spawn(ItemStack(p), player.x, player.y + 1f, player.z)
+        sound("splash", player.x, player.y + 1f, player.z, 0.5f)
+        uiEvents.add("toast:Brewed a Potion of $potion")
+    }
+
+    /** Cake: seven slices, each fills 2 hunger points. */
+    private fun eatCake(x: Int, y: Int, z: Int) {
+        if (survival && food >= 20f) { uiEvents.add("toast:You're not hungry"); return }
+        food = minOf(20f, food + 2f); saturation = minOf(food, saturation + 0.4f)
+        val m = world.getMeta(x, y, z) + 1
+        if (m >= 7) setBlock(x, y, z, Blocks.AIR) else setBlock(x, y, z, Blocks.CAKE, m)
+        sound("eat", x + 0.5f, y + 0.5f, z + 0.5f)
+    }
+
+    /** Writes text on a sign (from the sign screen). */
+    fun setSignText(x: Int, y: Int, z: Int, text: String) {
+        if (world.getBlock(x, y, z) != Blocks.SIGN) return
+        world.blockEntities.sign(x, y, z)?.text = text.take(60)
+    }
+
+    fun signText(x: Int, y: Int, z: Int): String = (world.blockEntities.get(x, y, z) as? com.vishucraft.game.world.SignEntity)?.text ?: ""
+
+    /** Item frame: put the held item in, or take the item out with an empty hand. */
+    private fun useFrame(x: Int, y: Int, z: Int) {
+        val h = world.blockEntities.holder(x, y, z) ?: return
+        val held = heldStack()
+        val inside = h.stack
+        if (inside != null && held == null) {
+            if (inventory.add(inside.id, inside.count, inside.damage) > 0) drops.spawn(inside, x + 0.5f, y + 0.5f, z + 0.5f)
+            h.stack = null
+        } else if (inside == null && held != null) {
+            h.stack = ItemStack(held.id, 1, held.damage)
+            if (survival) consumeHeld() else Unit
+        } else if (inside != null) uiEvents.add("toast:Item frame: ${Items.displayName(inside.id)}")
+        dirtyChunks.add(Chunk.key(x shr 4, z shr 4))
+        sound("click", x + 0.5f, y + 0.5f, z + 0.5f, 0.5f)
+    }
+
+    /** Jukebox: insert a music disc to play it; tap again to take it out. */
+    private fun useJukebox(x: Int, y: Int, z: Int) {
+        val h = world.blockEntities.holder(x, y, z) ?: return
+        val inside = h.stack
+        if (inside != null) {
+            if (inventory.add(inside.id, 1) > 0) drops.spawn(inside, x + 0.5f, y + 1f, z + 0.5f)
+            h.stack = null
+            uiEvents.add("toast:Took out ${Items.displayName(inside.id)}")
+            return
+        }
+        val name = heldItem()?.name
+        if (name == null || !name.startsWith("Music Disc")) { uiEvents.add("toast:Put a music disc in the jukebox"); return }
+        h.stack = ItemStack(heldId(), 1)
+        consumeHeld()
+        val tune = name.substringAfter("(").removeSuffix(")").lowercase()
+        sound("disc_$tune", x + 0.5f, y + 1f, z + 0.5f, 1.2f)
+        uiEvents.add("toast:Now playing: ${name.substringAfter("(").removeSuffix(")")}")
+    }
+
+    /** Raw food cooks on a campfire in a few seconds. */
+    private fun campfireCooks(name: String?): String? = when (name) {
+        "Raw Beef" -> "Steak"; "Raw Porkchop" -> "Cooked Porkchop"; "Raw Mutton" -> "Cooked Mutton"; "Raw Chicken" -> "Cooked Chicken"
+        "Raw Cod" -> "Cooked Cod"; "Raw Salmon" -> "Cooked Salmon"; "Raw Rabbit" -> "Cooked Rabbit"; "Potato" -> "Baked Potato"
+        "Dried Kelp" -> null; else -> null
+    }
+
+    private class Cooking(val x: Int, val y: Int, val z: Int, val result: Int, var left: Float)
+    private val cooking = ArrayList<Cooking>()
+
+    private fun cookOnCampfire(x: Int, y: Int, z: Int, item: ItemDef) {
+        if (cooking.count { it.x == x && it.y == y && it.z == z } >= 4) { uiEvents.add("toast:The campfire is full"); return }
+        cooking.add(Cooking(x, y, z, Items.find(campfireCooks(item.name)!!), 6f))
+        consumeHeld()
+        sound("fuse", x + 0.5f, y + 0.5f, z + 0.5f, 0.4f)
+    }
+
+    private fun updateCampfires(dt: Float) {
+        val it = cooking.iterator()
+        while (it.hasNext()) {
+            val c = it.next()
+            if (world.getBlock(c.x, c.y, c.z) != Blocks.CAMPFIRE) { it.remove(); continue }
+            c.left -= dt
+            if (c.left <= 0f) { drops.spawn(ItemStack(c.result), c.x + 0.5f, c.y + 0.8f, c.z + 0.5f); it.remove() }
+        }
+        // Standing in a campfire burns.
+        if (survival && !hasEffect("fire_resistance") && world.getBlock(player.blockX(), floorInt(player.y + 0.1f), player.blockZ()) == Blocks.CAMPFIRE) {
+            campfireBurn += dt
+            if (campfireBurn >= 1f) { campfireBurn = 0f; hurtPlayer(1f, player.x, player.z, knockback = false) }
+        } else campfireBurn = 0f
+    }
+    private var campfireBurn = 0f
+
+    /** For the HUD: sign text or item frame contents under the crosshair. */
+    fun lookedAtBlockLabel(): String? {
+        val t = target ?: return null
+        return when (t.block) {
+            Blocks.SIGN -> signText(t.x, t.y, t.z).ifEmpty { null }?.let { "“$it”" }
+            Blocks.ITEM_FRAME -> (world.blockEntities.get(t.x, t.y, t.z) as? com.vishucraft.game.world.ItemHolderEntity)?.stack?.let { Items.displayName(it.id) }
+            Blocks.JUKEBOX -> (world.blockEntities.get(t.x, t.y, t.z) as? com.vishucraft.game.world.ItemHolderEntity)?.stack?.let { "Playing: " + Items.displayName(it.id) }
+            Blocks.COMPOSTER -> "Composter ${world.getMeta(t.x, t.y, t.z).coerceAtMost(7)}/7"
+            else -> null
+        }
+    }
+
     /** Villager trade [index] with the villager [uid]. Returns a message for the screen. */
     fun trade(uid: Int, index: Int): String {
         val v = mobs.list.firstOrNull { it.uid == uid && it.type == MobType.VILLAGER } ?: return "The villager walked away"
@@ -963,7 +1120,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
 
     /** What the crosshair is on: a named or tamed mob's label for the HUD. */
     fun lookedAtLabel(): String? {
-        val hit = mobs.raycast(player.x, player.eyeY, player.z, dir[0], dir[1], dir[2], 8f) ?: return null
+        val hit = mobs.raycast(player.x, player.eyeY, player.z, dir[0], dir[1], dir[2], 8f) ?: return lookedAtBlockLabel()
         val m = hit.mob
         val name = m.customName
         return when {
@@ -1089,11 +1246,32 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
             return
         }
         if (mount != null) { dismount(); return }
+        if (boats.riding != null) { boats.riding = null; player.y += 0.8f; return }
+        // Boats: tap to get in; a sword or axe breaks one back into an item.
+        boats.raycast(player.x, player.eyeY, player.z, dir[0], dir[1], dir[2], 4f)?.let { b ->
+            if (item?.tool == ToolType.SWORD || item?.tool == ToolType.AXE) {
+                boats.list.remove(b)
+                if (survival) drops.spawn(ItemStack(Items.find("Oak Boat")), b.x, b.y + 0.5f, b.z)
+            } else { boats.riding = b; carts.riding = null }
+            return
+        }
+        if (item?.use == ItemUse.BOAT) {
+            val w = Raycast.cast(world, player.x, player.eyeY, player.z, dir[0], dir[1], dir[2], REACH, hitWater = true)
+            if (w != null) {
+                val onWater = w.block == Blocks.WATER
+                val y = if (onWater) w.y + 0.5f else w.y + 1f
+                boats.list.add(Boat(w.x + 0.5f, y, w.z + 0.5f).also { it.yaw = player.yaw })
+                consumeHeld()
+                return
+            }
+        }
         if (item != null && useItem(item)) return
         mobs.raycast(player.x, player.eyeY, player.z, dir[0], dir[1], dir[2], 4f)?.let { m ->
             if (item != null && useOnMob(item, m.mob)) return
             if (!isClient && petActions(item, sel, m.mob)) return
         }
+        // Raw food on a campfire cooks instead of being eaten.
+        target?.let { c -> if (c.block == Blocks.CAMPFIRE && item != null && campfireCooks(item.name) != null) { cookOnCampfire(c.x, c.y, c.z, item); return } }
         // Eating works without looking at anything.
         if (item != null && item.use == ItemUse.EAT && mobs.raycast(player.x, player.eyeY, player.z, dir[0], dir[1], dir[2], 4f)?.let { mobs.wantsFood(it.mob, sel) } != true) {
             if (eat(item)) {
@@ -1163,8 +1341,18 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
             }
             Blocks.HOPPER -> { world.blockEntities.hopper(t.x, t.y, t.z); net?.openContainer(t.x, t.y, t.z, 2); uiEvents.add("open:hopper:${t.x},${t.y},${t.z}"); return }
             Blocks.FURNACE -> { world.blockEntities.furnace(t.x, t.y, t.z); net?.openContainer(t.x, t.y, t.z, 1); uiEvents.add("open:furnace:${t.x},${t.y},${t.z}"); return }
-            Blocks.CHEST -> { world.blockEntities.chest(t.x, t.y, t.z); net?.openContainer(t.x, t.y, t.z, 0); uiEvents.add("open:chest:${t.x},${t.y},${t.z}"); return }
-            Blocks.NOTE_BLOCK, Blocks.JUKEBOX -> if (item == null) return
+            Blocks.CHEST, Blocks.BARREL -> { world.blockEntities.chest(t.x, t.y, t.z); net?.openContainer(t.x, t.y, t.z, 0); uiEvents.add("open:chest:${t.x},${t.y},${t.z}"); return }
+            Blocks.ENDER_CHEST -> { uiEvents.add("open:ender"); sound("door", t.x + 0.5f, t.y + 0.5f, t.z + 0.5f, 0.5f); return }
+            Blocks.ANVIL -> { repairHeld(); return }
+            Blocks.COMPOSTER -> { compost(t.x, t.y, t.z, item); return }
+            Blocks.BELL -> { sound("bell", t.x + 0.5f, t.y + 0.5f, t.z + 0.5f); return }
+            Blocks.BREWING_STAND -> { brew(); return }
+            Blocks.CAKE -> { eatCake(t.x, t.y, t.z); return }
+            Blocks.SIGN -> { uiEvents.add("signedit:${t.x},${t.y},${t.z}"); return }
+            Blocks.ITEM_FRAME -> { useFrame(t.x, t.y, t.z); return }
+            Blocks.JUKEBOX -> { useJukebox(t.x, t.y, t.z); return }
+            Blocks.CAMPFIRE -> if (item != null && campfireCooks(item.name) != null) { cookOnCampfire(t.x, t.y, t.z, item); return }
+            Blocks.NOTE_BLOCK -> if (item == null) return
         }
 
         if (item != null) {
@@ -1370,13 +1558,15 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
             }
             Blocks.OAK_STAIRS, Blocks.COBBLESTONE_STAIRS, Blocks.STONE_BRICK_STAIRS, Blocks.BRICK_STAIRS,
             Blocks.SANDSTONE_STAIRS, in trapdoors -> if (t.ny == -1) meta = meta or S.UPPER
-            Blocks.LADDER -> {
+            Blocks.LADDER, Blocks.PAINTING, Blocks.ITEM_FRAME -> {
                 if (t.ny != 0 || !Blocks.opaque[t.block]) return
                 meta = if (t.nz == 1) 2 else if (t.nz == -1) 3 else if (t.nx == 1) 4 else 5
+                if (id == Blocks.PAINTING) meta = meta or (java.util.Random().nextInt(4) shl 3)
             }
             Blocks.REPEATER, Blocks.OBSERVER -> meta = meta xor 1
         }
         setBlock(x, y, z, id, meta)
+        if (id == Blocks.SIGN) uiEvents.add("signedit:$x,$y,$z")
         if (com.vishucraft.game.world.Rails.isRail(id)) {
             updateRail(x, y, z)
             for ((dx, dz) in arrayOf(1 to 0, -1 to 0, 0 to 1, 0 to -1)) for (dy in -1..1) updateRail(x + dx, y + dy, z + dz)
@@ -1454,7 +1644,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
         try {
             dir.mkdirs()
             val tmp = File(dir, "entities.dat.tmp")
-            java.io.DataOutputStream(tmp.outputStream().buffered()).use { d -> mobs.write(d); carts.write(d) }
+            java.io.DataOutputStream(tmp.outputStream().buffered()).use { d -> mobs.write(d); carts.write(d); boats.write(d) }
             tmp.renameTo(File(dir, "entities.dat"))
         } catch (_: Exception) {}
     }
@@ -1462,6 +1652,6 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
     private fun loadEntities() {
         val f = File(world.dataDir ?: return, "entities.dat")
         if (!f.exists()) return
-        try { java.io.DataInputStream(f.inputStream().buffered()).use { d -> mobs.read(d); carts.read(d) } } catch (_: Exception) {}
+        try { java.io.DataInputStream(f.inputStream().buffered()).use { d -> mobs.read(d); carts.read(d); boats.read(d) } } catch (_: Exception) {}
     }
 }

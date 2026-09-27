@@ -210,13 +210,15 @@ class LevelData(
     var xp: Int = 0,
     /** Keys of the achievements already earned (see Achievements). */
     val achievements: MutableSet<String> = LinkedHashSet(),
+    /** The ender chest: the same 27 slots behind every ender chest in the world. */
+    val enderChest: ChestEntity = ChestEntity(),
 ) {
     val hasPassword get() = passwordHash.isNotEmpty()
     fun checkPassword(password: String) = !hasPassword || hashPassword(password) == passwordHash
     fun setPassword(password: String) { passwordHash = if (password.isEmpty()) "" else hashPassword(password) }
 
     companion object {
-        private const val VERSION = 6
+        private const val VERSION = 7
 
         /** Passwords are never stored or sent as plain text. */
         fun hashPassword(password: String): String {
@@ -273,6 +275,7 @@ class LevelData(
                             l.xp = d.readInt()
                             repeat(d.readInt()) { l.achievements.add(d.readUTF()) }
                         }
+                        if (version >= 7) for (i in l.enderChest.slots.indices) l.enderChest.slots[i] = Inventory.readStack(d)
                     }
                     l.hasPlayer = true
                     l
@@ -307,6 +310,7 @@ class LevelData(
             d.writeInt(xp)
             d.writeInt(achievements.size)
             for (a in achievements) d.writeUTF(a)
+            for (s in enderChest.slots) Inventory.writeStack(d, s)
         }
         tmp.renameTo(f)
     }

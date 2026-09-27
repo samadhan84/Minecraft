@@ -1276,7 +1276,65 @@ object TextureAtlas {
         }
     }
 
+    /** Block pack 2: lanterns, campfires, barrels, anvils, cakes, paintings... (original pixel art). */
+    private fun blockPack2(name: String, t: Tile): Boolean {
+        val iron = rgb(90, 90, 96); val wood = rgb(150, 112, 62)
+        when (name) {
+            "lantern" -> t.fill { x, y ->
+                when {
+                    x < 2 || x > 13 || y < 2 || y > 13 || x == 7 || x == 8 -> scale(iron, t.jitter(0.05f))
+                    else -> mix(rgb(255, 200, 80), rgb(255, 240, 170), (1f - abs(y - 8f) / 8f))
+                }
+            }
+            "campfire_top" -> { t.fill { x, y -> if ((x / 4 + y / 4) % 2 == 0) scale(rgb(110, 80, 50), t.jitter(0.1f)) else mix(rgb(250, 120, 20), rgb(255, 220, 90), t.rnd.nextFloat()) } }
+            "campfire_side" -> t.fill { x, y -> if (y > 9) scale(rgb(110, 80, 50), t.jitter(0.1f)) else if (y > 5 && (x + y) % 3 != 0) rgb(250, 150, 30) else 0 }
+            "barrel_top" -> { planks(t, rgb(140, 100, 56)); for (i in 0 until 16) { t[i, 0] = iron; t[i, 15] = iron; t[0, i] = iron; t[15, i] = iron }; for (x in 6..9) for (y in 6..9) t[x, y] = rgb(70, 50, 30) }
+            "barrel_side" -> { logSide(t, rgb(140, 100, 56), rgb(100, 70, 40), false); for (x in 0 until 16) { t[x, 2] = iron; t[x, 13] = iron } }
+            "ender_chest_top" -> noisy(t, rgb(24, 36, 40), 0.1f, 0.2f)
+            "ender_chest_side" -> { noisy(t, rgb(24, 36, 40), 0.1f, 0.2f); for (x in 0 until 16) t[x, 6] = rgb(40, 120, 110) }
+            "ender_chest_front" -> { noisy(t, rgb(24, 36, 40), 0.1f, 0.2f); for (x in 0 until 16) t[x, 6] = rgb(40, 120, 110); for (y in 5..9) for (x in 7..8) t[x, y] = rgb(90, 220, 200) }
+            "anvil", "anvil_top" -> { noisy(t, rgb(70, 70, 74), 0.06f, 0.15f); if (name == "anvil_top") for (x in 2..13) t[x, 8] = rgb(50, 50, 54) }
+            "composter_top" -> t.fill { x, y -> if (x < 2 || x > 13 || y < 2 || y > 13) scale(wood, t.jitter(0.06f)) else scale(rgb(90, 70, 40), t.jitter(0.15f)) }
+            "composter_side" -> { planks(t, rgb(150, 112, 62)); for (y in 0 until 16) { t[0, y] = rgb(100, 70, 40); t[15, y] = rgb(100, 70, 40) } }
+            "bell" -> t.fill { x, y -> scale(if ((x + y) % 5 == 0) rgb(255, 240, 150) else rgb(236, 190, 60), t.jitter(0.05f)) }
+            "scaffolding" -> t.fill { x, y -> if (x < 2 || x > 13 || y < 2 || y > 13 || abs(x - y) < 2) scale(rgb(210, 180, 100), t.jitter(0.06f)) else 0 }
+            "brewing_stand" -> t.fill { x, y -> if (x in 7..8 || y > 13) scale(rgb(200, 160, 60), t.jitter(0.05f)) else if (y in 6..8) rgb(120, 110, 100) else 0 }
+            "cake_top" -> t.fill { x, y -> if ((x * 7 + y * 3) % 11 == 0) rgb(220, 40, 40) else scale(rgb(250, 248, 240), t.jitter(0.02f)) }
+            "cake_side" -> t.fill { _, y -> when { y < 3 -> scale(rgb(250, 248, 240), t.jitter(0.02f)); y == 7 -> rgb(236, 220, 200); else -> scale(rgb(196, 130, 70), t.jitter(0.06f)) } }
+            "cake_bottom" -> noisy(t, rgb(196, 130, 70), 0.05f, 0.1f)
+            "item_frame" -> t.fill { x, y -> if (x < 2 || x > 13 || y < 2 || y > 13) scale(rgb(150, 100, 60), t.jitter(0.08f)) else scale(rgb(170, 130, 90), t.jitter(0.04f)) }
+            "boat" -> mask(t, arrayOf("d..........d", "dm........md", "dmmmmmmmmmmd", ".dmmmmmmmmd.", "..dddddddd.."), wood)
+            else -> {
+                if (name.startsWith("painting_")) {
+                    // Four little landscapes in a wooden frame.
+                    val k = name.removePrefix("painting_").toInt()
+                    val skyC = listOf(rgb(120, 180, 240), rgb(250, 170, 90), rgb(30, 30, 70), rgb(160, 210, 240))[k]
+                    val land = listOf(rgb(80, 160, 60), rgb(200, 150, 80), rgb(40, 70, 60), rgb(230, 230, 240))[k]
+                    t.fill { x, y ->
+                        val hill = 9 + (kotlin.math.sin(x * 0.6 + k) * 2).toInt()
+                        when {
+                            x == 0 || y == 0 || x == 15 || y == 15 -> scale(wood, t.jitter(0.08f))
+                            y > hill -> scale(land, t.jitter(0.08f))
+                            k == 2 && (x * 5 + y * 3) % 17 == 0 -> rgb(250, 250, 220)
+                            (k == 0 || k == 3) && (x - 11) * (x - 11) + (y - 4) * (y - 4) < 5 -> rgb(255, 230, 120)
+                            else -> skyC
+                        }
+                    }
+                    return true
+                }
+                if (name.startsWith("disc_")) {
+                    val c = when (name) { "disc_meadow" -> rgb(90, 190, 90); "disc_caves" -> rgb(150, 110, 70); else -> rgb(120, 110, 220) }
+                    sprite(t); disc(t, 8f, 8f, 7f, rgb(30, 30, 34)); disc(t, 8f, 8f, 3f, c, false); t[7, 7] = rgb(10, 10, 10); t[8, 8] = rgb(10, 10, 10)
+                    return true
+                }
+                return false
+            }
+        }
+        return true
+    }
+
     private fun buildingAndRedstone(name: String, t: Tile): Boolean {
+        if (blockPack2(name, t)) return true
         if (name.startsWith("bed_")) {
             val part = name.removePrefix("bed_").substringBefore('_')
             val color = DYE_COLORS[name.removePrefix("bed_$part" + "_")] ?: return false

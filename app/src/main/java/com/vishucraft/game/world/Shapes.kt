@@ -51,6 +51,8 @@ object Shapes {
             Blocks.isGate(id) -> Blocks.OAK_FENCE_GATE
             Blocks.isBed(id) -> Blocks.BED_FIRST
             Blocks.isPlate(id) -> Blocks.PRESSURE_PLATE
+            Blocks.isCarpet(id) -> Blocks.CARPET_FIRST
+            Blocks.isBanner(id) -> Blocks.BANNER_FIRST
             else -> id
         }
         return when (kind) {
@@ -112,6 +114,32 @@ object Shapes {
             Blocks.REPEATER -> listOf(b(0f, 0f, 0f, 1f, 2 * P, 1f))
             Blocks.DAYLIGHT_SENSOR -> listOf(b(0f, 0f, 0f, 1f, 6 * P, 1f))
             Blocks.PRESSURE_PLATE -> listOf(b(P, 0f, P, 15 * P, if (meta != 0) 0.5f * P else P, 15 * P))
+            // ---- Block pack 2
+            Blocks.CARPET_FIRST -> listOf(b(0f, 0f, 0f, 1f, P, 1f))
+            Blocks.BANNER_FIRST -> {
+                val ns = f == 2 || f == 3
+                listOf(b(7.5f * P, 0f, 7.5f * P, 8.5f * P, 1f, 8.5f * P),
+                    if (ns) b(2 * P, 3 * P, 8.5f * P, 14 * P, 15 * P, 9.5f * P) else b(8.5f * P, 3 * P, 2 * P, 9.5f * P, 15 * P, 14 * P),
+                    if (ns) b(1 * P, 15 * P, 7 * P, 15 * P, 16 * P, 9 * P) else b(7 * P, 15 * P, 1 * P, 9 * P, 16 * P, 15 * P))
+            }
+            Blocks.LANTERN -> listOf(b(5 * P, 0f, 5 * P, 11 * P, 8 * P, 11 * P), b(6 * P, 8 * P, 6 * P, 10 * P, 10 * P, 10 * P))
+            Blocks.CAMPFIRE -> listOf(b(0f, 0f, 0f, 1f, 7 * P, 1f))
+            Blocks.ANVIL -> if (collision) listOf(b(0f, 0f, 0f, 1f, 1f, 1f)) else
+                listOf(b(2 * P, 0f, 2 * P, 14 * P, 4 * P, 14 * P), b(4 * P, 4 * P, 5 * P, 12 * P, 10 * P, 11 * P),
+                    if (f == 2 || f == 3) b(0f, 10 * P, 3 * P, 1f, 1f, 13 * P) else b(3 * P, 10 * P, 0f, 13 * P, 1f, 1f))
+            Blocks.BELL -> listOf(b(5 * P, 4 * P, 5 * P, 11 * P, 12 * P, 11 * P), b(0f, 14 * P, 7 * P, 1f, 1f, 9 * P),
+                b(0f, 0f, 7 * P, 2 * P, 14 * P, 9 * P), b(14 * P, 0f, 7 * P, 1f, 14 * P, 9 * P))
+            Blocks.SCAFFOLDING -> listOf(b(0f, 14 * P, 0f, 1f, 1f, 1f), b(0f, 0f, 0f, 2 * P, 14 * P, 2 * P), b(14 * P, 0f, 0f, 1f, 14 * P, 2 * P),
+                b(0f, 0f, 14 * P, 2 * P, 14 * P, 1f), b(14 * P, 0f, 14 * P, 1f, 14 * P, 1f))
+            Blocks.BREWING_STAND -> listOf(b(1 * P, 0f, 1 * P, 15 * P, 2 * P, 15 * P), b(7 * P, 2 * P, 7 * P, 9 * P, 14 * P, 9 * P),
+                b(3 * P, 6 * P, 7 * P, 13 * P, 8 * P, 9 * P))
+            Blocks.CAKE -> listOf(b(1 * P + (meta and 7) * 2 * P, 0f, 1 * P, 15 * P, 8 * P, 15 * P))
+            Blocks.SIGN -> {
+                val ns = f == 2 || f == 3
+                listOf(b(7 * P, 0f, 7 * P, 9 * P, 9 * P, 9 * P),
+                    if (ns) b(0f, 8 * P, 7 * P, 1f, 1f, 9 * P) else b(7 * P, 8 * P, 0f, 9 * P, 1f, 1f))
+            }
+            Blocks.PAINTING, Blocks.ITEM_FRAME -> listOf(panel(f xor 1, P))
             Blocks.HOPPER -> if (collision) listOf(b(0f, 0f, 0f, 1f, 1f, 1f))
                 else listOf(b(0f, 10 * P, 0f, 1f, 1f, 1f), b(4 * P, 4 * P, 4 * P, 12 * P, 10 * P, 12 * P), b(6 * P, 0f, 6 * P, 10 * P, 4 * P, 10 * P))
             else -> listOf(b(0f, 0f, 0f, 1f, 1f, 1f))

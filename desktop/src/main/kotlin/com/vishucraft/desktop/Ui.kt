@@ -340,8 +340,7 @@ class IconAtlas {
                     // Buttons and pressure plates are drawn as thin slabs.
                     val h = when {
                         d.render == RenderType.BOX && d.box != null -> d.box!![4].coerceAtLeast(0.25f)
-                        Blocks.isPlate(slot) -> 0.2f
-                        else -> 1f
+                        else -> Blocks.iconHeight(slot)
                     }
                     val o = (1f - h) * s * 0.5f
                     face(g, tile(top), floatArrayOf(0f, s * 0.25f + o, s * 0.5f, o, s * 0.5f, s * 0.5f + o), 1f, ox, oy)

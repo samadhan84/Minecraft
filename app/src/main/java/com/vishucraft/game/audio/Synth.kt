@@ -90,6 +90,17 @@ object Synth {
         make("cow", 1.1f) { tone(it, 0, it.size, { t -> 110f + 25f * sin(t * 5f) + (if (t < 0.2f) t * 150f else 30f) }, 0.6f, 0.6f, 0.08f, floatArrayOf(1f, 0.7f, 0.5f, 0.35f, 0.2f)) }
         make("pig", 0.35f) { for (k in 0..1) tone(it, k * 3500, 3500, { t -> 330f - t * 400f }, 0.5f, 0.07f, 0.01f, floatArrayOf(1f, 0.8f, 0.6f, 0.4f)) }
         make("sheep", 0.8f) { tone(it, 0, it.size, { t -> 380f * (1f + 0.06f * sin(t * 50f)) }, 0.5f, 0.35f, 0.03f, floatArrayOf(1f, 0.6f, 0.4f, 0.3f)) }
+        // Bell and music discs (short original tunes).
+        make("bell", 2.0f) { tone(it, 0, it.size, { 880f }, 0.5f, 0.9f, 0.002f, floatArrayOf(1f, 0.6f, 0.45f, 0.3f, 0.2f)); tone(it, 0, it.size, { 1320f }, 0.2f, 0.6f) }
+        fun tune(notes: IntArray, beat: Float, root: Int, out: FloatArray) {
+            for ((k, n) in notes.withIndex()) if (n >= 0) {
+                val f = 440f * Math.pow(2.0, (root + n - 69) / 12.0).toFloat()
+                tone(out, (k * beat * RATE).toInt(), (beat * 3 * RATE).toInt(), { f }, 0.35f, beat * 1.4f, 0.01f, floatArrayOf(1f, 0.35f, 0.15f))
+            }
+        }
+        make("disc_meadow", 14f) { tune(intArrayOf(0, 4, 7, 12, 7, 4, 2, 5, 9, 12, 9, 5, 0, 4, 7, 11, 12, -1, 7, 4, 2, 4, 0, -1, 0, 4, 7, 12, 14, 12, 7, 4, 5, 4, 2, 0), 0.38f, 60, it) }
+        make("disc_caves", 14f) { tune(intArrayOf(0, 3, 7, 3, 10, 7, 3, -1, 5, 8, 12, 8, 7, 3, 0, -1, 0, 3, 7, 10, 12, 10, 7, 5, 3, 2, 0, -1, 7, 3, 0, -1), 0.44f, 50, it) }
+        make("disc_stars", 14f) { tune(intArrayOf(12, 11, 7, 4, 7, 11, 12, 16, 14, 12, 9, 5, 9, 12, 14, 17, 16, 12, 7, 4, 0, 4, 7, 12, 11, 7, 2, 7, 11, 14, 12, -1), 0.4f, 64, it) }
         // Creature pack voices.
         make("chicken", 0.3f) { for (k in 0..2) tone(it, k * 2200, 1800, { t -> 900f + 300f * sin(t * 90f) }, 0.35f, 0.04f, 0.005f, floatArrayOf(1f, 0.5f, 0.3f)) }
         make("wolf", 0.4f) { for (k in 0..1) { tone(it, k * 4400, 3000, { t -> 420f - t * 600f }, 0.6f, 0.06f, 0.004f, floatArrayOf(1f, 0.8f, 0.5f, 0.3f)); noiseBurst(it, k * 4400, 1500, 0.3f, 0.03f, 0.3f) } }

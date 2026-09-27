@@ -75,7 +75,7 @@ const val CONTROLS_HELP =
 
 class App(private val demo: File?) {
     private enum class Menu { TITLE, WORLDS, CREATE, JOIN, SETTINGS, CONTROLS, CONFIRM_DELETE, UNLOCK }
-    private enum class Overlay { NONE, PAUSE, CREATIVE, CONTAINER, SETTINGS, CONTROLS, SAVE_QUIT, NAME_MOB, TRADE, ACHIEVEMENTS }
+    private enum class Overlay { NONE, PAUSE, CREATIVE, CONTAINER, SETTINGS, CONTROLS, SAVE_QUIT, NAME_MOB, TRADE, ACHIEVEMENTS, SIGN }
 
     private var window = NULL
     private val prefs = Prefs()
@@ -219,6 +219,7 @@ class App(private val demo: File?) {
             Overlay.NAME_MOB -> nameMobScreen(s)
             Overlay.TRADE -> tradeScreen(s)
             Overlay.ACHIEVEMENTS -> achievementsScreen(s)
+            Overlay.SIGN -> signScreen(s)
         }
         ui.end()
     }
@@ -280,6 +281,11 @@ class App(private val demo: File?) {
             e == "sleep" -> hud.sleep = 3f
             e.startsWith("toast:") -> hud.toast(e.removePrefix("toast:"), 3f)
             e == "craft" -> audio.play("craft")
+            e == "open:ender" -> openContainer(ContainerScreen.Mode.CHEST, chest = s.level.enderChest)
+            e.startsWith("signedit:") -> {
+                signPos = e.removePrefix("signedit:").split(',').map { it.toInt() }
+                signField.text = s.game.signText(signPos[0], signPos[1], signPos[2]); ui.focus = signField; overlay = Overlay.SIGN
+            }
             e.startsWith("achievement:") -> hud.toast("Achievement unlocked!\n" + e.removePrefix("achievement:"), 4f)
             e.startsWith("trade:") -> { tradeUid = e.removePrefix("trade:").toIntOrNull() ?: -1; tradeMessage = ""; overlay = Overlay.TRADE }
             e.startsWith("name:") -> { namingUid = e.removePrefix("name:").toIntOrNull() ?: -1; nameField.text = ""; ui.focus = nameField; overlay = Overlay.NAME_MOB }
@@ -502,6 +508,20 @@ class App(private val demo: File?) {
     }
 
     private var namingUid = -1
+    private var signPos = listOf(0, 0, 0)
+    private val signField = Ui.Field("", "Text on the sign", 60)
+
+    private fun signScreen(s: GameSession) {
+        val cx = ui.width / 2; val w = 560f
+        ui.rect(0f, 0f, ui.width, ui.height, rgba(0, 0, 0, 150))
+        title("Sign", ui.height * 0.25f)
+        ui.field(signField, cx - w / 2, ui.height * 0.4f, w)
+        val y = ui.height * 0.4f + 60
+        if (ui.button("OK", cx - w / 2, y, w / 2 - 5, 44f) || ui.takeSubmit()) {
+            s.game.setSignText(signPos[0], signPos[1], signPos[2], signField.text); ui.focus = null; overlay = Overlay.NONE
+        }
+        if (ui.button("Cancel", cx + 5, y, w / 2 - 5, 44f)) { ui.focus = null; overlay = Overlay.NONE }
+    }
     private var tradeUid = -1
     private var tradeMessage = ""
 
@@ -752,6 +772,7 @@ class App(private val demo: File?) {
             }
             Overlay.PAUSE -> if (key == GLFW_KEY_ESCAPE) overlay = Overlay.NONE
             Overlay.TRADE -> if (key == GLFW_KEY_ESCAPE || key == GLFW_KEY_E) overlay = Overlay.NONE
+            Overlay.SIGN -> if (key == GLFW_KEY_ESCAPE) { ui.focus = null; overlay = Overlay.NONE }
             Overlay.SETTINGS, Overlay.CONTROLS, Overlay.SAVE_QUIT, Overlay.NAME_MOB, Overlay.ACHIEVEMENTS -> if (key == GLFW_KEY_ESCAPE) { ui.focus = null; overlay = Overlay.PAUSE }
             Overlay.CREATIVE, Overlay.CONTAINER -> when (key) {
                 GLFW_KEY_ESCAPE, GLFW_KEY_E, GLFW_KEY_I -> closeOverlay()

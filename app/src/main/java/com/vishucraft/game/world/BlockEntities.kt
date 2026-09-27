@@ -39,6 +39,12 @@ class HopperEntity : ChestEntity(5) {
     var cooldown = 0f
 }
 
+/** Text written on a sign. */
+class SignEntity(var text: String = "") : BlockEntity()
+
+/** One item shown in an item frame, or the disc in a jukebox. */
+class ItemHolderEntity(var stack: ItemStack? = null) : BlockEntity()
+
 class FurnaceEntity : BlockEntity() {
     var input: ItemStack? = null
     var fuel: ItemStack? = null
@@ -89,6 +95,8 @@ class BlockEntities {
     fun hopper(x: Int, y: Int, z: Int) = map.getOrPut(RedstoneIds.pack(x, y, z)) { HopperEntity() } as? HopperEntity
     fun furnace(x: Int, y: Int, z: Int) = map.getOrPut(RedstoneIds.pack(x, y, z)) { FurnaceEntity() } as? FurnaceEntity
     fun remove(x: Int, y: Int, z: Int) = map.remove(RedstoneIds.pack(x, y, z))
+    fun sign(x: Int, y: Int, z: Int) = map.getOrPut(RedstoneIds.pack(x, y, z)) { SignEntity() } as? SignEntity
+    fun holder(x: Int, y: Int, z: Int) = map.getOrPut(RedstoneIds.pack(x, y, z)) { ItemHolderEntity() } as? ItemHolderEntity
 
     companion object {
         /** One chest / hopper / furnace as bytes (used to share containers over Wi-Fi). */
@@ -120,6 +128,8 @@ class BlockEntities {
                     Inventory.writeStack(d, e.input); Inventory.writeStack(d, e.fuel); Inventory.writeStack(d, e.output)
                     d.writeFloat(e.burnLeft); d.writeFloat(e.burnTotal); d.writeFloat(e.progress)
                 }
+                is SignEntity -> { d.writeByte(3); d.writeUTF(e.text) }
+                is ItemHolderEntity -> { d.writeByte(4); Inventory.writeStack(d, e.stack) }
             }
         }
     }
@@ -148,6 +158,8 @@ class BlockEntities {
                     when (d.readByte().toInt()) {
                         0 -> map[pos] = ChestEntity().also { c -> for (i in c.slots.indices) c.slots[i] = Inventory.readStack(d) }
                         2 -> map[pos] = HopperEntity().also { c -> for (i in c.slots.indices) c.slots[i] = Inventory.readStack(d) }
+                        3 -> map[pos] = SignEntity(d.readUTF())
+                        4 -> map[pos] = ItemHolderEntity(Inventory.readStack(d))
                         else -> map[pos] = FurnaceEntity().also { f ->
                             f.input = Inventory.readStack(d); f.fuel = Inventory.readStack(d); f.output = Inventory.readStack(d)
                             f.burnLeft = d.readFloat(); f.burnTotal = d.readFloat(); f.progress = d.readFloat()

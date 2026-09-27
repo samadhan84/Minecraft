@@ -23,9 +23,11 @@ class DropRenderer {
     private val potionTile = Items[Items.find("Potion of Healing")]!!.icon
 
     fun draw(shader: Shader, drops: ItemEntities, camX: Float, camZ: Float, maxDist: Float, time: Float,
-             carts: com.vishucraft.game.engine.Carts? = null, arrows: com.vishucraft.game.engine.Projectiles? = null) {
+             carts: com.vishucraft.game.engine.Carts? = null, arrows: com.vishucraft.game.engine.Projectiles? = null,
+             boats: com.vishucraft.game.engine.Boats? = null) {
         buf.size = 0
         carts?.list?.forEach { c -> cart(c.x, c.y, c.z, c.yaw) }
+        boats?.list?.forEach { b -> boat(b.x, b.y, b.z, b.yaw) }
         arrows?.list?.forEach { a ->
             val tile = when (a.kind) {
                 com.vishucraft.game.engine.Projectile.SNOWBALL -> snowballTile
@@ -93,6 +95,29 @@ class DropRenderer {
         )
         for ((b, tile) in boxes) for (f in 0 until 6) {
             val u0 = ChunkMesher.tileU(tile); val v0 = ChunkMesher.tileV(tile)
+            buf.ensure(4 * FLOATS_PER_VERTEX)
+            for ((k, cv) in ChunkMesher.CORNERS[f].withIndex()) {
+                val lx = if (cv[0] == 1) b[3] else b[0]; val ly = if (cv[1] == 1) b[4] else b[1]; val lz = if (cv[2] == 1) b[5] else b[2]
+                val uv = ChunkMesher.UVS[k]
+                buf.put(cx + lx * c - lz * s, cy + ly, cz + lx * s + lz * c,
+                    u0 + uv[0] * ChunkMesher.TILE_UV, v0 + uv[1] * ChunkMesher.TILE_UV, ChunkMesher.FACE_SHADE[f])
+            }
+        }
+    }
+
+    /** A flat-bottomed rowing boat made of planks. */
+    private fun boat(cx: Float, cy: Float, cz: Float, yaw: Float) {
+        val c = cos(yaw); val s = sin(yaw)
+        val wood = com.vishucraft.game.world.Blocks[com.vishucraft.game.world.Blocks.PLANKS].top
+        val boxes = listOf(
+            floatArrayOf(-0.6f, 0f, -0.9f, 0.6f, 0.12f, 0.9f),
+            floatArrayOf(-0.6f, 0f, -0.9f, -0.5f, 0.45f, 0.9f),
+            floatArrayOf(0.5f, 0f, -0.9f, 0.6f, 0.45f, 0.9f),
+            floatArrayOf(-0.6f, 0f, -0.9f, 0.6f, 0.45f, -0.8f),
+            floatArrayOf(-0.6f, 0f, 0.8f, 0.6f, 0.45f, 0.9f),
+        )
+        for (b in boxes) for (f in 0 until 6) {
+            val u0 = ChunkMesher.tileU(wood); val v0 = ChunkMesher.tileV(wood)
             buf.ensure(4 * FLOATS_PER_VERTEX)
             for ((k, cv) in ChunkMesher.CORNERS[f].withIndex()) {
                 val lx = if (cv[0] == 1) b[3] else b[0]; val ly = if (cv[1] == 1) b[4] else b[1]; val lz = if (cv[2] == 1) b[5] else b[2]

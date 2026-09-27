@@ -266,7 +266,41 @@ object Blocks {
     /** Weighted pressure plates: the more things stand on them, the stronger the signal. */
     const val GOLD_PLATE = 278
     const val IRON_PLATE = 279
-    const val COUNT = 280
+    // ---- Block pack 2
+    /** Carpets in the 16 dye colours (DYES order). */
+    const val CARPET_FIRST = 280
+    const val LANTERN = 296
+    const val CAMPFIRE = 297
+    const val BARREL = 298
+    const val ENDER_CHEST = 299
+    const val ANVIL = 300
+    const val COMPOSTER = 301
+    const val BELL = 302
+    const val SCAFFOLDING = 303
+    const val BREWING_STAND = 304
+    /** Meta = slices eaten (0..6). */
+    const val CAKE = 305
+    const val SIGN = 306
+    /** Banners in the 16 dye colours. */
+    const val BANNER_FIRST = 307
+    /** Wall pictures: meta bits 0..2 facing, bits 3..4 which picture. */
+    const val PAINTING = 323
+    const val ITEM_FRAME = 324
+    const val COUNT = 325
+
+    fun isCarpet(id: Int) = id in CARPET_FIRST until CARPET_FIRST + 16
+
+    /** How tall a block's inventory icon is drawn (flat blocks look flat). */
+    fun iconHeight(id: Int): Float = when {
+        isPlate(id) -> 0.2f
+        isCarpet(id) -> 0.12f
+        id == CAKE -> 0.5f
+        id == CAMPFIRE -> 0.45f
+        else -> 1f
+    }
+    fun isBanner(id: Int) = id in BANNER_FIRST until BANNER_FIRST + 16
+    /** Hangs on the side of a block (placed like a ladder). */
+    fun isWallMounted(id: Int) = id == LADDER || id == PAINTING || id == ITEM_FRAME
 
     fun isButton(id: Int) = id == STONE_BUTTON || id in WOOD_BUTTON_FIRST until WOOD_BUTTON_FIRST + 6
     fun isPlate(id: Int) = id == PRESSURE_PLATE || id in WOOD_PLATE_FIRST until WOOD_PLATE_FIRST + 6 || id == GOLD_PLATE || id == IRON_PLATE
@@ -582,6 +616,30 @@ object Blocks {
             facing = Facing.NONE, solid = false)
         shape(IRON_PLATE, "Heavy Weighted Pressure Plate", "iron_block", hardness = 0.4f, tool = P, cat = Category.REDSTONE,
             facing = Facing.NONE, solid = false)
+        for ((i, c) in DYES.withIndex()) {
+            shape(CARPET_FIRST + i, "${pretty(c)} Carpet", "wool_$c", hardness = 0.1f, tool = ToolType.NONE, cat = Category.COLORED,
+                facing = Facing.NONE, solid = false)
+            shape(BANNER_FIRST + i, "${pretty(c)} Banner", "wool_$c", "wool_$c", "oak_planks", hardness = 0.5f, tool = A, cat = Category.COLORED, solid = false)
+        }
+        shape(LANTERN, "Lantern", "lantern", hardness = 0.5f, tool = P, facing = Facing.NONE, solid = false)
+        extraLight[LANTERN] = 15
+        shape(CAMPFIRE, "Campfire", "campfire_top", "campfire_side", "campfire_side", hardness = 1f, tool = A, facing = Facing.NONE)
+        extraLight[CAMPFIRE] = 14
+        reg(BlockDef(BARREL, "Barrel", t("barrel_top"), t("barrel_side"), t("barrel_top"), hardness = 1f, tool = A))
+        reg(BlockDef(ENDER_CHEST, "Ender Chest", t("ender_chest_top"), t("ender_chest_side"), t("ender_chest_top"), hardness = 5f, tool = P,
+            facing = Facing.HORIZONTAL, front = t("ender_chest_front"), movable = false))
+        extraLight[ENDER_CHEST] = 7
+        shape(ANVIL, "Anvil", "anvil_top", "anvil", "anvil", hardness = 3f, tool = P, blocksLight = false)
+        shape(COMPOSTER, "Composter", "composter_top", "composter_side", "composter_side", hardness = 0.6f, tool = A, facing = Facing.NONE)
+        shape(BELL, "Bell", "bell", hardness = 1f, tool = P, facing = Facing.NONE)
+        shape(SCAFFOLDING, "Scaffolding", "scaffolding", hardness = 0.1f, tool = ToolType.NONE, facing = Facing.NONE, solid = false)
+        shape(BREWING_STAND, "Brewing Stand", "brewing_stand", "brewing_stand", "cobblestone", hardness = 0.5f, tool = P, facing = Facing.NONE, solid = false)
+        extraLight[BREWING_STAND] = 1
+        shape(CAKE, "Cake", "cake_top", "cake_side", "cake_bottom", hardness = 0.5f, tool = ToolType.NONE, facing = Facing.NONE)
+        shape(SIGN, "Sign", "oak_planks", hardness = 1f, tool = A, solid = false)
+        shape(PAINTING, "Painting", "painting_0", hardness = 0.3f, tool = ToolType.NONE, solid = false)
+        for (k in 1..3) t("painting_$k")
+        shape(ITEM_FRAME, "Item Frame", "item_frame", hardness = 0.3f, tool = ToolType.NONE, solid = false)
         shape(IRON_TRAPDOOR, "Iron Trapdoor", "iron_trapdoor", hardness = 1.5f, tool = P, cat = Category.REDSTONE)
         for ((i, c) in DYES.withIndex()) {
             shape(BED_FIRST + i, "${pretty(c)} Bed", "bed_foot_$c", "bed_side_$c", "oak_planks", hardness = 0.2f,
@@ -645,6 +703,7 @@ object Blocks {
             REDSTONE_DUST -> return if (meta > 0) Tiles.id("redstone_dust_on") else d.top
             REDSTONE_TORCH -> return if (meta != 0) Tiles.id("redstone_torch_off") else d.top
             LEVER -> return if (meta != 0) Tiles.id("lever_on") else d.top
+            PAINTING -> return Tiles.id("painting_${(meta shr 3) and 3}")
             TNT -> if (meta == 2) return Tiles.id("tnt_flash")
             WHEAT_CROP -> return Tiles.id("wheat_stage_${meta.coerceIn(0, 7)}")
             CARROTS -> return Tiles.id("carrots_stage_${(meta.coerceIn(0, 7)) / 2}")

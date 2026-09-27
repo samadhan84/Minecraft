@@ -3,7 +3,7 @@ package com.vishucraft.game.world
 enum class ItemUse {
     NONE, TILL, PATH, IGNITE, BUCKET, WATER_BUCKET, EAT, BOW, GROW, LAVA_BUCKET, CART,
     /** Snowballs, eggs and ender pearls. */
-    THROW, DRINK, FISH, SHEAR, COMPASS, CLOCK, SPYGLASS, ROCKET,
+    THROW, DRINK, FISH, SHEAR, COMPASS, CLOCK, SPYGLASS, ROCKET, BOAT,
 }
 
 /** 0 helmet, 1 chestplate, 2 leggings, 3 boots; -1 when not armor. */
@@ -59,6 +59,9 @@ object Items {
         "Healing" to "healing", "Regeneration" to "regeneration", "Swiftness" to "swiftness", "Leaping" to "leaping",
         "Fire Resistance" to "fire_resistance", "Strength" to "strength", "Slow Falling" to "slow_falling",
     )
+
+    /** Music disc tunes (played by a jukebox; see Synth "disc_<name>"). */
+    val DISCS = listOf("Meadow", "Caves", "Stars")
 
     val all: List<ItemDef>
     private val byId = HashMap<Int, ItemDef>()
@@ -264,6 +267,9 @@ object Items {
         for ((name, key) in POTIONS) add("Potion of $name", "potion_$key", use = ItemUse.DRINK, maxStack = 1)
         // Dyes, in the same order as the wool colours.
         for (c in Blocks.DYES) add("${c.split('_').joinToString(" ") { it.replaceFirstChar { ch -> ch.uppercase() } }} Dye", "dye_$c")
+        // ---- Block pack 2 items (appended)
+        add("Oak Boat", "boat", use = ItemUse.BOAT, maxStack = 1, fuel = 60f)
+        for (d in DISCS) add("Music Disc ($d)", "disc_${d.lowercase()}", maxStack = 1)
 
         all = list
         for (i in all) { byId[i.id] = i; byName[i.name] = i.id }

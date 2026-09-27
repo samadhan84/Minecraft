@@ -92,8 +92,9 @@ class Player {
         }
 
         // Ladders: climb when pushing forward or jumping, otherwise slide down slowly.
-        val ladder = world.getBlock(floorInt(x), floorInt(y + 0.1f), floorInt(z)) == Blocks.LADDER ||
-            world.getBlock(floorInt(x), floorInt(y + 1f), floorInt(z)) == Blocks.LADDER
+        fun climbable(b: Int) = b == Blocks.LADDER || b == Blocks.SCAFFOLDING
+        val ladder = climbable(world.getBlock(floorInt(x), floorInt(y + 0.1f), floorInt(z))) ||
+            climbable(world.getBlock(floorInt(x), floorInt(y + 1f), floorInt(z)))
         onLadder = ladder && !flying
         if (onLadder) {
             vy = if (jump || moveF > 0.3f) 3.2f else if (descend) -3f else maxOf(vy, -1.2f)

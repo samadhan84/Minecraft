@@ -95,6 +95,71 @@ class Cart(var x: Float, var y: Float, var z: Float) {
     var yaw = 0f
 }
 
+/** A rowing boat: floats on water, steered by the player sitting in it. */
+class Boat(var x: Float, var y: Float, var z: Float) {
+    var yaw = 0f
+    var speed = 0f
+    var vy = 0f
+}
+
+class Boats(private val world: World) {
+    val list = ArrayList<Boat>()
+    var riding: Boat? = null
+
+    private fun block(x: Float, y: Float, z: Float) = world.getBlock(floorInt(x), floorInt(y), floorInt(z))
+
+    fun update(dt: Float, game: Game) {
+        for (b in list) if (world.isLoaded(floorInt(b.x), floorInt(b.z))) step(b, dt, game)
+        riding?.let { b ->
+            val p = game.player
+            p.x = b.x; p.z = b.z; p.y = b.y + 0.25f
+            p.vx = 0f; p.vy = 0f; p.vz = 0f
+        }
+    }
+
+    private fun step(b: Boat, dt: Float, game: Game) {
+        val inWater = block(b.x, b.y + 0.1f, b.z) == Blocks.WATER
+        val sunk = block(b.x, b.y + 0.55f, b.z) == Blocks.WATER
+        when {
+            sunk -> b.vy = 2.5f // bob back up to the surface
+            inWater -> { b.vy = 0f; b.y = floorInt(b.y + 0.1f) + 0.5f }
+            else -> b.vy -= 20f * dt
+        }
+        val onLand = !inWater
+        if (riding === b) {
+            b.yaw = game.player.yaw
+            val want = game.input.moveForward * (if (onLand) 1.2f else 7.5f)
+            b.speed += (want - b.speed) * minOf(1f, dt * 2.5f)
+        } else b.speed *= (1f - dt * 1.5f).coerceAtLeast(0f)
+        val nx = b.x + kotlin.math.sin(b.yaw) * b.speed * dt
+        val nz = b.z - kotlin.math.cos(b.yaw) * b.speed * dt
+        if (Blocks.solid[block(nx, b.y + 0.3f, b.z)]) b.speed *= 0.3f else b.x = nx
+        if (Blocks.solid[block(b.x, b.y + 0.3f, nz)]) b.speed *= 0.3f else b.z = nz
+        val ny = b.y + b.vy * dt
+        if (b.vy < 0f && Blocks.solid[block(b.x, ny, b.z)]) { b.vy = 0f; b.y = floorInt(ny) + 1f } else b.y = ny
+        if (b.y < -10f) b.y = -10f
+    }
+
+    fun raycast(ox: Float, oy: Float, oz: Float, dx: Float, dy: Float, dz: Float, maxDist: Float): Boat? {
+        var t = 0f
+        while (t < maxDist) {
+            val px = ox + dx * t; val py = oy + dy * t; val pz = oz + dz * t
+            list.firstOrNull { abs(it.x - px) < 0.7f && abs(it.z - pz) < 0.7f && py >= it.y - 0.1f && py <= it.y + 0.7f }?.let { return it }
+            t += 0.1f
+        }
+        return null
+    }
+
+    fun write(d: java.io.DataOutputStream) {
+        d.writeInt(list.size)
+        for (b in list) { d.writeFloat(b.x); d.writeFloat(b.y); d.writeFloat(b.z); d.writeFloat(b.yaw) }
+    }
+
+    fun read(d: java.io.DataInputStream) {
+        repeat(d.readInt()) { list.add(Boat(d.readFloat(), d.readFloat(), d.readFloat()).also { it.yaw = d.readFloat() }) }
+    }
+}
+
 class Carts(private val world: World) {
     val list = ArrayList<Cart>()
     var riding: Cart? = null
