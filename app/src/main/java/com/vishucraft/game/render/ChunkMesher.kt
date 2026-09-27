@@ -223,7 +223,7 @@ class ChunkMesher {
                         if (opaque[nb]) continue
                         if (nb == id && def.cullSelf) continue
                         if (def.translucent && nb != Blocks.AIR && Blocks[nb].translucent && Blocks[nb].cullSelf && nb == id) continue
-                        emitFace(out, px, y, pz, f, Blocks.tile(id, meta, f), emissive, 1f)
+                        emitFace(out, px, y, pz, f, Blocks.tile(id, meta, f), emissive, 1f, if (Blocks.waves[id] == 2) 8f else 0f)
                     }
                 }
                 RenderType.LIQUID -> {
@@ -238,10 +238,14 @@ class ChunkMesher {
                         if (nb == id || opaque[nb]) continue
                         if (id == Blocks.WATER && Blocks.isWaterPlant(nb)) continue
                         if (f != 0 && nb != Blocks.AIR && Blocks[nb].translucent) continue
-                        emitFace(out, px, y, pz, f, def.top, emissive, h)
+                        emitFace(out, px, y, pz, f, def.top, emissive, h, if (id == Blocks.WATER && surface) 12f else 0f)
                     }
                 }
-                RenderType.CROSS -> emitCross(opaqueOut, px, y, pz, Blocks.tile(id, meta, 0), emissive)
+                RenderType.CROSS -> {
+                    // Waving plants move at the top; stacked ones (cane, bamboo, kelp) move at the bottom too.
+                    val w = if (Blocks.waves[id] == 1) 4f else 0f
+                    emitCross(opaqueOut, px, y, pz, Blocks.tile(id, meta, 0), emissive, w, if (block(px, y - 1, pz) == id) w else 0f)
+                }
                 RenderType.FLAT -> emitFlat(opaqueOut, px, y, pz, Blocks.tile(id, meta, 0))
                 RenderType.BOX -> emitBox(opaqueOut, px, y, pz, def.box!!, id, meta, emissive)
                 RenderType.PISTON_HEAD -> {
@@ -280,7 +284,8 @@ class ChunkMesher {
         return MeshData(chunk.cx, chunk.cz, version, opaqueOut.toArray(), transOut.toArray())
     }
 
-    private fun emitFace(out: FloatBuilder, px: Int, y: Int, pz: Int, f: Int, tile: Int, emissive: Boolean, height: Float) {
+    /** [flag] (a multiple of 4 added to the block light) tells the shader how the vertex sways. */
+    private fun emitFace(out: FloatBuilder, px: Int, y: Int, pz: Int, f: Int, tile: Int, emissive: Boolean, height: Float, flag: Float = 0f) {
         val n = NORMALS[f]
         val lx = px + n[0]; val ly = y + n[1]; val lz = pz + n[2]
         val shade = FACE_SHADE[f]
@@ -326,14 +331,15 @@ class ChunkMesher {
             out.put(
                 bx + cv[0], by + vy, bz + cv[2],
                 u0 + uv[0] * TILE_UV, v0 + vTex * TILE_UV,
-                light[c], bl[c],
+                light[c], bl[c] + flag,
             )
         }
     }
 
-    private fun emitCross(out: FloatBuilder, px: Int, y: Int, pz: Int, tile: Int, emissive: Boolean) {
+    private fun emitCross(out: FloatBuilder, px: Int, y: Int, pz: Int, tile: Int, emissive: Boolean, topWave: Float = 0f, bottomWave: Float = 0f) {
         val l = if (emissive) 2f else 0.9f * (CAVE + (1f - CAVE) * sky(px, y, pz))
-        val b = 0.9f * lightCurve(blockLight(px, y, pz).toFloat())
+        val b0 = 0.9f * lightCurve(blockLight(px, y, pz).toFloat())
+        val b = b0 + topWave; val bb = b0 + bottomWave
         val x0 = (px - 1) + 0.15f; val x1 = (px - 1) + 0.85f
         val z0 = (pz - 1) + 0.15f; val z1 = (pz - 1) + 0.85f
         val y0 = y.toFloat(); val y1 = y + 1f
@@ -341,10 +347,10 @@ class ChunkMesher {
         val u1 = u0 + TILE_UV; val v1 = v0 + TILE_UV
         out.ensure(16 * FLOATS_PER_VERTEX)
         // Two diagonal planes, each emitted with both windings.
-        out.put(x0, y0, z0, u0, v1, l, b); out.put(x1, y0, z1, u1, v1, l, b); out.put(x1, y1, z1, u1, v0, l, b); out.put(x0, y1, z0, u0, v0, l, b)
-        out.put(x1, y0, z1, u1, v1, l, b); out.put(x0, y0, z0, u0, v1, l, b); out.put(x0, y1, z0, u0, v0, l, b); out.put(x1, y1, z1, u1, v0, l, b)
-        out.put(x0, y0, z1, u0, v1, l, b); out.put(x1, y0, z0, u1, v1, l, b); out.put(x1, y1, z0, u1, v0, l, b); out.put(x0, y1, z1, u0, v0, l, b)
-        out.put(x1, y0, z0, u1, v1, l, b); out.put(x0, y0, z1, u0, v1, l, b); out.put(x0, y1, z1, u0, v0, l, b); out.put(x1, y1, z0, u1, v0, l, b)
+        out.put(x0, y0, z0, u0, v1, l, bb); out.put(x1, y0, z1, u1, v1, l, bb); out.put(x1, y1, z1, u1, v0, l, b); out.put(x0, y1, z0, u0, v0, l, b)
+        out.put(x1, y0, z1, u1, v1, l, bb); out.put(x0, y0, z0, u0, v1, l, bb); out.put(x0, y1, z0, u0, v0, l, b); out.put(x1, y1, z1, u1, v0, l, b)
+        out.put(x0, y0, z1, u0, v1, l, bb); out.put(x1, y0, z0, u1, v1, l, bb); out.put(x1, y1, z0, u1, v0, l, b); out.put(x0, y1, z1, u0, v0, l, b)
+        out.put(x1, y0, z0, u1, v1, l, bb); out.put(x0, y0, z1, u0, v1, l, bb); out.put(x0, y1, z1, u0, v0, l, b); out.put(x1, y1, z0, u1, v0, l, b)
     }
 
     /** A flat decal lying on top of the block below (redstone dust). */

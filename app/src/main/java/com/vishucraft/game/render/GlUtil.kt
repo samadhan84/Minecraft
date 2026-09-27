@@ -169,16 +169,32 @@ attribute float aBlock;
 uniform mat4 uViewProj;
 uniform vec3 uOffset;
 uniform vec3 uCamPos;
+uniform float uTime;
+uniform float uWave;
 varying vec2 vUv;
 varying float vLight;
 varying float vBlock;
 varying float vDist;
+varying float vFlag;
 void main() {
+    // The block light carries a sway flag in multiples of 4: 1 plant, 2 leaves, 3 water surface.
+    float k = floor(aBlock * 0.25 + 0.01);
     vec3 wp = aPos + uOffset;
+    if (uWave > 0.5 && k > 0.5) {
+        float ph = uTime * 1.7 + wp.x * 0.7 + wp.z * 0.45;
+        if (k < 1.5) {
+            wp.x += sin(ph) * 0.07; wp.z += cos(ph * 1.3) * 0.05;
+        } else if (k < 2.5) {
+            wp.x += sin(ph * 0.8) * 0.035; wp.y += cos(ph * 1.1) * 0.02; wp.z += sin(ph * 0.6 + 1.0) * 0.035;
+        } else if (fract(wp.y) > 0.05) {
+            wp.y += sin(uTime * 1.8 + wp.x * 0.9) * 0.035 + cos(uTime * 1.3 + wp.z * 1.1) * 0.035 - 0.06;
+        }
+    }
     gl_Position = uViewProj * vec4(wp, 1.0);
     vUv = aUv;
     vLight = aLight;
-    vBlock = aBlock;
+    vBlock = aBlock - k * 4.0;
+    vFlag = k;
     vDist = length(wp.xz - uCamPos.xz);
 }
 """
@@ -190,20 +206,30 @@ uniform float uFogStart;
 uniform float uFogEnd;
 uniform float uCutout;
 uniform vec3 uTint;
+uniform vec3 uSunTint;
+uniform float uWave;
 varying vec2 vUv;
 varying float vLight;
 varying float vBlock;
 varying float vDist;
+varying float vFlag;
 void main() {
     vec4 c = texture2D(uTex, vUv);
     if (c.a < uCutout) discard;
     float sky = vLight * mix(0.16, 1.0, uDaylight);
-    float l = vLight > 1.5 ? 1.0 : max(sky, vBlock);
-    // Torch light is slightly warm where it outshines the sky.
+    // Torch light is slightly warm where it outshines the sky; sunlight turns golden at sunrise and sunset.
     vec3 warm = mix(vec3(1.0), vec3(1.08, 0.93, 0.74), clamp((vBlock - sky) * 3.0, 0.0, 1.0));
-    vec3 col = c.rgb * l * uTint * warm;
+    vec3 light = vLight > 1.5 ? vec3(1.0) : max(vec3(sky) * uSunTint, vec3(vBlock) * warm);
+    vec3 col = c.rgb * light * uTint;
+    float a = c.a;
+    if (uWave > 0.5 && vFlag > 2.5) {
+        // Water reflects the sky more when seen from further away.
+        float r = clamp(vDist / 40.0, 0.15, 0.7);
+        col = mix(col, uFogColor * max(sky, 0.15) * 1.1, r * 0.55);
+        a = mix(a, 0.92, r * 0.6);
+    }
     float f = clamp((vDist - uFogStart) / (uFogEnd - uFogStart), 0.0, 1.0);
-    gl_FragColor = vec4(mix(col, uFogColor, f), c.a);
+    gl_FragColor = vec4(mix(col, uFogColor, f), a);
 }
 """
 
@@ -214,13 +240,16 @@ uniform mat4 uViewProj;
 uniform vec3 uCamPos;
 varying vec2 vUv;
 varying float vDist;
+varying float vShade;
 void main() {
     gl_Position = uViewProj * vec4(aPos, 1.0);
     vUv = aUv;
-    vDist = length(aPos.xz - uCamPos.xz) + aLight * 0.0;
+    vDist = length(aPos.xz - uCamPos.xz);
+    vShade = aLight;
 }
 """
 
+    /** aLight: 0..1 darkens the colour (cloud sides); 2..3 instead fades the alpha (sky dome, stars). */
     const val SIMPLE_FS = FRAG_PRECISION + """uniform sampler2D uTex;
 uniform vec4 uColor;
 uniform vec3 uFogColor;
@@ -228,8 +257,10 @@ uniform float uFogStart;
 uniform float uFogEnd;
 varying vec2 vUv;
 varying float vDist;
+varying float vShade;
 void main() {
     vec4 c = texture2D(uTex, vUv) * uColor;
+    if (vShade > 1.5) c.a *= vShade - 2.0; else c.rgb *= vShade;
     if (c.a < 0.01) discard;
     float f = uFogEnd > 0.0 ? clamp((vDist - uFogStart) / (uFogEnd - uFogStart), 0.0, 1.0) : 0.0;
     gl_FragColor = vec4(c.rgb, c.a * (1.0 - f));

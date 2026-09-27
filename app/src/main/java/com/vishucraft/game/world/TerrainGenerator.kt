@@ -2,6 +2,7 @@ package com.vishucraft.game.world
 
 import java.util.Random
 import kotlin.math.abs
+import kotlin.math.floor
 import kotlin.math.max
 
 enum class Biome { PLAINS, FOREST, DESERT, SNOW, JUNGLE, SAVANNA, EMBER, SKY, SWAMP, BADLANDS, MUSHROOM, CHERRY }
@@ -43,6 +44,12 @@ class TerrainGenerator(private val seed: Long, private val world: World? = null)
         // Swamps are flat and wet: pull the land down to just above the water.
         val sw = swampiness(x, z)
         if (sw > 0.0 && h > SEA_LEVEL - 1) h += (SEA_LEVEL + 0.3 - h) * sw * 0.9
+        // Badlands: flat-topped mesas in steps, showing their coloured stripes.
+        val bad = smoothstep(0.18, 0.2, temp(x, z)) * smoothstep(-0.2, -0.23, humid(x, z))
+        if (bad > 0.0 && h > SEA_LEVEL + 1) {
+            val n = mountainNoise.fbm2(x * 0.02 + 40.0, z * 0.02, 3)
+            if (n > -0.05) h += floor((minOf(n + 0.05, 0.5) * 70 * bad) / 5) * 5
+        }
         return h.toInt().coerceIn(6, Chunk.HEIGHT - 12)
     }
 
@@ -103,7 +110,7 @@ class TerrainGenerator(private val seed: Long, private val world: World? = null)
             when (biome) {
                 Biome.DESERT -> { top = Blocks.SAND; filler = Blocks.SAND; fillerDepth = 4 }
                 Biome.SNOW -> { top = Blocks.SNOW_GRASS; filler = Blocks.DIRT }
-                Biome.BADLANDS -> { top = Blocks.RED_SAND; filler = Blocks.TERRACOTTA; fillerDepth = 12 }
+                Biome.BADLANDS -> { top = Blocks.RED_SAND; filler = Blocks.TERRACOTTA; fillerDepth = 30 }
                 Biome.MUSHROOM -> { top = Blocks.MYCELIUM; filler = Blocks.DIRT }
                 Biome.SWAMP -> { top = if (floorNoise.noise2(wx * 0.08, wz * 0.08) > 0.25) Blocks.MUD else Blocks.GRASS; filler = Blocks.DIRT }
                 else -> { top = Blocks.GRASS; filler = Blocks.DIRT }

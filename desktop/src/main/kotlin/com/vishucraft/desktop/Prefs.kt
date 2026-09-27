@@ -39,6 +39,7 @@ class Prefs {
     var showDebug: Boolean get() = b("showDebug", false); set(v) { p.setProperty("showDebug", v.toString()); save() }
     /** Rain, snow and thunderstorms. Off by default. */
     var weather: Boolean get() = b("weather", false); set(v) { p.setProperty("weather", v.toString()); save() }
+    var fancy: Boolean get() = b("fancy", true); set(v) { p.setProperty("fancy", v.toString()); save() }
     var fullscreen: Boolean get() = b("fullscreen", false); set(v) { p.setProperty("fullscreen", v.toString()); save() }
     var playerName: String
         get() = p.getProperty("playerName") ?: ("Player" + (100..999).random()).also { p.setProperty("playerName", it); save() }
@@ -54,6 +55,7 @@ class Prefs {
         { "Sound effects: $soundVolume%" } to { soundVolume = next(listOf(0, 40, 80, 100), soundVolume) },
         { "Music: $musicVolume%" } to { musicVolume = next(listOf(0, 25, 50, 100), musicVolume) },
         { "Weather (rain, snow, storms): ${if (weather) "On" else "Off"}" } to { weather = !weather },
+        { "Fancy graphics (waving grass, 3D clouds, stars, shadows): ${if (fancy) "On" else "Off"}" } to { fancy = !fancy },
         { "Fullscreen: ${if (fullscreen) "On" else "Off"} (F11)" } to { fullscreen = !fullscreen },
         { "FPS & coordinates: ${if (showDebug) "On" else "Off"} (F3)" } to { showDebug = !showDebug },
     )

@@ -81,6 +81,8 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
     private var raining = false
     /** Rain, snow and thunderstorms (off unless turned on in the settings). */
     var weatherEnabled = false
+    /** Waving plants and water, 3D clouds, stars and shadows (can be turned off on slow devices). */
+    var fancyGraphics = true
     private var autosaveTimer = 0f
     private var weatherTimer = 240f + java.util.Random().nextFloat() * 400f
     private var thunderDelay = -1f

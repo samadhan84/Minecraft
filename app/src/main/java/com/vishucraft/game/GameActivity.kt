@@ -353,6 +353,7 @@ class GameActivity : Activity() {
         game.fov = settings.fov.toFloat()
         game.renderDistance = settings.renderDistance
         game.weatherEnabled = settings.weather
+        game.fancyGraphics = settings.fancy
         sounds.volume = settings.soundVolume / 100f
         sounds.musicVolume = settings.musicVolume / 100f
         if (::stats.isInitialized) stats.visibility = if (settings.showDebug) View.VISIBLE else View.GONE

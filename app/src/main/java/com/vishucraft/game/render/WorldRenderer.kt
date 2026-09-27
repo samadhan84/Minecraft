@@ -240,6 +240,12 @@ class WorldRenderer(private val game: Game) {
         glUniform1f(blockShader.u("uCutout"), 0.5f)
         if (underwater) glUniform3f(blockShader.u("uTint"), 0.55f, 0.7f, 1f)
         else glUniform3f(blockShader.u("uTint"), 1f, 1f, 1f)
+        val fancy = game.fancyGraphics
+        glUniform1f(blockShader.u("uTime"), ((System.nanoTime() / 1_000_000L) % 600_000L) / 1000f)
+        glUniform1f(blockShader.u("uWave"), if (fancy) 1f else 0f)
+        // Golden light at sunrise and sunset.
+        val dusk = if (fancy && dim == com.vishucraft.game.world.Dimension.OVERWORLD) duskAmount() else 0f
+        glUniform3f(blockShader.u("uSunTint"), 1f, 1f - 0.28f * dusk, 1f - 0.5f * dusk)
 
         val visible = ArrayList<ChunkGpu>()
         for (m in meshes.values) {
@@ -258,10 +264,11 @@ class WorldRenderer(private val game: Game) {
         game.net?.let { n -> mobRenderer.draw(blockShader, n.players.values.map { it.proxy }, ex, ez, far) }
         dropRenderer.draw(blockShader, game.drops, ex, ez, far, game.timeOfDay, game.carts, game.projectiles, game.boats)
         if (underwater) glUniform3f(blockShader.u("uTint"), 0.55f, 0.7f, 1f)
+        if (fancy) drawShadows(ex, ez)
 
         drawSelection()
         if (dim == com.vishucraft.game.world.Dimension.OVERWORLD) {
-            drawClouds(ex, ez, daylight, far)
+            if (fancy) drawClouds3d(ex, ey, ez, daylight, far) else drawClouds(ex, ez, daylight, far)
             drawWeather(ex, ey, ez)
         }
 
@@ -280,6 +287,12 @@ class WorldRenderer(private val game: Game) {
         glDepthMask(true)
         glEnable(GL_CULL_FACE)
         glDisable(GL_BLEND)
+    }
+
+    /** 0..1, strongest when the sun is at the horizon. */
+    private fun duskAmount(): Float {
+        val s = sin(game.timeOfDay * 2 * Math.PI).toFloat()
+        return (1f - abs(s) * 4f).coerceIn(0f, 1f) * (1f - game.rain)
     }
 
     private fun skyColor(daylight: Float): FloatArray {
@@ -328,6 +341,7 @@ class WorldRenderer(private val game: Game) {
         // Two axes perpendicular to the sun direction.
         val ax = floatArrayOf(0f, 0f, 1f).let { cross(sd, it) }.let { normalize(it) }
         val ay = normalize(cross(ax, sd))
+        if (game.fancyGraphics) drawDomeAndStars(ex, ey, ez, daylight, a)
         dyn.size = 0
         val d = 150f
         val s = 18f
@@ -342,6 +356,172 @@ class WorldRenderer(private val game: Game) {
         glDisable(GL_BLEND)
         glEnable(GL_CULL_FACE)
         glEnable(GL_DEPTH_TEST)
+    }
+
+    private val stars: FloatArray by lazy {
+        val r = java.util.Random(4242)
+        FloatArray(260 * 4) { 0f }.also { a ->
+            for (i in 0 until 260) {
+                // Random directions on the sphere (they turn with the sky; the half below the horizon is hidden).
+                var x: Float; var y: Float; var z: Float
+                do { x = r.nextFloat() * 2 - 1; y = r.nextFloat() * 2 - 1; z = r.nextFloat() * 2 - 1 } while (x * x + y * y + z * z > 1f || x * x + y * y + z * z < 0.05f)
+                val l = sqrt(x * x + y * y + z * z)
+                a[i * 4] = x / l; a[i * 4 + 1] = y / l; a[i * 4 + 2] = z / l; a[i * 4 + 3] = 0.5f + r.nextFloat()
+            }
+        }
+    }
+
+    /** A darker blue towards the top of the sky, and stars at night. */
+    private fun drawDomeAndStars(ex: Float, ey: Float, ez: Float, daylight: Float, angle: Float) {
+        val sky = skyColor(daylight)
+        val zenith = floatArrayOf(sky[0] * 0.55f, sky[1] * 0.7f, minOf(1f, sky[2] * 1.02f), 1f)
+        val u = ChunkMesher.tileU(Tiles.WHITE) + 0.01f; val v = ChunkMesher.tileV(Tiles.WHITE) + 0.01f
+        dyn.size = 0
+        val rDome = 120f
+        val rings = floatArrayOf(0f, 0.12f, 0.3f, 0.55f, 0.85f, 1.2f, 1.5708f)
+        val seg = 20
+        for (ri in 0 until rings.size - 1) {
+            val e0 = rings[ri]; val e1 = rings[ri + 1]
+            val a0 = 2f + (e0 / 0.9f).coerceAtMost(1f); val a1 = 2f + (e1 / 0.9f).coerceAtMost(1f)
+            for (k in 0 until seg) {
+                val t0 = k * 6.2832f / seg; val t1 = (k + 1) * 6.2832f / seg
+                fun px(e: Float, t: Float) = ex + cos(e) * cos(t) * rDome
+                fun py(e: Float) = ey + sin(e) * rDome
+                fun pz(e: Float, t: Float) = ez + cos(e) * sin(t) * rDome
+                dyn.ensure(4 * FLOATS_PER_VERTEX)
+                dyn.put(px(e0, t0), py(e0), pz(e0, t0), u, v, a0); dyn.put(px(e0, t1), py(e0), pz(e0, t1), u, v, a0)
+                dyn.put(px(e1, t1), py(e1), pz(e1, t1), u, v, a1); dyn.put(px(e1, t0), py(e1), pz(e1, t0), u, v, a1)
+            }
+        }
+        glDisable(GL_DEPTH_TEST)
+        glDisable(GL_CULL_FACE)
+        glEnable(GL_BLEND)
+        dynamic.upload(dyn.data, dyn.size)
+        simpleUniforms(zenith, ex, ez, 0f, 0f)
+        dynamic.draw()
+        // Stars fade in after sunset and twinkle.
+        val night = (1f - daylight * 1.6f).coerceIn(0f, 1f) * (1f - game.rain)
+        if (night > 0.02f) {
+            dyn.size = 0
+            val ca = cos(angle); val sa = sin(angle)
+            val time = (System.nanoTime() / 1_000_000L % 100_000L) / 1000f
+            val su = ChunkMesher.tileU(Tiles.STAR); val sv = ChunkMesher.tileV(Tiles.STAR)
+            for (i in 0 until stars.size / 4) {
+                val x0 = stars[i * 4]; val y0 = stars[i * 4 + 1]; val z = stars[i * 4 + 2]
+                val x = x0 * ca - y0 * sa; val y = x0 * sa + y0 * ca
+                if (y < 0.02f) continue
+                val size = 0.35f * stars[i * 4 + 3]
+                val tw = 0.65f + 0.35f * sin(time * 2.3f + i * 1.7f)
+                val cx = ex + x * 110f; val cy = ey + y * 110f; val cz = ez + z * 110f
+                // Face the camera: two axes perpendicular to the star direction.
+                val ax = normalize(cross(floatArrayOf(x, y, z), floatArrayOf(0f, 1f, 0.001f)))
+                val ay = normalize(cross(ax, floatArrayOf(x, y, z)))
+                val al = 2f + night * tw * minOf(1f, y * 4f)
+                dyn.ensure(4 * FLOATS_PER_VERTEX)
+                dyn.put(cx - (ax[0] + ay[0]) * size, cy - (ax[1] + ay[1]) * size, cz - (ax[2] + ay[2]) * size, su, sv + ChunkMesher.TILE_UV, al)
+                dyn.put(cx + (ax[0] - ay[0]) * size, cy + (ax[1] - ay[1]) * size, cz + (ax[2] - ay[2]) * size, su + ChunkMesher.TILE_UV, sv + ChunkMesher.TILE_UV, al)
+                dyn.put(cx + (ax[0] + ay[0]) * size, cy + (ax[1] + ay[1]) * size, cz + (ax[2] + ay[2]) * size, su + ChunkMesher.TILE_UV, sv, al)
+                dyn.put(cx - (ax[0] - ay[0]) * size, cy - (ax[1] - ay[1]) * size, cz - (ax[2] - ay[2]) * size, su, sv, al)
+            }
+            if (dyn.size > 0) {
+                dynamic.upload(dyn.data, dyn.size)
+                simpleUniforms(floatArrayOf(1f, 1f, 1f, 1f), ex, ez, 0f, 0f)
+                dynamic.draw()
+            }
+        }
+        glDisable(GL_BLEND)
+        glEnable(GL_CULL_FACE)
+        glEnable(GL_DEPTH_TEST)
+    }
+
+    /** Puffy clouds made of real boxes, lit brighter on top. */
+    private fun drawClouds3d(ex: Float, ey: Float, ez: Float, daylight: Float, far: Float) {
+        val cell = 12f
+        val y0 = 118f; val y1 = 122f
+        val drift = game.timeOfDay * Game.DAY_LENGTH_SECONDS * 0.8f
+        val ox = ex + drift
+        val gx0 = floor(ox / cell).toInt(); val gz0 = floor(ez / cell).toInt()
+        val r = minOf((far / cell).toInt() + 2, 18)
+        val n = r * 2 + 1
+        val grid = BooleanArray(n * n)
+        for (gz in 0 until n) for (gx in 0 until n) {
+            val wx = gx0 - r + gx; val wz = gz0 - r + gz
+            grid[gz * n + gx] = cloudNoise.noise2(wx * 0.19, wz * 0.19) + cloudNoise.noise2(wx * 0.5, wz * 0.5) * 0.3 >= 0.18
+        }
+        fun at(gx: Int, gz: Int) = gx in 0 until n && gz in 0 until n && grid[gz * n + gx]
+        val u = ChunkMesher.tileU(Tiles.WHITE) + 0.01f; val v = ChunkMesher.tileV(Tiles.WHITE) + 0.01f
+        dyn.size = 0
+        fun face(ax: Float, ay: Float, az: Float, bx: Float, by: Float, bz: Float, cx: Float, cy: Float, cz: Float, dx: Float, dy: Float, dz: Float, l: Float) {
+            dyn.ensure(4 * FLOATS_PER_VERTEX)
+            dyn.put(ax, ay, az, u, v, l); dyn.put(bx, by, bz, u, v, l); dyn.put(cx, cy, cz, u, v, l); dyn.put(dx, dy, dz, u, v, l)
+        }
+        val below = ey < y0; val above = ey > y1
+        for (gz in 0 until n) for (gx in 0 until n) {
+            if (!grid[gz * n + gx]) continue
+            val x0 = (gx0 - r + gx) * cell - drift; val x1 = x0 + cell
+            val z0 = (gz0 - r + gz) * cell; val z1 = z0 + cell
+            if (!below) face(x0, y1, z0, x1, y1, z0, x1, y1, z1, x0, y1, z1, 1f)
+            if (!above) face(x0, y0, z0, x0, y0, z1, x1, y0, z1, x1, y0, z0, 0.72f)
+            if (!at(gx - 1, gz) && ex < x0) face(x0, y0, z0, x0, y1, z0, x0, y1, z1, x0, y0, z1, 0.85f)
+            if (!at(gx + 1, gz) && ex > x1) face(x1, y0, z0, x1, y0, z1, x1, y1, z1, x1, y1, z0, 0.85f)
+            if (!at(gx, gz - 1) && ez < z0) face(x0, y0, z0, x1, y0, z0, x1, y1, z0, x0, y1, z0, 0.9f)
+            if (!at(gx, gz + 1) && ez > z1) face(x0, y0, z1, x0, y1, z1, x1, y1, z1, x1, y0, z1, 0.9f)
+        }
+        if (dyn.size == 0) return
+        dynamic.upload(dyn.data, dyn.size)
+        val b = 0.08f + 0.92f * daylight
+        val dusk = duskAmount()
+        simpleUniforms(floatArrayOf(b, b * (1f - 0.12f * dusk), b * (1.02f - 0.25f * dusk), 0.85f), ex, ez, far * 0.8f, far * 1.6f)
+        glEnable(GL_BLEND)
+        glDisable(GL_CULL_FACE)
+        glDepthMask(false)
+        dynamic.draw()
+        glDepthMask(true)
+        glEnable(GL_CULL_FACE)
+        glDisable(GL_BLEND)
+    }
+
+    /** Soft round shadows on the ground under creatures. */
+    private fun drawShadows(ex: Float, ez: Float) {
+        dyn.size = 0
+        val u = ChunkMesher.tileU(Tiles.SHADOW); val v = ChunkMesher.tileV(Tiles.SHADOW); val tu = ChunkMesher.TILE_UV
+        val world = game.world
+        for (m in game.mobs.list) {
+            if (m.dead) continue
+            val dx = m.x - ex; val dz = m.z - ez
+            if (dx * dx + dz * dz > 40f * 40f) continue
+            val bx = floor(m.x).toInt(); val bz = floor(m.z).toInt()
+            var gy = floor(m.y + 0.01f).toInt()
+            var found = false
+            for (k in 0 until 5) {
+                val b = world.getBlock(bx, gy - 1, bz)
+                if (Blocks.solid[b] || Blocks.isLiquid(b)) { found = true; break }
+                gy--
+            }
+            if (!found) continue
+            val top = gy - 1 + (if (Blocks.isLiquid(world.getBlock(bx, gy - 1, bz))) 0.9f else Blocks.height[world.getBlock(bx, gy - 1, bz)]) + 0.02f
+            val fade = (1f - (m.y - top) / 4f).coerceIn(0f, 1f)
+            if (fade <= 0f) continue
+            val s = m.halfWidth * 1.4f + 0.1f
+            val al = 2f + 0.8f * fade
+            dyn.ensure(4 * FLOATS_PER_VERTEX)
+            dyn.put(m.x - s, top, m.z + s, u, v + tu, al); dyn.put(m.x + s, top, m.z + s, u + tu, v + tu, al)
+            dyn.put(m.x + s, top, m.z - s, u + tu, v, al); dyn.put(m.x - s, top, m.z - s, u, v, al)
+        }
+        if (dyn.size == 0) return
+        dynamic.upload(dyn.data, dyn.size)
+        simpleUniforms(floatArrayOf(1f, 1f, 1f, 1f), ex, ez, 0f, 0f)
+        glEnable(GL_BLEND)
+        glDisable(GL_CULL_FACE)
+        glDepthMask(false)
+        glEnable(GL_POLYGON_OFFSET_FILL)
+        glPolygonOffset(-2f, -2f)
+        dynamic.draw()
+        glDisable(GL_POLYGON_OFFSET_FILL)
+        glDepthMask(true)
+        glEnable(GL_CULL_FACE)
+        glDisable(GL_BLEND)
+        blockShader.use()
     }
 
     private fun drawClouds(ex: Float, ez: Float, daylight: Float, far: Float) {

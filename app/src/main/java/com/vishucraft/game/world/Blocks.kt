@@ -17,6 +17,8 @@ object Tiles {
     // Registered up front so they are painted into the atlas (tiles first asked for while drawing would be blank).
     val CART_SIDE = id("cart_side")
     val CART_FLOOR = id("cart_floor")
+    val SHADOW = id("shadow")
+    val STAR = id("star")
 }
 
 enum class RenderType { NONE, CUBE, CROSS, LIQUID, FLAT, BOX, PISTON_HEAD, SHAPE, RAIL, PORTAL }
@@ -800,9 +802,18 @@ object Blocks {
     @JvmField val blocksLight = BooleanArray(COUNT)
     /** Collision height (slabs are half height). */
     @JvmField val height = FloatArray(COUNT)
+    /** How the block sways in "fancy" graphics: 0 still, 1 plant, 2 leaves, 3 water surface. */
+    @JvmField val waves = IntArray(COUNT)
 
     init {
         for (d in all) {
+            waves[d.id] = when {
+                d.id == WATER -> 3
+                d.render == RenderType.CUBE && d.name.endsWith("Leaves") -> 2
+                d.render == RenderType.CROSS && d.id != TORCH && d.id != REDSTONE_TORCH && d.id != LEVER && d.id != COBWEB &&
+                    d.id != BROWN_MUSHROOM && d.id != RED_MUSHROOM -> 1
+                else -> 0
+            }
             opaque[d.id] = d.opaque
             solid[d.id] = d.solid
             blocksLight[d.id] = d.blocksLight

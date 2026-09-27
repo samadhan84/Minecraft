@@ -358,6 +358,7 @@ class App(private val demo: File?) {
             g.fov = prefs.fov.toFloat()
             g.renderDistance = prefs.renderDistance
             g.weatherEnabled = prefs.weather
+            g.fancyGraphics = prefs.fancy
         }
     }
 
@@ -904,6 +905,20 @@ class App(private val demo: File?) {
     // ---------------------------------------------------------------- demo / self-test mode
 
     private var demoFrame = 0
+
+    /** Moves the demo player to the nearest spot of [biome]. */
+    private fun demoVisit(g: com.vishucraft.game.engine.Game, biome: com.vishucraft.game.world.Biome) {
+        val gen = g.world.generator
+        val px = g.player.x.toInt(); val pz = g.player.z.toInt()
+        for (r in 0..6000 step 48) for (a in 0 until 24) {
+            val x = px + (kotlin.math.cos(a * 0.2618) * r).toInt(); val z = pz + (kotlin.math.sin(a * 0.2618) * r).toInt()
+            if (gen.biomeAt(x, z) == biome && gen.biomeAt(x + 24, z) == biome && gen.biomeAt(x - 24, z) == biome) {
+                g.player.x = x + 0.5f; g.player.z = z + 0.5f; g.player.y = gen.surfaceHeight(x, z) + 12f
+                g.player.flying = true; g.player.vy = 0f
+                return
+            }
+        }
+    }
     private var demoCreate = false
     private var demoWorld = 0
 
@@ -969,24 +984,55 @@ class App(private val demo: File?) {
             }
             f == 443 -> session?.game?.mobs?.list?.forEach { it.vx = 0f; it.vz = 0f }
             f == 470 -> shot("04e-creatures")
-            f == 471 -> overlay = Overlay.PAUSE
-            f == 473 -> shot("05-pause")
-            f == 474 -> { passwordField.text = "secret"; overlay = Overlay.SAVE_QUIT }
-            f == 476 -> shot("05b-save-and-quit")
-            f == 477 -> { overlay = Overlay.NONE; leaveWorld(); menu = Menu.CREATE; nameField.text = "Demo survival"; seedField.text = "777"; survival = true }
-            f == 479 -> demoCreate = true
-            f == 800 -> shot("06-survival-world")
-            f == 802 -> session?.let {
+            f == 472 -> session?.game?.let { g ->
+                // Pack 3 creatures.
+                val p = g.player
+                p.pitch = -0.15f
+                val fx = kotlin.math.sin(p.yaw); val fz = -kotlin.math.cos(p.yaw)
+                val rx = kotlin.math.cos(p.yaw); val rz = kotlin.math.sin(p.yaw)
+                val types = listOf("IRON_GOLEM", "SNOW_GOLEM", "FOX", "GOAT", "PANDA", "POLAR_BEAR", "LLAMA", "MOOSHROOM", "TURTLE", "FROG", "AXOLOTL", "PARROT", "BEE")
+                    .map { com.vishucraft.game.engine.MobType.valueOf(it) }
+                g.mobs.list.clear(); g.mobs.hostileEnabled = false
+                for ((i, t) in types.withIndex()) {
+                    val side = (i - 6f) * 1.4f
+                    val x = p.x + fx * 9f + rx * side; val z = p.z + fz * 9f + rz * side
+                    var y = p.y.toInt() + 6
+                    while (y > 1 && !Blocks.solid[g.world.getBlock(kotlin.math.floor(x).toInt(), y - 1, kotlin.math.floor(z).toInt())]) y--
+                    g.mobs.list.add(com.vishucraft.game.engine.Mob(t, x, y.toFloat(), z).also { it.yaw = p.yaw + 3.14159f; it.customName = "demo"; it.tamed = true; it.sitting = true })
+                }
+            }
+            f in 473..500 -> session?.game?.mobs?.list?.forEach { it.vx = 0f; it.vz = 0f }
+            f == 501 -> shot("04f-new-creatures")
+            f == 502 -> session?.game?.let { g -> g.mobs.list.clear(); g.timeOfDay = 0.485f; g.player.pitch = 0.05f }
+            f == 530 -> shot("04g-sunset")
+            f == 531 -> session?.game?.let { g -> g.timeOfDay = 0.75f; g.player.pitch = 0.9f }
+            f == 560 -> shot("04h-night-stars")
+            f == 561 -> session?.game?.let { g ->
+                // Visit a cherry grove, then the badlands.
+                g.timeOfDay = 0.2f; g.player.pitch = -0.2f
+                demoVisit(g, com.vishucraft.game.world.Biome.CHERRY)
+            }
+            f == 760 -> shot("04i-cherry-grove")
+            f == 761 -> session?.game?.let { g -> demoVisit(g, com.vishucraft.game.world.Biome.BADLANDS) }
+            f == 960 -> shot("04j-badlands")
+            f == 971 -> overlay = Overlay.PAUSE
+            f == 973 -> shot("05-pause")
+            f == 974 -> { passwordField.text = "secret"; overlay = Overlay.SAVE_QUIT }
+            f == 976 -> shot("05b-save-and-quit")
+            f == 977 -> { overlay = Overlay.NONE; leaveWorld(); menu = Menu.CREATE; nameField.text = "Demo survival"; seedField.text = "777"; survival = true }
+            f == 979 -> demoCreate = true
+            f == 1300 -> shot("06-survival-world")
+            f == 1302 -> session?.let {
                 it.game.inventory.add(com.vishucraft.game.world.Items.find("Minecart"), 1)
                 it.game.inventory.add(Blocks.LOG, 8)
                 openInventory()
             }
-            f == 806 -> shot("07-survival-inventory")
-            f == 808 -> { closeOverlay(); openContainer(ContainerScreen.Mode.CRAFTING) }
-            f == 812 -> shot("08-crafting-table")
-            f == 814 -> { closeOverlay(); leaveWorld(); menu = Menu.WORLDS }
-            f == 818 -> shot("09-worlds")
-            f == 820 -> glfwSetWindowShouldClose(window, true)
+            f == 1306 -> shot("07-survival-inventory")
+            f == 1308 -> { closeOverlay(); openContainer(ContainerScreen.Mode.CRAFTING) }
+            f == 1312 -> shot("08-crafting-table")
+            f == 1314 -> { closeOverlay(); leaveWorld(); menu = Menu.WORLDS }
+            f == 1318 -> shot("09-worlds")
+            f == 1320 -> glfwSetWindowShouldClose(window, true)
         }
     }
 }

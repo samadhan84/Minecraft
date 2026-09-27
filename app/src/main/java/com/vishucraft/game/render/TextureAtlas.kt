@@ -449,7 +449,7 @@ object TextureAtlas {
         "jungle" to Wood(rgb(92, 72, 34), rgb(60, 48, 22), rgb(162, 116, 80), rgb(48, 142, 32)),
         "acacia" to Wood(rgb(106, 100, 92), rgb(72, 68, 62), rgb(172, 92, 50), rgb(104, 132, 42)),
         "dark_oak" to Wood(rgb(62, 48, 30), rgb(40, 30, 18), rgb(70, 46, 22), rgb(42, 92, 26)),
-        "cherry" to Wood(rgb(64, 36, 44), rgb(40, 22, 28), rgb(226, 178, 172), rgb(240, 168, 198)),
+        "cherry" to Wood(rgb(104, 64, 72), rgb(70, 40, 48), rgb(226, 178, 172), rgb(240, 168, 198)),
         "mangrove" to Wood(rgb(84, 66, 40), rgb(56, 42, 26), rgb(118, 56, 50), rgb(66, 118, 40)),
     )
 
@@ -1393,6 +1393,8 @@ object TextureAtlas {
         }
         val brown = rgb(122, 90, 56)
         when (name) {
+            "shadow" -> t.fill { x, y -> val d = kotlin.math.hypot(x - 7.5, y - 7.5) / 7.5; if (d >= 1.0) 0 else argb((170 * (1 - d * d)).toInt(), 0, 0, 0) }
+            "star" -> t.fill { x, y -> val d = kotlin.math.hypot(x - 7.5, y - 7.5) / 7.5; if (d >= 1.0) 0 else argb((255 * (1 - d) * (1 - d)).toInt(), 255, 255, 255) }
             // ---- nature
             "bamboo" -> t.fill { x, y -> if (x in 6..9) (if (y % 6 == 0) rgb(92, 120, 30) else scale(rgb(128, 170, 44), if (x == 6) 0.85f else t.jitter(0.05f))) else if ((x == 10 || x == 11) && y % 6 == 2) rgb(90, 150, 40) else 0 }
             "bamboo_planks" -> t.fill { x, y -> scale(rgb(206, 186, 90), (if (y % 4 == 0) 0.8f else if (x % 8 == 0) 0.9f else 1f) * t.jitter(0.04f)) }
