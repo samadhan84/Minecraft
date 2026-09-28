@@ -55,7 +55,7 @@ object BlockIcons {
 
     private fun render(id: Int): Bitmap {
         val def = Blocks[id]
-        if (def.render == RenderType.CROSS || def.render == RenderType.FLAT) return sprite(def.top, false)
+        if (def.render == RenderType.CROSS || def.render == RenderType.FLAT || id == Blocks.LEVER) return sprite(def.top, false)
         val out = Bitmap.createBitmap(S, S, Bitmap.Config.ARGB_8888)
         val c = Canvas(out)
         val paint = Paint().apply { isFilterBitmap = false; isAntiAlias = false }

@@ -64,13 +64,13 @@ class Redstone(private val world: World, private val set: (Int, Int, Int, Int, I
         val id = world.getBlock(x, y, z)
         if (!Blocks.isButton(id)) return
         onClick?.invoke(x, y, z)
-        set(x, y, z, id, 1)
+        set(x, y, z, id, world.getMeta(x, y, z) or 1) // bit 0 = pressed; the rest says where it is attached
         buttons[RedstoneIds.pack(x, y, z)] = BUTTON_TICKS
     }
 
     fun toggleLever(x: Int, y: Int, z: Int) {
         onClick?.invoke(x, y, z)
-        set(x, y, z, Blocks.LEVER, if (world.getMeta(x, y, z) != 0) 0 else 1)
+        set(x, y, z, Blocks.LEVER, world.getMeta(x, y, z) xor 1)
     }
 
     /** Called when TNT is lit, and when a lever / button is used (for sounds). */
@@ -94,7 +94,7 @@ class Redstone(private val world: World, private val set: (Int, Int, Int, Int, I
                 e.setValue(e.value - 1)
                 if (e.value <= 0) {
                     val b = id(e.key)
-                    if (Blocks.isButton(b)) setAt(e.key, b, 0)
+                    if (Blocks.isButton(b)) setAt(e.key, b, meta(e.key) and 1.inv())
                     it.remove()
                 }
             }
@@ -162,14 +162,16 @@ class Redstone(private val world: World, private val set: (Int, Int, Int, Int, I
         }
         for (p in comps) {
             val pid = id(p)
-            if ((Blocks.isButton(pid) || Blocks.isPlate(pid)) && meta(p) != 0) {
+            if (Blocks.isPlate(pid) && meta(p) != 0) {
                 sources.add(p); dir(p, 1).let { if (it >= 0) strong.add(it) }
                 continue
             }
+            // Buttons and levers strongly power the block they are stuck to (floor, wall or ceiling).
+            if ((Blocks.isButton(pid) || pid == Blocks.LEVER) && meta(p) and 1 != 0) {
+                sources.add(p); dir(p, Shapes.supportFace(meta(p))).let { if (it >= 0) strong.add(it) }
+                continue
+            }
             when (pid) {
-                Blocks.LEVER -> if (meta(p) != 0) {
-                    sources.add(p); dir(p, 1).let { if (it >= 0) strong.add(it) }
-                }
                 Blocks.REDSTONE_BLOCK -> sources.add(p)
                 Blocks.REDSTONE_TORCH -> if (meta(p) == 0) {
                     sources.add(p); dir(p, 0).let { if (it >= 0) strong.add(it) }

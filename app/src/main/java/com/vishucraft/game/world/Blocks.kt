@@ -364,6 +364,7 @@ object Blocks {
     fun iconHeight(id: Int): Float = when {
         isPlate(id) -> 0.2f
         isCarpet(id) -> 0.12f
+        isButton(id) -> 0.25f
         id == CAKE -> 0.5f
         id == CAMPFIRE -> 0.45f
         id == SNOW_LAYER -> 0.15f
@@ -596,11 +597,12 @@ object Blocks {
         t("redstone_dust_on")
         plant(REDSTONE_TORCH, "Redstone Torch", "redstone_torch", R, emissive = true)
         t("redstone_torch_off")
-        plant(LEVER, "Lever", "lever", R, hardness = 0.2f)
+        // Buttons and levers go on the floor, a wall or the ceiling (see Shapes.attachCode); drawn as SHAPEs.
+        reg(BlockDef(LEVER, "Lever", t("lever"), render = RenderType.SHAPE, opaque = false, solid = false, blocksLight = false,
+            hardness = 0.2f, category = R, movable = false))
         t("lever_on")
-        reg(BlockDef(STONE_BUTTON, "Stone Button", t("stone"), render = RenderType.BOX, opaque = false, solid = false,
-            blocksLight = false, hardness = 0.2f, category = R, needsSupport = true, movable = false,
-            box = floatArrayOf(5 / 16f, 0f, 6 / 16f, 11 / 16f, 2 / 16f, 10 / 16f)))
+        reg(BlockDef(STONE_BUTTON, "Stone Button", t("stone"), render = RenderType.SHAPE, opaque = false, solid = false,
+            blocksLight = false, hardness = 0.2f, category = R, movable = false))
         cube(REDSTONE_LAMP, "Redstone Lamp", "redstone_lamp", 0.4f, ToolType.NONE, R)
         reg(BlockDef(REDSTONE_LAMP_ON, "Redstone Lamp (lit)", t("redstone_lamp_on"), hardness = 0.4f, emissive = true,
             category = R, inInventory = false))
@@ -678,9 +680,8 @@ object Blocks {
         }
         for ((i, w) in (listOf("oak") + EXTRA_WOODS).withIndex()) {
             val nice = pretty(w)
-            reg(BlockDef(WOOD_BUTTON_FIRST + i, "$nice Button", t("${w}_planks"), render = RenderType.BOX, opaque = false, solid = false,
-                blocksLight = false, hardness = 0.2f, tool = A, category = Category.REDSTONE, needsSupport = true, movable = false,
-                box = floatArrayOf(5 / 16f, 0f, 6 / 16f, 11 / 16f, 2 / 16f, 10 / 16f)))
+            reg(BlockDef(WOOD_BUTTON_FIRST + i, "$nice Button", t("${w}_planks"), render = RenderType.SHAPE, opaque = false, solid = false,
+                blocksLight = false, hardness = 0.2f, tool = A, category = Category.REDSTONE, movable = false))
             shape(WOOD_PLATE_FIRST + i, "$nice Pressure Plate", "${w}_planks", hardness = 0.4f, tool = A, cat = Category.REDSTONE,
                 facing = Facing.NONE, solid = false)
         }
@@ -851,7 +852,7 @@ object Blocks {
         when (id) {
             REDSTONE_DUST -> return if (meta > 0) Tiles.id("redstone_dust_on") else d.top
             REDSTONE_TORCH -> return if (meta != 0) Tiles.id("redstone_torch_off") else d.top
-            LEVER -> return if (meta != 0) Tiles.id("lever_on") else d.top
+            LEVER -> return if (meta and 1 != 0) Tiles.id("lever_on") else d.top
             PAINTING -> return Tiles.id("painting_${(meta shr 3) and 3}")
             TNT -> if (meta == 2) return Tiles.id("tnt_flash")
             WHEAT_CROP -> return Tiles.id("wheat_stage_${meta.coerceIn(0, 7)}")

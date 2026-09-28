@@ -930,7 +930,29 @@ class App(private val demo: File?) {
                     g.mobs.list.add(com.vishucraft.game.engine.Mob(t, x, y.toFloat(), z).also { it.yaw = p.yaw + 3.14159f; it.customName = "demo"; it.tamed = true; it.sitting = true })
                 }
             }
-            f in 473..500 -> session?.game?.mobs?.list?.forEach { it.vx = 0f; it.vz = 0f }
+            f == 473 -> session?.game?.let { g ->
+                // A small stone wall with switches on its face, the floor and under an overhang.
+                val p = g.player
+                val fx = kotlin.math.round(kotlin.math.sin(p.yaw)).toInt(); val fz = kotlin.math.round(-kotlin.math.cos(p.yaw)).toInt()
+                val (sx, sz) = if (fx != 0) fx to 0 else 0 to (if (fz == 0) -1 else fz)
+                val bx = com.vishucraft.game.world.floorInt(p.x) + sx * 3; val bz = com.vishucraft.game.world.floorInt(p.z) + sz * 3
+                val y = com.vishucraft.game.world.floorInt(p.y)
+                val rx = -sz; val rz = sx
+                val S = com.vishucraft.game.world.Shapes
+                // The wall's face towards the player is on side "toward player", so the switch's support is away from the player.
+                val away = when { sx == 1 -> 4; sx == -1 -> 5; sz == 1 -> 2; else -> 3 }
+                for (i in -2..2) for (dy in 0..2) g.setBlock(bx + rx * i, y + dy, bz + rz * i, Blocks.STONE_BRICKS)
+                for (i in -2..2) for (dy in 0..2) g.setBlock(bx - sx + rx * i, y + dy, bz - sz + rz * i, Blocks.AIR)
+                g.setBlock(bx - sx - rx, y + 1, bz - sz - rz, Blocks.LEVER, S.attachMeta(away))
+                g.setBlock(bx - sx, y + 1, bz - sz, Blocks.STONE_BUTTON, S.attachMeta(away))
+                g.setBlock(bx - sx + rx, y + 1, bz - sz + rz, Blocks.WOOD_BUTTON_FIRST, S.attachMeta(away))
+                g.setBlock(bx - sx + rx * 2, y + 1, bz - sz + rz * 2, Blocks.LEVER, S.attachMeta(away) or 1)
+                g.setBlock(bx - sx * 2 + rx, y, bz - sz * 2 + rz, Blocks.LEVER, S.attachMeta(1))
+                g.mobs.list.clear()
+                p.pitch = -0.1f
+            }
+            f == 490 -> shot("04e2-wall-switches")
+            f in 474..500 -> session?.game?.mobs?.list?.forEach { it.vx = 0f; it.vz = 0f }
             f == 501 -> shot("04f-new-creatures")
             f == 502 -> session?.game?.let { g -> g.mobs.list.clear(); g.timeOfDay = 0.485f; g.player.pitch = 0.05f }
             f == 530 -> shot("04g-sunset")

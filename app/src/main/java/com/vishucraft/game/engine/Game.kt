@@ -756,7 +756,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
         }
     }
 
-    private fun breakBlock(x: Int, y: Int, z: Int) {
+    internal fun breakBlock(x: Int, y: Int, z: Int) {
         val id = world.getBlock(x, y, z)
         val meta = world.getMeta(x, y, z)
         setBlock(x, y, z, Blocks.AIR)
@@ -801,6 +801,15 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
             if (world.getBlock(x + n[f][0], y + n[f][1], z + n[f][2]) == Blocks.PISTON_HEAD) {
                 setBlock(x + n[f][0], y + n[f][1], z + n[f][2], Blocks.AIR)
             }
+        }
+        // Buttons and levers stuck to this block fall off.
+        for (f in 0 until 6) {
+            val ax = x + n[f][0]; val ay = y + n[f][1]; val az = z + n[f][2]
+            val a = world.getBlock(ax, ay, az)
+            if (!com.vishucraft.game.world.Shapes.isAttached(a)) continue
+            if (com.vishucraft.game.world.Shapes.supportFace(world.getMeta(ax, ay, az)) != (f xor 1)) continue
+            setBlock(ax, ay, az, Blocks.AIR)
+            if (survival) drops.spawn(ItemStack(a), ax + 0.5f, ay + 0.3f, az + 0.5f)
         }
         // Plants, torches, dust and stacked sugar cane / cactus above pop off too.
         var above = y + 1
@@ -1597,6 +1606,15 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
                 if (id == Blocks.PAINTING) meta = meta or (java.util.Random().nextInt(4) shl 3)
             }
             Blocks.REPEATER, Blocks.OBSERVER -> meta = meta xor 1
+            Blocks.LEVER, in Blocks.WOOD_BUTTON_FIRST until Blocks.WOOD_BUTTON_FIRST + 6, Blocks.STONE_BUTTON -> {
+                // Stick it to the face that was tapped: floor, ceiling or a wall (a replaced plant: the floor).
+                val support = if (replace) 1 else when {
+                    t.ny == 1 -> 1; t.ny == -1 -> 0; t.nz == 1 -> 3; t.nz == -1 -> 2; t.nx == 1 -> 5; else -> 4
+                }
+                val n = ChunkMesher.NORMALS[support]
+                if (!Blocks.opaque[world.getBlock(x + n[0], y + n[1], z + n[2])]) return
+                meta = S.attachMeta(support)
+            }
         }
         setBlock(x, y, z, id, meta)
         if (id == Blocks.SIGN) uiEvents.add("signedit:$x,$y,$z")

@@ -51,6 +51,7 @@ object Shapes {
             Blocks.isGate(id) -> Blocks.OAK_FENCE_GATE
             Blocks.isBed(id) -> Blocks.BED_FIRST
             Blocks.isPlate(id) -> Blocks.PRESSURE_PLATE
+            Blocks.isButton(id) -> Blocks.STONE_BUTTON
             Blocks.isCarpet(id) -> Blocks.CARPET_FIRST
             Blocks.isBanner(id) -> Blocks.BANNER_FIRST
             else -> id
@@ -111,6 +112,8 @@ object Shapes {
                 }
                 out
             }
+            Blocks.STONE_BUTTON -> listOf(buttonBox(meta))
+            Blocks.LEVER -> leverParts(meta).let { listOf(it.first, it.second) }
             Blocks.REPEATER -> listOf(b(0f, 0f, 0f, 1f, 2 * P, 1f))
             Blocks.DAYLIGHT_SENSOR -> listOf(b(0f, 0f, 0f, 1f, 6 * P, 1f))
             Blocks.PRESSURE_PLATE -> listOf(b(P, 0f, P, 15 * P, if (meta != 0) 0.5f * P else P, 15 * P))
@@ -144,6 +147,52 @@ object Shapes {
                 else listOf(b(0f, 10 * P, 0f, 1f, 1f, 1f), b(4 * P, 4 * P, 4 * P, 12 * P, 10 * P, 12 * P), b(6 * P, 0f, 6 * P, 10 * P, 4 * P, 10 * P))
             else -> listOf(b(0f, 0f, 0f, 1f, 1f, 1f))
         }
+    }
+
+    // ---------------------------------------------------------------- buttons and levers
+
+    /**
+     * Buttons and levers hang on the floor, the ceiling or a wall. Meta bit 0 = pressed / on, bits 1..3 = which
+     * side holds them: 0 floor (so older worlds keep working), 1 ceiling, 2..5 the wall on face 2..5.
+     */
+    fun attachCode(meta: Int) = (meta shr 1) and 7
+
+    /** The face (0 +Y, 1 -Y, 2 +Z, 3 -Z, 4 +X, 5 -X) that points at the block holding it. */
+    fun supportFace(meta: Int) = when (val c = attachCode(meta)) { 0 -> 1; 1 -> 0; in 2..5 -> c; else -> 1 }
+
+    /** Meta for something stuck to the block on [face] of its cell. */
+    fun attachMeta(face: Int) = (when (face) { 1 -> 0; 0 -> 1; else -> face }) shl 1
+
+    fun isAttached(id: Int) = Blocks.isButton(id) || id == Blocks.LEVER
+
+    /**
+     * Turns a box drawn for the floor (y = distance from the holding block) so it sits against [face] instead.
+     */
+    private fun onSide(face: Int, x0: Float, y0: Float, z0: Float, x1: Float, y1: Float, z1: Float): FloatArray {
+        fun map(x: Float, y: Float, z: Float): FloatArray = when (face) {
+            0 -> floatArrayOf(x, 1 - y, z)
+            2 -> floatArrayOf(x, z, 1 - y)
+            3 -> floatArrayOf(x, z, y)
+            4 -> floatArrayOf(1 - y, z, x)
+            5 -> floatArrayOf(y, z, x)
+            else -> floatArrayOf(x, y, z)
+        }
+        val a = map(x0, y0, z0); val c = map(x1, y1, z1)
+        return b(minOf(a[0], c[0]), minOf(a[1], c[1]), minOf(a[2], c[2]), maxOf(a[0], c[0]), maxOf(a[1], c[1]), maxOf(a[2], c[2]))
+    }
+
+    fun buttonBox(meta: Int): FloatArray {
+        val depth = if (meta and 1 != 0) P else 2 * P
+        return onSide(supportFace(meta), 5 * P, 0f, 6 * P, 11 * P, depth, 10 * P)
+    }
+
+    /** The lever's stone base and its wooden handle (tilted one way when off, the other way when on). */
+    fun leverParts(meta: Int): Pair<FloatArray, FloatArray> {
+        val f = supportFace(meta)
+        val on = meta and 1 != 0
+        val base = onSide(f, 5 * P, 0f, 4 * P, 11 * P, 3 * P, 12 * P)
+        val handle = if (on) onSide(f, 7 * P, 3 * P, 9 * P, 9 * P, 10 * P, 11 * P) else onSide(f, 7 * P, 3 * P, 5 * P, 9 * P, 10 * P, 7 * P)
+        return base to handle
     }
 
     /** An arm from the centre towards side [side]. */

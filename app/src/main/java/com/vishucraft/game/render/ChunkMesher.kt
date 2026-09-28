@@ -263,7 +263,12 @@ class ChunkMesher {
                     emitBox(opaqueOut, px, y, pz, plate, id, meta, false, frontFace = f, frontTile = frontTile)
                     emitBox(opaqueOut, px, y, pz, arm, id, meta, false, sideTile = def.side)
                 }
-                RenderType.SHAPE -> {
+                RenderType.SHAPE -> if (id == Blocks.LEVER) {
+                    // Stone base and wooden handle.
+                    val (base, handle) = com.vishucraft.game.world.Shapes.leverParts(meta)
+                    emitBox(opaqueOut, px, y, pz, base, id, meta, false, sideTile = Tiles.id("cobblestone"))
+                    emitBox(opaqueOut, px, y, pz, handle, id, meta, false, sideTile = Tiles.id("oak_planks"))
+                } else {
                     val boxes = com.vishucraft.game.world.Shapes.boxes(id, meta, false) { side ->
                         val n = NORMALS[side]; block(px + n[0], y, pz + n[2])
                     }

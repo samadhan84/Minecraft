@@ -332,7 +332,7 @@ class IconAtlas {
                 }
             } else if (slot in 1 until Blocks.COUNT) {
                 val d = Blocks[slot]
-                if (d.render == RenderType.CROSS || d.render == RenderType.FLAT || d.render == RenderType.RAIL) {
+                if (d.render == RenderType.CROSS || d.render == RenderType.FLAT || d.render == RenderType.RAIL || slot == Blocks.LEVER) {
                     g.drawImage(tile(d.top), ox, oy, size, size, null)
                 } else {
                     val top = if (d.facing == Facing.ALL) d.front else d.top
