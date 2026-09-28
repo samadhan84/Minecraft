@@ -81,7 +81,7 @@ class MenuActivity : Activity() {
     override fun onResume() {
         super.onResume()
         // The game updates itself: a newer build is downloaded and Android asks to install it.
-        if (!Updater.handleStatus(this, intent.also { setIntent(Intent()) })) Updater.check(this)
+        if (!Updater.handleStatus(this, intent.also { setIntent(Intent()) })) Updater.attach(this)
         CrashReporter.takeReport(this)?.let { report ->
             AlertDialog.Builder(this)
                 .setTitle("The game stopped last time")
@@ -94,6 +94,11 @@ class MenuActivity : Activity() {
         @Suppress("DEPRECATION")
         window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY or
             View.SYSTEM_UI_FLAG_FULLSCREEN or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+    }
+
+    override fun onPause() {
+        Updater.detach(this)
+        super.onPause()
     }
 
     // ---------------------------------------------------------------- backup
@@ -196,38 +201,21 @@ class MenuActivity : Activity() {
         buttons.add("+  Create new world" to { newWorld() })
         for (w in list) {
             val mode = if (w.level.mode == com.vishucraft.game.world.GameMode.SURVIVAL) "Survival" else "Creative"
-            val lock = if (w.level.hasPassword) "  ·  🔒" else ""
-            buttons.add("${w.level.name}  ·  $mode$lock" to { withPassword(w.level) { startGame(w.dir.name) } })
+            buttons.add("${w.level.name}  ·  $mode" to { startGame(w.dir.name) })
         }
         if (list.isNotEmpty()) buttons.add("Delete a world…" to { deleteWorld() })
         buttonDialog("Select world", buttons)
     }
 
-    /** Runs [then] straight away, or after the right password for a protected world. */
-    private fun withPassword(level: com.vishucraft.game.world.LevelData, then: () -> Unit) {
-        if (!level.hasPassword) { then(); return }
-        val input = EditText(this).apply {
-            hint = "Password"
-            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
-        }
-        AlertDialog.Builder(this).setTitle("\"${level.name}\" is locked").setMessage("Type the world's password.").setView(input)
-            .setPositiveButton("OK") { _, _ ->
-                if (level.checkPassword(input.text.toString())) then()
-                else AlertDialog.Builder(this).setTitle("Wrong password").setPositiveButton("OK", null).show()
-            }
-            .setNegativeButton("Cancel", null).show()
-        input.requestFocus()
-    }
-
     private fun deleteWorld() {
         buttonDialog("Delete which world?", worlds().map { w ->
-            "Delete \"${w.level.name}\"" to { withPassword(w.level) {
+            "Delete \"${w.level.name}\"" to {
                 AlertDialog.Builder(this).setTitle("Delete ${w.level.name}?")
                     .setMessage("This cannot be undone.")
                     .setPositiveButton("Delete") { _, _ -> w.dir.deleteRecursively(); onResume() }
                     .setNegativeButton("Cancel", null).show()
                 Unit
-            } }
+            }
         })
     }
 
@@ -244,7 +232,7 @@ class MenuActivity : Activity() {
                 if (!scanning.isShowing) return@runOnUiThread
                 scanning.dismiss()
                 val buttons = ArrayList<Pair<String, () -> Unit>>()
-                for (h in hosts) buttons.add("${h.name}  ·  ${h.players} playing${if (h.locked) "  ·  🔒" else ""}" to { connect(h.address) })
+                for (h in hosts) buttons.add("${h.name}  ·  ${h.players} playing" to { connect(h.address) })
                 buttons.add("Enter address…" to { enterAddress() })
                 buttonDialog(if (hosts.isEmpty()) "No games found" else "Games on your Wi-Fi", buttons)
             }
@@ -259,27 +247,14 @@ class MenuActivity : Activity() {
         input.requestFocus()
     }
 
-    private fun connect(address: String, password: String = "") {
+    private fun connect(address: String) {
         val wait = AlertDialog.Builder(this).setTitle("Joining…").setMessage("Connecting to $address").show()
         val name = com.vishucraft.game.ui.Settings(this).playerName
         Thread {
-            var locked: String? = null
-            val result = try { com.vishucraft.game.net.ClientSession.connect(address, name, password) }
-                catch (e: com.vishucraft.game.net.PasswordException) { locked = e.message; null }
-                catch (e: Exception) { null }
+            val result = try { com.vishucraft.game.net.ClientSession.connect(address, name) } catch (e: Exception) { null }
             runOnUiThread {
                 wait.dismiss()
-                if (locked != null) {
-                    // The host's world is password protected: ask and try again.
-                    val input = EditText(this).apply {
-                        hint = "Password"
-                        inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
-                    }
-                    AlertDialog.Builder(this).setTitle(locked).setMessage("Ask the host for the world's password.").setView(input)
-                        .setPositiveButton("Join") { _, _ -> connect(address, input.text.toString()) }
-                        .setNegativeButton("Cancel", null).show()
-                    input.requestFocus()
-                } else if (result == null) {
+                if (result == null) {
                     AlertDialog.Builder(this).setTitle("Could not join")
                         .setMessage("No game answered at $address. Make sure both devices are on the same Wi-Fi and the host chose \"Open to Wi-Fi\".")
                         .setPositiveButton("OK", null).show()

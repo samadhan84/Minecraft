@@ -87,15 +87,14 @@ class HostSession(private val game: Game, private val worldName: String, private
         Thread({
             DatagramSocket().use { udp ->
                 while (running) {
-                    Discovery.announce(udp, worldName, 1 + clients.count { it.authed }, game.level.hasPassword)
+                    Discovery.announce(udp, worldName, 1 + clients.count { it.authed })
                     Thread.sleep(1000)
                 }
             }
         }, "net-announce").apply { isDaemon = true; start() }
     }
 
-    override val status get() = "Hosting \"$worldName\" · ${clients.count { it.open && it.authed }} joined" +
-        if (game.level.hasPassword) " · password protected" else ""
+    override val status get() = "Hosting \"$worldName\" · ${clients.count { it.open && it.authed }} joined"
 
     private fun broadcast(type: Int, except: Connection? = null, body: (DataOutputStream) -> Unit) {
         for (c in clients) if (c.open && c.authed && c !== except) c.send(type, body)
@@ -113,18 +112,12 @@ class HostSession(private val game: Game, private val worldName: String, private
             val p = inbox.poll() ?: break
             val d = reader(p.data)
             val c = p.from
-            // Until a client has said hello with the right password it gets nothing and can change nothing.
+            // Until a client has said hello it gets nothing and can change nothing.
             if (!c.authed && p.type != Msg.HELLO) continue
             when (p.type) {
                 Msg.HELLO -> {
                     if (c.authed) continue
                     c.name = d.readUTF()
-                    val hash = try { d.readUTF() } catch (_: Exception) { "" } // older versions send no password
-                    if (game.level.hasPassword && hash != game.level.passwordHash) {
-                        c.send(Msg.REJECT) { it.writeUTF(if (hash.isEmpty()) "This world needs a password" else "Wrong password") }
-                        Thread { Thread.sleep(300); c.close() }.start()
-                        continue
-                    }
                     c.authed = true
                     players[c.id] = RemotePlayer(c.id, c.name).also { it.moveTo(game.player.x, game.player.y, game.player.z, 0f) }
                     c.send(Msg.WELCOME) {
@@ -237,9 +230,6 @@ class HostSession(private val game: Game, private val worldName: String, private
 }
 
 /** A player who joined someone else's world. The host owns the world; we mirror it. */
-/** The host wants a (different) password. */
-class PasswordException(message: String) : java.io.IOException(message)
-
 class ClientSession private constructor(private val conn: Connection) : Session() {
     override val isClient = true
     var myId = 0; var seed = 0L; var mode = GameMode.CREATIVE; var time = 0.3f; var worldName = ""
@@ -249,14 +239,15 @@ class ClientSession private constructor(private val conn: Connection) : Session(
 
     companion object {
         /** Connects and waits for the host's welcome (call off the main thread). */
-        fun connect(address: String, name: String, password: String = "", timeoutMs: Int = 5000): ClientSession {
+        fun connect(address: String, name: String, timeoutMs: Int = 5000): ClientSession {
             val socket = Socket()
             val (host, port) = Net.splitAddress(address)
             socket.connect(InetSocketAddress(host, port), timeoutMs)
             val inbox = ConcurrentLinkedQueue<Packet>()
             val c = Connection(socket, inbox)
             val s = ClientSession(c)
-            c.send(Msg.HELLO) { it.writeUTF(name); it.writeUTF(com.vishucraft.game.world.LevelData.hashPassword(password)) }
+            // The empty second field is where older versions expected a password.
+            c.send(Msg.HELLO) { it.writeUTF(name); it.writeUTF("") }
             val end = System.currentTimeMillis() + timeoutMs
             while (System.currentTimeMillis() < end) {
                 val p = inbox.poll()
@@ -264,7 +255,7 @@ class ClientSession private constructor(private val conn: Connection) : Session(
                 if (p.type == Msg.REJECT) {
                     val reason = reader(p.data).readUTF()
                     c.close()
-                    throw PasswordException(reason)
+                    throw java.io.IOException(reason)
                 }
                 if (p.type == Msg.WELCOME) {
                     val d = reader(p.data)

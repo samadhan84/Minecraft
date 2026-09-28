@@ -204,8 +204,6 @@ class LevelData(
     /** Respawn point set by sleeping in a bed (Overworld only). */
     var hasBedSpawn: Boolean = false,
     var bedX: Int = 0, var bedY: Int = 0, var bedZ: Int = 0,
-    /** SHA-256 of the world password ("" = no password). Needed to open the world and to join it over Wi-Fi. */
-    var passwordHash: String = "",
     /** Experience points collected in total (the level is worked out from this). */
     var xp: Int = 0,
     /** Keys of the achievements already earned (see Achievements). */
@@ -215,19 +213,8 @@ class LevelData(
     /** The Sky Warden has been beaten (it does not come back). */
     var bossDefeated: Boolean = false,
 ) {
-    val hasPassword get() = passwordHash.isNotEmpty()
-    fun checkPassword(password: String) = !hasPassword || hashPassword(password) == passwordHash
-    fun setPassword(password: String) { passwordHash = if (password.isEmpty()) "" else hashPassword(password) }
-
     companion object {
         private const val VERSION = 8
-
-        /** Passwords are never stored or sent as plain text. */
-        fun hashPassword(password: String): String {
-            if (password.isEmpty()) return ""
-            val md = java.security.MessageDigest.getInstance("SHA-256")
-            return md.digest("dhruvilcraft:$password".toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it) }
-        }
 
         /** Creative worlds start with a useful hotbar; survival starts empty-handed. */
         fun create(seed: Long, name: String, mode: GameMode): LevelData {
@@ -310,7 +297,7 @@ class LevelData(
             d.writeBoolean(arriving)
             d.writeBoolean(hasBedSpawn)
             d.writeInt(bedX); d.writeInt(bedY); d.writeInt(bedZ)
-            d.writeUTF(passwordHash)
+            d.writeUTF("") // where versions 5..8 kept a world password (worlds no longer have one)
             d.writeInt(xp)
             d.writeInt(achievements.size)
             for (a in achievements) d.writeUTF(a)

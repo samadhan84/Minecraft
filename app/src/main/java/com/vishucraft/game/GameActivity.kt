@@ -743,9 +743,12 @@ class GameActivity : Activity() {
         super.onResume()
         glView.onResume()
         sounds.resume()
+        // New versions download in the background while playing; they install back on the menu.
+        Updater.attach(this)
     }
 
     override fun onPause() {
+        Updater.detach(this)
         sounds.pause()
         releaseInputs()
         glView.onPause() // blocks until the GL thread has paused, so saving below is safe
