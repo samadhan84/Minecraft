@@ -46,5 +46,7 @@ application {
 }
 
 tasks.jar {
-    manifest { attributes("Main-Class" to "com.vishucraft.desktop.MainKt") }
+    // The version shown on the title screen (the Windows build number; "dev" for local builds).
+    val build = System.getenv("GITHUB_RUN_NUMBER") ?: "dev"
+    manifest { attributes("Main-Class" to "com.vishucraft.desktop.MainKt", "Implementation-Version" to "1.$build") }
 }

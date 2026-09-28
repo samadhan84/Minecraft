@@ -385,6 +385,8 @@ class App(private val demo: File?) {
                 y += 54
                 if (ui.button("Quit", cx - bw / 2, y, bw, 44f)) glfwSetWindowShouldClose(window, true)
                 ui.text("Worlds are saved in ${Paths.worlds}", 10f, ui.height - 26, 14f, rgba(170, 170, 170))
+                val version = "Version " + (App::class.java.`package`?.implementationVersion ?: "dev")
+                ui.text(version, ui.width - ui.textWidth(version, 16f) - 14, 12f, 16f, rgba(230, 230, 230))
             }
             Menu.WORLDS -> worldsScreen()
             Menu.CREATE -> createScreen()

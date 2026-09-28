@@ -213,6 +213,26 @@ class GameActivity : Activity() {
         }
         root.addView(toast, lp(-2f, -2f, Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL, b = 78f))
 
+        // The game's name: big in the middle when the world opens, then a small label at the top while playing.
+        val nameTag = TextView(this).apply {
+            text = "DhruvVishu"; textSize = 14f
+            typeface = android.graphics.Typeface.create(android.graphics.Typeface.MONOSPACE, android.graphics.Typeface.BOLD)
+            setTextColor(Color.rgb(255, 255, 110)); setShadowLayer(2f, 2f, 2f, Color.BLACK)
+            alpha = 0f
+        }
+        root.addView(nameTag, lp(-2f, -2f, Gravity.TOP or Gravity.CENTER_HORIZONTAL, t = 8f))
+        val bigTitle = TextView(this).apply {
+            text = "DhruvVishu"; textSize = 52f
+            typeface = android.graphics.Typeface.create(android.graphics.Typeface.MONOSPACE, android.graphics.Typeface.BOLD)
+            setTextColor(Color.rgb(235, 235, 235)); setShadowLayer(0.01f, 5f, 5f, Color.rgb(50, 50, 50))
+            gravity = Gravity.CENTER
+        }
+        root.addView(bigTitle, lp(-2f, -2f, Gravity.CENTER, b = 120f))
+        bigTitle.animate().setStartDelay(2500).setDuration(900).alpha(0f).withEndAction {
+            bigTitle.visibility = View.GONE
+            nameTag.animate().setDuration(500).alpha(0.85f)
+        }
+
         status = StatusView(this)
         if (game.survival) root.addView(status, lp(9 * 42f, 36f, Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL, l = 0f, r = 50f, b = 50f))
         hurtFlash = View(this).apply { setBackgroundColor(Color.argb(110, 220, 0, 0)); alpha = 0f }

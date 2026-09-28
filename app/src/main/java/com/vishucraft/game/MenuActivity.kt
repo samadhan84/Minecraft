@@ -59,6 +59,20 @@ class MenuActivity : Activity() {
         }
         col.addView(subtitle, LinearLayout.LayoutParams(-2, -2).apply { bottomMargin = dpi(24f) })
 
+        // The installed version, bottom right (the same number the updater compares).
+        val version = TextView(this).apply {
+            val info = packageManager.getPackageInfo(packageName, 0)
+            @Suppress("DEPRECATION")
+            val code = if (android.os.Build.VERSION.SDK_INT >= 28) info.longVersionCode else info.versionCode.toLong()
+            text = "Version ${info.versionName} ($code)"
+            textSize = 14f
+            setTextColor(Color.rgb(230, 230, 230))
+            setShadowLayer(0.01f, dpi(2f).toFloat(), dpi(2f).toFloat(), Color.rgb(40, 40, 40))
+        }
+        root.addView(version, FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM or Gravity.END).apply {
+            setMargins(0, 0, dpi(16f), dpi(12f))
+        })
+
         playButton = menuButton(this, "Play") { if (hasWorld()) showWorlds() else newWorld() }
         col.addView(playButton, LinearLayout.LayoutParams(dpi(320f), -2).apply { bottomMargin = dpi(10f) })
         col.addView(menuButton(this, "Join Wi-Fi game") { joinGame() }, LinearLayout.LayoutParams(dpi(320f), -2).apply { bottomMargin = dpi(10f) })

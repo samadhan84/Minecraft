@@ -60,8 +60,22 @@ class Hud(private val game: Game) {
 
     fun toast(s: String, seconds: Float = 2f) { toast = s; toastTime = seconds }
 
+    /** Seconds since the world opened (the game's name shows big at first). */
+    private var shown = 0f
+
     fun draw(ui: Ui, dt: Float, debug: String?, showHotbar: Boolean) {
         val w = ui.width; val h = ui.height
+        // The game's name: big in the middle when the world opens, then small at the top while playing.
+        shown += dt
+        if (shown < 3.4f) {
+            val a = if (shown < 2.5f) 1f else 1f - (shown - 2.5f) / 0.9f
+            ui.text("DhruvVishu", w / 2 + 4, h * 0.3f + 4, 72f, rgba(50, 50, 50, (255 * a).toInt()), 1)
+            ui.text("DhruvVishu", w / 2, h * 0.3f, 72f, rgba(235, 235, 235, (255 * a).toInt()), 1)
+        } else {
+            val a = ((shown - 3.4f) / 0.5f).coerceIn(0f, 1f) * 0.85f
+            ui.text("DhruvVishu", w / 2 + 1, 9f, 18f, rgba(0, 0, 0, (255 * a).toInt()), 1)
+            ui.text("DhruvVishu", w / 2, 8f, 18f, rgba(255, 255, 110, (255 * a).toInt()), 1)
+        }
         if (hurt > 0f) { ui.rect(0f, 0f, w, h, rgba(220, 0, 0, (110 * hurt).toInt())); hurt = maxOf(0f, hurt - dt * 3f) }
         if (sleep > 0f) {
             // Fade to black and back while the night passes.
