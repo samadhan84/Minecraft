@@ -145,7 +145,7 @@ object Shapes {
             Blocks.PAINTING, Blocks.ITEM_FRAME -> listOf(panel(f xor 1, P))
             Blocks.HOPPER -> if (collision) listOf(b(0f, 0f, 0f, 1f, 1f, 1f))
                 else listOf(b(0f, 10 * P, 0f, 1f, 1f, 1f), b(4 * P, 4 * P, 4 * P, 12 * P, 10 * P, 12 * P), b(6 * P, 0f, 6 * P, 10 * P, 4 * P, 10 * P))
-            else -> listOf(b(0f, 0f, 0f, 1f, 1f, 1f))
+            else -> HomeShapes.boxes(id, meta, collision) ?: listOf(b(0f, 0f, 0f, 1f, 1f, 1f))
         }
     }
 

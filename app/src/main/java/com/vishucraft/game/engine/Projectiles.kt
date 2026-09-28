@@ -3,6 +3,7 @@ package com.vishucraft.game.engine
 import com.vishucraft.game.world.Blocks
 import com.vishucraft.game.world.ItemStack
 import com.vishucraft.game.world.Items
+import com.vishucraft.game.world.RedstoneIds
 import com.vishucraft.game.world.World
 import com.vishucraft.game.world.floorInt
 import kotlin.math.abs
@@ -89,12 +90,41 @@ class Projectiles(private val world: World) {
     }
 }
 
-/** A minecart that follows rails, can be ridden and is boosted by powered rails. */
-class Cart(var x: Float, var y: Float, var z: Float) {
+/**
+ * A minecart that follows rails, can be ridden and is boosted by powered rails. Trains are carts too: an engine
+ * or a metro drives itself, and coaches hooked on behind ([leader]) follow the track it has just run along.
+ */
+class Cart(var x: Float, var y: Float, var z: Float, var kind: Int = MINECART) {
     var speed = 0f
     var hx = 1f; var hz = 0f
     var vy = 0f
     var yaw = 0f
+    /** The car this one is coupled behind. */
+    var leader: Cart? = null
+    /** Where this car has been (x, y, z), newest last; coaches behind it follow these points. */
+    val trail = ArrayDeque<FloatArray>()
+    /** Seconds left standing at a station (metros). */
+    var stopTimer = 0f
+    /** The station rail this metro last stopped at, so it doesn't stop there again straight away. */
+    var lastStation = Long.MIN_VALUE
+    /** Standing at the end of the track. */
+    var atEnd = false
+
+    val isTrain get() = kind != MINECART
+    /** Half the length of the car body. */
+    val half get() = when (kind) { ENGINE -> 1.35f; METRO -> 1.6f; COACH -> 1.4f; else -> 0.6f }
+    val height get() = if (isTrain) 2.4f else 0.8f
+    val maxSpeed get() = when (kind) { ENGINE -> 16f; METRO -> 20f; else -> 12f }
+
+    companion object {
+        const val MINECART = 0
+        const val ENGINE = 1
+        const val METRO = 2
+        const val COACH = 3
+
+        fun itemName(kind: Int) = when (kind) { ENGINE -> "Train Engine"; METRO -> "Metro Train"; COACH -> "Train Coach"; else -> "Minecart" }
+        fun kindOf(itemName: String?) = when (itemName) { "Train Engine" -> ENGINE; "Metro Train" -> METRO; "Train Coach" -> COACH; else -> MINECART }
+    }
 }
 
 /** A rowing boat: floats on water, steered by the player sitting in it. */
@@ -177,6 +207,97 @@ class Carts(private val world: World) {
         }
     }
 
+    /** Train kinds and couplings, written after everything else so older saves still load. */
+    fun writeExtra(d: java.io.DataOutputStream) {
+        d.writeInt(list.size)
+        for (c in list) { d.writeByte(c.kind); d.writeInt(c.leader?.let { list.indexOf(it) } ?: -1) }
+    }
+
+    fun readExtra(d: java.io.DataInputStream) {
+        val n = d.readInt()
+        val links = IntArray(n)
+        for (i in 0 until n) { val kind = d.readByte().toInt(); links[i] = d.readInt(); if (i < list.size) list[i].kind = kind }
+        for (i in 0 until minOf(n, list.size)) list[i].leader = list.getOrNull(links[i])?.takeIf { it !== list[i] }
+    }
+
+    /** The front car of the train [c] belongs to. */
+    fun head(c: Cart): Cart {
+        var h = c; var guard = 0
+        while (guard++ < 64) h = h.leader?.takeIf { it in list } ?: break
+        return h
+    }
+
+    /** The car coupled directly behind [c], if any. */
+    fun follower(c: Cart): Cart? = list.firstOrNull { it.leader === c }
+
+    /**
+     * Hooks a newly placed coach behind the nearest train end within reach. The leading car's trail is filled in
+     * back to the coach, so the coach knows where to run.
+     */
+    fun couple(coach: Cart) {
+        val tail = list.filter { it !== coach && it.isTrain && follower(it) == null && head(it) !== coach }
+            .minByOrNull { (it.x - coach.x) * (it.x - coach.x) + (it.z - coach.z) * (it.z - coach.z) }
+            ?.takeIf { (it.x - coach.x) * (it.x - coach.x) + (it.z - coach.z) * (it.z - coach.z) < 7f * 7f } ?: return
+        coach.leader = tail
+        tail.trail.clear()
+        val steps = 20
+        for (k in 0..steps) {
+            val f = k / steps.toFloat()
+            tail.trail.addLast(floatArrayOf(coach.x + (tail.x - coach.x) * f, coach.y + (tail.y - coach.y) * f, coach.z + (tail.z - coach.z) * f))
+        }
+    }
+
+    private fun record(c: Cart) {
+        val last = c.trail.lastOrNull()
+        if (last == null || (last[0] - c.x) * (last[0] - c.x) + (last[2] - c.z) * (last[2] - c.z) > 0.01f) {
+            c.trail.addLast(floatArrayOf(c.x, c.y, c.z))
+            while (c.trail.size > 600) c.trail.removeFirst()
+        }
+    }
+
+    /** Puts a coupled car [gap] blocks behind its leader, along the leader's trail. */
+    private fun follow(c: Cart, leader: Cart) {
+        val gap = leader.half + c.half + 0.35f
+        var px = leader.x; var py = leader.y; var pz = leader.z
+        var left = gap
+        var placed = false
+        for (i in leader.trail.indices.reversed()) {
+            val q = leader.trail[i]
+            val dx = q[0] - px; val dz = q[2] - pz
+            val d = kotlin.math.sqrt(dx * dx + dz * dz)
+            if (d >= left && d > 0f) {
+                val f = left / d
+                c.x = px + dx * f; c.y = py + (q[1] - py) * f; c.z = pz + dz * f
+                placed = true
+                break
+            }
+            left -= d; px = q[0]; py = q[1]; pz = q[2]
+        }
+        // Past the end of the trail (just placed or loaded): carry on straight back from the leader's heading.
+        if (!placed) { c.x = px - leader.hx * left; c.y = py; c.z = pz - leader.hz * left }
+        val fx = leader.x - c.x; val fz = leader.z - c.z
+        val len = kotlin.math.sqrt(fx * fx + fz * fz)
+        if (len > 0.05f) { c.hx = fx / len; c.hz = fz / len; c.yaw = kotlin.math.atan2(c.hx, -c.hz) }
+        c.speed = leader.speed
+        c.vy = 0f
+    }
+
+    /** Gets the rider out: out of the side door of a train, or just up out of a minecart. */
+    fun leave(game: Game) {
+        val c = riding ?: return
+        riding = null
+        val p = game.player
+        if (!c.isTrain) { p.y += 0.6f; return }
+        for (side in floatArrayOf(1f, -1f)) {
+            val x = c.x - c.hz * 1.2f * side; val z = c.z + c.hx * 1.2f * side
+            val by = floorInt(c.y + 0.1f)
+            if (!Blocks.solid[world.getBlock(floorInt(x), by, floorInt(z))] && !Blocks.solid[world.getBlock(floorInt(x), by + 1, floorInt(z))]) {
+                p.x = x; p.z = z; p.y = c.y + 0.1f; return
+            }
+        }
+        p.y = c.y + 2.5f
+    }
+
     private fun railAt(x: Int, y: Int, z: Int): Int = world.getBlock(x, y, z).let { if (com.vishucraft.game.world.Rails.isRail(it)) it else 0 }
 
     /** Points a cart along its track in the direction closest to (lookX, lookZ). */
@@ -192,23 +313,45 @@ class Carts(private val world: World) {
     /** Get into a cart. A cart that is standing still will head the way you are looking. */
     fun enter(c: Cart, lookX: Float, lookZ: Float) {
         riding = c
-        if (c.speed < 0.5f) aim(c, lookX, lookZ)
+        // Trains keep their direction (coaches are pulled; engines are driven with forward and back).
+        if (c.speed < 0.5f && !c.isTrain) aim(c, lookX, lookZ)
     }
 
     /** The cart right in front of the player (within reach of a jump), if any. */
     fun nearby(px: Float, py: Float, pz: Float, lookX: Float, lookZ: Float): Cart? = list.filter {
         val dx = it.x - px; val dz = it.z - pz
         val d = kotlin.math.sqrt(dx * dx + dz * dz)
-        d < 2.2f && abs(it.y - py) < 1.6f && (d < 0.8f || (dx * lookX + dz * lookZ) / d > 0.2f)
+        if (it.isTrain) {
+            // Long cars: close to the body anywhere along its length.
+            val along = abs(dx * it.hx + dz * it.hz); val across = abs(dx * it.hz - dz * it.hx)
+            along < it.half + 0.8f && across < 1.9f && abs(it.y - py) < 1.6f
+        } else d < 2.2f && abs(it.y - py) < 1.6f && (d < 0.8f || (dx * lookX + dz * lookZ) / d > 0.2f)
     }.minByOrNull { (it.x - px) * (it.x - px) + (it.z - pz) * (it.z - pz) }
 
     fun update(dt: Float, game: Game) {
         // Carts in chunks that are not loaded wait there (they would otherwise fall through the missing ground).
-        for (c in list) if (world.isLoaded(floorInt(c.x), floorInt(c.z))) step(c, dt, game)
+        for (c in list) {
+            if (c.leader != null && c.leader !in list) c.leader = null
+            if (c.leader != null || !world.isLoaded(floorInt(c.x), floorInt(c.z))) continue
+            // Fast trains move in small steps so they never skip a curve.
+            val n = kotlin.math.ceil(c.speed * dt / 0.3f).toInt().coerceIn(1, 8)
+            repeat(n) { step(c, dt / n, game) }
+            record(c)
+        }
+        // Coupled cars follow in order, front to back.
+        var frontier = list.filter { it.leader == null }
+        var guard = 0
+        while (frontier.isNotEmpty() && guard++ < 64) {
+            val next = list.filter { f -> f.leader != null && frontier.any { it === f.leader } }
+            for (f in next) { follow(f, f.leader!!); record(f) }
+            frontier = next
+        }
         riding?.let { c ->
             val p = game.player
-            p.x = c.x; p.z = c.z; p.y = c.y + 0.35f
+            // In a train you sit low enough to look out of the windows.
+            p.x = c.x; p.z = c.z; p.y = c.y + (if (c.isTrain) 0f else 0.35f)
             p.vx = 0f; p.vy = 0f; p.vz = 0f
+            if (c.isTrain) { drive(c, dt, game); return }
             // Push the cart in the direction the player is looking along the track.
             val push = game.input.moveForward
             if (push != 0f) {
@@ -220,6 +363,93 @@ class Carts(private val world: World) {
                 if (c.speed < 0f) { c.hx = -c.hx; c.hz = -c.hz; c.speed = -c.speed }
             }
         }
+    }
+
+    /**
+     * The rider drives an engine with forward (faster) and back (brake, then reverse). A metro drives itself
+     * from station to station while anyone is on board; forward leaves a station straight away.
+     */
+    private fun drive(riddenCar: Cart, dt: Float, game: Game) {
+        val c = head(riddenCar)
+        val throttle = game.input.moveForward
+        when (c.kind) {
+            // A coach on its own can be pushed along slowly, like a minecart.
+            Cart.COACH -> if (throttle > 0f && riddenCar === c) c.speed = minOf(4f, c.speed + 3f * throttle * dt)
+            Cart.ENGINE -> {
+                if (riddenCar !== c) return // passengers in the coaches just ride along
+                if (throttle > 0f) {
+                    if (c.speed < 0.2f) game.sound("train_horn", c.x, c.y + 2f, c.z, 0.8f)
+                    c.speed = minOf(c.maxSpeed, c.speed + 4f * throttle * dt)
+                } else if (throttle < 0f) {
+                    if (c.speed > 0f) c.speed = maxOf(0f, c.speed - 12f * dt)
+                    else if (follower(c) == null) { c.hx = -c.hx; c.hz = -c.hz; c.speed = 0.3f }
+                }
+            }
+            Cart.METRO -> {
+                if (c.stopTimer > 0f) {
+                    c.speed = 0f
+                    c.stopTimer -= dt
+                    if (throttle > 0f) c.stopTimer = 0f
+                    if (c.stopTimer <= 0f) { game.sound("metro_chime", c.x, c.y + 2f, c.z); game.uiEvents.add("toast:Doors closing. Next station…") }
+                    return
+                }
+                val ahead = stationAhead(c)
+                val target = if (ahead != null) minOf(c.maxSpeed, 1.5f + ahead * 2.2f) else c.maxSpeed
+                c.speed = if (c.speed < target) minOf(target, c.speed + 5f * dt) else maxOf(target, c.speed - 14f * dt)
+                if (c.speed < 0.3f) c.speed = 0.3f
+                // At the end of the line a metro on its own turns back.
+                if (c.atEnd && follower(c) == null) {
+                    c.hx = -c.hx; c.hz = -c.hz; c.atEnd = false; c.stopTimer = 5f; c.lastStation = Long.MIN_VALUE
+                    game.sound("metro_chime", c.x, c.y + 2f, c.z)
+                    game.uiEvents.add("toast:End of the line. This metro goes back the other way")
+                }
+            }
+        }
+    }
+
+    private fun railCell(c: Cart): IntArray? {
+        val bx = floorInt(c.x); val bz = floorInt(c.z); var by = floorInt(c.y + 0.1f)
+        if (railAt(bx, by, bz) == 0) by -= 1
+        return if (railAt(bx, by, bz) == 0) null else intArrayOf(bx, by, bz)
+    }
+
+    private fun platformNext(x: Int, y: Int, z: Int): Boolean {
+        for ((dx, dz) in arrayOf(1 to 0, -1 to 0, 0 to 1, 0 to -1)) for (dy in -1..0) {
+            if (world.getBlock(x + dx, y + dy, z + dz) == Blocks.STATION_PLATFORM) return true
+        }
+        return false
+    }
+
+    /** Blocks until the next station rail ahead (a rail with a platform beside it), up to 8 ahead. */
+    private fun stationAhead(c: Cart): Int? {
+        val cell = railCell(c) ?: return null
+        val sx = kotlin.math.round(c.hx).toInt(); val sz = kotlin.math.round(c.hz).toInt()
+        for (k in 0..8) {
+            val x = cell[0] + sx * k; val z = cell[2] + sz * k
+            for (dy in -1..1) {
+                val y = cell[1] + dy
+                if (railAt(x, y, z) == 0) continue
+                if (platformNext(x, y, z) && RedstoneIds.pack(x, y, z) != c.lastStation) return k
+            }
+        }
+        return null
+    }
+
+    /** A metro with people on board stops for a few seconds at each station. */
+    private fun checkStation(c: Cart, bx: Int, by: Int, bz: Int, game: Game) {
+        if (c.kind != Cart.METRO || c.stopTimer > 0f) return
+        val r = riding ?: return
+        if (head(r) !== c) return
+        val key = RedstoneIds.pack(bx, by, bz)
+        if (key == c.lastStation || !platformNext(bx, by, bz)) return
+        // Stop near the middle of the station block.
+        val fx = c.x - (bx + 0.5f); val fz = c.z - (bz + 0.5f)
+        if (fx * c.hx + fz * c.hz < 0f) return
+        c.lastStation = key
+        c.stopTimer = 5f
+        c.speed = 0f
+        game.sound("metro_chime", c.x, c.y + 2f, c.z)
+        game.uiEvents.add("toast:Station! Doors open. Crouch or tap to get off, or press forward to go on")
     }
 
     private fun step(c: Cart, dt: Float, game: Game) {
@@ -263,7 +493,8 @@ class Carts(private val world: World) {
             c.speed -= uphill * 9f * dt
             if (c.speed < 0f) { c.hx = -c.hx; c.hz = -c.hz; c.speed = -c.speed }
         }
-        if (rail == Blocks.POWERED_RAIL) {
+        checkStation(c, bx, by, bz, game)
+        if (rail == Blocks.POWERED_RAIL && !c.isTrain) {
             // A cart standing on a powered rail next to a wall is pushed away from the wall;
             // otherwise it keeps going the way it was already heading.
             if (meta and 8 != 0 && c.speed < 0.5f) {
@@ -274,8 +505,16 @@ class Carts(private val world: World) {
             if (meta and 8 != 0) c.speed = minOf(12f, c.speed + 14f * dt).coerceAtLeast(if (c.speed < 0.5f) 2f else 0f)
             else c.speed = maxOf(0f, c.speed - 25f * dt)
         }
-        c.speed = (c.speed * (1f - 0.15f * dt)).coerceAtMost(12f)
+        c.speed = (c.speed * (1f - 0.15f * dt)).coerceAtMost(c.maxSpeed)
         val nx = c.x + c.hx * c.speed * dt; val nz = c.z + c.hz * c.speed * dt
+        // Trains stop at the end of the track instead of rolling off it.
+        c.atEnd = false
+        if (c.isTrain && (floorInt(nx) != bx || floorInt(nz) != bz) && (-1..1).none { railAt(floorInt(nx), by + it, floorInt(nz)) != 0 }) {
+            c.speed = 0f; c.atEnd = true
+            c.x += (bx + 0.5f - c.x) * minOf(1f, dt * 10f); c.z += (bz + 0.5f - c.z) * minOf(1f, dt * 10f)
+            c.y = by.toFloat(); c.yaw = kotlin.math.atan2(c.hx, -c.hz)
+            return
+        }
         if (Blocks.solid[world.getBlock(floorInt(nx), by, floorInt(nz))] && railAt(floorInt(nx), by + 1, floorInt(nz)) == 0) {
             c.speed = 0f
         } else { c.x = nx; c.z = nz }
@@ -289,7 +528,11 @@ class Carts(private val world: World) {
         var t = 0f
         while (t < maxDist) {
             val px = ox + dx * t; val py = oy + dy * t; val pz = oz + dz * t
-            list.firstOrNull { abs(it.x - px) < 0.5f && abs(it.z - pz) < 0.5f && py >= it.y && py <= it.y + 0.8f }?.let { return it }
+            list.firstOrNull {
+                val dx = px - it.x; val dz = pz - it.z
+                abs(dx * it.hx + dz * it.hz) < it.half && abs(dx * it.hz - dz * it.hx) < (if (it.isTrain) 0.65f else 0.5f) &&
+                    py >= it.y && py <= it.y + it.height
+            }?.let { return it }
             t += 0.1f
         }
         return null

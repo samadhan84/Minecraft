@@ -880,10 +880,10 @@ class App(private val demo: File?) {
             f == 400 -> shot("03-creative-world")
             f == 402 -> overlay = Overlay.CREATIVE
             f == 406 -> shot("04-creative-inventory")
-            f == 407 -> creative?.tab = 4
+            f == 407 -> creative?.tab = 5
             f == 409 -> shot("04b-creative-items")
-            f == 410 -> creative?.tab = 3
-            f == 412 -> shot("04c-creative-redstone")
+            f == 410 -> creative?.tab = 4
+            f == 412 -> shot("04c-creative-home")
             f == 413 -> {
                 overlay = Overlay.NONE
                 // A short track straight ahead with a minecart on it.
@@ -978,22 +978,88 @@ class App(private val demo: File?) {
             f == 760 -> shot("04i-cherry-grove")
             f == 761 -> session?.game?.let { g -> demoVisit(g, com.vishucraft.game.world.Biome.BADLANDS) }
             f == 960 -> shot("04j-badlands")
-            f == 971 -> overlay = Overlay.PAUSE
-            f == 973 -> shot("05-pause")
-            f == 977 -> { overlay = Overlay.NONE; leaveWorld(); menu = Menu.CREATE; nameField.text = "Demo survival"; seedField.text = "777"; survival = true }
-            f == 979 -> demoCreate = true
-            f == 1300 -> shot("06-survival-world")
-            f == 1302 -> session?.let {
+            f == 961 -> session?.game?.let { g ->
+                // A kitchen and living room floating in the sky: every home block, some of them switched on.
+                val p = g.player
+                p.flying = true; p.vy = 0f; p.pitch = -0.25f; g.timeOfDay = 0.25f
+                val fx = kotlin.math.round(kotlin.math.sin(p.yaw)).toInt(); val fz = kotlin.math.round(-kotlin.math.cos(p.yaw)).toInt()
+                val (sx, sz) = if (fx != 0) fx to 0 else 0 to (if (fz == 0) -1 else fz)
+                val rx = -sz; val rz = sx
+                val toPlayer = when { sx == 1 -> 5; sx == -1 -> 4; sz == 1 -> 3; else -> 2 }
+                val bx = com.vishucraft.game.world.floorInt(p.x); val bz = com.vishucraft.game.world.floorInt(p.z)
+                val y = com.vishucraft.game.world.floorInt(p.y) - 2
+                fun at(f: Int, r: Int, dy: Int, id: Int, meta: Int = 0) = g.setBlock(bx + sx * f + rx * r, y + dy, bz + sz * f + rz * r, id, meta)
+                for (f in -1..6) for (r in -6..6) { at(f, r, 0, Blocks.SMOOTH_STONE); for (dy in 1..4) at(f, r, dy, Blocks.AIR) }
+                for (r in -6..6) for (dy in 1..4) at(6, r, dy, Blocks.CONCRETE_FIRST)
+                val B = Blocks
+                // Kitchen on the left.
+                at(5, -6, 1, B.FRIDGE, toPlayer); at(5, -6, 2, B.FRIDGE, toPlayer or com.vishucraft.game.world.Shapes.UPPER)
+                at(5, -5, 1, B.KITCHEN_COUNTER, toPlayer); at(5, -5, 2, B.MICROWAVE, toPlayer or 8)
+                at(5, -4, 1, B.GAS_STOVE, toPlayer or 8); at(5, -4, 2, B.PRESSURE_COOKER, toPlayer or 8)
+                at(5, -3, 1, B.GAS_STOVE, toPlayer or 8); at(5, -3, 2, B.TAWA, toPlayer or 8)
+                at(5, -2, 1, B.KITCHEN_SINK, toPlayer)
+                at(5, -1, 1, B.KITCHEN_COUNTER, toPlayer); at(5, -1, 2, B.TOASTER, toPlayer)
+                at(4, -6, 1, B.OVEN, toPlayer or 8)
+                at(3, -6, 1, B.KITCHEN_COUNTER, toPlayer); at(3, -6, 2, B.MIXER, toPlayer); at(2, -6, 1, B.KITCHEN_COUNTER, toPlayer); at(2, -6, 2, B.KETTLE, toPlayer)
+                at(2, -3, 1, B.DINING_TABLE); at(2, -2, 1, B.DINING_TABLE); at(1, -3, 1, B.CHAIR, toPlayer xor 1); at(3, -2, 1, B.CHAIR, toPlayer)
+                at(2, -3, 2, B.FRYING_PAN, toPlayer or 8)
+                // Living room on the right.
+                at(5, 3, 1, B.DINING_TABLE); at(5, 3, 2, B.TV, toPlayer or 8)
+                at(5, 5, 1, B.WASHING_MACHINE, toPlayer or 8)
+                at(2, 2, 1, B.SOFA, toPlayer xor 1); at(2, 3, 1, B.SOFA, toPlayer xor 1); at(2, 4, 1, B.SOFA, toPlayer xor 1)
+                at(5, 1, 1, B.DINING_TABLE); at(5, 1, 2, B.TABLE_LAMP, 8)
+                at(5, 4, 4, B.AIR_CONDITIONER, toPlayer or 8)
+                for (r in 1..5) for (f in 1..4) at(f, r, 5, B.SMOOTH_STONE)
+                at(3, 3, 4, B.CEILING_FAN, 8)
+                g.mobs.list.clear(); g.carts.list.clear()
+                p.x = bx + 0.5f - sx * 1.5f; p.z = bz + 0.5f - sz * 1.5f; p.y = y + 2.2f
+            }
+            f == 990 -> shot("04k-kitchen-and-home")
+            f == 991 -> session?.game?.let { g ->
+                // A station with a metro, and an engine pulling coaches on the next track.
+                val p = g.player
+                val fx = kotlin.math.round(kotlin.math.sin(p.yaw)).toInt(); val fz = kotlin.math.round(-kotlin.math.cos(p.yaw)).toInt()
+                val (sx, sz) = if (fx != 0) fx to 0 else 0 to (if (fz == 0) -1 else fz)
+                val rx = -sz; val rz = sx
+                val bx = com.vishucraft.game.world.floorInt(p.x) + sx * 10; val bz = com.vishucraft.game.world.floorInt(p.z) + sz * 10
+                val y = com.vishucraft.game.world.floorInt(p.y) + 2
+                fun at(f: Int, r: Int, dy: Int, id: Int, meta: Int = 0) = g.setBlock(bx + sx * f + rx * r, y + dy, bz + sz * f + rz * r, id, meta)
+                val railMeta = if (rx != 0) 1 else 0
+                for (r in -24..24) {
+                    for (f in -3..3) { at(f, r, -1, Blocks.RAILWAY_BALLAST); for (dy in 0..4) at(f, r, dy, Blocks.AIR) }
+                    at(-1, r, 0, Blocks.RAIL, railMeta); at(2, r, 0, Blocks.RAIL, railMeta)
+                    if (r in -6..6) { at(-2, r, 0, Blocks.STATION_PLATFORM); at(-3, r, 0, Blocks.STATION_PLATFORM); at(0, r, 0, Blocks.STATION_PLATFORM) }
+                }
+                g.carts.list.clear()
+                fun car(f: Int, r: Float, kind: Int) = com.vishucraft.game.engine.Cart(bx + sx * f + rx * r + 0.5f, y.toFloat(), bz + sz * f + rz * r + 0.5f, kind)
+                    .also { it.hx = rx.toFloat(); it.hz = rz.toFloat(); it.yaw = kotlin.math.atan2(it.hx, -it.hz); g.carts.list.add(it) }
+                val metro = car(-1, 2f, com.vishucraft.game.engine.Cart.METRO)
+                car(-1, -1.4f, com.vishucraft.game.engine.Cart.COACH).leader = metro
+                val eng = car(2, 6f, com.vishucraft.game.engine.Cart.ENGINE)
+                val c1 = car(2, 3.1f, com.vishucraft.game.engine.Cart.COACH).also { it.leader = eng }
+                car(2, 0.2f, com.vishucraft.game.engine.Cart.COACH).leader = c1
+                p.x = bx + 0.5f - sx * 9f + rx * 3f; p.z = bz + 0.5f - sz * 9f + rz * 3f; p.y = y + 4f; p.pitch = -0.3f
+            }
+            f == 1030 -> shot("04l-metro-and-train")
+            f == 1031 -> session?.game?.let { g -> g.carts.list.firstOrNull { it.kind == com.vishucraft.game.engine.Cart.METRO }?.let { g.carts.enter(it, it.hx, it.hz); g.player.pitch = 0f } }
+            f == 1060 -> shot("04m-inside-the-metro")
+            f == 1061 -> session?.game?.let { g -> g.carts.leave(g); g.carts.list.clear() }
+            f == 1111 -> overlay = Overlay.PAUSE
+            f == 1113 -> shot("05-pause")
+            f == 1117 -> { overlay = Overlay.NONE; leaveWorld(); menu = Menu.CREATE; nameField.text = "Demo survival"; seedField.text = "777"; survival = true }
+            f == 1119 -> demoCreate = true
+            f == 1440 -> shot("06-survival-world")
+            f == 1442 -> session?.let {
                 it.game.inventory.add(com.vishucraft.game.world.Items.find("Minecart"), 1)
                 it.game.inventory.add(Blocks.LOG, 8)
                 openInventory()
             }
-            f == 1306 -> shot("07-survival-inventory")
-            f == 1308 -> { closeOverlay(); openContainer(ContainerScreen.Mode.CRAFTING) }
-            f == 1312 -> shot("08-crafting-table")
-            f == 1314 -> { closeOverlay(); leaveWorld(); menu = Menu.WORLDS }
-            f == 1318 -> shot("09-worlds")
-            f == 1320 -> glfwSetWindowShouldClose(window, true)
+            f == 1446 -> shot("07-survival-inventory")
+            f == 1448 -> { closeOverlay(); openContainer(ContainerScreen.Mode.CRAFTING) }
+            f == 1452 -> shot("08-crafting-table")
+            f == 1454 -> { closeOverlay(); leaveWorld(); menu = Menu.WORLDS }
+            f == 1458 -> shot("09-worlds")
+            f == 1460 -> glfwSetWindowShouldClose(window, true)
         }
     }
 }

@@ -320,6 +320,42 @@ object Recipes {
             r(dyeOf(dye), 1, false, Blocks.FLOWER_FIRST + k to 1)
         }
         r(i("Mushroom Stew"), 1, false, Blocks.RED_MUSHROOM to 1, Blocks.BROWN_MUSHROOM to 1, i("Bowl") to 1)
+
+        // ---- Kitchen and home
+        val smooth = Blocks.SMOOTH_STONE; val glass = Blocks.GLASS; val red = Blocks.REDSTONE_DUST
+        val wools = (0 until Blocks.COUNT).filter { !Items.isItem(it) && Blocks[it].name.endsWith(" Wool") }.toIntArray()
+        val nugget = i("Iron Nugget")
+        sh(Blocks.GAS_STOVE, 1, listOf("I I", "SFS", "SSS"), 'I' to iron, 'F' to i("Flint and Steel"), 'S' to smooth)
+        sh(Blocks.PRESSURE_COOKER, 1, listOf(" N ", "I I", "III"), 'N' to nugget, 'I' to iron)
+        sh(Blocks.TAWA, 1, listOf("III", " S "), 'I' to iron, 'S' to stick)
+        sh(Blocks.FRYING_PAN, 1, listOf("I I", " IS"), 'I' to iron, 'S' to stick)
+        sh(Blocks.KETTLE, 1, listOf("NI ", "I I", "III"), 'N' to nugget, 'I' to iron)
+        sh(Blocks.MICROWAVE, 1, listOf("III", "GRI", "III"), 'I' to iron, 'G' to glass, 'R' to red)
+        sh(Blocks.OVEN, 1, listOf("III", "GFI", "III"), 'I' to iron, 'G' to glass, 'F' to Blocks.FURNACE)
+        sh(Blocks.TOASTER, 1, listOf("I I", "IRI"), 'I' to iron, 'R' to red)
+        sh(Blocks.MIXER, 1, listOf(" G ", "IRI"), 'I' to iron, 'G' to glass, 'R' to red)
+        sh(Blocks.FRIDGE, 1, listOf("III", "ICI", "IRI"), 'I' to iron, 'C' to Blocks.CHEST, 'R' to red)
+        sh(Blocks.KITCHEN_SINK, 1, listOf("IBI", "SSS"), 'I' to iron, 'B' to i("Bucket"), 'S' to smooth)
+        sh(Blocks.KITCHEN_COUNTER, 1, listOf("SSS", "PCP"), 'S' to smooth, 'P' to planks, 'C' to Blocks.CHEST)
+        sh(Blocks.DINING_TABLE, 1, listOf("PPP", "S S", "S S"), 'P' to planks, 'S' to stick)
+        sh(Blocks.CHAIR, 2, listOf("S  ", "PPP", "S S"), 'P' to planks, 'S' to stick)
+        sh(Blocks.SOFA, 1, listOf("W  ", "WWW", "P P"), 'W' to wools, 'P' to planks)
+        sh(Blocks.TV, 1, listOf("GGG", "GRG", " I "), 'G' to glass, 'R' to red, 'I' to iron)
+        sh(Blocks.CEILING_FAN, 1, listOf(" I ", "IRI", " I "), 'I' to iron, 'R' to red)
+        sh(Blocks.TABLE_LAMP, 1, listOf(" W ", " T ", " I "), 'W' to wools, 'T' to Blocks.TORCH, 'I' to iron)
+        sh(Blocks.WASHING_MACHINE, 1, listOf("III", "IGI", "IRI"), 'I' to iron, 'G' to glass, 'R' to red)
+        sh(Blocks.AIR_CONDITIONER, 1, listOf("III", "RPI"), 'I' to iron, 'R' to red, 'P' to Blocks.PACKED_ICE)
+        r(i("Raw Pizza"), 1, false, i("Dough") to 1, i("Tomato") to 1, i("Cheese") to 1)
+        r(i("Cheese"), 4, false, i("Milk Bucket") to 1)
+        r(i("Dal Chawal"), 1, false, i("Steamed Rice") to 1, i("Dal") to 1)
+        r(i("Indian Thali"), 1, true, i("Roti") to 2, i("Dal") to 1, i("Steamed Rice") to 1, i("Bowl") to 1)
+        r(i("Sandwich"), 1, false, i("Bread") to 1, i("Cheese") to 1, i("Tomato") to 1)
+        // ---- Railway
+        r(Blocks.STATION_PLATFORM, 4, false, smooth to 2, i("Yellow Dye") to 1)
+        r(Blocks.RAILWAY_BALLAST, 4, false, Blocks.GRAVEL to 2, stick to 1)
+        sh(i("Train Engine"), 1, listOf("  I", "IFI", "IMI"), 'I' to iron, 'F' to Blocks.FURNACE, 'M' to i("Minecart"))
+        sh(i("Metro Train"), 1, listOf("GGG", "IMI", "IRI"), 'G' to glass, 'I' to iron, 'M' to i("Minecart"), 'R' to red)
+        sh(i("Train Coach"), 1, listOf("GGG", "IMI"), 'G' to glass, 'I' to iron, 'M' to i("Minecart"))
         crafting = list
 
         smelting = mapOf(
@@ -430,6 +466,8 @@ object Drops {
 
     fun canHarvest(id: Int, tool: ItemDef?): Boolean {
         val def = Blocks[id]
+        // Kitchen and home things come back whatever you break them with.
+        if (def.category == Category.HOME) return true
         if (def.tool == ToolType.PICKAXE) return tool?.tool == ToolType.PICKAXE && tool.tier >= harvestTier(id)
         if (id == Blocks.COBWEB) return tool?.tool == ToolType.SWORD
         return true
@@ -451,6 +489,7 @@ object Drops {
             Blocks.CHERRY_LEAVES, Blocks.MANGROVE_LEAVES -> if (tool?.name == "Shears") one(id)
                 else if (rnd.nextInt(100) < 7) one(if (id == Blocks.CHERRY_LEAVES) Blocks.CHERRY_SAPLING else i("Stick")) else emptyList()
             Blocks.BEE_NEST -> one(Blocks.BEE_NEST)
+            Blocks.FRIDGE -> if (meta and Shapes.UPPER != 0) emptyList() else one(id)
             Blocks.STONE -> one(Blocks.COBBLESTONE)
             Blocks.DEEPSLATE -> one(Blocks.COBBLED_DEEPSLATE)
             Blocks.GRASS, Blocks.SNOW_GRASS, Blocks.MYCELIUM, Blocks.PODZOL, Blocks.FARMLAND, Blocks.DIRT_PATH -> one(Blocks.DIRT)
@@ -474,11 +513,19 @@ object Drops {
                     in 0..6 -> one(sapling)
                     in 7..10 -> if (id == Blocks.LEAVES || id == Blocks.DARK_OAK_LEAVES) one(i("Apple")) else emptyList()
                     in 11..13 -> one(i("Stick"))
+                    in 14..18 -> if (id == Blocks.JUNGLE_LEAVES || id == Blocks.LEAVES) one(i("Tea Leaves")) else emptyList()
                     else -> emptyList()
                 }
             }
             Blocks.SNOW -> listOf(i("Snowball") to 4)
-            Blocks.TALL_GRASS, Blocks.FERN -> if (tool?.name == "Shears") one(id) else if (rnd.nextInt(100) < 15) one(i("Wheat Seeds")) else emptyList()
+            Blocks.TALL_GRASS, Blocks.FERN -> if (tool?.name == "Shears") one(id) else when (rnd.nextInt(100)) {
+                // Grass hides seeds and, now and then, the kitchen basics.
+                in 0..14 -> one(i("Wheat Seeds"))
+                in 15..19 -> one(i("Rice"))
+                in 20..23 -> one(i("Lentils"))
+                in 24..26 -> one(i("Tomato"))
+                else -> emptyList()
+            }
             Blocks.GRAVEL -> if (rnd.nextInt(10) == 0) one(i("Flint")) else one(Blocks.GRAVEL)
             Blocks.CLAY -> listOf(i("Clay Ball") to 4)
             Blocks.GLOWSTONE -> listOf(i("Glowstone Dust") to 2 + rnd.nextInt(3))

@@ -63,6 +63,8 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
     val drops = ItemEntities(world)
     val projectiles = Projectiles(world)
     val carts = Carts(world)
+    /** Cooking pots, appliances and the seat the player sits on (see Kitchen.kt). */
+    val kitchen = Kitchen()
     val boats = Boats(world)
     val dimension get() = world.dimension
     private var portalTime = 0f
@@ -408,7 +410,8 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
             lastJump = input.jumpHeld; lastCrouch = input.descendHeld
             if (boats.riding != null && crouchPressed) { boats.riding = null; player.y += 0.8f }
             else if (mount != null && crouchPressed) dismount()
-            else if (carts.riding != null && crouchPressed) { carts.riding = null; player.y += 0.6f }
+            else if (carts.riding != null && crouchPressed) carts.leave(this)
+            else if (carts.riding?.kind == Cart.ENGINE && jumpPressed) sound("train_horn", player.x, player.y + 2f, player.z)
             else if (carts.riding == null && jumpPressed && !player.flying) {
                 val len = sqrt(dir[0] * dir[0] + dir[2] * dir[2]).coerceAtLeast(0.01f)
                 carts.nearby(player.x, player.y, player.z, dir[0] / len, dir[2] / len)?.let { carts.enter(it, dir[0], dir[2]) }
@@ -416,7 +419,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
             lastVy = player.vy
             player.speedMul = (if (input.sprint && !player.flying) 1.3f else 1f) * (if (hasEffect("swiftness")) 1.4f else 1f)
             player.jumpMul = if (hasEffect("leaping")) 1.22f else 1f
-            if (carts.riding == null && mount == null && boats.riding == null) player.update(dt, world, input.moveForward, input.moveStrafe, input.jumpHeld, input.descendHeld)
+            if (carts.riding == null && mount == null && boats.riding == null && !sitting) player.update(dt, world, input.moveForward, input.moveStrafe, input.jumpHeld, input.descendHeld)
             updateFlight(dt)
             // Fall damage when landing hard (not while flying or in water).
             if (player.onGround && !wasOnGround && !player.flying && !player.inWater && lastVy < -14f && !hasEffect("slow_falling")) {
@@ -450,6 +453,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
 
         updateEffects(dt)
         updateCampfires(dt)
+        updateKitchen(dt)
         if (survival) updateAir(dt) else air = 10f
         achievementTimer += dt
         if (achievementTimer >= 1f) { achievementTimer = 0f; checkInventoryAchievements() }
@@ -588,6 +592,8 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
         if (item.name == "Golden Apple") health = minOf(20f, health + 8f)
         if (item.name == "Enchanted Golden Apple") { health = 20f; effects["regeneration"] = 20f; effects["fire_resistance"] = 300f }
         if (item.name == "Chorus Fruit") chorusTeleport()
+        // A hot cup of chai keeps you going.
+        if (item.name == "Masala Chai") effects["swiftness"] = maxOf(effects["swiftness"] ?: 0f, 30f)
         uiEvents.add("eat")
         sound("eat", player.x, player.y + 1.5f, player.z)
         return true
@@ -783,6 +789,16 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
             val head = meta and com.vishucraft.game.world.Shapes.UPPER != 0
             val ox = if (head) x - n[0] else x + n[0]; val oz = if (head) z - n[2] else z + n[2]
             if (world.getBlock(ox, y, oz) == id) setBlock(ox, y, oz, Blocks.AIR)
+        }
+        // Fridges are two blocks tall.
+        if (id == Blocks.FRIDGE) {
+            val oy = if (meta and com.vishucraft.game.world.Shapes.UPPER != 0) y - 1 else y + 1
+            if (world.getBlock(x, oy, z) == id) {
+                setBlock(x, oy, z, Blocks.AIR)
+                // The top half drops nothing itself, so breaking it drops the fridge here.
+                if (survival && oy < y) for ((dropId, n) in Drops.forBlock(id, heldItem(), 0)) drops.spawn(ItemStack(dropId, n), x + 0.5f, y + 0.3f, z + 0.5f)
+                if (survival) (world.blockEntities.remove(x, oy, z) as? ChestEntity)?.slots?.forEach { s -> if (s != null) drops.spawn(s, x + 0.5f, y + 0.5f, z + 0.5f) }
+            }
         }
         // Doors come in two halves.
         if (Blocks.isDoor(id)) {
@@ -1301,6 +1317,9 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
                 return
             }
         }
+        // Kitchen and home blocks come first: an egg goes on the tawa instead of being thrown, milk into the fridge.
+        if (kitchen.seat != null) { standUp(); return }
+        target?.let { c -> if (kitchenBlock(c, item, sel)) return }
         if (item != null && useItem(item)) return
         mobs.raycast(player.x, player.eyeY, player.z, dir[0], dir[1], dir[2], 4f)?.let { m ->
             if (!isClient && pack3Mob(item, m.mob)) return
@@ -1321,12 +1340,19 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
             return
         }
         // Minecarts: tap to get in or out; hitting an empty one picks it up.
-        if (carts.riding != null) { carts.riding = null; player.y += 0.6f; return }
+        if (carts.riding != null) { carts.leave(this); return }
         carts.raycast(player.x, player.eyeY, player.z, dir[0], dir[1], dir[2], 4f)?.let { c ->
             if (item?.tool == ToolType.SWORD || item?.tool == ToolType.AXE) {
                 carts.list.remove(c)
-                if (survival) drops.spawn(ItemStack(Items.find("Minecart")), c.x, c.y + 0.5f, c.z)
-            } else carts.enter(c, dir[0], dir[2])
+                if (survival) drops.spawn(ItemStack(Items.find(Cart.itemName(c.kind))), c.x, c.y + 0.5f, c.z)
+            } else {
+                carts.enter(c, dir[0], dir[2])
+                if (c.isTrain) uiEvents.add(when (carts.head(c).kind) {
+                    Cart.METRO -> "toast:All aboard the metro! It stops at every station platform"
+                    Cart.ENGINE -> if (carts.head(c) === c) "toast:Forward to drive, back to brake, jump for the horn" else "toast:All aboard!"
+                    else -> "toast:All aboard!"
+                })
+            }
             return
         }
         // Bows shoot where you look (arrows are used up in survival).
@@ -1411,9 +1437,14 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
                 }
                 ItemUse.CART -> if (com.vishucraft.game.world.Rails.isRail(t.block)) {
                     // The cart faces away from you, so it rolls off the way you are looking.
-                    val cart = Cart(t.x + 0.5f, t.y.toFloat(), t.z + 0.5f)
+                    val cart = Cart(t.x + 0.5f, t.y.toFloat(), t.z + 0.5f, Cart.kindOf(item.name))
                     carts.list.add(cart)
                     carts.aim(cart, dir[0], dir[2])
+                    // A coach placed just behind a train is hooked on to it.
+                    if (cart.kind == Cart.COACH) {
+                        carts.couple(cart)
+                        if (cart.leader != null) uiEvents.add("toast:Coach coupled to the train")
+                    }
                     consumeHeld()
                     sound("hit_stone", cart.x, cart.y, cart.z, 0.6f)
                 }
@@ -1600,7 +1631,8 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
             }
             Blocks.OAK_STAIRS, Blocks.COBBLESTONE_STAIRS, Blocks.STONE_BRICK_STAIRS, Blocks.BRICK_STAIRS,
             Blocks.SANDSTONE_STAIRS, in trapdoors -> if (t.ny == -1) meta = meta or S.UPPER
-            Blocks.LADDER, Blocks.PAINTING, Blocks.ITEM_FRAME -> {
+            Blocks.FRIDGE -> if (y + 1 >= Chunk.HEIGHT || !placeFridgeTop(x, y, z, meta)) return
+            Blocks.LADDER, Blocks.PAINTING, Blocks.ITEM_FRAME, Blocks.AIR_CONDITIONER -> {
                 if (t.ny != 0 || !Blocks.opaque[t.block]) return
                 meta = if (t.nz == 1) 2 else if (t.nz == -1) 3 else if (t.nx == 1) 4 else 5
                 if (id == Blocks.PAINTING) meta = meta or (java.util.Random().nextInt(4) shl 3)
@@ -1695,7 +1727,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
         try {
             dir.mkdirs()
             val tmp = File(dir, "entities.dat.tmp")
-            java.io.DataOutputStream(tmp.outputStream().buffered()).use { d -> mobs.write(d); carts.write(d); boats.write(d) }
+            java.io.DataOutputStream(tmp.outputStream().buffered()).use { d -> mobs.write(d); carts.write(d); boats.write(d); carts.writeExtra(d) }
             tmp.renameTo(File(dir, "entities.dat"))
         } catch (_: Exception) {}
     }
@@ -1703,6 +1735,6 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
     private fun loadEntities() {
         val f = File(world.dataDir ?: return, "entities.dat")
         if (!f.exists()) return
-        try { java.io.DataInputStream(f.inputStream().buffered()).use { d -> mobs.read(d); carts.read(d); boats.read(d) } } catch (_: Exception) {}
+        try { java.io.DataInputStream(f.inputStream().buffered()).use { d -> mobs.read(d); carts.read(d); boats.read(d); carts.readExtra(d) } } catch (_: Exception) {}
     }
 }

@@ -166,7 +166,7 @@ class Hud(private val game: Game) {
 /** Creative inventory: tabs of blocks and items; click one to put it in the selected hotbar slot. */
 class CreativeScreen(private val game: Game) {
     private val tabs: List<Pair<String, List<Int>>> =
-        Category.values().map { it.title to Blocks.inCategory(it) } + ("Tools & items" to Items.all.map { it.id })
+        Category.values().map { it.title to Blocks.inCategory(it) } + ("Items" to Items.all.map { it.id })
     var tab = 0
     private var scroll = 0f
     private val search = Ui.Field("", "Search…", 24)

@@ -27,7 +27,9 @@ class DropRenderer {
              carts: com.vishucraft.game.engine.Carts? = null, arrows: com.vishucraft.game.engine.Projectiles? = null,
              boats: com.vishucraft.game.engine.Boats? = null) {
         buf.size = 0
-        carts?.list?.forEach { c -> cart(c.x, c.y, c.z, c.yaw) }
+        carts?.list?.forEach { c ->
+            if (c.isTrain) train(c.x, c.y, c.z, c.yaw, c.kind, carts.head(c).kind) else cart(c.x, c.y, c.z, c.yaw)
+        }
         boats?.list?.forEach { b -> boat(b.x, b.y, b.z, b.yaw) }
         arrows?.list?.forEach { a ->
             val tile = when (a.kind) {
@@ -104,6 +106,52 @@ class DropRenderer {
                 buf.put(cx + lx * c - lz * s, cy + ly, cz + lx * s + lz * c,
                     u0 + uv[0] * ChunkMesher.TILE_UV, v0 + uv[1] * ChunkMesher.TILE_UV, ChunkMesher.FACE_SHADE[f])
             }
+        }
+    }
+
+    private fun tile(name: String) = com.vishucraft.game.world.Tiles.id(name)
+    private val engineTiles by lazy { intArrayOf(tile("train_roof"), tile("train_roof"), tile("train_front"), tile("train_front"), tile("train_side"), tile("train_side")) }
+    private val coachTiles by lazy { intArrayOf(tile("train_roof"), tile("train_roof"), tile("train_roof"), tile("train_roof"), tile("coach_side"), tile("coach_side")) }
+    private val metroTiles by lazy { intArrayOf(tile("metro_roof"), tile("metro_roof"), tile("metro_front"), tile("metro_front"), tile("metro_side"), tile("metro_side")) }
+    private val metroCoachTiles by lazy { intArrayOf(tile("metro_roof"), tile("metro_roof"), tile("metro_roof"), tile("metro_roof"), tile("metro_side"), tile("metro_side")) }
+    private val wheelTile by lazy { tile("train_wheel") }
+
+    /**
+     * An engine, metro car or coach: a long body with see-through windows (so a rider sitting inside can look
+     * out), a floor and wheels. Coaches behind a metro are painted like the metro. Local -Z is the front.
+     */
+    private fun train(cx: Float, cy: Float, cz: Float, yaw: Float, kind: Int, headKind: Int) {
+        val c = cos(yaw); val s = sin(yaw)
+        val metroStyle = kind == com.vishucraft.game.engine.Cart.METRO || headKind == com.vishucraft.game.engine.Cart.METRO
+        val half = when (kind) { com.vishucraft.game.engine.Cart.ENGINE -> 1.35f; com.vishucraft.game.engine.Cart.METRO -> 1.6f; else -> 1.4f }
+        val w = if (metroStyle) 0.6f else 0.55f
+        val top = if (metroStyle) 2.4f else 2.3f
+        val body = when {
+            kind == com.vishucraft.game.engine.Cart.METRO -> metroTiles
+            kind == com.vishucraft.game.engine.Cart.ENGINE -> engineTiles
+            metroStyle -> metroCoachTiles
+            else -> coachTiles
+        }
+        fun box(b: FloatArray, tiles: IntArray) {
+            for (f in 0 until 6) {
+                val tile = tiles[f]
+                val u0 = ChunkMesher.tileU(tile); val v0 = ChunkMesher.tileV(tile)
+                buf.ensure(4 * FLOATS_PER_VERTEX)
+                for ((k, cv) in ChunkMesher.CORNERS[f].withIndex()) {
+                    val lx = if (cv[0] == 1) b[3] else b[0]; val ly = if (cv[1] == 1) b[4] else b[1]; val lz = if (cv[2] == 1) b[5] else b[2]
+                    val uv = ChunkMesher.UVS[k]
+                    buf.put(cx + lx * c - lz * s, cy + ly, cz + lx * s + lz * c,
+                        u0 + uv[0] * ChunkMesher.TILE_UV, v0 + uv[1] * ChunkMesher.TILE_UV, ChunkMesher.FACE_SHADE[f])
+                }
+            }
+        }
+        box(floatArrayOf(-w, 0.3f, -half, w, top, half), body)
+        val floor = body[0]
+        box(floatArrayOf(-w + 0.02f, 0.3f, -half + 0.02f, w - 0.02f, 0.4f, half - 0.02f), IntArray(6) { floor })
+        val wheels = IntArray(6) { wheelTile }
+        for (zc in floatArrayOf(-half + 0.45f, half - 0.45f)) for (side in floatArrayOf(-1f, 1f)) {
+            val x0 = if (side < 0) -w + 0.02f else w - 0.1f
+            box(floatArrayOf(x0, 0f, zc - 0.2f, x0 + 0.08f, 0.38f, zc + 0.2f), wheels)
         }
     }
 

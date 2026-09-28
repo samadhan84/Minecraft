@@ -1668,7 +1668,251 @@ object TextureAtlas {
 
     // ---------------------------------------------------------------- dispatch
 
+    // ---------------------------------------------------------------- kitchen, home and railway (original pixel art)
+
+    private val CUP = arrayOf("dddddddd..", "daaaaaad..", "dmmmmmmddd", "dmmmmmmd.d", "dmmmmmmd.d", "dmmmmmmddd", ".dmmmmd...", "..dddd....")
+    private val GLASS = arrayOf("dddddddd", "dlaaaaad", "dlaaaaad", "dlaaaaad", "dlaaaaad", "dlaaaaad", ".dlaaad.", ".dlaaad.", ".dddddd.")
+    private val LEAVES2 = arrayOf("....dd..", "...dmmd.", "..dmlmd.", ".dmlmd..", "dmlmd...", "dmmd.dd.", ".dd.dmmd", "...dmlmd", "..dmlmd.", "..dmmd..", "...dd...")
+    private val SACK = arrayOf("...aa...", "..dmmd..", ".dmmmmd.", "dmmllmmd", "dmmmmmmd", "dmmmmmmd", "dmmmmmmd", ".dddddd.")
+    private val WEDGE = arrayOf("......dd", "....ddmd", "..ddmmmd", "ddmmammd", "dmmmmmmd", "dmammmad", "dmmmmmmd", "dddddddd")
+    private val ROLL = arrayOf("dddddddddd....", "dmlmmmmmmmdd..", "dmmmmmmmmmmmdd", "dmlmmmmmmmmmmd", "dddddddddddddd")
+    private val FRIES = arrayOf("..a.a.a..", ".aa.a.aa.", ".aaaaaaa.", "dmmmmmmmd", "dmmllmmmd", "dmmmmmmmd", ".dmmmmmd.", ".dmmmmmd.", "..ddddd..")
+    private val SLICE = arrayOf("..dddd..", ".dmmmmd.", "dmaaaamd", "dmaaaamd", "dmaaaamd", "dmaaaamd", "dmaaaamd", "dddddddd")
+    private val BAR = arrayOf("dddddddddd", "dmldmldmld", "dmmdmmdmmd", "dddddddddd", "dmldmldmld", "dmmdmmdmmd", "dddddddddd", "aaaaaaaaaa")
+    private val CONE = arrayOf("..dddd..", ".dmmlmd.", "dmmmmmmd", "dmmmmmmd", ".aaaaaa.", ".abaaba.", "..abba..", "..aaaa..", "...ab...", "...aa...")
+    private val SANDWICH = arrayOf("d.........", "dmd.......", "dabd......", "dmmmd.....", "dabbbd....", "dmmmmmd...", "dbbbbbbd..", "dmmmmmmmd.", "dddddddddd")
+    private val TRAIN = arrayOf(
+        "..dd..........", "..dd..........", "dddddddddddddd", "dmmmmmmmmaaamd", "dmaamaammaaamd", "dmmmmmmmmmmmmd",
+        "dbbbbbbbbbbbbd", "dmmmmmmmmmmmmd", "dddddddddddddd", ".dd..dd..dd.dd",
+    )
+    private val METRO = arrayOf(
+        ".dddddddddddd.", "dmmmmmmmmmmmmd", "daamaamaamaaad", "daamaamaamaaad", "dmmmmmmmmmmmmd",
+        "dbbbbbbbbbbbbd", "dmmmmmmmmmmmmd", "dddddddddddddd", ".dd..dd..dd.dd",
+    )
+    private val COACH = arrayOf(
+        "dddddddddddddd", "dmmmmmmmmmmmmd", "dmaamaamaamamd", "dmaamaamaamamd", "dmmmmmmmmmmmmd",
+        "dbbbbbbbbbbbbd", "dmmmmmmmmmmmmd", "dddddddddddddd", ".dd..dd..dd.dd",
+    )
+
+    /** A little heap of grains. */
+    private fun pile(t: Tile, c: Int) {
+        sprite(t)
+        for (y in 6..13) {
+            val half = (y - 5) * 0.9f
+            for (x in 0 until 16) if (abs(x + 0.5f - 8f) <= half && t.rnd.nextInt(6) != 0) {
+                t[x, y] = when (t.rnd.nextInt(4)) { 0 -> scale(c, 1.15f); 1 -> scale(c, 0.8f); else -> c }
+            }
+        }
+    }
+
+    private fun speckle(t: Tile, base: Int, flecks: List<Int>, share: Int) =
+        t.fill { _, _ -> if (t.rnd.nextInt(100) < share) flecks[t.rnd.nextInt(flecks.size)] else scale(base, t.jitter(0.05f)) }
+
+    private fun granite(t: Tile) = speckle(t, rgb(40, 40, 44), listOf(rgb(120, 120, 124), rgb(200, 200, 200), rgb(70, 60, 56)), 14)
+
+    private fun cabinet(t: Tile, doors: Boolean) {
+        val wood = rgb(120, 78, 44)
+        t.fill { _, y -> if (y < 2) rgb(40, 40, 44) else scale(wood, t.jitter(0.04f)) }
+        if (!doors) return
+        for (y in 2 until 16) { t[0, y] = scale(wood, 0.7f); t[15, y] = scale(wood, 0.7f); t[7, y] = scale(wood, 0.6f); t[8, y] = scale(wood, 0.6f) }
+        for (x in 0 until 16) { t[x, 5] = scale(wood, 0.7f); t[x, 15] = scale(wood, 0.6f) }
+        for (x in 6..9) t[x, 3] = rgb(200, 200, 206) // drawer handle
+        for (y in 8..11) { t[5, y] = rgb(200, 200, 206); t[10, y] = rgb(200, 200, 206) }
+    }
+
+    private fun burner(t: Tile, cx: Int, cy: Int, lit: Boolean) {
+        for (y in cy - 3..cy + 3) for (x in cx - 3..cx + 3) {
+            val d = hypot((x - cx).toFloat(), (y - cy).toFloat())
+            when {
+                d <= 1.2f -> t[x, y] = rgb(30, 30, 30)
+                d <= 2.2f -> t[x, y] = if (lit) rgb(90, 160, 255) else rgb(150, 150, 156)
+                d <= 3.2f -> t[x, y] = if (lit && (x + y) % 2 == 0) rgb(60, 110, 250) else rgb(20, 20, 22)
+            }
+        }
+    }
+
+    private fun kitchenTile(name: String, t: Tile): Boolean {
+        val white = rgb(236, 236, 232); val steel = rgb(196, 198, 204); val dark = rgb(30, 30, 34)
+        when (name) {
+            "steel" -> t.fill { _, y -> scale(steel, (if (y % 3 == 0) 1.06f else 0.97f) * t.jitter(0.02f)) }
+            "black_plastic" -> t.fill { _, _ -> scale(rgb(40, 40, 44), t.jitter(0.06f)) }
+            "white_plastic" -> t.fill { x, y -> if (x == 0 || y == 0 || x == 15 || y == 15) rgb(206, 206, 204) else scale(white, t.jitter(0.015f)) }
+            "black_iron" -> speckle(t, rgb(44, 44, 48), listOf(rgb(64, 64, 70), rgb(30, 30, 32)), 20)
+            "cooker_side" -> t.fill { x, y -> if (y == 9) rgb(120, 120, 126) else scale(rgb(186, 188, 194), (if (x % 4 == 1) 1.08f else 1f) * t.jitter(0.02f)) }
+            "cooker_top" -> { t.fill { _, _ -> scale(rgb(186, 188, 194), t.jitter(0.02f)) }; disc(t, 8f, 8f, 2.2f, dark, false); for (x in 8..15) t[x, 7] = dark }
+            "tawa_top", "tawa_top_on" -> {
+                speckle(t, rgb(34, 34, 38), listOf(rgb(56, 56, 60)), 12)
+                if (name.endsWith("on")) { disc(t, 8f, 8f, 5f, rgb(222, 184, 120), false); repeat(8) { t[5 + t.rnd.nextInt(7), 5 + t.rnd.nextInt(7)] = rgb(150, 96, 44) } }
+            }
+            "pan_top", "pan_top_on" -> {
+                speckle(t, rgb(50, 50, 56), listOf(rgb(70, 70, 76)), 10)
+                if (name.endsWith("on")) { disc(t, 8f, 8f, 4.5f, rgb(250, 222, 90), false); disc(t, 9f, 7f, 1.6f, rgb(250, 160, 40), false) }
+            }
+            "microwave_front", "microwave_front_on" -> {
+                t.fill { x, y -> if (x == 0 || x == 15) rgb(206, 206, 204) else scale(white, t.jitter(0.015f)) }
+                val on = name.endsWith("on")
+                for (y in 9..14) for (x in 2..10) t[x, y] = if (on) (if (y >= 12 && x in 4..8) rgb(236, 236, 236) else rgb(250, 210, 110)) else if (x + y == 16) rgb(70, 70, 76) else rgb(26, 26, 30)
+                for (y in 9..14) for (x in 12..13) t[x, y] = if ((x + y) % 2 == 0) rgb(60, 60, 66) else rgb(140, 140, 146)
+                t[12, 9] = if (on) rgb(80, 230, 90) else rgb(40, 90, 50)
+            }
+            "oven_front", "oven_front_on" -> {
+                t.fill { _, _ -> scale(steel, t.jitter(0.02f)) }
+                for (x in 1..14) t[x, 6] = dark
+                for (k in 0..3) t[3 + k * 3, 7] = dark
+                val on = name.endsWith("on")
+                for (y in 9..14) for (x in 3..12) t[x, y] = if (on) (if (y == 12) rgb(255, 120, 30) else rgb(250, 170, 60)) else rgb(26, 26, 30)
+            }
+            "toaster_top" -> { t.fill { _, _ -> scale(steel, t.jitter(0.02f)) }; for (x in 5..10) { t[x, 7] = dark; t[x, 9] = dark } }
+            "mixer_jar" -> t.fill { x, y -> if (x % 5 == 2) rgb(170, 200, 220) else if (y % 4 == 0 && x < 4) rgb(120, 150, 170) else scale(rgb(206, 226, 238), t.jitter(0.02f)) }
+            "fridge_side" -> t.fill { x, _ -> if (x == 0 || x == 15) rgb(200, 200, 198) else scale(white, t.jitter(0.012f)) }
+            "fridge_front", "fridge_front_top" -> {
+                t.fill { x, y -> if (x == 0 || x == 15) rgb(200, 200, 198) else if (name == "fridge_front" && y == 0) rgb(150, 150, 150) else scale(white, t.jitter(0.012f)) }
+                val ys = if (name == "fridge_front") 2..9 else 8..14
+                for (y in ys) { t[13, y] = steel; t[12, y] = rgb(150, 152, 158) }
+                if (name == "fridge_front_top") { for (x in 3..6) t[x, 3] = rgb(40, 110, 200); t[4, 2] = rgb(40, 110, 200) }
+            }
+            "counter_top" -> granite(t)
+            "counter_side" -> cabinet(t, false)
+            "counter_front" -> cabinet(t, true)
+            "stove_top", "stove_top_on" -> { granite(t); val lit = name.endsWith("on"); burner(t, 4, 8, lit); burner(t, 11, 8, lit) }
+            "stove_front" -> {
+                cabinet(t, true)
+                for (y in 2..4) for (x in 0 until 16) t[x, y] = rgb(40, 40, 44)
+                for (k in 0..3) { t[2 + k * 4, 3] = rgb(220, 220, 224); t[3 + k * 4, 3] = rgb(150, 150, 156) }
+            }
+            "sink_top" -> {
+                granite(t)
+                for (y in 3..13) for (x in 2..13) t[x, y] = if (y == 3 || x == 2) rgb(120, 122, 128) else scale(steel, t.jitter(0.03f))
+                disc(t, 8f, 9f, 1.2f, dark, false)
+            }
+            "sofa" -> t.fill { x, y -> val c = rgb(170, 40, 50); if ((x % 8 == 4 && y % 8 == 4)) scale(c, 0.6f) else scale(c, t.jitter(0.05f)) }
+            "tv_screen" -> t.fill { x, y -> if (y <= 3 || y >= 12 || x == 0 || x == 15) rgb(20, 20, 22) else if (x - y == 1 || x - y == 2) rgb(60, 60, 70) else rgb(12, 12, 16) }
+            "tv_screen_on" -> {
+                t.fill { x, y -> if (y <= 3 || y >= 12 || x == 0 || x == 15) rgb(20, 20, 22) else if (y >= 9) rgb(90, 190, 70) else rgb(110, 180, 250) }
+                disc(t, 12f, 5.5f, 1.4f, rgb(255, 220, 60), false)
+                for (y in 6..8) t[6, y] = rgb(240, 120, 40); t[6, 5] = rgb(250, 210, 170); t[5, 7] = rgb(240, 120, 40); t[7, 7] = rgb(240, 120, 40)
+                for (y in 6..8) t[9, y] = rgb(70, 110, 220); t[9, 5] = rgb(160, 110, 80)
+            }
+            "fan_blur" -> {
+                sprite(t)
+                for (y in 0 until 16) for (x in 0 until 16) {
+                    val dx = x + 0.5f - 8f; val dy = y + 0.5f - 8f
+                    val r = hypot(dx, dy)
+                    if (r > 7.6f || r < 1.5f) continue
+                    val a = (kotlin.math.atan2(dy, dx) / (2 * Math.PI).toFloat() * 3f + r * 0.08f + 3f) % 1f
+                    if (a < 0.45f) t[x, y] = mix(rgb(230, 230, 228), rgb(160, 160, 164), a)
+                }
+            }
+            "lamp_shade" -> t.fill { _, y -> scale(rgb(236, 220, 180), (if (y % 4 == 0) 0.94f else 1f) * t.jitter(0.03f)) }
+            "lamp_shade_on" -> t.fill { _, _ -> scale(rgb(255, 236, 160), t.jitter(0.03f)) }
+            "washer_front", "washer_front_on" -> {
+                t.fill { x, y -> if (x == 0 || y == 0 || x == 15 || y == 15) rgb(206, 206, 204) else scale(white, t.jitter(0.015f)) }
+                for (x in 2..13) t[x, 3] = rgb(180, 180, 184)
+                t[3, 2] = rgb(60, 60, 66); t[11, 2] = if (name.endsWith("on")) rgb(80, 230, 90) else rgb(60, 60, 66)
+                disc(t, 8f, 9.5f, 5f, rgb(170, 172, 178), false)
+                disc(t, 8f, 9.5f, 3.8f, if (name.endsWith("on")) rgb(80, 150, 230) else rgb(40, 44, 54), false)
+                if (name.endsWith("on")) { t[6, 9] = white; t[9, 11] = white; t[8, 8] = rgb(200, 230, 255) }
+            }
+            "ac_front", "ac_front_on" -> {
+                t.fill { x, y -> if (y == 0 || y == 15) rgb(200, 200, 198) else scale(white, t.jitter(0.012f)) }
+                for (x in 1..14) { t[x, 6] = rgb(170, 170, 174); t[x, 7] = rgb(120, 120, 126) }
+                t[13, 3] = if (name.endsWith("on")) rgb(80, 230, 90) else rgb(150, 150, 150)
+            }
+            "platform_top" -> t.fill { x, y -> when {
+                x in 12..14 -> if ((x + y) % 2 == 0) rgb(250, 206, 40) else rgb(226, 180, 30)
+                x % 8 == 0 || y % 8 == 0 -> rgb(150, 150, 150)
+                else -> scale(rgb(190, 190, 188), t.jitter(0.03f))
+            } }
+            "ballast" -> {
+                gravel(t)
+                for (y in 6..9) for (x in 0 until 16) t[x, y] = scale(rgb(110, 76, 44), t.jitter(0.06f))
+            }
+            // ---- trains (drawn stretched over the long car bodies; clear pixels are windows)
+            "train_side" -> t.fill { x, y -> when {
+                y in 2..7 && x % 4 != 0 && x in 1..14 -> 0
+                y == 9 || y == 10 -> rgb(236, 214, 150)
+                y >= 14 -> rgb(40, 40, 44)
+                else -> scale(rgb(176, 36, 32), t.jitter(0.03f))
+            } }
+            "coach_side" -> t.fill { x, y -> when {
+                y in 2..7 && x % 3 != 0 && x in 1..14 -> 0
+                y == 9 -> rgb(236, 214, 150)
+                y >= 14 -> rgb(40, 40, 44)
+                else -> scale(rgb(34, 70, 150), t.jitter(0.03f))
+            } }
+            "metro_side" -> t.fill { x, y -> when {
+                y in 3..7 && (x in 1..5 || x in 10..14) -> 0                  // windows
+                x in 6..9 && y in 3..6 && x in 7..8 -> 0                     // door windows
+                (x == 6 || x == 9) && y in 2..13 -> rgb(120, 122, 130)      // door edges
+                x in 7..8 && y in 2..13 -> rgb(170, 172, 180)               // doors
+                y == 10 || y == 11 -> rgb(30, 90, 200)
+                y >= 14 -> rgb(60, 60, 66)
+                else -> scale(rgb(206, 208, 214), t.jitter(0.02f))
+            } }
+            "train_front" -> t.fill { x, y -> when {
+                y in 2..7 && x in 2..13 && x != 7 && x != 8 -> 0
+                y == 11 && (x in 2..3 || x in 12..13) -> rgb(255, 250, 200) // headlights
+                y == 9 || y == 10 -> rgb(236, 214, 150)
+                else -> scale(rgb(176, 36, 32), t.jitter(0.03f))
+            } }
+            "metro_front" -> t.fill { x, y -> when {
+                y == 1 && x in 4..11 -> rgb(250, 160, 40) // destination board
+                y in 2..8 && x in 1..14 -> 0
+                y == 12 && (x in 1..3 || x in 12..14) -> rgb(255, 250, 220)
+                y == 10 || y == 11 -> rgb(30, 90, 200)
+                else -> scale(rgb(206, 208, 214), t.jitter(0.02f))
+            } }
+            "train_roof" -> t.fill { x, _ -> scale(rgb(90, 90, 96), (if (x % 5 == 0) 0.85f else 1f) * t.jitter(0.03f)) }
+            "metro_roof" -> t.fill { x, _ -> scale(rgb(176, 178, 186), (if (x % 5 == 0) 0.9f else 1f) * t.jitter(0.02f)) }
+            "train_wheel" -> t.fill { x, y -> if (hypot(x + 0.5f - 8f, y + 0.5f - 8f) < 3f) rgb(170, 170, 176) else rgb(30, 30, 32) }
+            // ---- food and drink
+            "rice" -> pile(t, rgb(244, 242, 234))
+            "lentils" -> pile(t, rgb(240, 170, 50))
+            "tea_leaves" -> mask(t, LEAVES2, rgb(60, 130, 50))
+            "tomato" -> { mask(t, ORB, rgb(220, 40, 30)); t[7, 4] = rgb(60, 140, 40); t[8, 4] = rgb(60, 140, 40); t[8, 3] = rgb(60, 140, 40) }
+            "flour" -> mask(t, SACK, rgb(236, 230, 214), rgb(150, 110, 60))
+            "dough" -> mask(t, ORB, rgb(234, 206, 156))
+            "dosa_batter" -> mask(t, BOWL, rgb(170, 170, 178), rgb(240, 232, 200))
+            "cheese" -> mask(t, WEDGE, rgb(250, 210, 80), rgb(214, 164, 44))
+            "raw_pizza", "pizza" -> {
+                sprite(t); val baked = name == "pizza"
+                disc(t, 8f, 8f, 7f, if (baked) rgb(200, 130, 60) else rgb(236, 210, 160))
+                disc(t, 8f, 8f, 5.4f, if (baked) rgb(240, 190, 70) else rgb(210, 50, 40), false)
+                for ((x, y) in listOf(6 to 6, 10 to 7, 7 to 10, 10 to 10, 5 to 9)) { t[x, y] = rgb(170, 30, 30); t[x + 1, y] = rgb(60, 130, 50) }
+            }
+            "steamed_rice" -> mask(t, BOWL, rgb(170, 170, 178), rgb(248, 248, 244))
+            "dal" -> mask(t, BOWL, rgb(170, 170, 178), rgb(240, 180, 40))
+            "chicken_curry" -> mask(t, BOWL, rgb(170, 170, 178), rgb(200, 100, 40))
+            "dal_chawal" -> { mask(t, BOWL, rgb(170, 170, 178), rgb(248, 248, 244)); for (y in 0 until 16) for (x in 8 until 16) if (t[x, y] == rgb(248, 248, 244)) t[x, y] = rgb(240, 180, 40) }
+            "roti_item" -> { sprite(t); disc(t, 8f, 8f, 6.5f, rgb(222, 184, 120)); repeat(10) { t[4 + t.rnd.nextInt(9), 4 + t.rnd.nextInt(9)] = rgb(150, 96, 44) } }
+            "dosa" -> mask(t, ROLL, rgb(220, 160, 70))
+            "omelette" -> mask(t, LUMP, rgb(250, 220, 90)).also { t[6, 5] = rgb(250, 160, 40); t[9, 7] = rgb(60, 140, 40) }
+            "french_fries" -> mask(t, FRIES, rgb(210, 40, 40), rgb(250, 210, 80))
+            "masala_chai" -> { mask(t, CUP, rgb(236, 232, 224), rgb(196, 140, 80)); t[4, 1] = rgb(220, 220, 220); t[6, 0] = rgb(220, 220, 220) }
+            "hot_chocolate" -> { mask(t, CUP, rgb(236, 232, 224), rgb(100, 56, 30)); t[4, 1] = rgb(220, 220, 220); t[6, 0] = rgb(220, 220, 220) }
+            "toast" -> mask(t, SLICE, rgb(170, 100, 40), rgb(230, 170, 80))
+            "apple_juice" -> mask(t, GLASS, rgb(200, 220, 235), rgb(240, 200, 60))
+            "watermelon_juice" -> mask(t, GLASS, rgb(200, 220, 235), rgb(240, 80, 100))
+            "carrot_juice" -> mask(t, GLASS, rgb(200, 220, 235), rgb(250, 140, 30))
+            "sugarcane_juice" -> mask(t, GLASS, rgb(200, 220, 235), rgb(190, 220, 120))
+            "chocolate" -> mask(t, BAR, rgb(110, 60, 30), rgb(200, 40, 40))
+            "ice_cream" -> mask(t, CONE, rgb(240, 150, 180), rgb(220, 170, 90), rgb(170, 120, 60))
+            "sandwich" -> mask(t, SANDWICH, rgb(235, 210, 160), rgb(210, 50, 40), rgb(250, 210, 80))
+            "thali" -> {
+                sprite(t); disc(t, 8f, 8f, 7.5f, rgb(190, 190, 196))
+                disc(t, 5f, 5.5f, 2.2f, rgb(240, 180, 40)); disc(t, 11f, 5.5f, 2.2f, rgb(200, 100, 40))
+                disc(t, 5.5f, 11f, 2.4f, rgb(248, 248, 244)); disc(t, 11f, 11f, 2.4f, rgb(222, 184, 120))
+            }
+            "train_engine" -> mask(t, TRAIN, rgb(176, 36, 32), rgb(120, 180, 230), rgb(236, 214, 150))
+            "metro_train" -> mask(t, METRO, rgb(206, 208, 214), rgb(40, 60, 90), rgb(30, 90, 200))
+            "train_coach" -> mask(t, COACH, rgb(34, 70, 150), rgb(120, 180, 230), rgb(236, 214, 150))
+            else -> return false
+        }
+        return true
+    }
+
     private fun paint(name: String, t: Tile) {
+        if (kitchenTile(name, t)) return
         if (pack3Tile(name, t)) return
         if (mobSkin(name, t)) return
         if (survivalItem(name, t)) return

@@ -283,6 +283,41 @@ object Items {
             add("${t.displayName} Spawn Egg", "spawn_egg_${t.name.lowercase()}", use = ItemUse.SPAWN)
         }
 
+        // ---- Kitchen pack (appended): ingredients, home cooking and drinks.
+        add("Rice", "rice", food = 1)
+        add("Lentils", "lentils", food = 1)
+        add("Tea Leaves", "tea_leaves")
+        add("Tomato", "tomato", food = 2)
+        add("Flour", "flour")
+        add("Dough", "dough")
+        add("Dosa Batter", "dosa_batter")
+        add("Cheese", "cheese", food = 3)
+        add("Raw Pizza", "raw_pizza")
+        add("Steamed Rice", "steamed_rice", food = 5, maxStack = 16)
+        add("Dal", "dal", food = 6, maxStack = 16)
+        add("Chicken Curry", "chicken_curry", food = 10, maxStack = 16)
+        add("Roti", "roti_item", food = 5)
+        add("Dosa", "dosa", food = 7)
+        add("Omelette", "omelette", food = 6)
+        add("French Fries", "french_fries", food = 5)
+        add("Masala Chai", "masala_chai", food = 3, maxStack = 16)
+        add("Hot Chocolate", "hot_chocolate", food = 4, maxStack = 16)
+        add("Toast", "toast", food = 4)
+        add("Pizza", "pizza", food = 12, maxStack = 16)
+        add("Apple Juice", "apple_juice", food = 5, maxStack = 16)
+        add("Watermelon Juice", "watermelon_juice", food = 4, maxStack = 16)
+        add("Carrot Juice", "carrot_juice", food = 5, maxStack = 16)
+        add("Sugarcane Juice", "sugarcane_juice", food = 4, maxStack = 16)
+        add("Chocolate", "chocolate", food = 3)
+        add("Ice Cream", "ice_cream", food = 4, maxStack = 16)
+        add("Dal Chawal", "dal_chawal", food = 12, maxStack = 16)
+        add("Indian Thali", "thali", food = 20, maxStack = 16)
+        add("Sandwich", "sandwich", food = 10)
+        // Trains: they run on rails like minecarts (see engine/Projectiles Carts).
+        add("Train Engine", "train_engine", use = ItemUse.CART, maxStack = 1)
+        add("Metro Train", "metro_train", use = ItemUse.CART, maxStack = 1)
+        add("Train Coach", "train_coach", use = ItemUse.CART, maxStack = 1)
+
         all = list
         for (i in all) { byId[i.id] = i; byName[i.name] = i.id }
     }

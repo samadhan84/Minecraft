@@ -24,7 +24,7 @@ object Tiles {
 enum class RenderType { NONE, CUBE, CROSS, LIQUID, FLAT, BOX, PISTON_HEAD, SHAPE, RAIL, PORTAL }
 enum class ToolType { NONE, PICKAXE, AXE, SHOVEL, HOE, SWORD }
 enum class Facing { NONE, HORIZONTAL, ALL }
-enum class Category(val title: String) { BUILDING("Building"), COLORED("Colored"), NATURE("Nature"), REDSTONE("Sparkstone") }
+enum class Category(val title: String) { BUILDING("Building"), COLORED("Colored"), NATURE("Nature"), REDSTONE("Sparkstone"), HOME("Home") }
 
 class BlockDef(
     val id: Int,
@@ -345,7 +345,40 @@ object Blocks {
     const val HONEY_BLOCK = 380
     const val TARGET = 381
     const val CHERRY_SAPLING = 382
-    const val COUNT = 383
+    // ---- Kitchen and home (meta bits 0..2 facing, bit 3 switched on / cooking; see engine/Kitchen.kt)
+    /** A kitchen counter with a gas hob: pots, pans and kettles on top of it cook. */
+    const val GAS_STOVE = 383
+    const val PRESSURE_COOKER = 384
+    const val TAWA = 385
+    const val FRYING_PAN = 386
+    const val KETTLE = 387
+    const val MICROWAVE = 388
+    const val OVEN = 389
+    const val TOASTER = 390
+    const val MIXER = 391
+    /** Two blocks tall (the top half has Shapes.UPPER); keeps food like a chest. */
+    const val FRIDGE = 392
+    const val KITCHEN_SINK = 393
+    const val KITCHEN_COUNTER = 394
+    const val DINING_TABLE = 395
+    const val CHAIR = 396
+    const val SOFA = 397
+    const val TV = 398
+    const val CEILING_FAN = 399
+    const val TABLE_LAMP = 400
+    const val WASHING_MACHINE = 401
+    const val AIR_CONDITIONER = 402
+    // ---- Railway
+    /** Trains and metros stop next to it. */
+    const val STATION_PLATFORM = 403
+    const val RAILWAY_BALLAST = 404
+    const val COUNT = 405
+
+    fun isKitchenAppliance(id: Int) = id in GAS_STOVE..AIR_CONDITIONER
+    /** Pots and pans that cook when they stand on a gas stove. */
+    fun isStovePot(id: Int) = id == PRESSURE_COOKER || id == TAWA || id == FRYING_PAN || id == KETTLE
+    /** Chairs and sofas can be sat on. */
+    fun isSeat(id: Int) = id == CHAIR || id == SOFA
 
     val DEEPSLATE_ORES = listOf("coal", "iron", "gold", "diamond", "redstone", "lapis")
     val FLOWERS = listOf("pink_petals" to "Pink Petals", "cornflower" to "Cornflower", "lily_of_the_valley" to "Lily of the Valley",
@@ -369,11 +402,15 @@ object Blocks {
         id == CAMPFIRE -> 0.45f
         id == SNOW_LAYER -> 0.15f
         id == STONECUTTER -> 0.56f
+        id == TAWA -> 0.12f
+        id == FRYING_PAN -> 0.25f
+        id == TOASTER || id == KETTLE || id == PRESSURE_COOKER -> 0.5f
+        id == MICROWAVE -> 0.55f
         else -> 1f
     }
     fun isBanner(id: Int) = id in BANNER_FIRST until BANNER_FIRST + 16
     /** Hangs on the side of a block (placed like a ladder). */
-    fun isWallMounted(id: Int) = id == LADDER || id == PAINTING || id == ITEM_FRAME
+    fun isWallMounted(id: Int) = id == LADDER || id == PAINTING || id == ITEM_FRAME || id == AIR_CONDITIONER
 
     fun isButton(id: Int) = id == STONE_BUTTON || id in WOOD_BUTTON_FIRST until WOOD_BUTTON_FIRST + 6
     fun isPlate(id: Int) = id == PRESSURE_PLATE || id in WOOD_PLATE_FIRST until WOOD_PLATE_FIRST + 6 || id == GOLD_PLATE || id == IRON_PLATE
@@ -791,6 +828,52 @@ object Blocks {
             hardness = 0f, cullSelf = true))
         column(TARGET, "Target", "target_top", "target_side", "target_top", 0.5f, ToolType.HOE, R)
         plant(CHERRY_SAPLING, "Cherry Sapling", "sapling_cherry")
+
+        // ---- Kitchen and home
+        val H = Category.HOME
+        fun home(id: Int, name: String, top: String, side: String, bottom: String = side, front: String = side,
+                 hardness: Float = 1f, tool: ToolType = P, solid: Boolean = true, facing: Facing = Facing.HORIZONTAL) =
+            reg(BlockDef(id, name, t(top), t(side), t(bottom), render = RenderType.SHAPE, opaque = false, solid = solid,
+                blocksLight = false, hardness = hardness, tool = tool, category = H, facing = facing, front = t(front), movable = false))
+        reg(BlockDef(GAS_STOVE, "Gas Stove", t("stove_top"), t("counter_side"), t("counter_side"), hardness = 1.2f, tool = P,
+            category = H, facing = Facing.HORIZONTAL, front = t("stove_front"), movable = false))
+        t("stove_top_on")
+        home(PRESSURE_COOKER, "Pressure Cooker", "cooker_top", "cooker_side", hardness = 0.6f)
+        home(TAWA, "Tawa", "tawa_top", "black_iron", hardness = 0.6f)
+        t("tawa_top_on")
+        home(FRYING_PAN, "Frying Pan", "pan_top", "black_iron", hardness = 0.6f)
+        t("pan_top_on")
+        home(KETTLE, "Kettle", "steel", "steel", hardness = 0.6f)
+        home(MICROWAVE, "Microwave", "white_plastic", "white_plastic", front = "microwave_front", hardness = 0.8f)
+        t("microwave_front_on")
+        home(OVEN, "Oven", "black_iron", "steel", front = "oven_front", hardness = 1f)
+        t("oven_front_on")
+        home(TOASTER, "Toaster", "toaster_top", "steel", hardness = 0.6f)
+        home(MIXER, "Mixer Grinder", "mixer_jar", "mixer_jar", "white_plastic", hardness = 0.6f)
+        reg(BlockDef(FRIDGE, "Fridge", t("white_plastic"), t("fridge_side"), t("fridge_side"), hardness = 1.2f, tool = P,
+            category = H, facing = Facing.HORIZONTAL, front = t("fridge_front"), movable = false))
+        t("fridge_front_top")
+        home(KITCHEN_SINK, "Kitchen Sink", "sink_top", "counter_side", "counter_side", "counter_front", hardness = 1.2f)
+        reg(BlockDef(KITCHEN_COUNTER, "Kitchen Counter", t("counter_top"), t("counter_side"), t("counter_side"), hardness = 1.2f, tool = P,
+            category = H, facing = Facing.HORIZONTAL, front = t("counter_front"), movable = false))
+        home(DINING_TABLE, "Dining Table", "oak_planks", "oak_planks", hardness = 0.8f, tool = A, facing = Facing.NONE)
+        home(CHAIR, "Chair", "oak_planks", "oak_planks", hardness = 0.6f, tool = A)
+        home(SOFA, "Sofa", "sofa", "sofa", "oak_planks", hardness = 0.6f, tool = A)
+        home(TV, "TV", "black_plastic", "black_plastic", front = "tv_screen", hardness = 0.6f)
+        t("tv_screen_on")
+        home(CEILING_FAN, "Ceiling Fan", "white_plastic", "white_plastic", hardness = 0.5f, solid = false, facing = Facing.NONE)
+        t("fan_blur")
+        home(TABLE_LAMP, "Table Lamp", "lamp_shade", "lamp_shade", "steel", hardness = 0.3f, tool = ToolType.NONE, solid = false, facing = Facing.NONE)
+        t("lamp_shade_on")
+        home(WASHING_MACHINE, "Washing Machine", "white_plastic", "white_plastic", front = "washer_front", hardness = 1f)
+        t("washer_front_on")
+        home(AIR_CONDITIONER, "Air Conditioner", "white_plastic", "white_plastic", front = "ac_front", hardness = 0.6f, solid = false)
+        t("ac_front_on")
+        // ---- Railway
+        column(STATION_PLATFORM, "Station Platform", "platform_top", "smooth_stone_side", "smooth_stone", 1.2f, P)
+        cube(RAILWAY_BALLAST, "Railway Ballast", "ballast", 0.6f, S)
+        for (n in listOf("steel", "black_plastic", "train_side", "train_front", "train_roof",
+            "coach_side", "metro_side", "metro_front", "metro_roof", "train_wheel")) t(n)
     }
 
     private fun pretty(c: String) = c.split('_').joinToString(" ") { it.replaceFirstChar { ch -> ch.uppercase() } }
@@ -832,6 +915,10 @@ object Blocks {
         CRYING_OBSIDIAN -> 10
         REDSTONE_TORCH -> if (meta == 0) 7 else 0
         MAGMA -> 3
+        GAS_STOVE -> if (meta and 8 != 0) 6 else 0
+        TABLE_LAMP -> if (meta and 8 != 0) 14 else 0
+        TV -> if (meta and 8 != 0) 8 else 0
+        OVEN, MICROWAVE -> if (meta and 8 != 0) 7 else 0
         else -> extraLight[id]
     }
 
@@ -842,6 +929,7 @@ object Blocks {
 
     fun isEmissive(id: Int, meta: Int): Boolean {
         if (isFurnace(id)) return meta and 8 != 0
+        if (id == TABLE_LAMP) return meta and 8 != 0
         if (!all[id].emissive) return false
         return !(id == REDSTONE_TORCH && meta != 0)
     }
@@ -870,9 +958,25 @@ object Blocks {
             POWERED_RAIL -> return Tiles.id(if (meta and 8 != 0) "powered_rail_on" else "powered_rail")
             RAIL -> return Tiles.id(if ((meta and 15) >= 6) "rail_curve" else "rail")
             BERRY_BUSH -> return Tiles.id("berry_bush_${meta.coerceIn(0, 3)}")
+            GAS_STOVE -> if (face == 0) return Tiles.id(if (meta and 8 != 0) "stove_top_on" else "stove_top")
+            TAWA -> if (face == 0) return Tiles.id(if (meta and 8 != 0) "tawa_top_on" else "tawa_top")
+            FRYING_PAN -> if (face == 0) return Tiles.id(if (meta and 8 != 0) "pan_top_on" else "pan_top")
+            FRIDGE -> if (face == (meta and 7).coerceIn(2, 5)) return Tiles.id(if (meta and Shapes.UPPER != 0) "fridge_front_top" else "fridge_front")
+            TABLE_LAMP -> if (meta and 8 != 0) return Tiles.id("lamp_shade_on")
             BEE_NEST -> if (face == (meta and 7).let { if (it < 2 || it > 5) 2 else it } && (meta shr 3) >= 5) return Tiles.id("bee_nest_front_honey")
         }
-        if (d.render == RenderType.SHAPE) return when (face) { 0 -> d.top; 1 -> d.bottom; else -> d.side }
+        if (d.render == RenderType.SHAPE) {
+            // Appliances show their front (door, screen) on the side facing the player who placed them.
+            if (d.front != d.side && face == (meta and 7).let { if (it < 2 || it > 5) 2 else it }) {
+                if (meta and 8 != 0) when (id) {
+                    MICROWAVE -> return Tiles.id("microwave_front_on"); OVEN -> return Tiles.id("oven_front_on")
+                    TV -> return Tiles.id("tv_screen_on"); WASHING_MACHINE -> return Tiles.id("washer_front_on")
+                    AIR_CONDITIONER -> return Tiles.id("ac_front_on")
+                }
+                return d.front
+            }
+            return when (face) { 0 -> d.top; 1 -> d.bottom; else -> d.side }
+        }
         if (d.facing != Facing.NONE) {
             var f = meta and 7
             if (f > 5 || (d.facing == Facing.HORIZONTAL && f < 2)) f = 2

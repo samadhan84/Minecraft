@@ -135,6 +135,16 @@ object Synth {
         make("bear", 1.0f) { tone(it, 0, it.size, { t -> 80f + 20f * sin(t * 9f) }, 0.6f, 0.5f, 0.1f, floatArrayOf(1f, 0.9f, 0.8f, 0.6f)); noiseBurst(it, 0, it.size, 0.3f, 0.4f, 0.1f) }
         make("llama", 0.5f) { tone(it, 0, it.size, { t -> 300f + 80f * sin(t * 20f) }, 0.4f, 0.25f, 0.03f, floatArrayOf(1f, 0.6f, 0.4f)) }
 
+        // Kitchen and railway.
+        make("whistle", 1.1f) { tone(it, 0, it.size, { t -> 1900f + 90f * sin(t * 50f) }, 0.35f, 0.9f, 0.08f, floatArrayOf(1f, 0.3f)); noiseBurst(it, 0, it.size, 0.35f, 0.6f, 0.9f) }
+        make("beep", 0.9f) { for (k in 0..2) tone(it, k * 6600, 4400, { 1800f }, 0.4f, 0.4f, 0.003f) }
+        make("ding", 1.4f) { tone(it, 0, it.size, { 1568f }, 0.5f, 0.6f, 0.002f, floatArrayOf(1f, 0.3f, 0.15f)) }
+        make("mixer", 1.8f) { tone(it, 0, it.size, { t -> 140f + 30f * minOf(1f, t * 3f) }, 0.35f, 3f, 0.1f, floatArrayOf(1f, 0.9f, 0.8f, 0.7f, 0.6f)); noiseBurst(it, 0, it.size, 0.4f, 3f, 0.5f) }
+        make("tv", 0.8f) { for ((k, f) in listOf(523f, 659f, 784f, 1047f).withIndex()) tone(it, k * 3500, 5000, { f }, 0.35f, 0.25f, 0.003f, floatArrayOf(1f, 0.4f)) }
+        make("train_horn", 1.8f) { tone(it, 0, it.size, { 311f }, 0.35f, 2.5f, 0.05f, floatArrayOf(1f, 0.7f, 0.5f)); tone(it, 0, it.size, { 370f }, 0.35f, 2.5f, 0.05f, floatArrayOf(1f, 0.7f, 0.5f)) }
+        make("metro_chime", 1.6f) { for ((k, f) in listOf(784f, 659f, 523f).withIndex()) tone(it, k * 7000, 12000, { f }, 0.4f, 0.5f, 0.003f, floatArrayOf(1f, 0.35f, 0.1f)) }
+        make("rails", 0.35f) { for (k in 0..1) noiseBurst(it, k * 5000, 2500, 0.6f, 0.03f, 0.35f) }
+
         // Loops.
         make("rain", 2.0f) {
             var lp = 0f

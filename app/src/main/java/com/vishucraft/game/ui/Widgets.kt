@@ -194,7 +194,7 @@ class HotbarView(
 class InventoryView(ctx: Context, private val onPick: (Int?) -> Unit) : View(ctx) {
     private val tabs: List<Pair<String, List<Int>>> =
         com.vishucraft.game.world.Category.values().map { it.title to com.vishucraft.game.world.Blocks.inCategory(it) } +
-            ("Tools & items" to com.vishucraft.game.world.Items.all.map { it.id })
+            ("Items" to com.vishucraft.game.world.Items.all.map { it.id })
     private var tab = 0
     private var scroll = 0f
     private val dim = Paint().apply { color = Color.argb(150, 0, 0, 0) }

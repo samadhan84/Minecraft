@@ -272,7 +272,8 @@ class ChunkMesher {
                     val boxes = com.vishucraft.game.world.Shapes.boxes(id, meta, false) { side ->
                         val n = NORMALS[side]; block(px + n[0], y, pz + n[2])
                     }
-                    for (b in boxes) emitBox(opaqueOut, px, y, pz, b, id, meta, emissive)
+                    // A 7th value is a texture tile for the whole box (handles, legs...).
+                    for (b in boxes) emitBox(opaqueOut, px, y, pz, b, id, meta, emissive, sideTile = if (b.size > 6) b[6].toInt() else -1)
                 }
                 RenderType.RAIL -> emitRail(opaqueOut, px, y, pz, id, meta)
                 RenderType.PORTAL -> {
