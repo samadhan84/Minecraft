@@ -75,7 +75,7 @@ const val CONTROLS_HELP =
 
 class App(private val demo: File?) {
     private enum class Menu { TITLE, WORLDS, CREATE, JOIN, SETTINGS, CONTROLS, CONFIRM_DELETE, UNLOCK }
-    private enum class Overlay { NONE, PAUSE, CREATIVE, CONTAINER, SETTINGS, CONTROLS, SAVE_QUIT, NAME_MOB, TRADE, ACHIEVEMENTS, SIGN, ENDING, INTERNET }
+    private enum class Overlay { NONE, PAUSE, CREATIVE, CONTAINER, SETTINGS, CONTROLS, NAME_MOB, TRADE, ACHIEVEMENTS, SIGN, ENDING, INTERNET }
 
     private var window = NULL
     private val prefs = Prefs()
@@ -215,7 +215,6 @@ class App(private val demo: File?) {
             Overlay.CONTAINER -> if (!container!!.draw(ui)) closeOverlay()
             Overlay.SETTINGS -> settingsScreen { overlay = Overlay.PAUSE }
             Overlay.CONTROLS -> controlsScreen { overlay = Overlay.PAUSE }
-            Overlay.SAVE_QUIT -> saveQuitScreen(s)
             Overlay.NAME_MOB -> nameMobScreen(s)
             Overlay.TRADE -> tradeScreen(s)
             Overlay.ACHIEVEMENTS -> achievementsScreen(s)
@@ -613,29 +612,6 @@ class App(private val demo: File?) {
         if (ui.button("Cancel", cx + 5, y, w / 2 - 5, 44f)) { ui.focus = null; overlay = Overlay.NONE }
     }
 
-    /** Save and quit, choosing (or changing / removing) the world's password on the way out. */
-    private fun saveQuitScreen(s: GameSession) {
-        val cx = ui.width / 2; val w = 460f
-        ui.rect(0f, 0f, ui.width, ui.height, rgba(0, 0, 0, 170))
-        title("Save and quit", ui.height * 0.18f)
-        val level = s.level
-        val info = if (level.hasPassword) "This world has a password. Type a new one to change it, or leave it empty to keep it."
-            else "Choose a password for this world (optional). It is needed to open it and to join it over Wi-Fi."
-        ui.text(info, cx, ui.height * 0.18f + 56, 16f, rgba(220, 220, 220), 1)
-        var y = ui.height * 0.18f + 110
-        ui.field(passwordField, cx - w / 2, y, w)
-        y += 60
-        fun quit() { ui.focus = null; leaveWorld(); menu = Menu.TITLE }
-        if (ui.button("Save and quit", cx - w / 2, y, w, 44f) || ui.takeSubmit()) {
-            if (passwordField.text.isNotEmpty()) s.level.setPassword(passwordField.text)
-            quit(); return
-        }
-        y += 52
-        if (level.hasPassword && ui.button("Remove the password and quit", cx - w / 2, y, w, 40f)) { s.level.setPassword(""); quit(); return }
-        if (level.hasPassword) y += 48
-        if (ui.button("Cancel", cx - w / 2, y, w, 40f)) { ui.focus = null; overlay = Overlay.PAUSE }
-    }
-
     private fun connect(address: String, password: String = "") {
         if (joining != null) return
         joining = address
@@ -747,8 +723,7 @@ class App(private val demo: File?) {
         b("Settings") { overlay = Overlay.SETTINGS }
         b("Controls") { overlay = Overlay.CONTROLS }
         b("Save and quit to title") {
-            if (game.isClient) { leaveWorld(); menu = Menu.TITLE }
-            else { passwordField.text = ""; ui.focus = passwordField; overlay = Overlay.SAVE_QUIT }
+            leaveWorld(); menu = Menu.TITLE
         }
     }
 
@@ -814,7 +789,7 @@ class App(private val demo: File?) {
             Overlay.SIGN -> if (key == GLFW_KEY_ESCAPE) { ui.focus = null; overlay = Overlay.NONE }
             Overlay.ENDING -> if (key == GLFW_KEY_ESCAPE) overlay = Overlay.NONE
             Overlay.INTERNET -> if (key == GLFW_KEY_ESCAPE) overlay = Overlay.PAUSE
-            Overlay.SETTINGS, Overlay.CONTROLS, Overlay.SAVE_QUIT, Overlay.NAME_MOB, Overlay.ACHIEVEMENTS -> if (key == GLFW_KEY_ESCAPE) { ui.focus = null; overlay = Overlay.PAUSE }
+            Overlay.SETTINGS, Overlay.CONTROLS, Overlay.NAME_MOB, Overlay.ACHIEVEMENTS -> if (key == GLFW_KEY_ESCAPE) { ui.focus = null; overlay = Overlay.PAUSE }
             Overlay.CREATIVE, Overlay.CONTAINER -> when (key) {
                 GLFW_KEY_ESCAPE, GLFW_KEY_E, GLFW_KEY_I -> closeOverlay()
                 in GLFW_KEY_1..GLFW_KEY_9 -> input.selectedSlot = key - GLFW_KEY_1
@@ -1017,8 +992,6 @@ class App(private val demo: File?) {
             f == 960 -> shot("04j-badlands")
             f == 971 -> overlay = Overlay.PAUSE
             f == 973 -> shot("05-pause")
-            f == 974 -> { passwordField.text = "secret"; overlay = Overlay.SAVE_QUIT }
-            f == 976 -> shot("05b-save-and-quit")
             f == 977 -> { overlay = Overlay.NONE; leaveWorld(); menu = Menu.CREATE; nameField.text = "Demo survival"; seedField.text = "777"; survival = true }
             f == 979 -> demoCreate = true
             f == 1300 -> shot("06-survival-world")

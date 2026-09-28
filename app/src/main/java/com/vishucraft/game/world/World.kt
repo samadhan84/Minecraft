@@ -272,7 +272,8 @@ class LevelData(
                             l.hasBedSpawn = d.readBoolean()
                             l.bedX = d.readInt(); l.bedY = d.readInt(); l.bedZ = d.readInt()
                         }
-                        if (version >= 5) l.passwordHash = d.readUTF()
+                        // Worlds no longer have passwords: an old one is dropped so the world just opens.
+                        if (version >= 5) d.readUTF()
                         if (version >= 6) {
                             l.xp = d.readInt()
                             repeat(d.readInt()) { l.achievements.add(d.readUTF()) }

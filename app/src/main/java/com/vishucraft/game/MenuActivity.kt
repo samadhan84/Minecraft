@@ -64,6 +64,7 @@ class MenuActivity : Activity() {
         col.addView(menuButton(this, "Join Wi-Fi game") { joinGame() }, LinearLayout.LayoutParams(dpi(320f), -2).apply { bottomMargin = dpi(10f) })
         col.addView(menuButton(this, "Settings") { settingsDialog(this) }, LinearLayout.LayoutParams(dpi(320f), -2).apply { bottomMargin = dpi(10f) })
         col.addView(menuButton(this, "Back up / restore worlds") { backupMenu() }, LinearLayout.LayoutParams(dpi(320f), -2).apply { bottomMargin = dpi(10f) })
+        col.addView(menuButton(this, "Check for updates") { Updater.check(this, manual = true) }, LinearLayout.LayoutParams(dpi(320f), -2).apply { bottomMargin = dpi(10f) })
         col.addView(menuButton(this, "How to play") { help() }, LinearLayout.LayoutParams(dpi(320f), -2))
 
         root.addView(col, FrameLayout.LayoutParams(-2, -2, Gravity.CENTER))
@@ -72,8 +73,15 @@ class MenuActivity : Activity() {
         CrashReporter.install(this)
     }
 
+    override fun onNewIntent(intent: Intent?) {
+        super.onNewIntent(intent)
+        Updater.handleStatus(this, intent)
+    }
+
     override fun onResume() {
         super.onResume()
+        // The game updates itself: a newer build is downloaded and Android asks to install it.
+        if (!Updater.handleStatus(this, intent.also { setIntent(Intent()) })) Updater.check(this)
         CrashReporter.takeReport(this)?.let { report ->
             AlertDialog.Builder(this)
                 .setTitle("The game stopped last time")

@@ -33,5 +33,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           cp app/build/outputs/apk/release/*.apk DhruvVishu.apk
+          # The game reads this number to know a newer build exists (same as versionCode in app/build.gradle.kts).
+          echo $((100 + GITHUB_RUN_NUMBER)) > version.txt
           gh release view latest >/dev/null 2>&1 || gh release create latest --target "$GITHUB_SHA" --title "DhruvVishu (latest build)" --notes "Newest DhruvVishu APK, updated on every build. On Android TV: install the Downloader app and open this APK's link."
-          gh release upload latest DhruvVishu.apk --clobber
+          gh release upload latest DhruvVishu.apk version.txt --clobber

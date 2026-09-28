@@ -457,8 +457,7 @@ object Net {
             "Then your friend chooses Join Wi-Fi game → Enter address and types your VPN address.\n\n" +
             "2. Or open port ${Msg.PORT} (TCP) on your router and forward it to this device " +
             "(${localAddress()}). Your friend then types your internet address" +
-            (if (internet != null) ": $internet" else " (not available right now)") + ".\n\n" +
-            "Give the world a password (Save and quit) before opening it to the internet."
+            (if (internet != null) ": $internet" else " (not available right now)") + "."
 
     /** This device's Wi-Fi address, to show to friends who want to join. */
     fun localAddress(): String {
