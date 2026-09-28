@@ -37,6 +37,9 @@ class WorldRenderer(private val game: Game) {
 
     private lateinit var blockShader: Shader
     private lateinit var simpleShader: Shader
+    /** The device couldn't use the fancy block shader, so the plain one is in use. */
+    var fancyFailed = false
+        private set
     private var atlasTex = 0
     private val dynamic = GpuMesh(GL_DYNAMIC_DRAW)
     private val lines = GpuMesh(GL_DYNAMIC_DRAW)
@@ -64,7 +67,14 @@ class WorldRenderer(private val game: Game) {
         QuadIndices.reset()
         for (c in game.world.chunks.values) { c.requestedVersion = -1; c.uploadedVersion = -1; c.meshing = false }
 
-        blockShader = Shader(Shaders.BLOCK_VS, Shaders.BLOCK_FS)
+        // Some graphics chips (often on TVs) reject the fancy shader; fall back to the plain one instead of closing.
+        blockShader = try {
+            if (System.getProperty("vishucraft.basicShader") == "true") throw RuntimeException("basic shader requested")
+            Shader(Shaders.BLOCK_VS, Shaders.BLOCK_FS)
+        } catch (e: RuntimeException) {
+            fancyFailed = true
+            Shader(Shaders.BLOCK_VS_BASIC, Shaders.BLOCK_FS_BASIC)
+        }
         simpleShader = Shader(Shaders.SIMPLE_VS, Shaders.SIMPLE_FS)
         atlasTex = createAtlasTexture()
         glEnable(GL_DEPTH_TEST)

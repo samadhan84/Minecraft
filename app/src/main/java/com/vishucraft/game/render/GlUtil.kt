@@ -194,7 +194,9 @@ void main() {
     vUv = aUv;
     vLight = aLight;
     vBlock = aBlock - k * 4.0;
-    vFlag = k;
+    // uWave is only read here: a uniform used by both shaders must have the same precision in each, which
+    // devices without high-precision fragment shaders (many TVs) can't give, and the program fails to link.
+    vFlag = uWave > 0.5 ? k : 0.0;
     vDist = length(wp.xz - uCamPos.xz);
 }
 """
@@ -207,7 +209,6 @@ uniform float uFogEnd;
 uniform float uCutout;
 uniform vec3 uTint;
 uniform vec3 uSunTint;
-uniform float uWave;
 varying vec2 vUv;
 varying float vLight;
 varying float vBlock;
@@ -222,7 +223,7 @@ void main() {
     vec3 light = vLight > 1.5 ? vec3(1.0) : max(vec3(sky) * uSunTint, vec3(vBlock) * warm);
     vec3 col = c.rgb * light * uTint;
     float a = c.a;
-    if (uWave > 0.5 && vFlag > 2.5) {
+    if (vFlag > 2.5) {
         // Water reflects the sky more when seen from further away.
         float r = clamp(vDist / 40.0, 0.15, 0.7);
         col = mix(col, uFogColor * max(sky, 0.15) * 1.1, r * 0.55);
@@ -230,6 +231,50 @@ void main() {
     }
     float f = clamp((vDist - uFogStart) / (uFogEnd - uFogStart), 0.0, 1.0);
     gl_FragColor = vec4(mix(col, uFogColor, f), a);
+}
+"""
+
+    /** Plain block shaders, used if the ones above don't work on a device (no swaying, no golden light). */
+    const val BLOCK_VS_BASIC = """attribute vec3 aPos;
+attribute vec2 aUv;
+attribute float aLight;
+attribute float aBlock;
+uniform mat4 uViewProj;
+uniform vec3 uOffset;
+uniform vec3 uCamPos;
+varying vec2 vUv;
+varying float vLight;
+varying float vBlock;
+varying float vDist;
+void main() {
+    vec3 wp = aPos + uOffset;
+    gl_Position = uViewProj * vec4(wp, 1.0);
+    vUv = aUv;
+    vLight = aLight;
+    vBlock = aBlock - floor(aBlock * 0.25 + 0.01) * 4.0;
+    vDist = length(wp.xz - uCamPos.xz);
+}
+"""
+
+    const val BLOCK_FS_BASIC = FRAG_PRECISION + """uniform sampler2D uTex;
+uniform float uDaylight;
+uniform vec3 uFogColor;
+uniform float uFogStart;
+uniform float uFogEnd;
+uniform float uCutout;
+uniform vec3 uTint;
+varying vec2 vUv;
+varying float vLight;
+varying float vBlock;
+varying float vDist;
+void main() {
+    vec4 c = texture2D(uTex, vUv);
+    if (c.a < uCutout) discard;
+    float sky = vLight * mix(0.16, 1.0, uDaylight);
+    float l = vLight > 1.5 ? 1.0 : max(sky, vBlock);
+    vec3 col = c.rgb * l * uTint;
+    float f = clamp((vDist - uFogStart) / (uFogEnd - uFogStart), 0.0, 1.0);
+    gl_FragColor = vec4(mix(col, uFogColor, f), c.a);
 }
 """
 
