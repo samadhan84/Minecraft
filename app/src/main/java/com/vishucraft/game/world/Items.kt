@@ -293,7 +293,7 @@ object Items {
     fun isValidSlot(slot: Int): Boolean =
         if (isItem(slot)) byId.containsKey(slot) else slot in 1 until Blocks.COUNT && Blocks[slot].inInventory
 
-    fun displayName(slot: Int): String = get(slot)?.name ?: Blocks[slot].name
+    fun displayName(slot: Int): String = Names.show(get(slot)?.name ?: Blocks[slot].name)
 
     fun find(name: String): Int = byName[name] ?: error("unknown item $name")
 

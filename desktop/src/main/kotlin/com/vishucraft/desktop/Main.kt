@@ -508,7 +508,7 @@ class App(private val demo: File?) {
         title("The End", ui.height * 0.15f)
         var y = ui.height * 0.15f + 70
         val text = "You defeated the Sky Warden and freed the Sky Isles!\n\n" +
-                "It dropped a Nether Star, an Elytra, diamonds and a Totem of Undying.\n\n" +
+                "It dropped an Ember Star, Glider Wings, diamonds and a Totem of Life.\n\n" +
                 "Thank you for playing DhruvVishu.\n\n" +
                 "Made for Dhruv and Vishu.\n" +
                 "Every block, creature, sound and song in this game was made from code.\n\n" +

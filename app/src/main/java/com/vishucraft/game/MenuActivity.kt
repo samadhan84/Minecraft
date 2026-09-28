@@ -52,7 +52,7 @@ class MenuActivity : Activity() {
         add("Join Wi-Fi game") { joinGame() }
         add("Settings") { settingsDialog(this) }
         add("Back up / restore") { backupMenu() }
-        add("Check for updates") { Updater.check(this, manual = true) }
+        if (Updater.enabled(this)) add("Check for updates") { Updater.check(this, manual = true) }
         add("How to play", last = true) { help() }
 
         root.addView(col, FrameLayout.LayoutParams(-2, -2, Gravity.START or Gravity.CENTER_VERTICAL).apply {

@@ -468,8 +468,10 @@ class GameActivity : Activity() {
         }
     }
 
+    private var lastLook: String? = null
+
     private fun showToast(text: String) {
-        toast.text = text
+        toast.text = com.vishucraft.game.world.Names.show(text)
         toast.animate().cancel()
         toast.alpha = 1f
         toast.animate().alpha(0f).setStartDelay(1500).setDuration(500).start()
@@ -513,7 +515,7 @@ class GameActivity : Activity() {
                 releaseInputs()
                 android.app.AlertDialog.Builder(this).setTitle("The End")
                     .setMessage("You defeated the Sky Warden and freed the Sky Isles!\n\n" +
-                "It dropped a Nether Star, an Elytra, diamonds and a Totem of Undying.\n\n" +
+                "It dropped an Ember Star, Glider Wings, diamonds and a Totem of Life.\n\n" +
                 "Thank you for playing DhruvVishu.\n\n" +
                 "Made for Dhruv and Vishu.\n" +
                 "Every block, creature, sound and song in this game was made from code.\n\n" +
@@ -561,10 +563,11 @@ class GameActivity : Activity() {
             "$name ${left.toInt() / 60}:${"%02d".format(left.toInt() % 60)}"
         }
         effectsText.text = (fx + (if (game.gliding) listOf("Gliding") else emptyList())).joinToString("\n")
-        lookLabel.text = game.bossBar()?.let { (name, hp) ->
+        val look = game.bossBar()?.let { (name, hp) ->
             val n = (hp * 20).toInt()
             "$name\n" + "▰".repeat(n) + "▱".repeat(20 - n)
         } ?: game.lookedAtLabel() ?: ""
+        if (look != lastLook) { lastLook = look; lookLabel.text = com.vishucraft.game.world.Names.show(look) }
         val flying = game.player.flying
         flyButton.toggled = flying
         downButton.visibility = if (flying) View.VISIBLE else View.GONE

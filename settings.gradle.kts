@@ -6,7 +6,7 @@ pluginManagement {
     }
     // Declared here rather than in the root build so the desktop build does not need the Android plugin.
     plugins {
-        id("com.android.application") version "8.7.3"
+        id("com.android.application") version "8.11.1"
         id("org.jetbrains.kotlin.android") version "2.0.21"
         id("org.jetbrains.kotlin.jvm") version "2.0.21"
     }

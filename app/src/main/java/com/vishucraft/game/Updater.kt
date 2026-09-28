@@ -41,8 +41,19 @@ object Updater {
         }
     }
 
+    /**
+     * Only the download-link version updates itself (its manifest sets dhruvvishu.selfUpdate). The Google Play
+     * version is updated by Google Play and must not install updates on its own.
+     */
+    fun enabled(a: Activity): Boolean = try {
+        @Suppress("DEPRECATION")
+        a.packageManager.getApplicationInfo(a.packageName, android.content.pm.PackageManager.GET_META_DATA)
+            .metaData?.getBoolean("dhruvvishu.selfUpdate", false) == true
+    } catch (e: Exception) { false }
+
     /** Called from each screen's onResume: checks now (at most every 30 minutes) and keeps checking. */
     fun attach(a: Activity) {
+        if (!enabled(a)) return
         current = a
         main.removeCallbacks(tick)
         if (System.currentTimeMillis() - lastCheck >= EVERY_MS || lastCheck == 0L) check(a)
@@ -69,6 +80,7 @@ object Updater {
 
     /** Looks at the link for a newer version and downloads it in the background. [manual] reports the result. */
     fun check(a: Activity, manual: Boolean = false) {
+        if (!enabled(a)) return
         if (busy) { if (manual) toast(a, "Already downloading the update…"); return }
         busy = true
         lastCheck = System.currentTimeMillis()

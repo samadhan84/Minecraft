@@ -17,14 +17,35 @@ jobs:
           distribution: temurin
           java-version: 17
       - uses: gradle/actions/setup-gradle@v4
-      - name: Build APKs (uses the Android SDK preinstalled on the runner)
-        run: ./gradlew --no-daemon assembleDebug assembleRelease
+      # The Google Play upload key comes from the repository's secrets (Settings → Secrets and variables → Actions):
+      # PLAY_UPLOAD_KEYSTORE_BASE64, PLAY_UPLOAD_STORE_PASSWORD, PLAY_UPLOAD_KEY_ALIAS, PLAY_UPLOAD_KEY_PASSWORD.
+      - name: Get the Google Play upload key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.PLAY_UPLOAD_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/play-upload.jks"
+            echo "PLAY_UPLOAD_KEYSTORE=$RUNNER_TEMP/play-upload.jks" >> "$GITHUB_ENV"
+          else
+            echo "::warning::No Google Play upload key in the secrets yet; the Play bundle is signed with the download-link key."
+          fi
+      - name: Build the APKs (download link) and the app bundle (Google Play)
+        env:
+          PLAY_UPLOAD_STORE_PASSWORD: ${{ secrets.PLAY_UPLOAD_STORE_PASSWORD }}
+          PLAY_UPLOAD_KEY_ALIAS: ${{ secrets.PLAY_UPLOAD_KEY_ALIAS }}
+          PLAY_UPLOAD_KEY_PASSWORD: ${{ secrets.PLAY_UPLOAD_KEY_PASSWORD }}
+        run: ./gradlew --no-daemon assembleDirectDebug assembleDirectRelease bundlePlayRelease
       - uses: actions/upload-artifact@v4
         with:
           name: DhruvVishu-apk
           path: |
-            app/build/outputs/apk/debug/*.apk
-            app/build/outputs/apk/release/*.apk
+            app/build/outputs/apk/direct/debug/*.apk
+            app/build/outputs/apk/direct/release/*.apk
+      # The .aab to upload in the Google Play Console.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DhruvVishu-google-play-aab
+          path: app/build/outputs/bundle/playRelease/*.aab
       # A fixed download link for TVs and phones (no login, no zip):
       # https://github.com/samadhan84/Minecraft/releases/download/latest/DhruvVishu.apk
       - name: Publish the APK to the "latest" release
@@ -32,7 +53,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          cp app/build/outputs/apk/release/*.apk DhruvVishu.apk
+          cp app/build/outputs/apk/direct/release/*.apk DhruvVishu.apk
           # The game reads this number to know a newer build exists (same as versionCode in app/build.gradle.kts).
           echo $((100 + GITHUB_RUN_NUMBER)) > version.txt
           gh release view latest >/dev/null 2>&1 || gh release create latest --target "$GITHUB_SHA" --title "DhruvVishu (latest build)" --notes "Newest DhruvVishu APK, updated on every build. On Android TV: install the Downloader app and open this APK's link."

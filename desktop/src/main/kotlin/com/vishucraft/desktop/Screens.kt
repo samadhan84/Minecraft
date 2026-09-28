@@ -58,7 +58,7 @@ class Hud(private val game: Game) {
     var sleep = 0f
     var swing = 0f
 
-    fun toast(s: String, seconds: Float = 2f) { toast = s; toastTime = seconds }
+    fun toast(s: String, seconds: Float = 2f) { toast = com.vishucraft.game.world.Names.show(s); toastTime = seconds }
 
     /** Seconds since the world opened (the game's name shows big at first). */
     private var shown = 0f
@@ -146,7 +146,7 @@ class Hud(private val game: Game) {
             }
         }
         if (game.gliding) ui.text("Gliding", w / 2, 40f, 18f, rgba(220, 220, 255), 1)
-        game.lookedAtLabel()?.let { ui.text(it, w / 2, h / 2 - 50, 18f, -1, 1) }
+        game.lookedAtLabel()?.let { ui.text(com.vishucraft.game.world.Names.show(it), w / 2, h / 2 - 50, 18f, -1, 1) }
         // Boss health bar.
         game.bossBar()?.let { (name, hp) ->
             val bw = minOf(600f, w - 80)

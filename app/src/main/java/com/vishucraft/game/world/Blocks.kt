@@ -24,7 +24,7 @@ object Tiles {
 enum class RenderType { NONE, CUBE, CROSS, LIQUID, FLAT, BOX, PISTON_HEAD, SHAPE, RAIL, PORTAL }
 enum class ToolType { NONE, PICKAXE, AXE, SHOVEL, HOE, SWORD }
 enum class Facing { NONE, HORIZONTAL, ALL }
-enum class Category(val title: String) { BUILDING("Building"), COLORED("Colored"), NATURE("Nature"), REDSTONE("Redstone") }
+enum class Category(val title: String) { BUILDING("Building"), COLORED("Colored"), NATURE("Nature"), REDSTONE("Sparkstone") }
 
 class BlockDef(
     val id: Int,

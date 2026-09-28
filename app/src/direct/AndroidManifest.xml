@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The download-link version updates itself (see Updater). The Google Play version is updated by Google Play. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <application>
+        <meta-data android:name="dhruvvishu.selfUpdate" android:value="true" />
+    </application>
+</manifest>
