@@ -3,11 +3,8 @@ package com.vishucraft.game
 import android.app.Activity
 import android.app.AlertDialog
 import android.content.Intent
-import android.graphics.Bitmap
 import android.graphics.Color
-import android.graphics.Shader
 import android.graphics.Typeface
-import android.graphics.drawable.BitmapDrawable
 import android.os.Bundle
 import android.text.InputType
 import android.view.Gravity
@@ -16,11 +13,9 @@ import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
-import com.vishucraft.game.ui.BlockIcons
 import com.vishucraft.game.ui.dpi
 import com.vishucraft.game.ui.menuButton
 import com.vishucraft.game.ui.settingsDialog
-import com.vishucraft.game.world.Tiles
 import java.io.File
 
 class MenuActivity : Activity() {
@@ -30,34 +25,39 @@ class MenuActivity : Activity() {
         super.onCreate(savedInstanceState)
 
         val root = FrameLayout(this)
-        // Tiled, darkened dirt background generated from the texture atlas.
-        val tile = BlockIcons.tile(Tiles.id("dirt"))
-        val big = Bitmap.createScaledBitmap(tile, dpi(48f), dpi(48f), false)
-        root.background = BitmapDrawable(resources, big).apply {
-            setTileModeXY(Shader.TileMode.REPEAT, Shader.TileMode.REPEAT)
-            setColorFilter(Color.rgb(110, 110, 110), android.graphics.PorterDuff.Mode.MULTIPLY)
-        }
+        // The DhruvVishu castle picture fills the screen; it already shows the game's name.
+        root.addView(android.widget.ImageView(this).apply {
+            setImageResource(resources.getIdentifier("menu_background", "drawable", packageName))
+            scaleType = android.widget.ImageView.ScaleType.CENTER_CROP
+        }, FrameLayout.LayoutParams(-1, -1))
 
+        // The buttons sit in a stone-and-wood panel on the left so the castle and the logo stay in view.
+        val pixel = try { Typeface.createFromAsset(assets, "fonts/PressStart2P.ttf") } catch (e: Exception) { Typeface.MONOSPACE }
         val col = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
+            setPadding(dpi(12f), dpi(12f), dpi(12f), dpi(12f))
+            background = android.graphics.drawable.GradientDrawable().apply {
+                setColor(Color.argb(170, 28, 22, 16)); cornerRadius = dpi(6f).toFloat()
+                setStroke(dpi(3f), Color.rgb(122, 84, 44))
+            }
         }
-        val title = TextView(this).apply {
-            text = "DhruvVishu"
-            textSize = 54f
-            typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
-            setTextColor(Color.rgb(230, 230, 230))
-            setShadowLayer(0.01f, dpi(4f).toFloat(), dpi(4f).toFloat(), Color.rgb(50, 50, 50))
-            gravity = Gravity.CENTER
+        fun add(label: String, last: Boolean = false, onClick: () -> Unit): TextView {
+            val b = homeButton(label, pixel, onClick)
+            col.addView(b, LinearLayout.LayoutParams(dpi(212f), dpi(38f)).apply { if (!last) bottomMargin = dpi(8f) })
+            return b
         }
-        col.addView(title, LinearLayout.LayoutParams(-2, -2).apply { bottomMargin = dpi(4f) })
-        val subtitle = TextView(this).apply {
-            text = "Build anything. Explore forever."
-            textSize = 15f
-            setTextColor(Color.rgb(255, 255, 110))
-            gravity = Gravity.CENTER
-        }
-        col.addView(subtitle, LinearLayout.LayoutParams(-2, -2).apply { bottomMargin = dpi(24f) })
+
+        playButton = add("Play") { if (hasWorld()) showWorlds() else newWorld() }
+        add("Join Wi-Fi game") { joinGame() }
+        add("Settings") { settingsDialog(this) }
+        add("Back up / restore") { backupMenu() }
+        add("Check for updates") { Updater.check(this, manual = true) }
+        add("How to play", last = true) { help() }
+
+        root.addView(col, FrameLayout.LayoutParams(-2, -2, Gravity.START or Gravity.CENTER_VERTICAL).apply {
+            setMargins(dpi(16f), dpi(12f), 0, dpi(12f))
+        })
 
         // The installed version, bottom right (the same number the updater compares).
         val version = TextView(this).apply {
@@ -65,26 +65,41 @@ class MenuActivity : Activity() {
             @Suppress("DEPRECATION")
             val code = if (android.os.Build.VERSION.SDK_INT >= 28) info.longVersionCode else info.versionCode.toLong()
             text = "Version ${info.versionName} ($code)"
-            textSize = 14f
-            setTextColor(Color.rgb(230, 230, 230))
-            setShadowLayer(0.01f, dpi(2f).toFloat(), dpi(2f).toFloat(), Color.rgb(40, 40, 40))
+            typeface = pixel
+            textSize = 9f
+            setTextColor(Color.rgb(255, 244, 214))
+            setShadowLayer(0.01f, dpi(2f).toFloat(), dpi(2f).toFloat(), Color.rgb(30, 22, 12))
+            setPadding(dpi(8f), dpi(5f), dpi(8f), dpi(5f))
+            background = android.graphics.drawable.GradientDrawable().apply {
+                setColor(Color.argb(150, 28, 22, 16)); cornerRadius = dpi(4f).toFloat()
+            }
         }
         root.addView(version, FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM or Gravity.END).apply {
-            setMargins(0, 0, dpi(16f), dpi(12f))
+            setMargins(0, 0, dpi(14f), dpi(12f))
         })
-
-        playButton = menuButton(this, "Play") { if (hasWorld()) showWorlds() else newWorld() }
-        col.addView(playButton, LinearLayout.LayoutParams(dpi(320f), -2).apply { bottomMargin = dpi(10f) })
-        col.addView(menuButton(this, "Join Wi-Fi game") { joinGame() }, LinearLayout.LayoutParams(dpi(320f), -2).apply { bottomMargin = dpi(10f) })
-        col.addView(menuButton(this, "Settings") { settingsDialog(this) }, LinearLayout.LayoutParams(dpi(320f), -2).apply { bottomMargin = dpi(10f) })
-        col.addView(menuButton(this, "Back up / restore worlds") { backupMenu() }, LinearLayout.LayoutParams(dpi(320f), -2).apply { bottomMargin = dpi(10f) })
-        col.addView(menuButton(this, "Check for updates") { Updater.check(this, manual = true) }, LinearLayout.LayoutParams(dpi(320f), -2).apply { bottomMargin = dpi(10f) })
-        col.addView(menuButton(this, "How to play") { help() }, LinearLayout.LayoutParams(dpi(320f), -2))
-
-        root.addView(col, FrameLayout.LayoutParams(-2, -2, Gravity.CENTER))
         setContentView(root)
         playButton.requestFocus()
         CrashReporter.install(this)
+    }
+
+    /**
+     * A menu button in the style of the title picture: grey stone with a dark wooden edge and cream pixel
+     * lettering; the focused / pressed one glows gold (easy to follow with a TV remote).
+     */
+    private fun homeButton(label: String, font: Typeface, onClick: () -> Unit): TextView = menuButton(this, label, onClick).apply {
+        typeface = font
+        textSize = 10f
+        setTextColor(Color.rgb(255, 244, 214))
+        setShadowLayer(0.01f, dpi(2f).toFloat(), dpi(2f).toFloat(), Color.rgb(40, 28, 14))
+        setPadding(dpi(8f), 0, dpi(8f), 0)
+        fun state(fill: Int, border: Int, width: Float) = android.graphics.drawable.GradientDrawable().apply {
+            setColor(fill); setStroke(dpi(width), border); cornerRadius = dpi(3f).toFloat()
+        }
+        background = android.graphics.drawable.StateListDrawable().apply {
+            addState(intArrayOf(android.R.attr.state_pressed), state(Color.rgb(196, 150, 60), Color.rgb(255, 220, 90), 3f))
+            addState(intArrayOf(android.R.attr.state_focused), state(Color.rgb(150, 112, 56), Color.rgb(255, 214, 70), 3f))
+            addState(intArrayOf(), state(Color.rgb(108, 108, 112), Color.rgb(70, 46, 22), 3f))
+        }
     }
 
     override fun onNewIntent(intent: Intent?) {

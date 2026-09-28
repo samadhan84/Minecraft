@@ -214,17 +214,19 @@ class GameActivity : Activity() {
         root.addView(toast, lp(-2f, -2f, Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL, b = 78f))
 
         // The game's name: big in the middle when the world opens, then a small label at the top while playing.
+        val pixel = try { android.graphics.Typeface.createFromAsset(assets, "fonts/PressStart2P.ttf") }
+            catch (e: Exception) { android.graphics.Typeface.MONOSPACE }
         val nameTag = TextView(this).apply {
-            text = "DhruvVishu"; textSize = 14f
-            typeface = android.graphics.Typeface.create(android.graphics.Typeface.MONOSPACE, android.graphics.Typeface.BOLD)
+            text = "DhruvVishu"; textSize = 11f
+            typeface = pixel
             setTextColor(Color.rgb(255, 255, 110)); setShadowLayer(2f, 2f, 2f, Color.BLACK)
             alpha = 0f
         }
         root.addView(nameTag, lp(-2f, -2f, Gravity.TOP or Gravity.CENTER_HORIZONTAL, t = 8f))
         val bigTitle = TextView(this).apply {
-            text = "DhruvVishu"; textSize = 52f
-            typeface = android.graphics.Typeface.create(android.graphics.Typeface.MONOSPACE, android.graphics.Typeface.BOLD)
-            setTextColor(Color.rgb(235, 235, 235)); setShadowLayer(0.01f, 5f, 5f, Color.rgb(50, 50, 50))
+            text = "DhruvVishu"; textSize = 34f
+            typeface = pixel
+            setTextColor(Color.rgb(255, 214, 70)); setShadowLayer(0.01f, 6f, 6f, Color.rgb(60, 40, 16))
             gravity = Gravity.CENTER
         }
         root.addView(bigTitle, lp(-2f, -2f, Gravity.CENTER, b = 120f))
