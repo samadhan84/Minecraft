@@ -372,7 +372,18 @@ object Blocks {
     /** Trains and metros stop next to it. */
     const val STATION_PLATFORM = 403
     const val RAILWAY_BALLAST = 404
-    const val COUNT = 405
+    // ---- Farming pack: crops (meta = growth 0..7), a sprinkler and a scarecrow
+    const val RICE_CROP = 405
+    const val TOMATO_CROP = 406
+    const val LENTIL_CROP = 407
+    const val BEETROOT_CROP = 408
+    /** Crops within 4 blocks grow much faster. */
+    const val SPRINKLER = 409
+    const val SCARECROW = 410
+    const val COUNT = 411
+
+    /** The newer crops' texture names, in id order from RICE_CROP. */
+    val NEW_CROPS = listOf("rice", "tomato", "lentil", "beetroot")
 
     fun isKitchenAppliance(id: Int) = id in GAS_STOVE..AIR_CONDITIONER
     /** Pots and pans that cook when they stand on a gas stove. */
@@ -872,7 +883,18 @@ object Blocks {
         // ---- Railway
         column(STATION_PLATFORM, "Station Platform", "platform_top", "smooth_stone_side", "smooth_stone", 1.2f, P)
         cube(RAILWAY_BALLAST, "Railway Ballast", "ballast", 0.6f, S)
-        for (n in listOf("steel", "black_plastic", "train_side", "train_front", "train_roof",
+        // ---- Farming pack
+        for ((i, c) in NEW_CROPS.withIndex()) {
+            for (k in 0..3) t("${c}_stage_$k")
+            reg(BlockDef(RICE_CROP + i, "${pretty(c)} Crops", t("${c}_stage_0"), render = RenderType.CROSS, opaque = false, solid = false,
+                hardness = 0f, needsSupport = true, inInventory = false, movable = false, category = N))
+        }
+        reg(BlockDef(SPRINKLER, "Sprinkler", t("steel"), t("steel"), t("steel"), render = RenderType.SHAPE, opaque = false,
+            solid = false, blocksLight = false, hardness = 0.5f, tool = P, category = N, movable = false))
+        reg(BlockDef(SCARECROW, "Scarecrow", t("hay_top"), t("hay_side"), t("hay_top"), render = RenderType.SHAPE, opaque = false,
+            solid = true, blocksLight = false, hardness = 0.5f, tool = A, category = N, facing = Facing.HORIZONTAL,
+            front = t("scarecrow_face"), movable = false))
+        for (n in listOf("steel", "black_plastic", "scarecrow", "train_side", "train_front", "train_roof",
             "coach_side", "metro_side", "metro_front", "metro_roof", "train_wheel")) t(n)
     }
 
@@ -924,7 +946,7 @@ object Blocks {
 
 
     fun isLiquid(id: Int) = id == WATER || id == LAVA
-    fun isCrop(id: Int) = id == WHEAT_CROP || id == CARROTS || id == POTATOES
+    fun isCrop(id: Int) = id == WHEAT_CROP || id == CARROTS || id == POTATOES || id in RICE_CROP..BEETROOT_CROP
     fun isSapling(id: Int) = id in SAPLING_FIRST until SAPLING_FIRST + 6 || id == CHERRY_SAPLING
 
     fun isEmissive(id: Int, meta: Int): Boolean {
@@ -946,6 +968,7 @@ object Blocks {
             WHEAT_CROP -> return Tiles.id("wheat_stage_${meta.coerceIn(0, 7)}")
             CARROTS -> return Tiles.id("carrots_stage_${(meta.coerceIn(0, 7)) / 2}")
             POTATOES -> return Tiles.id("potatoes_stage_${(meta.coerceIn(0, 7)) / 2}")
+            in RICE_CROP..BEETROOT_CROP -> return Tiles.id("${NEW_CROPS[id - RICE_CROP]}_stage_${(meta.coerceIn(0, 7)) / 2}")
             OAK_DOOR -> return Tiles.id(if (meta and Shapes.UPPER != 0) "oak_door_top" else "oak_door_bottom")
             IRON_DOOR -> return Tiles.id(if (meta and Shapes.UPPER != 0) "iron_door_top" else "iron_door_bottom")
             in BED_FIRST until BED_FIRST + 16 -> if (face == 0 && meta and Shapes.UPPER != 0) return Tiles.id("bed_head_${DYES[id - BED_FIRST]}")

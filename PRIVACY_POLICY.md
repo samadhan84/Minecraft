@@ -35,4 +35,4 @@ If this policy changes, the new version will be published at this same address.
 
 ## Contact
 
-Questions: CONTACT_EMAIL
+Questions: samadhan.pawar84@gmail.com

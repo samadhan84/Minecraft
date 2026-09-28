@@ -1731,7 +1731,62 @@ object TextureAtlas {
         }
     }
 
+    /** Growth stages 0..3 of the farming pack crops. */
+    private fun newCrop(t: Tile, kind: String, s: Int) {
+        sprite(t)
+        val stem = rgb(80, 150, 50)
+        when (kind) {
+            "rice" -> {
+                // Thin blades that turn golden with drooping grain heads.
+                val h = 4 + s * 3
+                for (k in 0..5) {
+                    val x = 1 + k * 3
+                    for (i in 0 until h) t[x + (if (i > h - 3 && s == 3) 1 else 0), 15 - i] = if (s == 3) rgb(206, 184, 90) else stem
+                    if (s >= 2) { t[x + 1, 16 - h] = if (s == 3) rgb(236, 206, 110) else rgb(150, 180, 80); t[x + 1, 17 - h] = if (s == 3) rgb(220, 190, 96) else rgb(140, 170, 70) }
+                }
+            }
+            "tomato", "lentil" -> {
+                // A leafy bush on a stick; ripe tomatoes are red, lentil pods pale brown.
+                val h = 4 + s * 3
+                for (i in 0 until h) { t[5, 15 - i] = stem; t[11, 15 - i] = stem }
+                for (i in 2 until h step 2) { t[4, 15 - i] = rgb(70, 140, 50); t[6, 14 - i] = rgb(96, 170, 60); t[10, 14 - i] = rgb(70, 140, 50); t[12, 15 - i] = rgb(96, 170, 60) }
+                if (s >= 2) for ((x, y) in listOf(6 to 15 - h + 3, 4 to 15 - h + 6, 12 to 15 - h + 4, 10 to 15 - h + 7)) {
+                    val c = if (kind == "tomato") (if (s == 3) rgb(220, 40, 30) else rgb(130, 190, 60)) else (if (s == 3) rgb(200, 170, 110) else rgb(120, 180, 70))
+                    t[x, y] = c; t[x, y + 1] = scale(c, 0.8f)
+                }
+            }
+            else -> {
+                // Beetroot: broad leaves, with the red root showing when ripe.
+                val h = 3 + s * 2
+                for (k in 0..3) {
+                    val x = 3 + k * 3
+                    for (i in 0 until h) t[x + (if (i % 3 == 1) 1 else 0), 15 - i] = if (i >= h - 2) rgb(96, 170, 60) else rgb(150, 40, 60)
+                }
+                if (s == 3) for (k in 0..3) { t[3 + k * 3, 15] = rgb(150, 30, 50); t[4 + k * 3, 15] = rgb(150, 30, 50) }
+            }
+        }
+    }
+
+    private val SICKLE = arrayOf("..dddd..", ".dmmmmd.", "dm....md", "d......m", ".......m", "......md", ".....aa.", "....aa..", "...aa...", "..aa....")
+    private val CAN = arrayOf("....dddd.......", "...d....d......", "..dmmmmmmd....d", ".dmmmmmmmmd..dm", ".dmlmmmmmmmddm.", ".dmmmmmmmmmmm..", ".dmmmmmmmmd....", ".dmmmmmmmmd....", "..dddddddd.....")
+    private val PLAN = arrayOf("dddddddddddd", "daaaaaaaaaad", "daaaalaaaaad", "daaallllaaad", "daallllllaad", "daalaaaalaad", "daalaallaaad", "daallllllaad", "daaaaaaaaaad", "dddddddddddd")
+
     private fun kitchenTile(name: String, t: Tile): Boolean {
+        for (c in Blocks.NEW_CROPS) if (name.startsWith("${c}_stage_")) { newCrop(t, c, name.substringAfterLast('_').toInt()); return true }
+        when (name) {
+            "scarecrow" -> { t.fill { x, y -> if ((x / 4 + y / 4) % 2 == 0) rgb(170, 50, 40) else rgb(120, 30, 30) }; return true }
+            "scarecrow_face" -> {
+                t.fill { _, _ -> scale(rgb(210, 180, 90), t.jitter(0.08f)) }
+                for (y in 5..6) { t[4, y] = rgb(30, 20, 10); t[5, y] = rgb(30, 20, 10); t[10, y] = rgb(30, 20, 10); t[11, y] = rgb(30, 20, 10) }
+                for (x in 5..10) t[x, 11] = rgb(60, 30, 20); t[4, 10] = rgb(60, 30, 20); t[11, 10] = rgb(60, 30, 20)
+                for (x in 0 until 16) { t[x, 0] = rgb(120, 80, 40); t[x, 1] = rgb(140, 96, 50) }
+                return true
+            }
+            "beetroot_seeds" -> { mask(t, BEANS, rgb(140, 110, 60)); return true }
+            "sickle" -> { mask(t, SICKLE, rgb(200, 202, 208), rgb(137, 103, 55)); return true }
+            "watering_can" -> { mask(t, CAN, rgb(60, 150, 80)); return true }
+            "blueprint" -> { mask(t, PLAN, rgb(40, 90, 180), rgb(40, 90, 180)); for (y in 0 until 16) for (x in 0 until 16) if (t[x, y] == scale(rgb(40, 90, 180), 1.3f)) t[x, y] = rgb(236, 240, 250); return true }
+        }
         val white = rgb(236, 236, 232); val steel = rgb(196, 198, 204); val dark = rgb(30, 30, 34)
         when (name) {
             "steel" -> t.fill { _, y -> scale(steel, (if (y % 3 == 0) 1.06f else 0.97f) * t.jitter(0.02f)) }

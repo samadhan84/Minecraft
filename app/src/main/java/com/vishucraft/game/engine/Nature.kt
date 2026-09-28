@@ -29,7 +29,7 @@ class Nature(private val world: World, private val set: (Int, Int, Int, Int, Int
 
     private fun randomTick(x: Int, y: Int, z: Int, id: Int, meta: Int) {
         when {
-            Blocks.isCrop(id) -> if (meta < 7 && rnd.nextFloat() < 0.6f) set(x, y, z, id, meta + 1)
+            Blocks.isCrop(id) -> if (meta < 7 && rnd.nextFloat() < Farming.growChance(world, x, y, z)) set(x, y, z, id, meta + 1)
             Blocks.isSapling(id) -> if (rnd.nextFloat() < 0.15f) growTree(x, y, z, saplingType(id))
             id == Blocks.SUGAR_CANE || id == Blocks.CACTUS || id == Blocks.BAMBOO || id == Blocks.KELP -> {
                 // Tall plants grow from their top block.

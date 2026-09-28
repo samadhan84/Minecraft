@@ -356,6 +356,18 @@ object Recipes {
         sh(i("Train Engine"), 1, listOf("  I", "IFI", "IMI"), 'I' to iron, 'F' to Blocks.FURNACE, 'M' to i("Minecart"))
         sh(i("Metro Train"), 1, listOf("GGG", "IMI", "IRI"), 'G' to glass, 'I' to iron, 'M' to i("Minecart"), 'R' to red)
         sh(i("Train Coach"), 1, listOf("GGG", "IMI"), 'G' to glass, 'I' to iron, 'M' to i("Minecart"))
+        // ---- Farming and ready-made buildings
+        sh(i("Sickle"), 1, listOf(" II", "  I", " S "), 'I' to iron, 'S' to stick)
+        sh(i("Watering Can"), 1, listOf("I  ", "IBI", " I "), 'I' to iron, 'B' to i("Bucket"))
+        sh(Blocks.SPRINKLER, 1, listOf(" I ", " B ", " I "), 'I' to iron, 'B' to i("Bucket"))
+        sh(Blocks.SCARECROW, 1, listOf(" P ", "SHS", " S "), 'P' to Blocks.PUMPKIN, 'S' to stick, 'H' to Blocks.HAY_BALE)
+        val paper = i("Paper")
+        r(i("Blueprint: Small House"), 1, true, paper to 1, planks to 32, cobble to 16, glass to 4)
+        r(i("Blueprint: Modern House"), 1, true, paper to 1, smooth to 32, glass to 16, iron to 12)
+        r(i("Blueprint: Farm"), 1, true, paper to 1, planks to 16, i("Wheat Seeds") to 8, i("Water Bucket") to 1)
+        r(i("Blueprint: Watch Tower"), 1, true, paper to 1, cobble to 48, planks to 8)
+        r(i("Blueprint: Metro Station"), 1, true, paper to 1, iron to 16, smooth to 24, glass to 8)
+        r(i("Blueprint: Swimming Pool"), 1, true, paper to 1, Blocks.SAND to 16, glass to 4, i("Water Bucket") to 1)
         crafting = list
 
         smelting = mapOf(
@@ -524,6 +536,7 @@ object Drops {
                 in 15..19 -> one(i("Rice"))
                 in 20..23 -> one(i("Lentils"))
                 in 24..26 -> one(i("Tomato"))
+                in 27..29 -> one(i("Beetroot Seeds"))
                 else -> emptyList()
             }
             Blocks.GRAVEL -> if (rnd.nextInt(10) == 0) one(i("Flint")) else one(Blocks.GRAVEL)
@@ -537,6 +550,10 @@ object Drops {
             Blocks.WHEAT_CROP -> if (meta >= 7) listOf(i("Wheat") to 1, i("Wheat Seeds") to 1 + rnd.nextInt(3)) else one(i("Wheat Seeds"))
             Blocks.CARROTS -> if (meta >= 7) listOf(i("Carrot") to 2 + rnd.nextInt(3)) else one(i("Carrot"))
             Blocks.POTATOES -> if (meta >= 7) listOf(i("Potato") to 2 + rnd.nextInt(3)) else one(i("Potato"))
+            Blocks.RICE_CROP -> if (meta >= 7) listOf(i("Rice") to 2 + rnd.nextInt(3)) else one(i("Rice"))
+            Blocks.TOMATO_CROP -> if (meta >= 7) listOf(i("Tomato") to 2 + rnd.nextInt(3)) else one(i("Tomato"))
+            Blocks.LENTIL_CROP -> if (meta >= 7) listOf(i("Lentils") to 2 + rnd.nextInt(3)) else one(i("Lentils"))
+            Blocks.BEETROOT_CROP -> if (meta >= 7) listOf(i("Beetroot") to 1 + rnd.nextInt(2), i("Beetroot Seeds") to 1 + rnd.nextInt(3)) else one(i("Beetroot Seeds"))
             else -> one(id)
         }
     }

@@ -1288,8 +1288,9 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
         val sel = heldId()
         val item = Items[sel]
         // Seeds, carrots and potatoes are planted on farmland.
-        val crop = when (item?.name) { "Wheat Seeds" -> Blocks.WHEAT_CROP; "Carrot" -> Blocks.CARROTS; "Potato" -> Blocks.POTATOES; else -> -1 }
+        val crop = Farming.cropFor(item?.name)
         val tgt = target
+        if (farmingUse(tgt, item)) return
         if (crop > 0 && tgt != null && tgt.block == Blocks.FARMLAND && tgt.ny == 1 && world.getBlock(tgt.x, tgt.y + 1, tgt.z) == Blocks.AIR) {
             setBlock(tgt.x, tgt.y + 1, tgt.z, crop, 0)
             consumeHeld()
@@ -1435,6 +1436,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
                         } else uiEvents.add("toast:Build a frame (at least 4 wide, 5 tall) to make a portal")
                     }
                 }
+                ItemUse.BLUEPRINT -> blueprintOf(item.name)?.let { if (placeBuilding(t, it)) consumeHeld() }
                 ItemUse.CART -> if (com.vishucraft.game.world.Rails.isRail(t.block)) {
                     // The cart faces away from you, so it rolls off the way you are looking.
                     val cart = Cart(t.x + 0.5f, t.y.toFloat(), t.z + 0.5f, Cart.kindOf(item.name))

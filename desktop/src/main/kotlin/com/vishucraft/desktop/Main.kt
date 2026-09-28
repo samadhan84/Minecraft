@@ -1,5 +1,6 @@
 package com.vishucraft.desktop
 
+import com.vishucraft.game.engine.placeBuilding
 import com.vishucraft.desktop.Ui.Companion.rgba
 import com.vishucraft.game.engine.GameInput
 import com.vishucraft.game.net.ClientSession
@@ -1044,6 +1045,23 @@ class App(private val demo: File?) {
             f == 1031 -> session?.game?.let { g -> g.carts.list.firstOrNull { it.kind == com.vishucraft.game.engine.Cart.METRO }?.let { g.carts.enter(it, it.hx, it.hz); g.player.pitch = 0f } }
             f == 1060 -> shot("04m-inside-the-metro")
             f == 1061 -> session?.game?.let { g -> g.carts.leave(g); g.carts.list.clear() }
+            f == 1062 -> session?.game?.let { g ->
+                // Ready-made buildings side by side: a small house, a farm and a modern house.
+                val p = g.player
+                p.flying = true; p.vy = 0f
+                val fx = kotlin.math.round(kotlin.math.sin(p.yaw)).toInt(); val fz = kotlin.math.round(-kotlin.math.cos(p.yaw)).toInt()
+                val (sx, sz) = if (fx != 0) fx to 0 else 0 to (if (fz == 0) -1 else fz)
+                p.yaw = kotlin.math.atan2(sx.toFloat(), -sz.toFloat())
+                val rx = -sz; val rz = sx
+                val bx = com.vishucraft.game.world.floorInt(p.x) + sx * 8 - rx * 70; val bz = com.vishucraft.game.world.floorInt(p.z) + sz * 8 - rz * 70
+                val y = g.world.generator.surfaceHeight(bx, bz)
+                for ((i, name) in listOf("Small House", "Farm", "Modern House").withIndex()) {
+                    val off = (i - 1) * 13
+                    g.placeBuilding(com.vishucraft.game.engine.RayHit(bx + rx * off, y, bz + rz * off, 0, 1, 0, Blocks.GRASS), name)
+                }
+                p.x = bx + 0.5f - sx * 9f; p.z = bz + 0.5f - sz * 9f; p.y = y + 14f; p.pitch = -0.6f
+            }
+            f == 1100 -> shot("04n-ready-made-buildings")
             f == 1111 -> overlay = Overlay.PAUSE
             f == 1113 -> shot("05-pause")
             f == 1117 -> { overlay = Overlay.NONE; leaveWorld(); menu = Menu.CREATE; nameField.text = "Demo survival"; seedField.text = "777"; survival = true }

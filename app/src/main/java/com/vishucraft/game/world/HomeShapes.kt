@@ -96,6 +96,18 @@ object HomeShapes {
             Blocks.WASHING_MACHINE -> listOf(b(1f, 0f, 1f, 15f, 15f, 15f))
             // Hangs on the wall behind it (at -Z before turning).
             Blocks.AIR_CONDITIONER -> listOf(b(0f, 9f, 0f, 16f, 15f, 5f))
+            Blocks.SPRINKLER -> listOf(
+                b(7f, 0f, 7f, 9f, 10f, 9f), b(5f, 10f, 5f, 11f, 12f, 11f),
+                b(7.5f, 12f, 7.5f, 8.5f, 13f, 8.5f, "black_plastic"),
+                b(1f, 11f, 7.5f, 15f, 11.5f, 8.5f, "black_plastic"),     // spray arm
+            )
+            // Straw head (the block's own tiles, with a face on the front), shirt, arms and a pole.
+            Blocks.SCARECROW -> if (collision) listOf(b(4f, 0f, 4f, 12f, 16f, 12f)) else listOf(
+                b(7f, 0f, 7f, 9f, 6f, 9f, "oak_planks"),
+                b(4f, 6f, 5f, 12f, 12f, 11f, "scarecrow"),
+                b(0f, 10f, 7f, 16f, 11f, 9f, "oak_planks"),
+                b(5f, 12f, 5f, 11f, 16f, 11f),
+            )
             else -> return null
         }
         val f = (meta and 7).let { if (it < 2 || it > 5) 2 else it }

@@ -12,6 +12,10 @@ Welcome to DhruvVishu – a block world that is all yours!
 ⛏ MINE & CRAFT – Dig for coal, iron, gold and diamonds. Craft tools, armour, furniture and hundreds of blocks.
 🏰 BUILD ANYTHING – Houses, castles, farms, railways and working Sparkstone machines with buttons, levers, lamps and doors.
 🌍 EXPLORE – Plains, forests, deserts, snowy peaks, swamps, badlands, cherry groves and mushroom islands, caves, villages and the Ember Realm.
+🍛 REAL KITCHEN – Gas stove, pressure cooker, tawa, fridge, microwave and mixer: cook rice, dal, roti, dosa, chai and pizza.
+🌾 FARMING – Grow wheat, rice, tomatoes, lentils, beetroot, carrots and potatoes. Water them, harvest with a sickle, and they replant themselves.
+🏠 READY-MADE BUILDINGS – Place a house, modern home, farm, watch tower, metro station or swimming pool in one tap.
+🚆 TRAINS & METRO – Drive a train engine with coaches, or ride the metro from station to station.
 🐺 ANIMALS & MONSTERS – Tame wolves, cats and parrots, ride horses, trade with villagers and defend yourself at night.
 ⚔ SURVIVAL & CREATIVE – Play survival with health, hunger and experience, or build freely in creative mode.
 👨‍👩‍👧 PLAY TOGETHER – Host a world and play with family and friends on the same Wi-Fi.
@@ -21,7 +25,7 @@ No ads. No accounts. No data collected.
 
 **Category:** Game → Simulation (or Adventure)
 **Tags:** Sandbox, Building, Survival
-**Contact email:** CONTACT_EMAIL
+**Contact email:** samadhan.pawar84@gmail.com
 **Privacy policy URL:** https://github.com/samadhan84/Minecraft/blob/claude/minecraft-android-clone-2fqpdz/PRIVACY_POLICY.md
 
 ## Graphics in this folder

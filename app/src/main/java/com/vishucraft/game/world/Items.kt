@@ -6,6 +6,8 @@ enum class ItemUse {
     THROW, DRINK, FISH, SHEAR, COMPASS, CLOCK, SPYGLASS, ROCKET, BOAT,
     /** Spawn eggs (creative) and the goat horn. */
     SPAWN, HORN,
+    /** Places a ready-made building. */
+    BLUEPRINT,
 }
 
 /** 0 helmet, 1 chestplate, 2 leggings, 3 boots; -1 when not armor. */
@@ -64,6 +66,9 @@ object Items {
 
     /** Music disc tunes (played by a jukebox; see Synth "disc_<name>"). */
     val DISCS = listOf("Meadow", "Caves", "Stars")
+
+    /** Ready-made buildings a blueprint can place (see engine/Buildings.kt). */
+    val BUILDINGS = listOf("Small House", "Modern House", "Farm", "Watch Tower", "Metro Station", "Swimming Pool")
 
     val all: List<ItemDef>
     private val byId = HashMap<Int, ItemDef>()
@@ -317,6 +322,11 @@ object Items {
         add("Train Engine", "train_engine", use = ItemUse.CART, maxStack = 1)
         add("Metro Train", "metro_train", use = ItemUse.CART, maxStack = 1)
         add("Train Coach", "train_coach", use = ItemUse.CART, maxStack = 1)
+        // ---- Farming pack and ready-made buildings (appended)
+        add("Beetroot Seeds", "beetroot_seeds")
+        add("Sickle", "sickle", ToolType.HOE, 6f, attack = 3, maxStack = 1, durability = 250, tier = 2)
+        add("Watering Can", "watering_can", maxStack = 1, durability = 20)
+        for (b in BUILDINGS) add("Blueprint: $b", "blueprint", use = ItemUse.BLUEPRINT, maxStack = 16)
 
         all = list
         for (i in all) { byId[i.id] = i; byName[i.name] = i.id }
