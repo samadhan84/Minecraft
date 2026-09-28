@@ -87,7 +87,8 @@ class GameActivity : Activity() {
     private lateinit var toast: TextView
     private lateinit var hand: ImageView
     private lateinit var hurtFlash: View
-    private lateinit var pauseMenu: LinearLayout
+    private lateinit var pauseMenu: android.widget.ScrollView
+    private lateinit var pauseList: LinearLayout
     private lateinit var inventory: InventoryView
     private lateinit var flyButton: HudButton
     private lateinit var runButton: HudButton
@@ -268,24 +269,37 @@ class GameActivity : Activity() {
         screen.visibility = View.GONE
         root.addView(screen, FrameLayout.LayoutParams(-1, -1))
 
-        pauseMenu = LinearLayout(this).apply {
+        // The game menu scrolls, so every option can be reached on short phone and TV screens.
+        pauseList = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER
+            gravity = Gravity.CENTER_HORIZONTAL
+            setPadding(0, dpi(16f), 0, dpi(16f))
+        }
+        pauseMenu = android.widget.ScrollView(this).apply {
             setBackgroundColor(Color.argb(160, 0, 0, 0))
             isClickable = true
+            isFillViewport = true
             visibility = View.GONE
+            addView(FrameLayout(this@GameActivity).apply {
+                addView(pauseList, FrameLayout.LayoutParams(-2, -2, Gravity.CENTER))
+            }, FrameLayout.LayoutParams(-1, -2))
         }
         val title = TextView(this).apply {
             text = "Game menu"; setTextColor(Color.WHITE); textSize = 24f
             setShadowLayer(2f, 3f, 3f, Color.DKGRAY); gravity = Gravity.CENTER
         }
-        pauseMenu.addView(title, LinearLayout.LayoutParams(-2, -2).apply { bottomMargin = dpi(16f) })
+        pauseList.addView(title, LinearLayout.LayoutParams(-2, -2).apply { bottomMargin = dpi(16f) })
         fun addMenu(label: String, action: (TextView) -> Unit) {
             lateinit var b: TextView
             b = menuButton(this, label) { action(b) }
-            pauseMenu.addView(b, LinearLayout.LayoutParams(dpi(300f), -2).apply { bottomMargin = dpi(10f) })
+            pauseList.addView(b, LinearLayout.LayoutParams(dpi(300f), -2).apply { bottomMargin = dpi(10f) })
         }
         addMenu("Back to game") { showPause(false) }
+        addMenu("Save game") {
+            if (game.isClient) { showToast("The host saves this world"); return@addMenu }
+            glView.queueEvent { game.save(); runOnUiThread { showToast("Game saved") } }
+        }
+        addMenu("Save and quit") { saveAndQuit() }
         addMenu("Skip to next morning / night") {
             glView.queueEvent { game.timeOfDay = if (game.daylight > 0.5f) 0.52f else 0.0f }
             showPause(false)
@@ -324,7 +338,6 @@ class GameActivity : Activity() {
         addMenu("Achievements") { showAchievements() }
         addMenu("Settings") { settingsDialog(this) { applySettings() } }
         addMenu("Controls") { showControls() }
-        addMenu("Save and quit") { saveAndQuit() }
         root.addView(pauseMenu, FrameLayout.LayoutParams(-1, -1))
         if (!touch) handler.postDelayed({ showToast("Press MENU / Y for controls help in the pause menu (Back)") }, 800)
     }
@@ -385,7 +398,8 @@ class GameActivity : Activity() {
         pauseMenu.visibility = if (show) View.VISIBLE else View.GONE
         if (show) {
             releaseInputs()
-            pauseMenu.getChildAt(1)?.requestFocus()
+            pauseMenu.scrollTo(0, 0)
+            pauseList.getChildAt(1)?.requestFocus()
         }
     }
 

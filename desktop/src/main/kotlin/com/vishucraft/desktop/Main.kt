@@ -657,8 +657,21 @@ class App(private val demo: File?) {
         title("Game menu", ui.height * 0.12f)
         val bw = 420f
         var y = ui.height * 0.12f + 60
-        fun b(label: String, action: () -> Unit) { if (ui.button(label, cx - bw / 2, y, bw, 40f)) action(); y += 48 }
+        // The main three are full width; the rest go in two columns so everything fits on a 720p screen.
+        var twoColumns = false
+        var column = 0
+        fun b(label: String, action: () -> Unit) {
+            if (!twoColumns) { if (ui.button(label, cx - bw / 2, y, bw, 38f)) action(); y += 44; return }
+            val w = 330f
+            if (ui.button(label, if (column == 0) cx - w - 5 else cx + 5, y, w, 38f)) action()
+            if (column == 1) y += 44
+            column = 1 - column
+        }
         b("Back to game") { overlay = Overlay.NONE }
+        b("Save game") { if (game.isClient) hud?.toast("The host saves this world") else { s.save(); hud?.toast("Game saved") } }
+        b("Save and quit to title") { leaveWorld(); menu = Menu.TITLE }
+        y += 10
+        twoColumns = true
         b("Skip to next morning / night") { game.timeOfDay = if (game.daylight > 0.5f) 0.52f else 0.0f }
         b(if (game.mobs.hostileEnabled) "Mobs: Normal" else "Mobs: Peaceful (no monsters)") { game.mobs.hostileEnabled = !game.mobs.hostileEnabled }
         b(if (prefs.weather) "Weather: On" else "Weather: Off") { prefs.weather = !prefs.weather; applySettings() }
@@ -678,9 +691,6 @@ class App(private val demo: File?) {
         b("Achievements") { overlay = Overlay.ACHIEVEMENTS }
         b("Settings") { overlay = Overlay.SETTINGS }
         b("Controls") { overlay = Overlay.CONTROLS }
-        b("Save and quit to title") {
-            leaveWorld(); menu = Menu.TITLE
-        }
     }
 
     // ---------------------------------------------------------------- input callbacks
