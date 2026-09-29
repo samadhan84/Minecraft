@@ -20,7 +20,7 @@ jobs:
       # The online relay behind room codes (relay/). Uses the CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID
       # secrets, and publishes its address as relay.txt next to the APK, where the game looks it up.
       - name: Deploy the online relay
-        if: github.event_name == 'push' && github.ref == 'refs/heads/claude/minecraft-android-clone-2fqpdz'
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/claude/minecraft-android-clone-2fqpdz'
         continue-on-error: true
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -71,7 +71,7 @@ jobs:
       # A fixed download link for TVs and phones (no login, no zip):
       # https://github.com/samadhan84/Minecraft/releases/download/latest/DhruvVishu.apk
       - name: Publish the APK to the "latest" release
-        if: github.event_name == 'push' && github.ref == 'refs/heads/claude/minecraft-android-clone-2fqpdz'
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/claude/minecraft-android-clone-2fqpdz'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
