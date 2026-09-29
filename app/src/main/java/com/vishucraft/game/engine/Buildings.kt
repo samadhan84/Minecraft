@@ -14,7 +14,9 @@ import com.vishucraft.game.world.Shapes
  * Places blocks in building coordinates: [a] across (to the player's right), [d] away from the player,
  * [h] up from the ground. Faces are given relative to the player too.
  */
-private class Plan(val g: Game, val ox: Int, val oy: Int, val oz: Int, val fx: Int, val fz: Int) {
+internal class Plan(val g: Game, val ox: Int, val oy: Int, val oz: Int, val fx: Int, val fz: Int,
+                    /** When set, blocks are queued (the builder robot places them a few at a time). */
+                    val queue: ArrayDeque<IntArray>? = null) {
     val rx = -fz; val rz = fx
     /** Face index pointing back at the player, away from them, and to their left and right. */
     val toward = when { fx == 1 -> 5; fx == -1 -> 4; fz == 1 -> 3; else -> 2 }
@@ -30,7 +32,8 @@ private class Plan(val g: Game, val ox: Int, val oy: Int, val oz: Int, val fx: I
     fun set(a: Int, d: Int, h: Int, id: Int, meta: Int = 0) {
         val y = oy + h
         if (y < 1 || y >= Chunk.HEIGHT) return
-        g.setBlock(x(a, d), y, z(a, d), id, meta)
+        if (queue != null) queue.addLast(intArrayOf(x(a, d), y, z(a, d), id, meta))
+        else g.setBlock(x(a, d), y, z(a, d), id, meta)
     }
 
     /** Clears the space above the footprint and fills any gap underneath so it stands on solid ground. */
@@ -59,6 +62,14 @@ internal fun Game.placeBuilding(t: RayHit, name: String): Boolean {
     val oy = if (t.ny == 1) t.y + 1 else t.y
     if (oy + 16 >= Chunk.HEIGHT) { uiEvents.add("toast:No room to build here"); return false }
     val p = Plan(this, t.x, oy, t.z, fx, fz)
+    if (!buildReady(p, name)) return false
+    sound("ding", player.x, player.y, player.z)
+    uiEvents.add("toast:Built a ${name.lowercase()}!")
+    return true
+}
+
+/** Builds one of the ready-made buildings with plan [p]. */
+internal fun Game.buildReady(p: Plan, name: String): Boolean {
     when (name) {
         "Small House" -> smallHouse(p)
         "Modern House" -> modernHouse(p)
@@ -68,8 +79,6 @@ internal fun Game.placeBuilding(t: RayHit, name: String): Boolean {
         "Swimming Pool" -> pool(p)
         else -> return false
     }
-    sound("ding", player.x, player.y, player.z)
-    uiEvents.add("toast:Built a ${name.lowercase()}!")
     return true
 }
 

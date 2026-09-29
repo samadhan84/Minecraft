@@ -65,6 +65,8 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
     val carts = Carts(world)
     /** Cooking pots, appliances and the seat the player sits on (see Kitchen.kt). */
     val kitchen = Kitchen()
+    /** The builder robot's work in progress (see Robot.kt). */
+    val robot = Robot()
     val boats = Boats(world)
     val dimension get() = world.dimension
     private var portalTime = 0f
@@ -454,6 +456,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
         updateEffects(dt)
         updateCampfires(dt)
         updateKitchen(dt)
+        updateRobot()
         if (survival) updateAir(dt) else air = 10f
         achievementTimer += dt
         if (achievementTimer >= 1f) { achievementTimer = 0f; checkInventoryAchievements() }
@@ -1436,6 +1439,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
                     }
                 }
                 ItemUse.BLUEPRINT -> blueprintOf(item.name)?.let { if (placeBuilding(t, it)) consumeHeld() }
+                ItemUse.ROBOT -> pointRobot(t)
                 ItemUse.CART -> if (com.vishucraft.game.world.Rails.isRail(t.block)) {
                     // The cart faces away from you, so it rolls off the way you are looking.
                     val cart = Cart(t.x + 0.5f, t.y.toFloat(), t.z + 0.5f, Cart.kindOf(item.name))

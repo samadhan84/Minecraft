@@ -8,6 +8,8 @@ enum class ItemUse {
     SPAWN, HORN,
     /** Places a ready-made building. */
     BLUEPRINT,
+    /** The builder robot: asks what to build. */
+    ROBOT,
 }
 
 /** 0 helmet, 1 chestplate, 2 leggings, 3 boots; -1 when not armor. */
@@ -327,6 +329,7 @@ object Items {
         add("Sickle", "sickle", ToolType.HOE, 6f, attack = 3, maxStack = 1, durability = 250, tier = 2)
         add("Watering Can", "watering_can", maxStack = 1, durability = 20)
         for (b in BUILDINGS) add("Blueprint: $b", "blueprint", use = ItemUse.BLUEPRINT, maxStack = 16)
+        add("Builder Robot", "builder_robot", use = ItemUse.ROBOT, maxStack = 1)
 
         all = list
         for (i in all) { byId[i.id] = i; byName[i.name] = i.id }

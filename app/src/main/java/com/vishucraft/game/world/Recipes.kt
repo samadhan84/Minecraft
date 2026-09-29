@@ -377,6 +377,7 @@ object Recipes {
         sh(Blocks.SWING, 1, listOf("S S", "S S", "PPP"), 'S' to i("String"), 'P' to planks)
         sh(Blocks.DRESSING_TABLE, 1, listOf(" G ", "PCP"), 'G' to Blocks.GLASS_PANE, 'P' to planks, 'C' to Blocks.CHEST)
         sh(Blocks.WATER_COOLER, 1, listOf(" B ", "IGI", "IRI"), 'B' to i("Water Bucket"), 'I' to iron, 'G' to glass, 'R' to red)
+        sh(i("Builder Robot"), 1, listOf(" D ", "IRI", "IGI"), 'D' to diamond, 'I' to Blocks.IRON_BLOCK, 'R' to Blocks.REDSTONE_BLOCK, 'G' to Blocks.GOLD_BLOCK)
         // ---- Farming and ready-made buildings
         sh(i("Sickle"), 1, listOf(" II", "  I", " S "), 'I' to iron, 'S' to stick)
         sh(i("Watering Can"), 1, listOf("I  ", "IBI", " I "), 'I' to iron, 'B' to i("Bucket"))

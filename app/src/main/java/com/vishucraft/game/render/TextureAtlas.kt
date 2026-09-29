@@ -1828,6 +1828,11 @@ object TextureAtlas {
             "water_bottle_blue" -> { t.fill { x, y -> if (x % 5 == 1) rgb(150, 200, 240) else rgb(90, 160, 230) }; return true }
             "sickle" -> { mask(t, SICKLE, rgb(200, 202, 208), rgb(137, 103, 55)); return true }
             "watering_can" -> { mask(t, CAN, rgb(60, 150, 80)); return true }
+            "builder_robot" -> {
+                mask(t, arrayOf("....a.....", "....d.....", ".dddddddd.", ".dmmmmmmd.", ".dmbmmbmd.", ".dmmmmmmd.", ".dmaaaamd.", ".dddddddd.",
+                    "dddmmmmddd", "d.dmmmmd.d", "d.dmmmmd.d", "..dd..dd..", "..dd..dd.."), rgb(170, 190, 210), rgb(250, 90, 60), rgb(80, 230, 255))
+                return true
+            }
             "blueprint" -> { mask(t, PLAN, rgb(40, 90, 180), rgb(40, 90, 180)); for (y in 0 until 16) for (x in 0 until 16) if (t[x, y] == scale(rgb(40, 90, 180), 1.3f)) t[x, y] = rgb(236, 240, 250); return true }
         }
         val white = rgb(236, 236, 232); val steel = rgb(196, 198, 204); val dark = rgb(30, 30, 34)

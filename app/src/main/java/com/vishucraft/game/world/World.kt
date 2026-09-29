@@ -225,7 +225,7 @@ class LevelData(
                 l.flat = true
                 val start = intArrayOf(
                     Items.find("Enchanted Diamond Pickaxe"), Items.find("Diamond Sword"), Blocks.GRASS, Blocks.STONE,
-                    Blocks.PLANKS, Blocks.GLASS, Blocks.TORCH, Blocks.REDSTONE_DUST, Blocks.PISTON,
+                    Blocks.PLANKS, Blocks.GLASS, Blocks.TORCH, Blocks.REDSTONE_DUST, Items.find("Builder Robot"),
                 )
                 for ((i, id) in start.withIndex()) l.inventory.slots[i] = ItemStack(id, 1)
             }
