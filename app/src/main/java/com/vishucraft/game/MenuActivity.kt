@@ -49,6 +49,7 @@ class MenuActivity : Activity() {
         }
 
         playButton = add("Play") { if (hasWorld()) showWorlds() else newWorld() }
+        add("Join online game") { joinOnline() }
         add("Join Wi-Fi game") { joinGame() }
         add("Settings") { settingsDialog(this) }
         add("Back up / restore") { backupMenu() }
@@ -264,6 +265,38 @@ class MenuActivity : Activity() {
                 for (h in hosts) buttons.add("${h.name}  ·  ${h.players} playing" to { connect(h.address) })
                 buttons.add("Enter address…" to { enterAddress() })
                 buttonDialog(if (hosts.isEmpty()) "No games found" else "Games on your Wi-Fi", buttons)
+            }
+        }.start()
+    }
+
+    /** Joins a friend's game anywhere with the room code they see. */
+    private fun joinOnline() {
+        val input = EditText(this).apply { hint = "Room code (6 numbers)"; inputType = InputType.TYPE_CLASS_NUMBER }
+        AlertDialog.Builder(this).setTitle("Join online game").setView(input)
+            .setMessage("Ask your friend to open their game with \"Play online (room code)\" in the game menu, then type the code they see.")
+            .setPositiveButton("Join") { _, _ -> joinRoom(input.text.toString()) }
+            .setNegativeButton("Cancel", null).show()
+        input.requestFocus()
+    }
+
+    private fun joinRoom(code: String) {
+        val wait = AlertDialog.Builder(this).setTitle("Joining…").setMessage("Looking for room ${code.trim()}").show()
+        val name = com.vishucraft.game.ui.Settings(this).playerName
+        Thread {
+            var tunnel: com.vishucraft.game.net.GuestTunnel? = null
+            val result = try {
+                tunnel = com.vishucraft.game.net.GuestTunnel.join(code)
+                Result.success(com.vishucraft.game.net.ClientSession.connect(tunnel.localAddress, name, 12000))
+            } catch (e: Exception) { tunnel?.close(); Result.failure(e) }
+            runOnUiThread {
+                wait.dismiss()
+                result.onSuccess {
+                    com.vishucraft.game.net.Net.pendingClient = it
+                    startActivity(Intent(this, GameActivity::class.java).putExtra(GameActivity.EXTRA_JOIN, true))
+                }.onFailure {
+                    AlertDialog.Builder(this).setTitle("Could not join").setMessage(it.message ?: "Check the code and your internet connection.")
+                        .setPositiveButton("OK", null).show()
+                }
             }
         }.start()
     }

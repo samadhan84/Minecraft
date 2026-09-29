@@ -41,7 +41,9 @@ not the home screen.
 
 ## Data safety form answers
 
-- Does your app collect or share user data? **No**
+- Does your app collect or share user data? **No** (online play only passes the player's chosen nickname and
+  game moves between the players through the relay while they play; nothing is stored. If Google asks, declare
+  "App activity → Other actions", not collected, processed ephemerally.)
 - Is data encrypted in transit? **Not applicable (no data collected)**
 - Can users request deletion? **Not applicable** (everything is on the device; uninstalling deletes it)
 

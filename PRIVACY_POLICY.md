@@ -19,6 +19,10 @@ receive any information about you or your device.
 
 - **Local Wi-Fi play:** when you host or join a game on your local network, your player name and your
   moves in the world are shared with the other players in that game. Nothing is sent to the internet.
+- **Online play with a room code:** when you choose "Play online (room code)" or "Join online game", your
+  player name and your moves in the world travel between the players through a small relay server
+  (run on Cloudflare for DhruvVishu). The relay only passes the data along while you play; it does not
+  store it or keep any record of it.
 - **Internet play help:** only when you open the "play over the internet" help screen, the game asks
   `api.ipify.org` for your public IP address so it can show it to you. The game does not store or send
   this address anywhere else.

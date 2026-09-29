@@ -17,6 +17,28 @@ jobs:
           distribution: temurin
           java-version: 17
       - uses: gradle/actions/setup-gradle@v4
+      # The online relay behind room codes (relay/). Uses the CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID
+      # secrets, and publishes its address as relay.txt next to the APK, where the game looks it up.
+      - name: Deploy the online relay
+        if: github.event_name == 'push' && github.ref == 'refs/heads/claude/minecraft-android-clone-2fqpdz'
+        continue-on-error: true
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -o pipefail
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "::warning::No Cloudflare secrets yet, so online room codes are not deployed."
+            exit 0
+          fi
+          cd relay
+          npm ci --no-audit --no-fund
+          npx wrangler deploy 2>&1 | tee deploy.log
+          url=$(grep -oE 'https://[a-zA-Z0-9.-]+\.workers\.dev' deploy.log | head -1)
+          if [ -z "$url" ]; then echo "::error::Couldn't find the relay's address in the deploy output"; exit 1; fi
+          sleep 5
+          curl -fsS "$url/health"
+          echo "$url" > ../relay.txt
       # The Google Play upload key comes from the repository's secrets (Settings → Secrets and variables → Actions):
       # PLAY_UPLOAD_KEYSTORE_BASE64, PLAY_UPLOAD_STORE_PASSWORD, PLAY_UPLOAD_KEY_ALIAS, PLAY_UPLOAD_KEY_PASSWORD.
       - name: Get the Google Play upload key
@@ -57,4 +79,7 @@ jobs:
           # The game reads this number to know a newer build exists (same as versionCode in app/build.gradle.kts).
           echo $((100 + GITHUB_RUN_NUMBER)) > version.txt
           gh release view latest >/dev/null 2>&1 || gh release create latest --target "$GITHUB_SHA" --title "DhruvVishu (latest build)" --notes "Newest DhruvVishu APK, updated on every build. On Android TV: install the Downloader app and open this APK's link."
-          gh release upload latest DhruvVishu.apk version.txt --clobber
+          files="DhruvVishu.apk version.txt"
+          # The online relay's address (only when it was deployed above).
+          [ -f relay.txt ] && files="$files relay.txt"
+          gh release upload latest $files --clobber

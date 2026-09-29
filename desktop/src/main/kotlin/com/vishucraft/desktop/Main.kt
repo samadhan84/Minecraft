@@ -102,6 +102,9 @@ class App(private val demo: File?) {
 
     // Join form
     private val addressField = Ui.Field("", "Host address: 192.168.1.23, a VPN or internet address")
+    private val roomField = Ui.Field("", "Room code (6 numbers)", 8)
+    /** The online room this world is open in (host), if any. */
+    @Volatile private var onlineRoom: com.vishucraft.game.net.HostTunnel? = null
     @Volatile private var hosts: List<Discovery.Host> = emptyList()
     @Volatile private var scanning = false
     @Volatile private var joining: String? = null
@@ -335,6 +338,8 @@ class App(private val demo: File?) {
     }
 
     private fun leaveWorld() {
+        onlineRoom?.let { r -> Thread { r.close() }.start() }
+        onlineRoom = null
         val s = session ?: return
         container?.close()
         s.close()
@@ -379,7 +384,7 @@ class App(private val demo: File?) {
                 var y = ui.height * 0.42f
                 if (ui.button("Play", cx - bw / 2, y, bw, 44f)) menu = Menu.WORLDS
                 y += 54
-                if (ui.button("Join Wi-Fi game", cx - bw / 2, y, bw, 44f)) { menu = Menu.JOIN; scan() }
+                if (ui.button("Join a game (online or Wi-Fi)", cx - bw / 2, y, bw, 44f)) { menu = Menu.JOIN; scan() }
                 y += 54
                 if (ui.button("Settings", cx - bw / 2, y, bw / 2 - 5, 44f)) menu = Menu.SETTINGS
                 if (ui.button("Controls", cx + 5, y, bw / 2 - 5, 44f)) menu = Menu.CONTROLS
@@ -486,12 +491,17 @@ class App(private val demo: File?) {
     private val signField = Ui.Field("", "Text on the sign", 60)
 
     @Volatile private var internetText = ""
+    private var internetTitle = "Play over the internet"
+
+    private fun roomText(code: String) = "Room code: ${code.chunked(3).joinToString(" ")}\n\n" +
+        "Friends anywhere (Wi-Fi or mobile data) choose \"Join online game\" on the DhruvVishu title screen and type this code.\n" +
+        "Keep the game open while they play."
 
     private fun internetScreen() {
         ui.rect(0f, 0f, ui.width, ui.height, rgba(0, 0, 0, 200))
-        title("Play over the internet", 50f)
+        title(internetTitle, 50f)
         var y = 110f
-        val words = internetText.ifEmpty { "Checking your internet address…" }
+        val words = internetText.ifEmpty { if (internetTitle == "Play online") "Opening your game online…" else "Checking your internet address…" }
         // Simple word wrap.
         for (para in words.split('\n')) {
             var line = ""
@@ -595,10 +605,26 @@ class App(private val demo: File?) {
         }, "join").start()
     }
 
+    /** Joins a friend's game anywhere through the online relay, with the room code they see. */
+    private fun connectRoom(code: String) {
+        if (joining != null) return
+        joining = "room $code"
+        message = null
+        val name = prefs.playerName
+        Thread({
+            var tunnel: com.vishucraft.game.net.GuestTunnel? = null
+            try {
+                tunnel = com.vishucraft.game.net.GuestTunnel.join(code)
+                joined = ClientSession.connect(tunnel.localAddress, name, 12000)
+            } catch (e: Exception) { tunnel?.close(); message = e.message ?: "Could not join room $code" }
+            joining = null
+        }, "join-online").start()
+    }
+
     private fun joinScreen() {
         val cx = ui.width / 2
         val w = 520f
-        title("Join Wi-Fi game")
+        title("Join a game")
         joined?.let { c ->
             joined = null
             val level = LevelData.create(c.seed, c.worldName, c.mode).apply {
@@ -618,9 +644,13 @@ class App(private val demo: File?) {
             }
         }
         y = maxOf(y + 60, 260f)
-        ui.text("Or type the host's address:", cx - w / 2, y - 24, 16f, rgba(220, 220, 220))
+        ui.text("Online: type the room code your friend sees:", cx - w / 2, y - 24, 16f, rgba(255, 220, 90))
+        ui.field(roomField, cx - w / 2, y, w - 130)
+        if (ui.button("Join", cx + w / 2 - 120, y, 120f, 36f, roomField.text.isNotBlank() && joining == null)) connectRoom(roomField.text.trim())
+        y += 76
+        ui.text("Or type the host's Wi-Fi / VPN address:", cx - w / 2, y - 24, 16f, rgba(220, 220, 220))
         ui.field(addressField, cx - w / 2, y, w - 130)
-        if (ui.button("Join", cx + w / 2 - 120, y, 120f, 36f, addressField.text.isNotBlank())) connect(addressField.text.trim())
+        if (ui.button("Join", cx + w / 2 - 120, y, 120f, 36f, addressField.text.isNotBlank() && joining == null)) connect(addressField.text.trim())
         ui.text("Your name: ${prefs.playerName}", cx - w / 2, y + 50, 16f, rgba(200, 200, 200))
         if (ui.button("Search again", cx - w / 2, ui.height - 70, w / 2 - 5, 44f, !scanning)) scan()
         if (ui.button("Back", cx + 5, ui.height - 70, w / 2 - 5, 44f)) { ui.focus = null; message = null; menu = Menu.TITLE }
@@ -685,7 +715,22 @@ class App(private val demo: File?) {
                 } catch (e: Exception) { hud?.toast("Could not open the game: ${e.message}", 4f) }
             }
         }
-        b("Play over the internet") {
+        b(onlineRoom?.takeIf { it.open }?.let { "Online: room ${it.code}" } ?: "Play online (room code)") {
+            if (game.isClient) { hud?.toast("Only the host can invite more friends"); return@b }
+            internetTitle = "Play online"
+            internetText = ""; overlay = Overlay.INTERNET
+            val room = onlineRoom?.takeIf { it.open }
+            if (room != null) internetText = roomText(room.code)
+            else {
+                if (game.net == null) try { game.net = HostSession(game, s.level.name, prefs.playerName) } catch (e: Exception) { internetText = "Could not open the game: ${e.message}"; return@b }
+                Thread {
+                    internetText = try { com.vishucraft.game.net.HostTunnel.start().also { onlineRoom = it }.let { roomText(it.code) } }
+                    catch (e: Exception) { "Couldn't open online: ${e.message}" }
+                }.start()
+            }
+        }
+        b("Other ways to play online") {
+            internetTitle = "Play over the internet"
             internetText = ""; overlay = Overlay.INTERNET
             Thread { internetText = Net.internetHelp(Net.internetAddress()) }.start()
         }

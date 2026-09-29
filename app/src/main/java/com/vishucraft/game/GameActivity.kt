@@ -93,6 +93,8 @@ class GameActivity : Activity() {
     private lateinit var flyButton: HudButton
     private lateinit var runButton: HudButton
     private var sprinting = false
+    /** The online room (code) this game is open in, if any. */
+    @Volatile private var onlineRoom: com.vishucraft.game.net.HostTunnel? = null
     private lateinit var effectsText: TextView
     private lateinit var lookLabel: TextView
     private lateinit var downButton: HudButton
@@ -325,7 +327,8 @@ class GameActivity : Activity() {
                 runOnUiThread { showToast(result); b.text = if (game.net != null) "Wi-Fi: open" else "Open to Wi-Fi" }
             }
         }
-        addMenu("Play over the internet") {
+        addMenu("Play online (room code)") { playOnline() }
+        addMenu("Other ways to play online") {
             showToast("Checking your internet address…")
             Thread {
                 val help = com.vishucraft.game.net.Net.internetHelp(com.vishucraft.game.net.Net.internetAddress())
@@ -340,6 +343,45 @@ class GameActivity : Activity() {
         addMenu("Controls") { showControls() }
         root.addView(pauseMenu, FrameLayout.LayoutParams(-1, -1))
         if (!touch) handler.postDelayed({ showToast("Press MENU / Y for controls help in the pause menu (Back)") }, 800)
+    }
+
+    /**
+     * Opens this world to friends anywhere: the game is opened like for Wi-Fi, then a room code is taken at
+     * the online relay. Friends choose "Join online game" and type the code.
+     */
+    private fun playOnline() {
+        if (game.isClient) { showToast("You joined someone else's game. Only the host can invite more friends"); return }
+        onlineRoom?.takeIf { it.open }?.let { showRoomCode(it.code); return }
+        showToast("Opening your game online…")
+        val name = settings.playerName
+        glView.queueEvent {
+            val opened = try {
+                if (game.net == null) game.net = com.vishucraft.game.net.HostSession(game, level.name, name)
+                null
+            } catch (e: Exception) { "Could not open the game: ${e.message}" }
+            if (opened != null) { runOnUiThread { showToast(opened) }; return@queueEvent }
+            Thread {
+                val result = try { com.vishucraft.game.net.HostTunnel.start() } catch (e: Exception) { runOnUiThread { showOnlineError(e.message) }; null }
+                if (result != null) { onlineRoom = result; runOnUiThread { showRoomCode(result.code) } }
+            }.start()
+        }
+    }
+
+    private fun showOnlineError(message: String?) {
+        android.app.AlertDialog.Builder(this).setTitle("Couldn't open online")
+            .setMessage(message ?: "Check your internet connection and try again.")
+            .setPositiveButton("OK", null).show()
+    }
+
+    private fun showRoomCode(code: String) {
+        val pretty = code.chunked(3).joinToString(" ")
+        android.app.AlertDialog.Builder(this).setTitle("Room code: $pretty")
+            .setMessage("Your game is open online.\n\nFriends anywhere (Wi-Fi or mobile data) tap \"Join online game\" on the DhruvVishu home screen and type:\n\n$pretty\n\nKeep the game open while they play.")
+            .setPositiveButton("OK", null)
+            .setNeutralButton("Share code") { _, _ ->
+                startActivity(android.content.Intent.createChooser(android.content.Intent(android.content.Intent.ACTION_SEND).setType("text/plain")
+                    .putExtra(android.content.Intent.EXTRA_TEXT, "Join my DhruvVishu game! Tap \"Join online game\" and type the room code $pretty"), "Share room code"))
+            }.show()
     }
 
     private fun updateHand() {
@@ -797,7 +839,8 @@ class GameActivity : Activity() {
 
     override fun onDestroy() {
         val n = game.net
-        if (n != null) Thread { n.close() }.start()
+        val room = onlineRoom
+        if (n != null || room != null) Thread { room?.close(); n?.close() }.start()
         sounds.release()
         world.shutdown()
         super.onDestroy()
