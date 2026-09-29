@@ -791,7 +791,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
             if (world.getBlock(ox, y, oz) == id) setBlock(ox, y, oz, Blocks.AIR)
         }
         // Fridges are two blocks tall.
-        if (id == Blocks.FRIDGE) {
+        if (Blocks.isTall(id)) {
             val oy = if (meta and com.vishucraft.game.world.Shapes.UPPER != 0) y - 1 else y + 1
             if (world.getBlock(x, oy, z) == id) {
                 setBlock(x, oy, z, Blocks.AIR)
@@ -1348,10 +1348,9 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
                 if (survival) drops.spawn(ItemStack(Items.find(Cart.itemName(c.kind))), c.x, c.y + 0.5f, c.z)
             } else {
                 carts.enter(c, dir[0], dir[2])
-                if (c.isTrain) uiEvents.add(when (carts.head(c).kind) {
-                    Cart.METRO -> "toast:All aboard the metro! It stops at every station platform"
-                    Cart.ENGINE -> if (carts.head(c) === c) "toast:Forward to drive, back to brake, jump for the horn" else "toast:All aboard!"
-                    else -> "toast:All aboard!"
+                if (c.isTrain) uiEvents.add(when (carts.power(c)?.kind) {
+                    Cart.METRO, Cart.ENGINE -> "toast:All aboard! It stops for 10 seconds at every Station Stop Rail and turns back at the end of the line"
+                    else -> "toast:A coach on its own: press forward to push it, or hook it behind an engine or metro"
                 })
             }
             return
@@ -1589,7 +1588,8 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
         val id = world.getBlock(x, y, z)
         if (!com.vishucraft.game.world.Rails.isRail(id)) return
         val m = world.getMeta(x, y, z)
-        val shape = com.vishucraft.game.world.Rails.shapeFor(world, x, y, z, id == Blocks.POWERED_RAIL)
+        // Powered and stop rails stay straight.
+        val shape = com.vishucraft.game.world.Rails.shapeFor(world, x, y, z, id == Blocks.POWERED_RAIL || id == Blocks.STOP_RAIL)
         // Powered rails keep their "on" flag (bit 3) when re-shaped.
         val mask = if (id == Blocks.POWERED_RAIL) 7 else 15
         if (shape != com.vishucraft.game.world.Rails.shape(id, m)) setBlock(x, y, z, id, (m and mask.inv()) or shape)
@@ -1633,9 +1633,11 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
             }
             Blocks.OAK_STAIRS, Blocks.COBBLESTONE_STAIRS, Blocks.STONE_BRICK_STAIRS, Blocks.BRICK_STAIRS,
             Blocks.SANDSTONE_STAIRS, in trapdoors -> if (t.ny == -1) meta = meta or S.UPPER
-            Blocks.FRIDGE -> if (y + 1 >= Chunk.HEIGHT || !placeFridgeTop(x, y, z, meta)) return
-            Blocks.LADDER, Blocks.PAINTING, Blocks.ITEM_FRAME, Blocks.AIR_CONDITIONER -> {
-                if (t.ny != 0 || !Blocks.opaque[t.block]) return
+            Blocks.FRIDGE, Blocks.WARDROBE -> if (y + 1 >= Chunk.HEIGHT || !placeTallTop(id, x, y, z, meta)) return
+            Blocks.LADDER, Blocks.PAINTING, Blocks.ITEM_FRAME, Blocks.AIR_CONDITIONER, Blocks.SHOWER, Blocks.MIRROR,
+            Blocks.WALL_CLOCK, Blocks.CURTAIN -> {
+                // Curtains also hang in front of windows.
+                if (t.ny != 0 || !(Blocks.opaque[t.block] || (id == Blocks.CURTAIN && Blocks.solid[t.block]))) return
                 meta = if (t.nz == 1) 2 else if (t.nz == -1) 3 else if (t.nx == 1) 4 else 5
                 if (id == Blocks.PAINTING) meta = meta or (java.util.Random().nextInt(4) shl 3)
             }

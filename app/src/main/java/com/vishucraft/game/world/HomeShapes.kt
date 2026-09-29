@@ -96,6 +96,75 @@ object HomeShapes {
             Blocks.WASHING_MACHINE -> listOf(b(1f, 0f, 1f, 15f, 15f, 15f))
             // Hangs on the wall behind it (at -Z before turning).
             Blocks.AIR_CONDITIONER -> listOf(b(0f, 9f, 0f, 16f, 15f, 5f))
+            // ---- Household pack
+            Blocks.STUDY_TABLE -> if (collision) listOf(b(0f, 0f, 0f, 16f, 16f, 16f)) else listOf(
+                b(0f, 14f, 0f, 16f, 16f, 16f),
+                b(0f, 0f, 1f, 6f, 14f, 15f),                              // drawers (front shows the counter doors)
+                b(14f, 0f, 1f, 16f, 14f, 3f, "dark_oak_planks"), b(14f, 0f, 13f, 16f, 14f, 15f, "dark_oak_planks"),
+            )
+            Blocks.COMPUTER -> listOf(
+                b(6f, 0f, 9f, 10f, 0.5f, 12f, "black_plastic"),
+                b(7.5f, 0.5f, 10f, 8.5f, 3f, 11f, "black_plastic"),
+                b(1f, 3f, 10f, 15f, 12f, 11f),                           // screen, facing the player
+                b(3f, 0f, 3f, 13f, 0.6f, 7f, "keyboard"),
+            )
+            Blocks.ARMCHAIR -> if (collision) listOf(b(0f, 0f, 1f, 16f, 8f, 15f)) else listOf(
+                b(2f, 1f, 1f, 14f, 7f, 15f),
+                b(2f, 7f, 1f, 14f, 16f, 5f),
+                b(0f, 1f, 1f, 2f, 11f, 15f), b(14f, 1f, 1f, 16f, 11f, 15f),
+                b(1f, 0f, 2f, 3f, 1f, 4f, "oak_planks"), b(13f, 0f, 2f, 15f, 1f, 4f, "oak_planks"),
+                b(1f, 0f, 12f, 3f, 1f, 14f, "oak_planks"), b(13f, 0f, 12f, 15f, 1f, 14f, "oak_planks"),
+            )
+            Blocks.COFFEE_TABLE -> listOf(
+                b(1f, 7f, 1f, 15f, 8f, 15f),
+                b(2f, 0f, 2f, 3f, 7f, 3f), b(13f, 0f, 2f, 14f, 7f, 3f), b(2f, 0f, 13f, 3f, 7f, 14f), b(13f, 0f, 13f, 14f, 7f, 14f),
+                b(3f, 2f, 3f, 13f, 3f, 13f, "oak_planks"),               // shelf
+            )
+            Blocks.BEAN_BAG -> listOf(b(2f, 0f, 2f, 14f, 6f, 14f), b(3f, 6f, 2f, 13f, 12f, 6f), b(4f, 6f, 6f, 12f, 7f, 13f))
+            Blocks.BATHTUB -> {
+                val tub = listOf(
+                    b(0f, 0f, 0f, 16f, 2f, 16f),
+                    b(0f, 2f, 0f, 16f, 9f, 1f), b(0f, 2f, 15f, 16f, 9f, 16f), b(0f, 2f, 1f, 1f, 9f, 15f), b(15f, 2f, 1f, 16f, 9f, 15f),
+                    b(13f, 9f, 7f, 14f, 12f, 9f, "steel"),                  // tap
+                )
+                if (on && !collision) tub + b(1f, 2f, 1f, 15f, 7f, 15f, "water") else tub
+            }
+            Blocks.TOILET -> if (collision) listOf(b(3f, 0f, 1f, 13f, 8f, 13f)) else listOf(
+                b(5f, 0f, 5f, 11f, 6f, 11f),
+                b(4f, 6f, 3f, 12f, 8f, 13f),
+                b(4f, 6f, 1f, 12f, 15f, 4f),                               // tank at the back
+                b(7f, 15f, 2f, 9f, 16f, 3f, "steel"),                      // flush button
+            )
+            Blocks.WASH_BASIN -> listOf(
+                b(6f, 0f, 6f, 10f, 10f, 10f, "white_plastic"),
+                b(2f, 10f, 2f, 14f, 14f, 14f),
+                b(7.5f, 14f, 2f, 8.5f, 17f, 3f, "steel"), b(7.5f, 16f, 3f, 8.5f, 17f, 6f, "steel"),
+            )
+            // Wall things hang on the wall behind them (at -Z before turning).
+            Blocks.SHOWER -> {
+                val parts = listOf(b(7.5f, 4f, 0f, 8.5f, 14f, 1f, "steel"), b(7.5f, 13f, 1f, 8.5f, 14f, 4f, "steel"), b(5f, 12f, 2f, 11f, 13f, 7f, "steel"))
+                if (on && !collision) parts + b(5f, 0f, 2.5f, 11f, 12f, 6.5f, "shower_water") else parts
+            }
+            Blocks.MIRROR -> listOf(b(2f, 1f, 0f, 14f, 15f, 1f))
+            Blocks.WALL_CLOCK -> listOf(b(4f, 4f, 0f, 12f, 12f, 1f))
+            Blocks.CURTAIN -> if (on) listOf(b(0f, 0f, 0f, 3f, 16f, 2f), b(13f, 0f, 0f, 16f, 16f, 2f), b(0f, 15f, 0f, 16f, 16f, 1f, "steel"))
+                else listOf(b(0f, 0f, 0f, 16f, 15f, 2f), b(0f, 15f, 0f, 16f, 16f, 1f, "steel"))
+            Blocks.PLANT_POT -> listOf(b(5f, 0f, 5f, 11f, 6f, 11f), b(3f, 6f, 3f, 13f, 14f, 13f, "oak_leaves"), b(6f, 14f, 6f, 10f, 16f, 10f, "oak_leaves"))
+            Blocks.CEILING_LIGHT -> listOf(b(7.5f, 12f, 7.5f, 8.5f, 16f, 8.5f, "steel"), b(4f, 8f, 4f, 12f, 12f, 12f))
+            Blocks.DUSTBIN -> listOf(b(4f, 0f, 4f, 12f, 10f, 12f), b(3.5f, 10f, 3.5f, 12.5f, 11f, 12.5f, "black_plastic"))
+            Blocks.SWING -> listOf(
+                b(1f, 7f, 7.5f, 2f, 16f, 8.5f, "steel"), b(14f, 7f, 7.5f, 15f, 16f, 8.5f, "steel"),
+                b(0f, 6f, 4f, 16f, 7f, 12f),
+            )
+            Blocks.DRESSING_TABLE -> if (collision) listOf(b(0f, 0f, 0f, 16f, 10f, 12f)) else listOf(
+                b(0f, 0f, 0f, 16f, 10f, 12f),
+                b(3f, 10f, 0f, 13f, 16f, 1f, "mirror"),
+            )
+            Blocks.WATER_COOLER -> listOf(
+                b(3f, 0f, 3f, 13f, 12f, 13f),
+                b(5f, 12f, 5f, 11f, 16f, 11f, "water_bottle_blue"),
+                b(7f, 7f, 13f, 9f, 8f, 15f, "steel"),
+            )
             Blocks.SPRINKLER -> listOf(
                 b(7f, 0f, 7f, 9f, 10f, 9f), b(5f, 10f, 5f, 11f, 12f, 11f),
                 b(7.5f, 12f, 7.5f, 8.5f, 13f, 8.5f, "black_plastic"),

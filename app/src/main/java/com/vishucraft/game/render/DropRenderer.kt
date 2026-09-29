@@ -28,7 +28,7 @@ class DropRenderer {
              boats: com.vishucraft.game.engine.Boats? = null) {
         buf.size = 0
         carts?.list?.forEach { c ->
-            if (c.isTrain) train(c.x, c.y, c.z, c.yaw, c.kind, carts.head(c).kind) else cart(c.x, c.y, c.z, c.yaw)
+            if (c.isTrain) train(c.x, c.y, c.z, c.yaw, c.kind, carts.power(c)?.kind ?: c.kind) else cart(c.x, c.y, c.z, c.yaw)
         }
         boats?.list?.forEach { b -> boat(b.x, b.y, b.z, b.yaw) }
         arrows?.list?.forEach { a ->

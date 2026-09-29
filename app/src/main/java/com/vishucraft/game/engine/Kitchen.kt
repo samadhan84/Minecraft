@@ -165,25 +165,66 @@ internal fun Game.kitchenBlock(t: RayHit, item: ItemDef?, sel: Int): Boolean {
             sound("splash", cx, cy + 0.5f, cz, 0.5f)
             return true
         }
-        Blocks.KITCHEN_COUNTER -> {
+        Blocks.KITCHEN_COUNTER, Blocks.STUDY_TABLE, Blocks.DRESSING_TABLE, Blocks.WARDROBE -> {
             if (holdingBlock) return false
-            world.blockEntities.chest(x, y, z); net?.openContainer(x, y, z, 0); uiEvents.add("open:chest:$x,$y,$z")
+            val by = if (block == Blocks.WARDROBE) fridgeBase(x, y, z) else y
+            world.blockEntities.chest(x, by, z); net?.openContainer(x, by, z, 0); uiEvents.add("open:chest:$x,$by,$z")
             sound("door", cx, cy, cz, 0.4f)
             return true
         }
-        Blocks.TV, Blocks.TABLE_LAMP, Blocks.CEILING_FAN, Blocks.AIR_CONDITIONER -> {
+        Blocks.WASH_BASIN, Blocks.WATER_COOLER -> {
+            if (holdingBlock) return false
+            when (item?.name) {
+                "Bucket" -> { consumeHeld(); give(Items.find("Water Bucket")) }
+                "Flour" -> { consumeHeld(); give(Items.find("Dough")) }
+                else -> say(if (block == Blocks.WATER_COOLER) "Ahh, cool water! (Fill a bucket here too)" else "You washed your hands")
+            }
+            sound("splash", cx, cy + 0.5f, cz, 0.4f)
+            return true
+        }
+        Blocks.DUSTBIN -> {
+            val held = heldStack()
+            if (held == null) { say("Tap the dustbin while holding something to throw it away"); return true }
+            say("Threw away ${held.count} × ${Items.displayName(held.id)}")
+            inventory.slots[input.selectedSlot] = null
+            sound("hit_wood", cx, cy, cz, 0.6f)
+            return true
+        }
+        Blocks.WALL_CLOCK -> {
+            if (holdingBlock) return false
+            // The day starts at 6 in the morning (time 0) and noon is a quarter of the way round.
+            val minutes = ((timeOfDay * 24f * 60f).toInt() + 6 * 60) % (24 * 60)
+            val h = minutes / 60; val m = minutes % 60
+            val h12 = if (h % 12 == 0) 12 else h % 12
+            say("It's $h12:${m.toString().padStart(2, '0')} ${if (h < 12) "in the morning" else if (h < 17) "in the afternoon" else if (h < 20) "in the evening" else "at night"}")
+            sound("click", cx, cy, cz, 0.5f)
+            return true
+        }
+        Blocks.MIRROR -> { if (holdingBlock) return false; say("Looking good!"); return true }
+        Blocks.BATHTUB -> {
+            if (holdingBlock) return false
+            setBlock(x, y, z, block, meta xor 8)
+            sound("splash", cx, cy, cz, 0.6f)
+            say(if (meta and 8 == 0) "The bath is full of warm water" else "The bath drains away")
+            return true
+        }
+        Blocks.TV, Blocks.TABLE_LAMP, Blocks.CEILING_FAN, Blocks.AIR_CONDITIONER, Blocks.COMPUTER, Blocks.CEILING_LIGHT,
+        Blocks.CURTAIN, Blocks.SHOWER -> {
             if (holdingBlock) return false
             setBlock(x, y, z, block, meta xor 8)
             sound("click", cx, cy, cz)
             if (meta and 8 == 0) when (block) {
                 Blocks.TV -> { sound("tv", cx, cy, cz, 0.6f); say("Cartoons are on!") }
                 Blocks.AIR_CONDITIONER -> say("Cool air fills the room")
+                Blocks.COMPUTER -> say("The computer starts up")
+                Blocks.SHOWER -> { sound("splash", cx, cy, cz); say("The shower is on") }
             }
             return true
         }
-        Blocks.CHAIR, Blocks.SOFA -> {
+        Blocks.CHAIR, Blocks.SOFA, Blocks.ARMCHAIR, Blocks.BEAN_BAG, Blocks.TOILET, Blocks.SWING -> {
             if (holdingBlock) return false
-            if (world.getBlock(x, y + 1, z) != Blocks.AIR) return false
+            if (block != Blocks.SWING && world.getBlock(x, y + 1, z) != Blocks.AIR) return false
+            if (block == Blocks.TOILET) sound("splash", cx, cy, cz)
             kitchen.seat = intArrayOf(x, y, z)
             player.x = cx; player.z = cz; player.y = y + 0.05f
             player.vx = 0f; player.vy = 0f; player.vz = 0f
@@ -283,9 +324,9 @@ internal fun Game.standUp() {
 /** A seat is drawn and collides like a block, so the sitting player skips normal movement. */
 internal val Game.sitting get() = kitchen.seat != null
 
-/** The upper half of a two-block fridge. */
-internal fun Game.placeFridgeTop(x: Int, y: Int, z: Int, meta: Int): Boolean {
+/** The upper half of a two-block fridge or wardrobe. */
+internal fun Game.placeTallTop(id: Int, x: Int, y: Int, z: Int, meta: Int): Boolean {
     if (world.getBlock(x, y + 1, z) != Blocks.AIR) return false
-    setBlock(x, y + 1, z, Blocks.FRIDGE, meta or Shapes.UPPER)
+    setBlock(x, y + 1, z, id, meta or Shapes.UPPER)
     return true
 }

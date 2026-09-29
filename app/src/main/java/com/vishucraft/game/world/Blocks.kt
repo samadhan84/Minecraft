@@ -380,16 +380,41 @@ object Blocks {
     /** Crops within 4 blocks grow much faster. */
     const val SPRINKLER = 409
     const val SCARECROW = 410
-    const val COUNT = 411
+    /** Trains and metros stop on it for 10 seconds (a straight rail with a stop mark). */
+    const val STOP_RAIL = 411
+    // ---- Household pack (meta bits 0..2 facing, bit 3 switched on; see HomeShapes and engine/Kitchen.kt)
+    /** Two blocks tall like the fridge, and keeps things like a chest. */
+    const val WARDROBE = 412
+    const val STUDY_TABLE = 413
+    const val COMPUTER = 414
+    const val ARMCHAIR = 415
+    const val COFFEE_TABLE = 416
+    const val BEAN_BAG = 417
+    const val BATHTUB = 418
+    const val TOILET = 419
+    const val WASH_BASIN = 420
+    const val SHOWER = 421
+    const val MIRROR = 422
+    const val WALL_CLOCK = 423
+    const val PLANT_POT = 424
+    const val CEILING_LIGHT = 425
+    const val CURTAIN = 426
+    const val DUSTBIN = 427
+    const val SWING = 428
+    const val DRESSING_TABLE = 429
+    const val WATER_COOLER = 430
+    const val COUNT = 431
 
     /** The newer crops' texture names, in id order from RICE_CROP. */
     val NEW_CROPS = listOf("rice", "tomato", "lentil", "beetroot")
 
-    fun isKitchenAppliance(id: Int) = id in GAS_STOVE..AIR_CONDITIONER
+    fun isKitchenAppliance(id: Int) = id in GAS_STOVE..AIR_CONDITIONER || id in WARDROBE..WATER_COOLER
+    /** Two blocks tall (the top half has Shapes.UPPER). */
+    fun isTall(id: Int) = id == FRIDGE || id == WARDROBE
     /** Pots and pans that cook when they stand on a gas stove. */
     fun isStovePot(id: Int) = id == PRESSURE_COOKER || id == TAWA || id == FRYING_PAN || id == KETTLE
     /** Chairs and sofas can be sat on. */
-    fun isSeat(id: Int) = id == CHAIR || id == SOFA
+    fun isSeat(id: Int) = id == CHAIR || id == SOFA || id == ARMCHAIR || id == BEAN_BAG || id == TOILET || id == SWING
 
     val DEEPSLATE_ORES = listOf("coal", "iron", "gold", "diamond", "redstone", "lapis")
     val FLOWERS = listOf("pink_petals" to "Pink Petals", "cornflower" to "Cornflower", "lily_of_the_valley" to "Lily of the Valley",
@@ -421,7 +446,8 @@ object Blocks {
     }
     fun isBanner(id: Int) = id in BANNER_FIRST until BANNER_FIRST + 16
     /** Hangs on the side of a block (placed like a ladder). */
-    fun isWallMounted(id: Int) = id == LADDER || id == PAINTING || id == ITEM_FRAME || id == AIR_CONDITIONER
+    fun isWallMounted(id: Int) = id == LADDER || id == PAINTING || id == ITEM_FRAME || id == AIR_CONDITIONER ||
+        id == SHOWER || id == MIRROR || id == WALL_CLOCK || id == CURTAIN
 
     fun isButton(id: Int) = id == STONE_BUTTON || id in WOOD_BUTTON_FIRST until WOOD_BUTTON_FIRST + 6
     fun isPlate(id: Int) = id == PRESSURE_PLATE || id in WOOD_PLATE_FIRST until WOOD_PLATE_FIRST + 6 || id == GOLD_PLATE || id == IRON_PLATE
@@ -894,6 +920,32 @@ object Blocks {
         reg(BlockDef(SCARECROW, "Scarecrow", t("hay_top"), t("hay_side"), t("hay_top"), render = RenderType.SHAPE, opaque = false,
             solid = true, blocksLight = false, hardness = 0.5f, tool = A, category = N, facing = Facing.HORIZONTAL,
             front = t("scarecrow_face"), movable = false))
+        reg(BlockDef(STOP_RAIL, "Station Stop Rail", t("stop_rail"), render = RenderType.RAIL, opaque = false, solid = false,
+            hardness = 0.4f, tool = P, category = Category.REDSTONE, needsSupport = true, movable = false))
+        // ---- Household pack
+        reg(BlockDef(WARDROBE, "Wardrobe", t("dark_oak_planks"), t("wardrobe_side"), t("dark_oak_planks"), hardness = 1f, tool = A,
+            category = H, facing = Facing.HORIZONTAL, front = t("wardrobe_front"), movable = false))
+        t("wardrobe_front_top")
+        home(STUDY_TABLE, "Study Table", "dark_oak_planks", "dark_oak_planks", front = "counter_front", hardness = 0.8f, tool = A)
+        home(COMPUTER, "Computer", "black_plastic", "black_plastic", front = "computer_screen", hardness = 0.5f)
+        t("computer_screen_on")
+        home(ARMCHAIR, "Armchair", "armchair", "armchair", "oak_planks", hardness = 0.6f, tool = A)
+        home(COFFEE_TABLE, "Coffee Table", "glass", "oak_planks", hardness = 0.6f, tool = A, facing = Facing.NONE)
+        home(BEAN_BAG, "Bean Bag", "bean_bag", "bean_bag", hardness = 0.3f, tool = ToolType.NONE)
+        home(BATHTUB, "Bathtub", "white_plastic", "white_plastic", hardness = 1f)
+        home(TOILET, "Toilet", "white_plastic", "white_plastic", hardness = 1f)
+        home(WASH_BASIN, "Wash Basin", "basin_top", "white_plastic", hardness = 1f)
+        home(SHOWER, "Shower", "steel", "steel", hardness = 0.5f, solid = false)
+        home(MIRROR, "Mirror", "steel", "steel", front = "mirror", hardness = 0.3f, tool = ToolType.NONE, solid = false)
+        home(WALL_CLOCK, "Wall Clock", "black_plastic", "black_plastic", front = "clock_face", hardness = 0.3f, tool = ToolType.NONE, solid = false)
+        home(PLANT_POT, "Plant Pot", "terracotta", "terracotta", hardness = 0.3f, tool = ToolType.NONE, facing = Facing.NONE)
+        home(CEILING_LIGHT, "Ceiling Light", "lamp_shade", "lamp_shade", hardness = 0.3f, tool = ToolType.NONE, solid = false, facing = Facing.NONE)
+        home(CURTAIN, "Curtain", "curtain", "curtain", hardness = 0.2f, tool = ToolType.NONE, solid = false)
+        home(DUSTBIN, "Dustbin", "dustbin", "dustbin", hardness = 0.5f)
+        home(SWING, "Swing", "oak_planks", "oak_planks", hardness = 0.5f, tool = A, solid = false)
+        home(DRESSING_TABLE, "Dressing Table", "dark_oak_planks", "dark_oak_planks", front = "counter_front", hardness = 0.8f, tool = A)
+        home(WATER_COOLER, "Water Cooler", "white_plastic", "white_plastic", hardness = 0.8f)
+        for (n in listOf("mirror", "keyboard", "shower_water", "water_bottle_blue", "oak_leaves", "water")) t(n)
         for (n in listOf("steel", "black_plastic", "scarecrow", "train_side", "train_front", "train_roof",
             "coach_side", "metro_side", "metro_front", "metro_roof", "train_wheel")) t(n)
     }
@@ -939,6 +991,8 @@ object Blocks {
         MAGMA -> 3
         GAS_STOVE -> if (meta and 8 != 0) 6 else 0
         TABLE_LAMP -> if (meta and 8 != 0) 14 else 0
+        CEILING_LIGHT -> if (meta and 8 != 0) 15 else 0
+        COMPUTER -> if (meta and 8 != 0) 5 else 0
         TV -> if (meta and 8 != 0) 8 else 0
         OVEN, MICROWAVE -> if (meta and 8 != 0) 7 else 0
         else -> extraLight[id]
@@ -951,7 +1005,7 @@ object Blocks {
 
     fun isEmissive(id: Int, meta: Int): Boolean {
         if (isFurnace(id)) return meta and 8 != 0
-        if (id == TABLE_LAMP) return meta and 8 != 0
+        if (id == TABLE_LAMP || id == CEILING_LIGHT) return meta and 8 != 0
         if (!all[id].emissive) return false
         return !(id == REDSTONE_TORCH && meta != 0)
     }
@@ -985,7 +1039,9 @@ object Blocks {
             TAWA -> if (face == 0) return Tiles.id(if (meta and 8 != 0) "tawa_top_on" else "tawa_top")
             FRYING_PAN -> if (face == 0) return Tiles.id(if (meta and 8 != 0) "pan_top_on" else "pan_top")
             FRIDGE -> if (face == (meta and 7).coerceIn(2, 5)) return Tiles.id(if (meta and Shapes.UPPER != 0) "fridge_front_top" else "fridge_front")
-            TABLE_LAMP -> if (meta and 8 != 0) return Tiles.id("lamp_shade_on")
+            WARDROBE -> if (face == (meta and 7).coerceIn(2, 5)) return Tiles.id(if (meta and Shapes.UPPER != 0) "wardrobe_front_top" else "wardrobe_front")
+            TABLE_LAMP, CEILING_LIGHT -> if (meta and 8 != 0) return Tiles.id("lamp_shade_on")
+            STOP_RAIL -> return d.top
             BEE_NEST -> if (face == (meta and 7).let { if (it < 2 || it > 5) 2 else it } && (meta shr 3) >= 5) return Tiles.id("bee_nest_front_honey")
         }
         if (d.render == RenderType.SHAPE) {
@@ -995,6 +1051,7 @@ object Blocks {
                     MICROWAVE -> return Tiles.id("microwave_front_on"); OVEN -> return Tiles.id("oven_front_on")
                     TV -> return Tiles.id("tv_screen_on"); WASHING_MACHINE -> return Tiles.id("washer_front_on")
                     AIR_CONDITIONER -> return Tiles.id("ac_front_on")
+                    COMPUTER -> return Tiles.id("computer_screen_on")
                 }
                 return d.front
             }

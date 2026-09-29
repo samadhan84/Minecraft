@@ -174,7 +174,7 @@ private fun Game.metroStation(p: Plan) {
     val len = 24
     // Track bed and rails running across in front of the player, through the station.
     p.site(-len, len, 1, 7, 6, Blocks.RAILWAY_BALLAST)
-    for (a in -len..len) p.set(a, 4, 0, Blocks.RAIL, p.railAcross)
+    for (a in -len..len) p.set(a, 4, 0, if (a == 0) Blocks.STOP_RAIL else Blocks.RAIL, p.railAcross)
     for (a in -8..8) {
         for (d in 1..3) p.set(a, d, 0, Blocks.STATION_PLATFORM)
         for (d in 5..7) p.set(a, d, 0, Blocks.STATION_PLATFORM)

@@ -2,7 +2,7 @@ package com.vishucraft.game.world
 
 /** Rail shapes: 0 N-S, 1 E-W, 2..5 ascending towards +X, -X, -Z, +Z, 6..9 curves SE, SW, NW, NE. */
 object Rails {
-    fun isRail(id: Int) = id == Blocks.RAIL || id == Blocks.POWERED_RAIL
+    fun isRail(id: Int) = id == Blocks.RAIL || id == Blocks.POWERED_RAIL || id == Blocks.STOP_RAIL
 
     /**
      * The track shape stored in a rail's meta. Powered rails keep their "on" flag in bit 3 (they never curve,

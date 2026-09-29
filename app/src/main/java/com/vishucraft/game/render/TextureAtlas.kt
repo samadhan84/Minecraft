@@ -1783,6 +1783,49 @@ object TextureAtlas {
                 return true
             }
             "beetroot_seeds" -> { mask(t, BEANS, rgb(140, 110, 60)); return true }
+            // ---- Household pack
+            "stop_rail" -> {
+                sprite(t)
+                for (y in 0 until 16) if (y % 4 == 1) for (x in 1..14) t[x, y] = rgb(110, 76, 44)
+                for (y in 0 until 16) { t[3, y] = rgb(170, 170, 176); t[12, y] = rgb(170, 170, 176); t[4, y] = rgb(120, 120, 126); t[11, y] = rgb(120, 120, 126) }
+                // A red and white stop plate between the rails.
+                for (y in 6..9) for (x in 5..10) t[x, y] = if ((x + y) % 2 == 0) rgb(220, 40, 40) else rgb(240, 240, 240)
+                return true
+            }
+            "wardrobe_side" -> { planks(t, rgb(92, 62, 36)); return true }
+            "wardrobe_front", "wardrobe_front_top" -> {
+                t.fill { x, _ -> if (x == 0 || x == 15 || x == 7 || x == 8) rgb(60, 40, 22) else scale(rgb(110, 74, 42), t.jitter(0.05f)) }
+                val ys = if (name == "wardrobe_front") 1..6 else 9..14
+                for (y in ys) { t[6, y] = rgb(210, 180, 90); t[9, y] = rgb(210, 180, 90) }
+                if (name == "wardrobe_front") for (x in 0 until 16) t[x, 0] = rgb(60, 40, 22)
+                return true
+            }
+            "computer_screen", "computer_screen_on" -> {
+                val on = name.endsWith("on")
+                t.fill { x, y -> if (y <= 3 || y >= 13 || x == 0 || x == 15) rgb(24, 24, 28) else if (!on) rgb(10, 10, 14) else if (y == 5 || y == 6) rgb(40, 120, 220) else rgb(236, 240, 246) }
+                if (on) { for (x in 2..6) t[x, 8] = rgb(90, 90, 100); for (x in 2..10) t[x, 10] = rgb(90, 90, 100); disc(t, 11.5f, 9.5f, 1.6f, rgb(250, 200, 60), false) }
+                return true
+            }
+            "keyboard" -> { t.fill { x, y -> if (x % 2 == 0 && y % 2 == 0) rgb(200, 200, 204) else rgb(40, 40, 44) }; return true }
+            "armchair" -> { t.fill { x, y -> val c = rgb(50, 90, 160); if (x % 8 == 4 && y % 8 == 4) scale(c, 0.6f) else scale(c, t.jitter(0.05f)) }; return true }
+            "bean_bag" -> { t.fill { x, y -> scale(rgb(240, 150, 40), (if ((x + y) % 7 == 0) 0.85f else 1f) * t.jitter(0.04f)) }; return true }
+            "basin_top" -> {
+                t.fill { x, y -> if (x <= 1 || y <= 1 || x >= 14 || y >= 14) rgb(236, 236, 232) else rgb(214, 220, 226) }
+                disc(t, 8f, 8f, 1.2f, rgb(120, 120, 126), false)
+                return true
+            }
+            "shower_water" -> { sprite(t); for (y in 0 until 16) for (x in 0 until 16) if ((x * 7 + y * 3) % 5 == 0) t[x, y] = rgb(170, 210, 250); return true }
+            "mirror" -> { t.fill { x, y -> if (x == 0 || y == 0 || x == 15 || y == 15) rgb(150, 150, 156) else if (x - y in -1..1 || x - y in 5..6) rgb(236, 246, 252) else rgb(170, 206, 226) }; return true }
+            "clock_face" -> {
+                t.fill { _, _ -> rgb(30, 30, 34) }
+                disc(t, 8f, 8f, 7.4f, rgb(246, 244, 236), false)
+                for ((x, y) in listOf(8 to 2, 13 to 8, 8 to 13, 2 to 8)) t[x, y] = rgb(30, 30, 34)
+                for (y in 4..8) t[8, y] = rgb(30, 30, 34); for (x in 8..11) t[x, 8] = rgb(200, 40, 40)
+                return true
+            }
+            "curtain" -> { t.fill { x, _ -> scale(rgb(150, 40, 110), if (x % 4 == 0) 0.75f else if (x % 4 == 2) 1.1f else 1f) }; return true }
+            "dustbin" -> { t.fill { x, y -> if (y % 5 == 0) rgb(40, 110, 50) else scale(rgb(60, 150, 70), if (x % 3 == 0) 0.9f else 1f) }; return true }
+            "water_bottle_blue" -> { t.fill { x, y -> if (x % 5 == 1) rgb(150, 200, 240) else rgb(90, 160, 230) }; return true }
             "sickle" -> { mask(t, SICKLE, rgb(200, 202, 208), rgb(137, 103, 55)); return true }
             "watering_can" -> { mask(t, CAN, rgb(60, 150, 80)); return true }
             "blueprint" -> { mask(t, PLAN, rgb(40, 90, 180), rgb(40, 90, 180)); for (y in 0 until 16) for (x in 0 until 16) if (t[x, y] == scale(rgb(40, 90, 180), 1.3f)) t[x, y] = rgb(236, 240, 250); return true }

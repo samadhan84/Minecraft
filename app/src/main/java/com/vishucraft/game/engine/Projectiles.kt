@@ -328,11 +328,27 @@ class Carts(private val world: World) {
         } else d < 2.2f && abs(it.y - py) < 1.6f && (d < 0.8f || (dx * lookX + dz * lookZ) / d > 0.2f)
     }.minByOrNull { (it.x - px) * (it.x - px) + (it.z - pz) * (it.z - pz) }
 
+    /** The cars of the train [head] leads, front to back. */
+    fun chain(head: Cart): List<Cart> {
+        val out = arrayListOf(head)
+        var c = head
+        while (out.size < 64) { c = follower(c) ?: break; out.add(c) }
+        return out
+    }
+
+    /** The engine or metro car that powers this train, if it has one. */
+    fun power(c: Cart): Cart? = chain(head(c)).firstOrNull { it.kind == Cart.ENGINE || it.kind == Cart.METRO }
+
+    /** Whether the player is riding in this train. */
+    private fun riderIn(head: Cart) = riding?.let { head(it) === head } == true
+
     fun update(dt: Float, game: Game) {
+        for (c in list) if (c.leader != null && c.leader !in list) c.leader = null
         // Carts in chunks that are not loaded wait there (they would otherwise fall through the missing ground).
         for (c in list) {
-            if (c.leader != null && c.leader !in list) c.leader = null
             if (c.leader != null || !world.isLoaded(floorInt(c.x), floorInt(c.z))) continue
+            // Trains with an engine or a metro car drive themselves.
+            if (power(c) != null && autoDrive(c, dt, game)) continue
             // Fast trains move in small steps so they never skip a curve.
             val n = kotlin.math.ceil(c.speed * dt / 0.3f).toInt().coerceIn(1, 8)
             repeat(n) { step(c, dt / n, game) }
@@ -351,9 +367,15 @@ class Carts(private val world: World) {
             // In a train you sit low enough to look out of the windows.
             p.x = c.x; p.z = c.z; p.y = c.y + (if (c.isTrain) 0f else 0.35f)
             p.vx = 0f; p.vy = 0f; p.vz = 0f
-            if (c.isTrain) { drive(c, dt, game); return }
-            // Push the cart in the direction the player is looking along the track.
             val push = game.input.moveForward
+            if (c.isTrain) {
+                val h = head(c)
+                // Forward leaves a station early; a coach on its own can be pushed along slowly.
+                if (push > 0f && h.stopTimer > 0.1f && power(h) != null) h.stopTimer = 0.1f
+                if (power(h) == null && h === c && push > 0f) c.speed = minOf(4f, c.speed + 3f * push * dt)
+                return
+            }
+            // Push the cart in the direction the player is looking along the track.
             if (push != 0f) {
                 val lookX = kotlin.math.sin(p.yaw); val lookZ = -kotlin.math.cos(p.yaw)
                 val along = lookX * c.hx + lookZ * c.hz
@@ -366,45 +388,52 @@ class Carts(private val world: World) {
     }
 
     /**
-     * The rider drives an engine with forward (faster) and back (brake, then reverse). A metro drives itself
-     * from station to station while anyone is on board; forward leaves a station straight away.
+     * Engines and metros run all the time: full speed on open track, slowing for the next stop rail, standing
+     * there for 10 seconds, and turning back at the end of the line. Returns true while standing still.
      */
-    private fun drive(riddenCar: Cart, dt: Float, game: Game) {
-        val c = head(riddenCar)
-        val throttle = game.input.moveForward
-        when (c.kind) {
-            // A coach on its own can be pushed along slowly, like a minecart.
-            Cart.COACH -> if (throttle > 0f && riddenCar === c) c.speed = minOf(4f, c.speed + 3f * throttle * dt)
-            Cart.ENGINE -> {
-                if (riddenCar !== c) return // passengers in the coaches just ride along
-                if (throttle > 0f) {
-                    if (c.speed < 0.2f) game.sound("train_horn", c.x, c.y + 2f, c.z, 0.8f)
-                    c.speed = minOf(c.maxSpeed, c.speed + 4f * throttle * dt)
-                } else if (throttle < 0f) {
-                    if (c.speed > 0f) c.speed = maxOf(0f, c.speed - 12f * dt)
-                    else if (follower(c) == null) { c.hx = -c.hx; c.hz = -c.hz; c.speed = 0.3f }
-                }
+    private fun autoDrive(h: Cart, dt: Float, game: Game): Boolean {
+        val engine = power(h)!!
+        if (h.stopTimer > 0f) {
+            h.speed = 0f
+            h.stopTimer -= dt
+            if (h.stopTimer <= 0f) {
+                h.stopTimer = 0f
+                if (engine.kind == Cart.METRO) game.sound("metro_chime", h.x, h.y + 2f, h.z) else game.sound("train_horn", h.x, h.y + 2f, h.z, 0.8f)
+                if (riderIn(h)) game.uiEvents.add("toast:" + if (engine.kind == Cart.METRO) "Doors closing. Next station…" else "All aboard! The train is leaving")
             }
-            Cart.METRO -> {
-                if (c.stopTimer > 0f) {
-                    c.speed = 0f
-                    c.stopTimer -= dt
-                    if (throttle > 0f) c.stopTimer = 0f
-                    if (c.stopTimer <= 0f) { game.sound("metro_chime", c.x, c.y + 2f, c.z); game.uiEvents.add("toast:Doors closing. Next station…") }
-                    return
-                }
-                val ahead = stationAhead(c)
-                val target = if (ahead != null) minOf(c.maxSpeed, 1.5f + ahead * 2.2f) else c.maxSpeed
-                c.speed = if (c.speed < target) minOf(target, c.speed + 5f * dt) else maxOf(target, c.speed - 14f * dt)
-                if (c.speed < 0.3f) c.speed = 0.3f
-                // At the end of the line a metro on its own turns back.
-                if (c.atEnd && follower(c) == null) {
-                    c.hx = -c.hx; c.hz = -c.hz; c.atEnd = false; c.stopTimer = 5f; c.lastStation = Long.MIN_VALUE
-                    game.sound("metro_chime", c.x, c.y + 2f, c.z)
-                    game.uiEvents.add("toast:End of the line. This metro goes back the other way")
-                }
+            return true
+        }
+        if (h.atEnd) { reverse(h, game); return true }
+        val ahead = stopAhead(h)
+        val max = engine.maxSpeed
+        val target = if (ahead != null) minOf(max, 1.5f + ahead * 2.2f) else max
+        h.speed = if (h.speed < target) minOf(target, h.speed + 5f * dt) else maxOf(target, h.speed - 14f * dt)
+        if (h.speed < 0.3f) h.speed = 0.3f
+        return false
+    }
+
+    /**
+     * At the end of the track the whole train turns round: the last car becomes the front, every car faces the
+     * other way, and it waits 10 seconds like at a station.
+     */
+    fun reverse(h: Cart, game: Game) {
+        val cars = chain(h)
+        for (c in cars) { c.hx = -c.hx; c.hz = -c.hz; c.yaw = kotlin.math.atan2(c.hx, -c.hz); c.leader = null; c.trail.clear(); c.speed = 0f; c.atEnd = false }
+        val rev = cars.reversed()
+        for (k in 1 until rev.size) {
+            val front = rev[k - 1]; val back = rev[k]
+            back.leader = front
+            // The front car's trail leads back to the car behind it, so the train keeps its shape.
+            for (s in 0..20) {
+                val f = s / 20f
+                front.trail.addLast(floatArrayOf(back.x + (front.x - back.x) * f, back.y + (front.y - back.y) * f, back.z + (front.z - back.z) * f))
             }
         }
+        val nh = rev[0]
+        nh.stopTimer = STOP_SECONDS
+        nh.lastStation = Long.MIN_VALUE
+        game.sound(if (power(nh)?.kind == Cart.METRO) "metro_chime" else "train_horn", nh.x, nh.y + 2f, nh.z, 0.8f)
+        if (riderIn(nh)) game.uiEvents.add("toast:End of the line. The train goes back the other way in 10 seconds")
     }
 
     private fun railCell(c: Cart): IntArray? {
@@ -413,43 +442,38 @@ class Carts(private val world: World) {
         return if (railAt(bx, by, bz) == 0) null else intArrayOf(bx, by, bz)
     }
 
-    private fun platformNext(x: Int, y: Int, z: Int): Boolean {
-        for ((dx, dz) in arrayOf(1 to 0, -1 to 0, 0 to 1, 0 to -1)) for (dy in -1..0) {
-            if (world.getBlock(x + dx, y + dy, z + dz) == Blocks.STATION_PLATFORM) return true
-        }
-        return false
-    }
-
-    /** Blocks until the next station rail ahead (a rail with a platform beside it), up to 8 ahead. */
-    private fun stationAhead(c: Cart): Int? {
+    /** Blocks until the next stop rail ahead, up to 8 ahead. */
+    private fun stopAhead(c: Cart): Int? {
         val cell = railCell(c) ?: return null
         val sx = kotlin.math.round(c.hx).toInt(); val sz = kotlin.math.round(c.hz).toInt()
         for (k in 0..8) {
             val x = cell[0] + sx * k; val z = cell[2] + sz * k
             for (dy in -1..1) {
                 val y = cell[1] + dy
-                if (railAt(x, y, z) == 0) continue
-                if (platformNext(x, y, z) && RedstoneIds.pack(x, y, z) != c.lastStation) return k
+                if (world.getBlock(x, y, z) == Blocks.STOP_RAIL && RedstoneIds.pack(x, y, z) != c.lastStation) return k
             }
         }
         return null
     }
 
-    /** A metro with people on board stops for a few seconds at each station. */
+    /** A running train stops for 10 seconds on each stop rail (once its middle reaches the rail's middle). */
     private fun checkStation(c: Cart, bx: Int, by: Int, bz: Int, game: Game) {
-        if (c.kind != Cart.METRO || c.stopTimer > 0f) return
-        val r = riding ?: return
-        if (head(r) !== c) return
+        if (c.leader != null || c.stopTimer > 0f || world.getBlock(bx, by, bz) != Blocks.STOP_RAIL) return
+        val engine = power(c) ?: return
         val key = RedstoneIds.pack(bx, by, bz)
-        if (key == c.lastStation || !platformNext(bx, by, bz)) return
-        // Stop near the middle of the station block.
+        if (key == c.lastStation) return
         val fx = c.x - (bx + 0.5f); val fz = c.z - (bz + 0.5f)
         if (fx * c.hx + fz * c.hz < 0f) return
         c.lastStation = key
-        c.stopTimer = 5f
+        c.stopTimer = STOP_SECONDS
         c.speed = 0f
-        game.sound("metro_chime", c.x, c.y + 2f, c.z)
-        game.uiEvents.add("toast:Station! Doors open. Crouch or tap to get off, or press forward to go on")
+        game.sound(if (engine.kind == Cart.METRO) "metro_chime" else "train_horn", c.x, c.y + 2f, c.z, 0.8f)
+        if (riderIn(c)) game.uiEvents.add("toast:Station stop for 10 seconds. Crouch or tap to get off, forward to leave now")
+    }
+
+    companion object {
+        /** Seconds a train stands at a stop rail or the end of the line. */
+        const val STOP_SECONDS = 10f
     }
 
     private fun step(c: Cart, dt: Float, game: Game) {

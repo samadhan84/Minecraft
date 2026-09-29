@@ -1057,6 +1057,14 @@ class App(private val demo: File?) {
                 at(5, 4, 4, B.AIR_CONDITIONER, toPlayer or 8)
                 for (r in 1..5) for (f in 1..4) at(f, r, 5, B.SMOOTH_STONE)
                 at(3, 3, 4, B.CEILING_FAN, 8)
+                // Household pack along the back wall and in the middle.
+                at(5, 0, 1, B.WARDROBE, toPlayer); at(5, 0, 2, B.WARDROBE, toPlayer or com.vishucraft.game.world.Shapes.UPPER)
+                at(5, 2, 1, B.STUDY_TABLE, toPlayer); at(5, 2, 2, B.COMPUTER, toPlayer or 8)
+                at(5, 1, 3, B.WALL_CLOCK, toPlayer); at(5, 3, 3, B.MIRROR, toPlayer)
+                at(3, 0, 1, B.ARMCHAIR, toPlayer); at(3, 1, 1, B.BEAN_BAG, toPlayer); at(4, 0, 1, B.PLANT_POT)
+                at(2, 1, 4, B.CEILING_LIGHT, 8)
+                at(1, 5, 1, B.BATHTUB, toPlayer or 8); at(1, 6, 1, B.TOILET, toPlayer); at(3, 6, 1, B.WASH_BASIN, toPlayer)
+                at(4, 6, 1, B.WATER_COOLER, toPlayer); at(2, 6, 1, B.DUSTBIN)
                 g.mobs.list.clear(); g.carts.list.clear()
                 p.x = bx + 0.5f - sx * 1.5f; p.z = bz + 0.5f - sz * 1.5f; p.y = y + 2.2f
             }
