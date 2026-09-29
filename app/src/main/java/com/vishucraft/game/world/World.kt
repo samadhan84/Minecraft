@@ -16,7 +16,7 @@ import kotlin.math.floor
  */
 enum class Dimension { OVERWORLD, EMBER, SKY }
 
-class World(val seed: Long, private val saveDir: File?, val dimension: Dimension = Dimension.OVERWORLD) {
+class World(val seed: Long, private val saveDir: File?, val dimension: Dimension = Dimension.OVERWORLD, val flat: Boolean = false) {
     /** Villagers placed by structure generation, waiting to be spawned on the game thread. */
     val pendingVillagers = java.util.concurrent.ConcurrentLinkedQueue<Triple<Int, Int, Int>>()
 
@@ -24,7 +24,7 @@ class World(val seed: Long, private val saveDir: File?, val dimension: Dimension
     /** Positions (see [RedstoneIds.pack]) of every redstone component in loaded chunks. */
     val components: MutableSet<Long> = ConcurrentHashMap.newKeySet()
     val generator: WorldGenerator = when (dimension) {
-        Dimension.OVERWORLD -> TerrainGenerator(seed, this)
+        Dimension.OVERWORLD -> if (flat) FlatGenerator() else TerrainGenerator(seed, this)
         Dimension.EMBER -> EmberGenerator(seed)
         Dimension.SKY -> SkyGenerator(seed)
     }
@@ -212,14 +212,17 @@ class LevelData(
     val enderChest: ChestEntity = ChestEntity(),
     /** The Sky Warden has been beaten (it does not come back). */
     var bossDefeated: Boolean = false,
+    /** A flat world: grass on top, no trees, plants or hills (new creative worlds). */
+    var flat: Boolean = false,
 ) {
     companion object {
-        private const val VERSION = 8
+        private const val VERSION = 9
 
         /** Creative worlds start with a useful hotbar; survival starts empty-handed. */
         fun create(seed: Long, name: String, mode: GameMode): LevelData {
             val l = LevelData(seed, mode = mode, name = name)
             if (mode == GameMode.CREATIVE) {
+                l.flat = true
                 val start = intArrayOf(
                     Items.find("Enchanted Diamond Pickaxe"), Items.find("Diamond Sword"), Blocks.GRASS, Blocks.STONE,
                     Blocks.PLANKS, Blocks.GLASS, Blocks.TORCH, Blocks.REDSTONE_DUST, Blocks.PISTON,
@@ -267,6 +270,7 @@ class LevelData(
                         }
                         if (version >= 7) for (i in l.enderChest.slots.indices) l.enderChest.slots[i] = Inventory.readStack(d)
                         if (version >= 8) l.bossDefeated = d.readBoolean()
+                        if (version >= 9) l.flat = d.readBoolean()
                     }
                     l.hasPlayer = true
                     l
@@ -303,6 +307,7 @@ class LevelData(
             for (a in achievements) d.writeUTF(a)
             for (s in enderChest.slots) Inventory.writeStack(d, s)
             d.writeBoolean(bossDefeated)
+            d.writeBoolean(flat)
         }
         tmp.renameTo(f)
     }

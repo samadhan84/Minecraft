@@ -125,7 +125,7 @@ class GameActivity : Activity() {
             com.vishucraft.game.world.Dimension.EMBER -> File(dir, "ember")
             com.vishucraft.game.world.Dimension.SKY -> File(dir, "sky")
         }
-        world = World(level.seed, if (client != null) null else dimDir, level.dimension)
+        world = World(level.seed, if (client != null) null else dimDir, level.dimension, level.flat)
         if (client != null) world.remoteLoader = { cx, cz -> client.requestChunk(cx, cz) }
         game = Game(world, level, input, if (client != null) null else dir)
         worldDirForDim = dir

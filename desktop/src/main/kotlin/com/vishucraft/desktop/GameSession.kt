@@ -27,7 +27,7 @@ class GameSession(
             Dimension.EMBER -> dir?.let { File(it, "ember") }
             Dimension.SKY -> dir?.let { File(it, "sky") }
         }
-        world = World(level.seed, if (client != null) null else dimDir, level.dimension)
+        world = World(level.seed, if (client != null) null else dimDir, level.dimension, level.flat)
         if (client != null) world.remoteLoader = { cx, cz -> client.requestChunk(cx, cz) }
         game = Game(world, level, input, if (client != null) null else dir)
         if (client != null) game.net = client

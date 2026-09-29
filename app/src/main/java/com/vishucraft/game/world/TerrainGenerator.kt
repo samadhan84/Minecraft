@@ -14,6 +14,23 @@ interface WorldGenerator {
     fun biomeAt(x: Int, z: Int): Biome
 }
 
+/** A flat world for building: bedrock, stone, three layers of dirt and grass on top. Nothing grows on it. */
+class FlatGenerator : WorldGenerator {
+    companion object { const val TOP = 64 }
+
+    override fun generate(chunk: Chunk) {
+        for (z in 0 until Chunk.SIZE) for (x in 0 until Chunk.SIZE) {
+            chunk.set(x, 0, z, Blocks.BEDROCK)
+            for (y in 1 until TOP - 3) chunk.set(x, y, z, Blocks.STONE)
+            for (y in TOP - 3 until TOP) chunk.set(x, y, z, Blocks.DIRT)
+            chunk.set(x, TOP, z, Blocks.GRASS)
+        }
+    }
+
+    override fun surfaceHeight(x: Int, z: Int) = TOP
+    override fun biomeAt(x: Int, z: Int) = Biome.PLAINS
+}
+
 /** Deterministic procedural terrain: heightmap + biomes + caves + ores + vegetation. */
 class TerrainGenerator(private val seed: Long, private val world: World? = null) : WorldGenerator {
     companion object {

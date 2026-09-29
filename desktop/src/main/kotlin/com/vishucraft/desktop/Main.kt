@@ -461,7 +461,7 @@ class App(private val demo: File?) {
         ui.text("Seed", cx - w / 2, y - 24, 16f, rgba(220, 220, 220))
         ui.field(seedField, cx - w / 2, y, w)
         y += 64
-        if (ui.button("Game mode: " + if (survival) "Survival" else "Creative", cx - w / 2, y, w, 42f)) survival = !survival
+        if (ui.button("Game mode: " + if (survival) "Survival" else "Creative (flat world)", cx - w / 2, y, w, 42f)) survival = !survival
         ui.text(if (survival) "Collect resources, craft tools, watch your health and hunger." else "Unlimited blocks, flying, no damage.",
             cx, y + 50, 16f, rgba(200, 200, 200), 1)
         y += 100

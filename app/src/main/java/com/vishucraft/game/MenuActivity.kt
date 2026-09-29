@@ -346,7 +346,7 @@ class MenuActivity : Activity() {
         lateinit var modeButton: TextView
         modeButton = menuButton(this, "Game mode: Survival") {
             survival = !survival
-            modeButton.text = if (survival) "Game mode: Survival" else "Game mode: Creative"
+            modeButton.text = if (survival) "Game mode: Survival" else "Game mode: Creative (flat world)"
         }
         col.addView(nameInput); col.addView(seedInput)
         col.addView(modeButton, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dpi(8f) })
