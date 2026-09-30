@@ -155,9 +155,11 @@ class HudButton(ctx: Context, var label: String, private val onChange: (Boolean)
 class HotbarView(
     ctx: Context,
     private val inv: com.vishucraft.game.world.Inventory,
-    private val showCounts: Boolean,
+    showCounts: Boolean,
     private val onSelect: (Int) -> Unit,
 ) : View(ctx) {
+    var showCounts = showCounts
+        set(v) { field = v; invalidate() }
     var selected = 0
         set(v) { field = v; invalidate() }
     private val frame = Paint().apply { color = Color.argb(150, 20, 20, 20) }

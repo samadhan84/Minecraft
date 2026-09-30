@@ -740,6 +740,10 @@ class App(private val demo: File?) {
         b("Save and quit to title") { leaveWorld(); menu = Menu.TITLE }
         y += 10
         twoColumns = true
+        b(if (game.survival) "Mode: Survival (switch to Creative)" else "Mode: Creative (switch to Survival)") {
+            if (game.isClient) hud?.toast("The host picks the game mode")
+            else { hud?.toast(game.switchMode(), 4f); overlay = Overlay.NONE }
+        }
         b("Skip to next morning / night") { game.timeOfDay = if (game.daylight > 0.5f) 0.52f else 0.0f }
         b(if (game.mobs.hostileEnabled) "Mobs: Normal" else "Mobs: Peaceful (no monsters)") { game.mobs.hostileEnabled = !game.mobs.hostileEnabled }
         b(if (prefs.weather) "Weather: On" else "Weather: Off") { prefs.weather = !prefs.weather; applySettings() }

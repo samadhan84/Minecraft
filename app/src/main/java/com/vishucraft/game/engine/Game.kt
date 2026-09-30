@@ -99,6 +99,15 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
     val mode get() = level.mode
     val survival get() = level.mode == GameMode.SURVIVAL
 
+    /** Switches this world between creative and survival (from the game menu); returns the message to show. */
+    fun switchMode(): String {
+        level.mode = if (survival) GameMode.CREATIVE else GameMode.SURVIVAL
+        // A fresh start either way: full health and food, and no flying in survival.
+        health = 20f; food = 20f; air = 10f
+        if (survival) { player.flying = false; return "Survival mode: collect, craft and survive. Your items are kept" }
+        return "Creative mode: every block, flying (double-jump or FLY) and no damage"
+    }
+
     /** Player health in half-hearts (20 = ten hearts). */
     var health = level.health.coerceIn(1f, 20f)
         private set

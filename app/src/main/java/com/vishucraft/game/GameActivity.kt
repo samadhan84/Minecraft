@@ -177,7 +177,8 @@ class GameActivity : Activity() {
         downButton.visibility = View.GONE
 
         flyButton = HudButton(this, "FLY") { if (it) input.actions.add(GameInput.Action.TOGGLE_FLY) }
-        if (!game.survival) root.addView(flyButton, lp(56f, 44f, Gravity.TOP or Gravity.END, t = 12f, r = 76f))
+        root.addView(flyButton, lp(56f, 44f, Gravity.TOP or Gravity.END, t = 12f, r = 76f))
+        if (game.survival) flyButton.visibility = View.GONE
         val menu = HudButton(this, "II") { if (it) handler.post { showPause(true) } }
         root.addView(menu, lp(52f, 44f, Gravity.TOP or Gravity.END, t = 12f, r = 16f))
 
@@ -241,7 +242,8 @@ class GameActivity : Activity() {
         }
 
         status = StatusView(this)
-        if (game.survival) root.addView(status, lp(9 * 42f, 36f, Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL, l = 0f, r = 50f, b = 50f))
+        root.addView(status, lp(9 * 42f, 36f, Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL, l = 0f, r = 50f, b = 50f))
+        if (!game.survival) status.visibility = View.GONE
         hurtFlash = View(this).apply { setBackgroundColor(Color.argb(110, 220, 0, 0)); alpha = 0f }
         root.addView(hurtFlash, 1, FrameLayout.LayoutParams(-1, -1))
 
@@ -304,6 +306,13 @@ class GameActivity : Activity() {
             glView.queueEvent { game.save(); runOnUiThread { showToast("Game saved") } }
         }
         addMenu("Save and quit") { saveAndQuit() }
+        addMenu(modeLabel()) { b ->
+            if (game.isClient) { showToast("The host picks the game mode"); return@addMenu }
+            glView.queueEvent {
+                val msg = game.switchMode()
+                runOnUiThread { applyMode(); b.text = modeLabel(); showToast(msg); showPause(false) }
+            }
+        }
         addMenu("Skip to next morning / night") {
             glView.queueEvent { game.timeOfDay = if (game.daylight > 0.5f) 0.52f else 0.0f }
             showPause(false)
@@ -436,6 +445,15 @@ class GameActivity : Activity() {
         sounds.volume = settings.soundVolume / 100f
         sounds.musicVolume = settings.musicVolume / 100f
         if (::stats.isInitialized) stats.visibility = if (settings.showDebug) View.VISIBLE else View.GONE
+    }
+
+    private fun modeLabel() = "Game mode: " + if (game.survival) "Survival  →  switch to Creative" else "Creative  →  switch to Survival"
+
+    /** Shows the buttons and bars that belong to the current game mode. */
+    private fun applyMode() {
+        flyButton.visibility = if (game.survival) View.GONE else View.VISIBLE
+        status.visibility = if (game.survival) View.VISIBLE else View.GONE
+        hotbar.showCounts = game.survival
     }
 
     private fun showPause(show: Boolean) {
