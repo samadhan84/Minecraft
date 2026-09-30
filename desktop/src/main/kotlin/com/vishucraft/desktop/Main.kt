@@ -1,7 +1,6 @@
 package com.vishucraft.desktop
 
 import com.vishucraft.game.engine.placeBuilding
-import com.vishucraft.game.engine.robotBuild
 import com.vishucraft.desktop.Ui.Companion.rgba
 import com.vishucraft.game.engine.GameInput
 import com.vishucraft.game.net.ClientSession
@@ -77,7 +76,7 @@ const val CONTROLS_HELP =
 
 class App(private val demo: File?) {
     private enum class Menu { TITLE, WORLDS, CREATE, JOIN, SETTINGS, CONTROLS, CONFIRM_DELETE }
-    private enum class Overlay { NONE, PAUSE, CREATIVE, CONTAINER, SETTINGS, CONTROLS, NAME_MOB, TRADE, ACHIEVEMENTS, SIGN, ENDING, INTERNET, ROBOT }
+    private enum class Overlay { NONE, PAUSE, CREATIVE, CONTAINER, SETTINGS, CONTROLS, NAME_MOB, TRADE, ACHIEVEMENTS, SIGN, ENDING, INTERNET }
 
     private var window = NULL
     private val prefs = Prefs()
@@ -218,7 +217,6 @@ class App(private val demo: File?) {
             Overlay.TRADE -> tradeScreen(s)
             Overlay.ACHIEVEMENTS -> achievementsScreen(s)
             Overlay.SIGN -> signScreen(s)
-            Overlay.ROBOT -> robotScreen(s)
             Overlay.ENDING -> endingScreen()
             Overlay.INTERNET -> internetScreen()
         }
@@ -288,7 +286,6 @@ class App(private val demo: File?) {
                 signPos = e.removePrefix("signedit:").split(',').map { it.toInt() }
                 signField.text = s.game.signText(signPos[0], signPos[1], signPos[2]); ui.focus = signField; overlay = Overlay.SIGN
             }
-            e == "robot" -> { robotField.text = ""; ui.focus = robotField; overlay = Overlay.ROBOT }
             e.startsWith("achievement:") -> hud.toast("Achievement unlocked!\n" + e.removePrefix("achievement:"), 4f)
             e.startsWith("trade:") -> { tradeUid = e.removePrefix("trade:").toIntOrNull() ?: -1; tradeMessage = ""; overlay = Overlay.TRADE }
             e.startsWith("name:") -> { namingUid = e.removePrefix("name:").toIntOrNull() ?: -1; nameField.text = ""; ui.focus = nameField; overlay = Overlay.NAME_MOB }
@@ -529,28 +526,6 @@ class App(private val demo: File?) {
                 "The world is still yours: keep building, exploring and playing."
         for (line in text.split('\n')) { ui.text(line, ui.width / 2, y, 19f, rgba(230, 230, 255), 1); y += 28 }
         if (ui.button("Keep playing", ui.width / 2 - 140, y + 20, 280f, 44f)) overlay = Overlay.NONE
-    }
-
-    private val robotField = Ui.Field("", "e.g. castle, red tower 20, glass pyramid, write DHRUV", 60)
-
-    /** The builder robot asks what to build. */
-    private fun robotScreen(s: GameSession) {
-        val cx = ui.width / 2; val w = 640f
-        ui.rect(0f, 0f, ui.width, ui.height, rgba(0, 0, 0, 150))
-        title("Builder Robot: what should I build?", ui.height * 0.22f)
-        ui.field(robotField, cx - w / 2, ui.height * 0.36f, w)
-        val ideas = com.vishucraft.game.engine.Robot.IDEAS.joinToString(", ")
-        var y = ui.height * 0.36f + 52
-        var line = "Ideas:"
-        for (word in ideas.split(' ')) {
-            if (ui.textWidth("$line $word", 15f) > w) { ui.text(line, cx, y, 15f, rgba(220, 220, 220), 1); y += 20; line = word } else line = "$line $word"
-        }
-        ui.text(line, cx, y, 15f, rgba(220, 220, 220), 1)
-        y += 36
-        if (ui.button("Build", cx - w / 2, y, w / 2 - 5, 44f) || ui.takeSubmit()) {
-            hud?.toast(s.game.robotBuild(robotField.text), 4f); ui.focus = null; overlay = Overlay.NONE
-        }
-        if (ui.button("Cancel", cx + 5, y, w / 2 - 5, 44f)) { ui.focus = null; overlay = Overlay.NONE }
     }
 
     private fun signScreen(s: GameSession) {
@@ -823,7 +798,7 @@ class App(private val demo: File?) {
             }
             Overlay.PAUSE -> if (key == GLFW_KEY_ESCAPE) overlay = Overlay.NONE
             Overlay.TRADE -> if (key == GLFW_KEY_ESCAPE || key == GLFW_KEY_E) overlay = Overlay.NONE
-            Overlay.SIGN, Overlay.ROBOT -> if (key == GLFW_KEY_ESCAPE) { ui.focus = null; overlay = Overlay.NONE }
+            Overlay.SIGN -> if (key == GLFW_KEY_ESCAPE) { ui.focus = null; overlay = Overlay.NONE }
             Overlay.ENDING -> if (key == GLFW_KEY_ESCAPE) overlay = Overlay.NONE
             Overlay.INTERNET -> if (key == GLFW_KEY_ESCAPE) overlay = Overlay.PAUSE
             Overlay.SETTINGS, Overlay.CONTROLS, Overlay.NAME_MOB, Overlay.ACHIEVEMENTS -> if (key == GLFW_KEY_ESCAPE) { ui.focus = null; overlay = Overlay.PAUSE }
@@ -1141,18 +1116,16 @@ class App(private val demo: File?) {
             }
             f == 1100 -> shot("04n-ready-made-buildings")
             f == 1101 -> session?.game?.let { g ->
-                // The builder robot: a castle, and the players' names written in gold.
+                // The mansion blueprint, seen from the front garden.
                 val p = g.player
                 val bx = com.vishucraft.game.world.floorInt(p.x) + 90; val bz = com.vishucraft.game.world.floorInt(p.z)
                 val y = g.world.generator.surfaceHeight(bx, bz)
-                p.x = bx + 0.5f; p.z = bz + 12.5f; p.y = y + 16f; p.yaw = 0f; p.pitch = -0.45f; p.flying = true
-                g.robot.target = intArrayOf(bx, y + 1, bz, 0, -1)
-                println("robot: " + g.robotBuild("big castle"))
-                g.robot.target = intArrayOf(bx, y + 12, bz - 30, 0, -1)
-                println("robot: " + g.robotBuild("write DHRUV VISHU"))
-                g.robot.speed = 100000
+                p.x = bx + 0.5f; p.z = bz + 12.5f; p.y = y + 12f; p.yaw = 0f; p.pitch = -0.35f; p.flying = true
+                g.placeBuilding(com.vishucraft.game.engine.RayHit(bx, y, bz, 0, 1, 0, Blocks.GRASS), "Mansion")
             }
-            f == 1109 -> shot("04o-builder-robot")
+            f == 1108 -> shot("04o-mansion")
+            f == 1109 -> session?.game?.let { g -> val p = g.player; p.z -= 21f; p.y -= 11f; p.pitch = -0.1f }
+            f == 1110 -> shot("04p-mansion-inside")
             f == 1111 -> overlay = Overlay.PAUSE
             f == 1113 -> shot("05-pause")
             f == 1117 -> { overlay = Overlay.NONE; leaveWorld(); menu = Menu.CREATE; nameField.text = "Demo survival"; seedField.text = "777"; survival = true }

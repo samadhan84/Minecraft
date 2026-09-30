@@ -20,7 +20,6 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import com.vishucraft.game.engine.Game
 import com.vishucraft.game.engine.GameInput
-import com.vishucraft.game.engine.robotBuild
 import com.vishucraft.game.render.GameRenderer
 import com.vishucraft.game.ui.CrosshairView
 import com.vishucraft.game.ui.HotbarView
@@ -368,30 +367,6 @@ class GameActivity : Activity() {
         }
     }
 
-    /** The builder robot asks what to build; the keyboard opens straight away. */
-    private fun askRobot() {
-        releaseInputs()
-        val input = android.widget.EditText(this).apply {
-            hint = "e.g. castle, red tower 20, glass pyramid, write DHRUV"
-            setSingleLine(); imeOptions = android.view.inputmethod.EditorInfo.IME_ACTION_DONE
-        }
-        val ideas = com.vishucraft.game.engine.Robot.IDEAS
-        lateinit var dialog: android.app.AlertDialog
-        fun go() {
-            val text = input.text.toString()
-            dialog.dismiss()
-            glView.queueEvent { val reply = game.robotBuild(text); runOnUiThread { showToast(reply) } }
-        }
-        dialog = android.app.AlertDialog.Builder(this).setTitle("Builder Robot: what should I build?").setView(input)
-            .setMessage("Ideas: " + ideas.joinToString(", "))
-            .setPositiveButton("Build") { _, _ -> go() }
-            .setNegativeButton("Cancel", null).create()
-        input.setOnEditorActionListener { _, _, _ -> go(); true }
-        dialog.window?.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE)
-        dialog.show()
-        input.requestFocus()
-    }
-
     private fun showOnlineError(message: String?) {
         android.app.AlertDialog.Builder(this).setTitle("Couldn't open online")
             .setMessage(message ?: "Check your internet connection and try again.")
@@ -599,7 +574,6 @@ class GameActivity : Activity() {
                     .setNegativeButton("Cancel", null).show()
                 input.requestFocus()
             }
-            e == "robot" -> askRobot()
             e.startsWith("achievement:") -> showToast("Achievement unlocked!\n" + e.removePrefix("achievement:"))
             e.startsWith("trade:") -> e.removePrefix("trade:").toIntOrNull()?.let { showTrades(it) }
             e.startsWith("name:") -> {

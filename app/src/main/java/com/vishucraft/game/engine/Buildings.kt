@@ -4,6 +4,7 @@ import com.vishucraft.game.world.Blocks
 import com.vishucraft.game.world.Chunk
 import com.vishucraft.game.world.Items
 import com.vishucraft.game.world.Shapes
+import kotlin.math.abs
 
 /*
  * Ready-made buildings: a blueprint builds a whole house, farm, tower, metro station or pool in front of
@@ -14,9 +15,7 @@ import com.vishucraft.game.world.Shapes
  * Places blocks in building coordinates: [a] across (to the player's right), [d] away from the player,
  * [h] up from the ground. Faces are given relative to the player too.
  */
-internal class Plan(val g: Game, val ox: Int, val oy: Int, val oz: Int, val fx: Int, val fz: Int,
-                    /** When set, blocks are queued (the builder robot places them a few at a time). */
-                    val queue: ArrayDeque<IntArray>? = null) {
+private class Plan(val g: Game, val ox: Int, val oy: Int, val oz: Int, val fx: Int, val fz: Int) {
     val rx = -fz; val rz = fx
     /** Face index pointing back at the player, away from them, and to their left and right. */
     val toward = when { fx == 1 -> 5; fx == -1 -> 4; fz == 1 -> 3; else -> 2 }
@@ -32,8 +31,7 @@ internal class Plan(val g: Game, val ox: Int, val oy: Int, val oz: Int, val fx: 
     fun set(a: Int, d: Int, h: Int, id: Int, meta: Int = 0) {
         val y = oy + h
         if (y < 1 || y >= Chunk.HEIGHT) return
-        if (queue != null) queue.addLast(intArrayOf(x(a, d), y, z(a, d), id, meta))
-        else g.setBlock(x(a, d), y, z(a, d), id, meta)
+        g.setBlock(x(a, d), y, z(a, d), id, meta)
     }
 
     /** Clears the space above the footprint and fills any gap underneath so it stands on solid ground. */
@@ -69,7 +67,7 @@ internal fun Game.placeBuilding(t: RayHit, name: String): Boolean {
 }
 
 /** Builds one of the ready-made buildings with plan [p]. */
-internal fun Game.buildReady(p: Plan, name: String): Boolean {
+private fun Game.buildReady(p: Plan, name: String): Boolean {
     when (name) {
         "Small House" -> smallHouse(p)
         "Modern House" -> modernHouse(p)
@@ -77,6 +75,7 @@ internal fun Game.buildReady(p: Plan, name: String): Boolean {
         "Watch Tower" -> watchTower(p)
         "Metro Station" -> metroStation(p)
         "Swimming Pool" -> pool(p)
+        "Mansion" -> mansion(p)
         else -> return false
     }
     return true
@@ -212,4 +211,140 @@ private fun Game.pool(p: Plan) {
     p.set(0, 1, 0, Blocks.OAK_SLAB)
     p.set(-4, 0, 0, Blocks.SOFA, p.toward); p.set(4, 0, 0, Blocks.SOFA, p.toward)
     p.set(-3, 0, 0, Blocks.LANTERN); p.set(3, 0, 0, Blocks.LANTERN)
+}
+
+/**
+ * A two-storey luxury mansion: a front garden with fountains and a gate, a pillared porch, a grand hall with
+ * a staircase, a full kitchen and dining room, a living room and library downstairs, bedrooms and a bathroom
+ * upstairs, and a roof terrace with a pool.
+ */
+private fun Game.mansion(p: Plan) {
+    val quartz = Blocks.QUARTZ_BLOCK; val white = Blocks.CONCRETE_FIRST; val gold = Blocks.GOLD_BLOCK
+    val S = Shapes
+    p.site(-11, 11, 1, 21, 14, Blocks.GRASS)
+
+    // ---- Front garden: iron fence with a gate, a quartz path, two fountains and flower beds.
+    for (a in -11..11) for (d in 1..21) {
+        val edge = a == -11 || a == 11 || d == 1 || d == 21
+        if (edge && !(d == 1 && a in -1..1)) p.set(a, d, 0, if ((a + d) % 4 == 0) quartz else Blocks.IRON_BARS)
+    }
+    for (a in intArrayOf(-11, -7, -3, 3, 7, 11)) { p.set(a, 1, 0, quartz); p.set(a, 1, 1, Blocks.LANTERN) }
+    for (d in 1..5) for (a in -1..1) p.set(a, d, -1, quartz)
+    for (sa in intArrayOf(-6, 6)) {
+        for (a in sa - 1..sa + 1) for (d in 2..4) p.set(a, d, 0, if (a == sa && d == 3) Blocks.AIR else Blocks.STONE_BRICK_SLAB)
+        // A little pond with a lily pad (water on top would run all over the garden).
+        p.set(sa, 3, -1, Blocks.WATER); p.set(sa, 3, 0, Blocks.LILY_PAD)
+    }
+    val flowers = intArrayOf(Blocks.FLOWER_RED, Blocks.FLOWER_YELLOW, Blocks.FLOWER_FIRST + 1, Blocks.FLOWER_FIRST + 6)
+    for (a in -10..10) for (d in 2..4) if (abs(a) in 3..4 || abs(a) in 8..10) p.set(a, d, 0, flowers[(a + 11 + d) % flowers.size])
+
+    // ---- Porch with pillars.
+    for (a in intArrayOf(-4, -2, 2, 4)) for (h in 0..4) p.set(a, 5, h, quartz)
+    for (a in -5..5) for (d in 5..6) p.set(a, d, 5, quartz)
+    p.set(-5, 5, 6, gold); p.set(5, 5, 6, gold)
+    for (a in -1..1) p.set(a, 5, 0, Blocks.CARPET_FIRST + 14)
+
+    // ---- The house: ground floor (floor at -1), upper floor (slab at 5), roof (10).
+    val a0 = -9; val a1 = 9; val d0 = 6; val d1 = 20
+    for (a in a0..a1) for (d in d0..d1) {
+        p.set(a, d, -1, Blocks.POLISHED_DIORITE)
+        p.set(a, d, 5, quartz)
+        p.set(a, d, 10, if ((a % 4 == 0) && (d % 4 == 2)) Blocks.SEA_LANTERN else quartz)
+        val edge = a == a0 || a == a1 || d == d0 || d == d1
+        if (!edge) continue
+        val column = (a == a0 || a == a1) && (d % 4 == 2) || (d == d0 || d == d1) && (a % 3 == 0) || ((a == a0 || a == a1) && (d == d0 || d == d1))
+        for (h in 0..9) {
+            if (h == 5) continue
+            val window = !column && (h in 1..3 || h in 7..8)
+            p.set(a, d, h, if (column) quartz else if (window) Blocks.GLASS else white)
+        }
+    }
+    // Grand entrance: three doors under the porch.
+    for (a in -1..1) p.door(a, d0)
+    for (a in -1..1) p.set(a, d0, 2, Blocks.GLASS)
+    // Gold trim on the roof corners and above the door.
+    for ((a, d) in listOf(a0 to d0, a1 to d0, a0 to d1, a1 to d1)) { p.set(a, d, 11, gold); p.set(a, d, 12, Blocks.LANTERN) }
+    p.set(0, d0, 11, Blocks.BANNER_FIRST + 4, p.toward)
+
+    // ---- Grand staircase on the left, up to the upper floor.
+    for (k in 0..5) for (a in -8..-7) {
+        p.set(a, 7 + k, k, Blocks.STONE_BRICK_STAIRS, p.toward)
+        for (h in 0 until k) p.set(a, 7 + k, h, quartz)
+    }
+    for (d in 7..11) for (a in -8..-7) p.set(a, d, 5, Blocks.AIR)
+    for (d in 7..12) p.set(-6, d, 6, Blocks.OAK_FENCE)
+
+    // ---- Downstairs: red carpet hall, chandeliers, living room, kitchen, dining, library.
+    for (d in 7..13) for (a in -1..1) p.set(a, d, 0, Blocks.CARPET_FIRST + 14)
+    for ((a, d) in listOf(-4 to 9, 4 to 9, 0 to 12, -4 to 16, 4 to 16)) p.set(a, d, 4, Blocks.CEILING_LIGHT, 8)
+    // Living room (right, front): sofas round a coffee table, facing the TV on the right wall.
+    for (d in 8..10) p.set(4, d, 0, Blocks.SOFA, p.right)
+    p.set(6, 9, 0, Blocks.COFFEE_TABLE)
+    p.set(8, 9, 0, Blocks.DINING_TABLE); p.set(8, 9, 1, Blocks.TV, p.left or 8)
+    p.set(6, 7, 0, Blocks.ARMCHAIR, p.away); p.set(6, 11, 0, Blocks.ARMCHAIR, p.toward)
+    p.set(8, 7, 0, Blocks.PLANT_POT); p.set(8, 12, 0, Blocks.PLANT_POT); p.set(2, 7, 0, Blocks.PLANT_POT)
+    p.set(8, 11, 0, Blocks.TABLE_LAMP, 8)
+    // Kitchen along the back wall, on the left.
+    p.set(-8, 19, 0, Blocks.FRIDGE, p.toward); p.set(-8, 19, 1, Blocks.FRIDGE, p.toward or S.UPPER)
+    p.set(-7, 19, 0, Blocks.KITCHEN_COUNTER, p.toward); p.set(-7, 19, 1, Blocks.MICROWAVE, p.toward)
+    p.set(-6, 19, 0, Blocks.GAS_STOVE, p.toward); p.set(-6, 19, 1, Blocks.PRESSURE_COOKER, p.toward)
+    p.set(-5, 19, 0, Blocks.KITCHEN_SINK, p.toward)
+    p.set(-4, 19, 0, Blocks.KITCHEN_COUNTER, p.toward); p.set(-4, 19, 1, Blocks.TOASTER, p.toward)
+    p.set(-3, 19, 0, Blocks.GAS_STOVE, p.toward); p.set(-3, 19, 1, Blocks.KETTLE, p.toward)
+    p.set(-2, 19, 0, Blocks.KITCHEN_COUNTER, p.toward); p.set(-2, 19, 1, Blocks.MIXER, p.toward)
+    p.set(-8, 17, 0, Blocks.OVEN, p.right); p.set(-8, 16, 0, Blocks.WATER_COOLER, p.right)
+    // Long dining table with chairs on both sides.
+    for (a in -6..-3) { p.set(a, 15, 0, Blocks.DINING_TABLE); p.set(a, 14, 0, Blocks.CHAIR, p.away); p.set(a, 16, 0, Blocks.CHAIR, p.toward) }
+    // Library and lounge (right, back).
+    for (a in 2..8) { p.set(a, 19, 0, Blocks.BOOKSHELF); p.set(a, 19, 1, Blocks.BOOKSHELF) }
+    p.set(4, 17, 0, Blocks.BEAN_BAG, p.away); p.set(6, 17, 0, Blocks.BEAN_BAG, p.away)
+    p.set(8, 15, 0, Blocks.WASHING_MACHINE, p.left)
+
+    // ---- Upstairs: master bedroom, bathroom, kids' room and a study.
+    // Master bedroom (right, front).
+    p.bed(5, 10, 0, 1, p.away, 0)
+    p.set(8, 7, 6, Blocks.WARDROBE, p.left); p.set(8, 7, 7, Blocks.WARDROBE, p.left or S.UPPER)
+    p.set(8, 10, 6, Blocks.DRESSING_TABLE, p.left)
+    p.set(4, 12, 6, Blocks.COFFEE_TABLE); p.set(4, 12, 7, Blocks.TABLE_LAMP, 8)
+    p.set(6, 12, 6, Blocks.COFFEE_TABLE); p.set(6, 12, 7, Blocks.TABLE_LAMP, 8)
+    p.set(5, 7, 8, Blocks.AIR_CONDITIONER, p.away or 8)
+    p.set(5, 10, 9, Blocks.CEILING_FAN, 8)
+    for (a in 3..7) for (d in 8..9) p.set(a, d, 6, Blocks.CARPET_FIRST + 11)
+    // Bathroom (right, back) behind a wall with a door.
+    for (a in 2..8) for (h in 6..9) p.set(a, 14, h, white)
+    p.set(5, 14, 6, Blocks.OAK_DOOR, p.toward); p.set(5, 14, 7, Blocks.OAK_DOOR, p.toward or S.UPPER)
+    p.set(7, 18, 6, Blocks.BATHTUB, p.left or 8)
+    p.set(3, 19, 6, Blocks.TOILET, p.toward)
+    p.set(5, 19, 6, Blocks.WASH_BASIN, p.toward); p.set(5, 19, 8, Blocks.MIRROR, p.toward)
+    p.set(8, 16, 8, Blocks.SHOWER, p.left)
+    p.set(2, 16, 9, Blocks.CEILING_LIGHT, 8)
+    // Kids' room (left, back): two beds, a study table with a computer and a bean bag.
+    for (a in -8..-2) for (h in 6..9) p.set(a, 14, h, white)
+    p.set(-4, 14, 6, Blocks.OAK_DOOR, p.toward); p.set(-4, 14, 7, Blocks.OAK_DOOR, p.toward or S.UPPER)
+    p.bed(-7, 17, 0, 1, p.away, 11)
+    p.bed(-5, 17, 0, 1, p.away, 6)
+    p.set(-2, 19, 6, Blocks.STUDY_TABLE, p.toward); p.set(-2, 19, 7, Blocks.COMPUTER, p.toward or 8)
+    p.set(-3, 16, 6, Blocks.BEAN_BAG, p.away)
+    p.set(-8, 15, 6, Blocks.WARDROBE, p.right); p.set(-8, 15, 7, Blocks.WARDROBE, p.right or S.UPPER)
+    p.set(-5, 16, 9, Blocks.CEILING_LIGHT, 8)
+    // Study at the top of the stairs.
+    p.set(-3, 8, 6, Blocks.STUDY_TABLE, p.away); p.set(-3, 8, 7, Blocks.COMPUTER, p.away or 8)
+    p.set(-3, 10, 6, Blocks.ARMCHAIR, p.toward)
+    p.set(-2, 12, 6, Blocks.PLANT_POT)
+    p.set(0, 10, 9, Blocks.CEILING_LIGHT, 8)
+    p.set(-1, 7, 8, Blocks.WALL_CLOCK, p.away)
+
+    // ---- Roof terrace: a pool, sun loungers, glass railing, and a ladder up from the upper floor.
+    for (a in a0..a1) for (d in d0..d1) {
+        val corner = (a == a0 || a == a1) && (d == d0 || d == d1)
+        if ((a == a0 || a == a1 || d == d0 || d == d1) && !corner && !(a == 0 && d == d0)) p.set(a, d, 11, Blocks.GLASS_PANE)
+    }
+    for (a in -4..4) for (d in 9..15) {
+        val rim = abs(a) == 4 || d == 9 || d == 15
+        p.set(a, d, 11, if (rim) quartz else Blocks.WATER)
+        if (!rim) p.set(a, d, 10, Blocks.CONCRETE_FIRST + 3)
+    }
+    for (a in intArrayOf(-3, -1, 1, 3)) p.set(a, 17, 11, Blocks.SOFA, p.toward)
+    p.set(-7, 8, 11, Blocks.PLANT_POT); p.set(7, 8, 11, Blocks.PLANT_POT); p.set(-7, 18, 11, Blocks.PLANT_POT); p.set(7, 18, 11, Blocks.PLANT_POT)
+    for (h in 6..10) p.set(0, 19, h, Blocks.LADDER, p.toward)
 }
