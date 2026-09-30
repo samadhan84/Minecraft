@@ -1823,6 +1823,70 @@ object TextureAtlas {
                     rgb(210, 40, 40), rgb(160, 210, 240))
                 return true
             }
+            // ---- Smart city
+            "road" -> { speckle(t, rgb(52, 52, 56), listOf(rgb(64, 64, 70), rgb(42, 42, 46)), 30); return true }
+            "road_marking" -> {
+                speckle(t, rgb(52, 52, 56), listOf(rgb(64, 64, 70), rgb(42, 42, 46)), 30)
+                for (y in 4..11) for (x in 4..11) t[x, y] = rgb(236, 236, 230)
+                return true
+            }
+            "zebra" -> { t.fill { _, _ -> scale(rgb(232, 232, 226), t.jitter(0.04f)) }; return true }
+            "traffic_light" -> {
+                t.fill { _, _ -> rgb(30, 30, 34) }
+                for (y in 0 until 16) for (x in 0 until 16) {
+                    fun lamp(cy: Float) = hypot(x + 0.5f - 8f, y + 0.5f - cy) < 1.9f
+                    when {
+                        lamp(2.5f) -> t[x, y] = rgb(236, 40, 30)
+                        lamp(6.5f) -> t[x, y] = rgb(250, 190, 30)
+                        lamp(10.5f) -> t[x, y] = rgb(50, 220, 80)
+                    }
+                }
+                return true
+            }
+            "street_lamp" -> { t.fill { x, _ -> scale(rgb(70, 76, 84), if (x % 4 == 0) 0.9f else 1f) }; return true }
+            "lamp_glow" -> { t.fill { x, y -> if (x == 0 || x == 15 || y == 0 || y == 15) rgb(70, 76, 84) else scale(rgb(255, 244, 200), t.jitter(0.02f)) }; return true }
+            "bus_stop_roof" -> { t.fill { x, _ -> scale(rgb(40, 130, 200), if (x % 4 == 0) 0.85f else 1f) }; return true }
+            "bus_stop_sign" -> {
+                t.fill { _, _ -> scale(rgb(40, 130, 200), t.jitter(0.02f)) }
+                // A white bus on the sign board (rows 2..7, columns 4..11).
+                for (y in 3..5) for (x in 5..10) t[x, y] = rgb(250, 250, 250)
+                t[6, 6] = rgb(250, 250, 250); t[9, 6] = rgb(250, 250, 250)
+                for (x in 6..9) t[x, 4] = rgb(40, 130, 200)
+                return true
+            }
+            "solar_panel" -> {
+                t.fill { x, y -> if (x % 4 == 0 || y % 8 == 0) rgb(190, 196, 206) else scale(rgb(30, 50, 110), (if ((x + y) % 5 == 0) 1.25f else 1f) * t.jitter(0.03f)) }
+                return true
+            }
+            "ev_charger" -> {
+                t.fill { _, _ -> scale(rgb(236, 238, 240), t.jitter(0.01f)) }
+                for (y in 2..6) for (x in 5..10) t[x, y] = rgb(20, 40, 50)
+                for (x in 6..8) t[x, 4] = rgb(60, 220, 110)
+                for (y in 9..12) for (x in 6..9) t[x, y] = rgb(40, 180, 90)
+                t[8, 10] = rgb(250, 250, 250); t[7, 11] = rgb(250, 250, 250)
+                return true
+            }
+            "car_window" -> { t.fill { x, y -> if (x < 1 || x > 14 || y < 1) rgb(40, 40, 44) else scale(rgb(120, 170, 210), if ((x + y) % 7 == 0) 1.3f else 1f) }; return true }
+            "bus_side" -> {
+                t.fill { x, y -> when { y in 2..7 && x % 8 != 0 -> rgb(110, 160, 200); y == 10 -> rgb(40, 110, 60); else -> scale(rgb(250, 196, 30), t.jitter(0.02f)) } }
+                return true
+            }
+            "bus_front" -> {
+                t.fill { x, y -> when { y in 1..7 && x in 1..14 -> rgb(110, 160, 200); y in 10..11 && (x < 3 || x > 12) -> rgb(255, 250, 210); else -> scale(rgb(250, 196, 30), t.jitter(0.02f)) } }
+                for (x in 4..11) t[x, 0] = rgb(20, 20, 20)
+                return true
+            }
+            "bus_roof" -> { t.fill { _, _ -> scale(rgb(236, 236, 230), t.jitter(0.02f)) }; return true }
+            "car_item" -> {
+                mask(t, arrayOf("....dddddd....", "...daaaaaad...", "..daaaaaaaad..", "dddmmmmmmmmddd", "dmmmmmmmmmmmmd", "lmmmmmmmmmmmml", "dmmmmmmmmmmmmd", "ddbbdddddbbddd", "..bb.....bb..."),
+                    rgb(220, 40, 40), rgb(150, 200, 240), rgb(30, 30, 30))
+                return true
+            }
+            "bus_item" -> {
+                mask(t, arrayOf("dddddddddddddd", "daamaamaamaaad", "daamaamaamaaad", "dmmmmmmmmmmmmd", "dmmmmmmmmmmmml", "dmmmmmmmmmmmmd", "ddbbddddddbbdd", "..bb......bb.."),
+                    rgb(250, 190, 30), rgb(120, 170, 220), rgb(30, 30, 30))
+                return true
+            }
             // ---- Household pack
             "stop_rail" -> {
                 sprite(t)

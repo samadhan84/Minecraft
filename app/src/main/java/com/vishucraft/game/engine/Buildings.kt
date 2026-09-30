@@ -7,8 +7,8 @@ import com.vishucraft.game.world.Shapes
 import kotlin.math.abs
 
 /*
- * Ready-made buildings: a blueprint builds a whole house, farm, tower, metro station or pool in front of
- * the player, with its door facing them.
+ * Ready-made buildings: a blueprint builds a whole house, farm, tower, metro station, pool, mansion, airport or
+ * even a smart city in front of the player, with its door facing them.
  */
 
 /**
@@ -34,6 +34,7 @@ private class Plan(val g: Game, val ox: Int, val oy: Int, val oz: Int, val fx: I
         val wx = x(a, d); val wz = z(a, d)
         // Big buildings reach past the loaded area: load (or generate) the ground there first.
         g.world.ensureLoaded(wx shr 4, wz shr 4)
+        if (id == Blocks.AIR && g.world.getBlock(wx, y, wz) == Blocks.AIR) return
         g.setBlock(wx, y, wz, id, meta)
     }
 
@@ -80,6 +81,10 @@ private fun Game.buildReady(p: Plan, name: String): Boolean {
         "Swimming Pool" -> pool(p)
         "Mansion" -> mansion(p)
         "Airport" -> airport(p)
+        "Smart City" -> {
+            if (p.oy + 46 >= Chunk.HEIGHT) { uiEvents.add("toast:Too high up for the city's tallest tower: build lower down"); return false }
+            smartCity(p)
+        }
         else -> return false
     }
     return true
@@ -415,4 +420,317 @@ private fun Game.airport(p: Plan) {
     aircraft.list.add(Aircraft(p.x(-11, 12) + 0.5f, p.oy.toFloat(), p.z(-11, 12) + 0.5f, Aircraft.HELICOPTER).also { it.yaw = yaw })
     aircraft.airports.add(Airport(name, p.x(0, 3) + 0.5f, p.oy.toFloat(), p.z(0, 3) + 0.5f, p.fx.toFloat(), p.fz.toFloat()))
     uiEvents.add("toast:$name is open! Build another airport to fly between them")
+}
+
+/**
+ * A smart city, about 100 x 110 blocks: a grid of five-wide roads (keep-left lanes, centre markings, zebra
+ * crossings, traffic lights, street lamps and bus stops) with cars and buses driving about; an elevated metro
+ * line over the middle road with two stations and elevators up to them; a railway station with a train; and
+ * sixteen city blocks: skyscrapers with elevators, a hospital with a helipad and helicopter, a school, a police
+ * station, shops, parks, a cricket ground, houses, and a solar farm with EV chargers.
+ */
+private fun Game.smartCity(p: Plan) {
+    val roads = intArrayOf(-48, -24, 0, 24, 48)     // road centres, across
+    val rows = intArrayOf(3, 27, 51, 75, 99)        // road centres, away
+    val white = Blocks.CONCRETE_FIRST
+    fun concrete(c: Int) = Blocks.CONCRETE_FIRST + c
+    val pave = Blocks.SMOOTH_STONE
+    p.site(-52, 52, 1, 112, 50, Blocks.GRASS)
+
+    // ---- Roads, pavements and grass.
+    for (a in -50..50) for (d in 1..101) {
+        val ra = roads.firstOrNull { abs(a - it) <= 2 }; val rd = rows.firstOrNull { abs(d - it) <= 2 }
+        val lotEdge = roads.any { abs(a - it) == 3 } || rows.any { abs(d - it) == 3 }
+        p.set(a, d, -1, when {
+            ra != null && rd != null -> Blocks.ROAD
+            ra != null -> if (a == ra && d % 2 == 0) Blocks.ROAD_MARKING else Blocks.ROAD
+            rd != null -> if (d == rd && a % 2 == 0) Blocks.ROAD_MARKING else Blocks.ROAD
+            lotEdge -> pave
+            else -> Blocks.GRASS
+        })
+    }
+    for (a in -52..52) for (d in 102..103) p.set(a, d, -1, pave)
+    // Zebra crossings on every road just before each junction (white stripes along the road).
+    for (ra in roads) for (rd in rows) for (k in 3..5) for (s in intArrayOf(-1, 1)) for (o in -2..2 step 2) {
+        val d = rd + s * k; val a = ra + s * k
+        if (d in 1..101 && rows.none { abs(d - it) <= 2 }) p.set(ra + o, d, -1, Blocks.ZEBRA_CROSSING)
+        if (a in -50..50 && roads.none { abs(a - it) <= 2 }) p.set(a, rd + o, -1, Blocks.ZEBRA_CROSSING)
+    }
+
+    fun lamp(a: Int, d: Int, face: Int) {
+        p.set(a, d, 0, Blocks.STREET_LAMP, face or 8); p.set(a, d, 1, Blocks.STREET_LAMP, face or 8); p.set(a, d, 2, Blocks.STREET_LAMP, face)
+    }
+    fun trafficLight(a: Int, d: Int, face: Int) {
+        p.set(a, d, 0, Blocks.STREET_LAMP, face or 8); p.set(a, d, 1, Blocks.STREET_LAMP, face or 8); p.set(a, d, 2, Blocks.TRAFFIC_LIGHT, face)
+    }
+    fun sign(a: Int, d: Int, h: Int, text: String, face: Int = p.toward) {
+        p.set(a, d, h, Blocks.SIGN, face)
+        world.blockEntities.sign(p.x(a, d), p.oy + h, p.z(a, d))?.text = text
+    }
+    // ---- The city blocks (centre (ca, cd); each is 17 x 17 inside its pavement).
+    fun sub(a: Int, d: Int) = Plan(this, p.x(a, d), p.oy, p.z(a, d), p.fx, p.fz)
+    fun tree(a: Int, d: Int) {
+        for (h in 0..3) p.set(a, d, h, Blocks.LOG)
+        for (x in -2..2) for (z in -2..2) for (h in 3..4) if (abs(x) + abs(z) < 4 && !(x == 0 && z == 0 && h == 3)) p.set(a + x, d + z, h, Blocks.LEAVES)
+        for (x in -1..1) for (z in -1..1) if (abs(x) + abs(z) < 2) p.set(a + x, d + z, 5, Blocks.LEAVES)
+    }
+    fun park(ca: Int, cd: Int) {
+        val flowers = intArrayOf(Blocks.FLOWER_RED, Blocks.FLOWER_YELLOW, Blocks.FLOWER_FIRST + 1, Blocks.FLOWER_FIRST + 6)
+        for (a in ca - 8..ca + 8) for (d in cd - 8..cd + 8) {
+            if (a == ca || d == cd) p.set(a, d, -1, Blocks.DIRT_PATH)
+            else if ((a * 7 + d * 3) % 11 == 0) p.set(a, d, 0, flowers[abs(a + d) % flowers.size])
+        }
+        for ((a, d) in listOf(ca - 5 to cd - 5, ca + 5 to cd - 5, ca - 5 to cd + 5, ca + 5 to cd + 5)) tree(a, d)
+        // A pond with lily pads, benches, swings and lamps.
+        for (a in ca + 2..ca + 7) for (d in cd + 2..cd + 3) { p.set(a, d, -1, Blocks.WATER); p.set(a, d, -2, Blocks.WATER) }
+        p.set(ca + 4, cd + 2, 0, Blocks.LILY_PAD)
+        for (a in intArrayOf(ca - 3, ca - 2)) { p.set(a, cd - 1, 0, Blocks.OAK_STAIRS, p.away); p.set(a, cd + 1, 0, Blocks.OAK_STAIRS, p.toward) }
+        for (a in intArrayOf(ca - 7, ca - 4)) for (h in 0..1) p.set(a, cd + 6, h, Blocks.OAK_FENCE)
+        for (a in ca - 7..ca - 4) p.set(a, cd + 6, 2, Blocks.PLANKS)
+        p.set(ca - 6, cd + 6, 1, Blocks.SWING, p.toward); p.set(ca - 5, cd + 6, 1, Blocks.SWING, p.toward)
+        lamp(ca + 1, cd - 4, p.left); lamp(ca - 1, cd + 4, p.right)
+        sign(ca, cd - 8, 0, "City Park")
+    }
+    fun skyscraper(ca: Int, cd: Int, floors: Int, frame: Int, name: String) {
+        val top = floors * 4 - 1
+        for (a in ca - 5..ca + 5) for (d in cd - 5..cd + 5) {
+            val edge = a == ca - 5 || a == ca + 5 || d == cd - 5 || d == cd + 5
+            for (k in 0..floors) p.set(a, d, k * 4 - 1, if (k == 0) Blocks.POLISHED_DIORITE else if (k == floors) frame else Blocks.QUARTZ_BLOCK)
+            if (edge) {
+                val column = (a - ca) % 3 == 0 && (d - cd) % 3 == 0 || (abs(a - ca) == 5 && abs(d - cd) == 5)
+                for (h in 0 until top) if (h % 4 != 3) p.set(a, d, h, if (column) frame else Blocks.GLASS)
+                for (h in 0 until top) if (h % 4 == 3) p.set(a, d, h, frame)
+            }
+        }
+        p.door(ca, cd - 5); p.door(ca - 1, cd - 5)
+        sign(ca + 2, cd - 6, 0, name)
+        // An elevator to every floor and the roof.
+        for (k in 0..floors) p.set(ca + 3, cd + 3, k * 4 - 1, Blocks.ELEVATOR)
+        for (k in 0 until floors) {
+            val h = k * 4
+            p.set(ca, cd, h + 2, Blocks.CEILING_LIGHT, 8)
+            if (k == 0) {
+                p.set(ca - 3, cd - 1, h, Blocks.KITCHEN_COUNTER, p.toward); p.set(ca - 2, cd - 1, h, Blocks.KITCHEN_COUNTER, p.toward)
+                p.set(ca - 3, cd - 1, h + 1, Blocks.COMPUTER, p.toward or 8)
+                p.set(ca + 2, cd - 3, h, Blocks.SOFA, p.away); p.set(ca + 3, cd - 3, h, Blocks.SOFA, p.away)
+                p.set(ca - 4, cd - 4, h, Blocks.PLANT_POT); p.set(ca + 4, cd - 4, h, Blocks.PLANT_POT)
+            } else {
+                for (a in intArrayOf(ca - 3, ca - 1)) { p.set(a, cd + 2, h, Blocks.STUDY_TABLE, p.toward); p.set(a, cd + 2, h + 1, Blocks.COMPUTER, p.toward or 8); p.set(a, cd + 1, h, Blocks.CHAIR, p.away) }
+                p.set(ca - 4, cd - 4, h, Blocks.WATER_COOLER, p.away); p.set(ca + 4, cd - 4, h, Blocks.PLANT_POT)
+            }
+        }
+        for (a in ca - 5..ca + 5) for (d in cd - 5..cd + 5) if (a == ca - 5 || a == ca + 5 || d == cd - 5 || d == cd + 5) p.set(a, d, top + 1, Blocks.GLASS_PANE)
+        p.set(ca - 5, cd - 5, top + 1, Blocks.REDSTONE_LAMP_ON); p.set(ca + 5, cd + 5, top + 1, Blocks.REDSTONE_LAMP_ON)
+    }
+    fun hospital(ca: Int, cd: Int) {
+        val red = concrete(14)
+        for (a in ca - 7..ca + 7) for (d in cd - 6..cd + 6) {
+            for (h in intArrayOf(-1, 3, 7, 11)) p.set(a, d, h, if (h == -1) Blocks.QUARTZ_BLOCK else white)
+            if (a == ca - 7 || a == ca + 7 || d == cd - 6 || d == cd + 6) for (h in 0..10) if (h % 4 != 3)
+                p.set(a, d, h, if (h % 4 in 1..2 && (a + d) % 3 != 0) Blocks.GLASS else white)
+        }
+        // A red cross on the front and the entrance under it.
+        for (k in -1..1) { p.set(ca + k, cd - 6, 9, red); p.set(ca, cd - 6, 9 + k, red) }
+        p.door(ca, cd - 6); p.door(ca + 1, cd - 6)
+        sign(ca - 2, cd - 7, 0, "City Hospital")
+        for (a in ca - 6..ca - 3) p.set(a, cd - 4, 0, Blocks.KITCHEN_COUNTER, p.toward)
+        p.set(ca - 5, cd - 4, 1, Blocks.COMPUTER, p.toward or 8)
+        for (h in intArrayOf(0, 4, 8)) {
+            for (a in intArrayOf(ca - 5, ca - 2, ca + 2, ca + 5)) { p.set(a, cd + 4, h, Blocks.BED_FIRST, p.away); p.set(a, cd + 5, h, Blocks.BED_FIRST, p.away or Shapes.UPPER) }
+            for (a in intArrayOf(ca - 4, ca + 4)) p.set(a, cd + 5, h, Blocks.CURTAIN, p.toward)
+            p.set(ca, cd, h + 2, Blocks.CEILING_LIGHT, 8)
+        }
+        p.set(ca + 6, cd - 5, 0, Blocks.WATER_COOLER, p.left)
+        for (h in intArrayOf(-1, 3, 7, 11)) p.set(ca + 6, cd, h, Blocks.ELEVATOR)
+        // Helipad on the roof, with the air ambulance.
+        for (a in ca - 3..ca + 3) for (d in cd - 3..cd + 3) p.set(a, d, 11, if (a == ca && d == cd) Blocks.HELIPAD else if (abs(a - ca) == 3 || abs(d - cd) == 3) concrete(4) else Blocks.RUNWAY)
+        for (a in ca - 7..ca + 7) for (d in cd - 6..cd + 6) if (a == ca - 7 || a == ca + 7 || d == cd - 6 || d == cd + 6) p.set(a, d, 12, Blocks.GLASS_PANE)
+        aircraft.list.add(Aircraft(p.x(ca, cd) + 0.5f, (p.oy + 12).toFloat(), p.z(ca, cd) + 0.5f, Aircraft.HELICOPTER).also { it.yaw = kotlin.math.atan2(p.fx.toFloat(), -p.fz.toFloat()) })
+    }
+    fun school(ca: Int, cd: Int) {
+        val yellow = concrete(4)
+        for (a in ca - 7..ca + 7) for (d in cd - 7..cd + 1) {
+            for (h in intArrayOf(-1, 3, 7)) p.set(a, d, h, if (h == -1) Blocks.PLANKS else if (h == 7) concrete(14) else yellow)
+            if (a == ca - 7 || a == ca + 7 || d == cd - 7 || d == cd + 1) for (h in 0..6) if (h != 3)
+                p.set(a, d, h, if (h % 4 in 1..2 && abs(a - ca) % 3 != 0) Blocks.GLASS else yellow)
+        }
+        p.door(ca, cd - 7)
+        sign(ca + 2, cd - 8, 0, "DV Public School")
+        for (h in intArrayOf(0, 4)) {
+            for (a in ca - 4..ca + 4) for (k in 1..2) p.set(a, cd + 1, h + k, concrete(15))   // blackboard
+            p.set(ca, cd - 1, h, Blocks.STUDY_TABLE, p.toward)                              // teacher's desk
+            for (a in intArrayOf(ca - 4, ca - 2, ca + 2, ca + 4)) for (d in intArrayOf(cd - 3, cd - 5)) { p.set(a, d, h, Blocks.STUDY_TABLE, p.away); p.set(a, d - 1, h, Blocks.CHAIR, p.away) }
+            p.set(ca - 6, cd - 6, h + 2, Blocks.CEILING_LIGHT, 8); p.set(ca + 6, cd - 6, h + 2, Blocks.CEILING_LIGHT, 8)
+            p.set(ca - 6, cd, h + 2, Blocks.WALL_CLOCK, p.toward)
+        }
+        for (k in 0..3) { p.set(ca - 6, cd - 2 - k, k, Blocks.OAK_STAIRS, p.toward); for (h in 0 until k) p.set(ca - 6, cd - 2 - k, h, Blocks.PLANKS) }
+        for (d in cd - 4..cd - 2) p.set(ca - 6, d, 3, Blocks.AIR)
+        // Playground behind: swings and a sand pit.
+        for (a in intArrayOf(ca - 6, ca - 2)) for (h in 0..1) p.set(a, cd + 5, h, Blocks.OAK_FENCE)
+        for (a in ca - 6..ca - 2) p.set(a, cd + 5, 2, Blocks.PLANKS)
+        for (a in ca - 5..ca - 3) p.set(a, cd + 5, 1, Blocks.SWING, p.toward)
+        for (a in ca + 2..ca + 6) for (d in cd + 3..cd + 7) p.set(a, d, -1, Blocks.SAND)
+        tree(ca, cd + 7)
+    }
+    fun police(ca: Int, cd: Int) {
+        val blue = concrete(11)
+        for (a in ca - 6..ca + 6) for (d in cd - 7..cd + 1) {
+            p.set(a, d, -1, Blocks.POLISHED_ANDESITE); p.set(a, d, 4, blue)
+            if (a == ca - 6 || a == ca + 6 || d == cd - 7 || d == cd + 1) for (h in 0..3)
+                p.set(a, d, h, if (h == 3) white else if (h in 1..2 && abs(a - ca) in 2..4) Blocks.GLASS else blue)
+        }
+        p.door(ca, cd - 7)
+        sign(ca + 1, cd - 8, 0, "Police Station")
+        p.set(ca - 1, cd - 7, 5, Blocks.REDSTONE_LAMP_ON); p.set(ca + 1, cd - 7, 5, Blocks.LAPIS_BLOCK)
+        for (a in intArrayOf(ca - 4, ca + 2)) { p.set(a, cd - 4, 0, Blocks.STUDY_TABLE, p.toward); p.set(a, cd - 4, 1, Blocks.COMPUTER, p.toward or 8); p.set(a, cd - 3, 0, Blocks.CHAIR, p.toward) }
+        // A lock-up at the back.
+        for (a in ca + 1..ca + 5) p.set(a, cd - 2, 0, Blocks.IRON_BARS); for (a in ca + 1..ca + 5) p.set(a, cd - 2, 1, Blocks.IRON_BARS)
+        p.set(ca + 5, cd, 0, Blocks.BED_FIRST + 7, p.left); p.set(ca + 4, cd, 0, Blocks.BED_FIRST + 7, p.left or Shapes.UPPER)
+        p.set(ca, cd - 1, 3, Blocks.CEILING_LIGHT, 8)
+        // Parking for the police cars.
+        for (a in ca - 7..ca + 7) for (d in cd + 3..cd + 8) p.set(a, d, -1, if (a % 4 == 0) concrete(0) else Blocks.POLISHED_ANDESITE)
+    }
+    fun shops(ca: Int, cd: Int) {
+        for (a in ca - 8..ca + 8) for (d in cd - 6..cd + 4) {
+            p.set(a, d, -1, Blocks.POLISHED_DIORITE); p.set(a, d, 5, Blocks.SMOOTH_STONE)
+            val edge = a == ca - 8 || a == ca + 8 || d == cd - 6 || d == cd + 4
+            val wall = edge || (a == ca - 3 || a == ca + 3)
+            if (wall) for (h in 0..4) p.set(a, d, h, if (d == cd - 6 && h in 0..3 && !(a == ca - 3 || a == ca + 3 || abs(a - ca) == 8)) Blocks.GLASS else white)
+        }
+        val names = listOf("Supermarket", "Bakery", "Cafe")
+        for ((k, sa) in intArrayOf(ca - 6, ca, ca + 6).withIndex()) {
+            p.door(sa, cd - 6)
+            sign(sa + 1, cd - 7, 0, names[k])
+            for (a in sa - 2..sa + 2) p.set(a, cd - 6, 4, concrete(intArrayOf(14, 1, 12)[k]))
+            p.set(sa, cd - 1, 3, Blocks.CEILING_LIGHT, 8)
+            when (k) {
+                0 -> {
+                    for (a in sa - 2..sa + 2) { p.set(a, cd + 3, 0, Blocks.BARREL); p.set(a, cd + 3, 1, Blocks.BARREL) }
+                    p.set(sa - 2, cd + 1, 0, Blocks.FRIDGE, p.right); p.set(sa - 2, cd + 1, 1, Blocks.FRIDGE, p.right or Shapes.UPPER)
+                    p.set(sa + 2, cd - 3, 0, Blocks.KITCHEN_COUNTER, p.left); p.set(sa + 2, cd - 3, 1, Blocks.COMPUTER, p.left or 8)
+                }
+                1 -> {
+                    p.set(sa - 1, cd + 3, 0, Blocks.OVEN, p.toward); p.set(sa + 1, cd + 3, 0, Blocks.OVEN, p.toward)
+                    for (a in sa - 2..sa + 2) p.set(a, cd + 1, 0, Blocks.KITCHEN_COUNTER, p.toward)
+                    p.set(sa, cd + 1, 1, Blocks.CAKE)
+                }
+                else -> {
+                    for (d in intArrayOf(cd - 3, cd + 1)) { p.set(sa, d, 0, Blocks.DINING_TABLE); p.set(sa - 1, d, 0, Blocks.CHAIR, p.right); p.set(sa + 1, d, 0, Blocks.CHAIR, p.left) }
+                    p.set(sa - 2, cd + 3, 0, Blocks.KITCHEN_COUNTER, p.toward); p.set(sa - 2, cd + 3, 1, Blocks.KETTLE, p.toward)
+                    p.set(sa + 2, cd + 3, 0, Blocks.WATER_COOLER, p.toward)
+                }
+            }
+        }
+        for (a in intArrayOf(ca - 6, ca + 6)) tree(a, cd + 7)
+    }
+    fun cricket(ca: Int, cd: Int) {
+        for (a in ca - 8..ca + 8) for (d in cd - 8..cd + 8) {
+            val r = kotlin.math.hypot((a - ca).toFloat(), (d - cd).toFloat())
+            if (r in 7.3f..8.2f) p.set(a, d, -1, Blocks.WOOL_WHITE)
+        }
+        for (d in cd - 4..cd + 4) for (a in ca - 1..ca + 1) p.set(a, d, -1, Blocks.SMOOTH_SANDSTONE)
+        for (d in intArrayOf(cd - 4, cd + 4)) for (a in ca - 1..ca + 1 step 2) p.set(a, d, 0, Blocks.OAK_FENCE)
+        for (d in intArrayOf(cd - 4, cd + 4)) p.set(ca, d, 0, Blocks.OAK_FENCE)
+        for ((a, d) in listOf(ca - 8 to cd - 8, ca + 8 to cd - 8, ca - 8 to cd + 8, ca + 8 to cd + 8)) {
+            for (h in 0..7) p.set(a, d, h, Blocks.STREET_LAMP, 8)
+            p.set(a, d, 8, Blocks.SEA_LANTERN)
+        }
+        for (a in ca - 5..ca + 5) { p.set(a, cd + 8, 0, Blocks.STONE_BRICK_STAIRS, p.toward); p.set(a, cd + 8, 1, Blocks.AIR) }
+        sign(ca, cd - 8, 0, "Cricket Stadium")
+    }
+    fun solarFarm(ca: Int, cd: Int) {
+        for (a in ca - 8..ca + 8) for (d in cd - 8..cd - 1) p.set(a, d, -1, if (d == cd - 5 && a % 3 != 0) concrete(0) else Blocks.POLISHED_ANDESITE)
+        for (a in ca - 7..ca + 7 step 3) p.set(a, cd - 1, 0, Blocks.EV_CHARGER, p.toward)
+        for (d in cd + 1..cd + 8) if (d % 3 != 0) for (a in ca - 8..ca + 8) p.set(a, d, 0, Blocks.SOLAR_PANEL, p.toward)
+        sign(ca + 2, cd - 8, 0, "Solar Farm & EV Charging")
+    }
+    fun houses(ca: Int, cd: Int) {
+        for (a in intArrayOf(ca - 4, ca + 4)) { smallHouse(sub(a, cd - 9)); smallHouse(sub(a, cd - 1)) }
+    }
+    fun villa(ca: Int, cd: Int) { modernHouse(sub(ca, cd - 9)); pool(sub(ca, cd)) }
+
+    park(-36, 15); police(-12, 15); shops(12, 15); hospital(36, 15)
+    school(-36, 39); skyscraper(-12, 39, 8, concrete(11), "Tech Park"); skyscraper(12, 39, 10, concrete(9), "Sky Towers"); houses(36, 39)
+    houses(-36, 63); skyscraper(-12, 63, 9, concrete(7), "City Centre"); cricket(12, 63); solarFarm(36, 63)
+    villa(-36, 87); skyscraper(-12, 87, 11, concrete(15), "DV Tower"); villa(12, 87); park(36, 87)
+
+    // ---- Street lamps along every pavement, traffic lights at the corners, and bus stops.
+    for (i in 0..3) for (j in 0..3) {
+        val a0 = roads[i] + 3; val a1 = roads[i + 1] - 3; val d0 = rows[j] + 3; val d1 = rows[j + 1] - 3
+        for (d in d0 + 2..d1 - 2 step 6) { lamp(a0, d, p.left); lamp(a1, d, p.right) }
+        for (a in a0 + 2..a1 - 2 step 6) { lamp(a, d0, p.toward); lamp(a, d1, p.away) }
+        trafficLight(a0, d0, p.toward); trafficLight(a1, d0, p.right); trafficLight(a0, d1, p.left); trafficLight(a1, d1, p.away)
+    }
+    for (j in 0..3) { p.set(-3, rows[j] + 13, 0, Blocks.BUS_STOP, p.right); p.set(3, rows[j] + 13, 0, Blocks.BUS_STOP, p.left) }
+    for (a in intArrayOf(-40, 32)) { p.set(a, 48, 0, Blocks.BUS_STOP, p.away); p.set(a, 54, 0, Blocks.BUS_STOP, p.toward) }
+
+    // ---- The elevated metro over the middle road, with two stations.
+    for (a in -50..50) {
+        for (d in 48..54) p.set(a, d, 10, if ((d == 48 || d == 54) && a % 8 == 0) Blocks.SEA_LANTERN else concrete(8))
+        p.set(a, 48, 11, Blocks.GLASS_PANE); p.set(a, 54, 11, Blocks.GLASS_PANE)
+        p.set(a, 50, 11, Blocks.RAIL, p.railAcross); p.set(a, 52, 11, Blocks.RAIL, p.railAcross)
+    }
+    for (a in intArrayOf(-36, -12, 12, 36)) for (h in 0..9) { p.set(a, 48, h, concrete(8)); p.set(a, 54, h, concrete(8)) }
+    for ((sa, name) in listOf(-36 to "DV Metro West", 36 to "DV Metro East")) {
+        for (a in sa - 8..sa + 8) {
+            for (d in intArrayOf(48, 49, 53, 54)) p.set(a, d, 11, Blocks.STATION_PLATFORM)
+            for (d in 48..54) p.set(a, d, 15, Blocks.GLASS)
+            if ((a - sa) % 4 == 0) for (h in 12..14) { p.set(a, 48, h, Blocks.QUARTZ_BLOCK); p.set(a, 54, h, Blocks.QUARTZ_BLOCK) }
+            else if (a != sa + 8) { p.set(a, 48, 12, Blocks.GLASS_PANE); p.set(a, 54, 12, Blocks.GLASS_PANE) }
+            if ((a - sa) % 4 == 2) { p.set(a, 48, 15, Blocks.SEA_LANTERN); p.set(a, 54, 15, Blocks.SEA_LANTERN) }
+        }
+        p.set(sa, 50, 11, Blocks.STOP_RAIL, p.railAcross); p.set(sa, 52, 11, Blocks.STOP_RAIL, p.railAcross)
+        sign(sa, 48, 12, name); sign(sa, 54, 12, name, p.away)
+        p.set(sa - 3, 49, 12, Blocks.SOFA, p.away); p.set(sa + 3, 53, 12, Blocks.SOFA, p.toward)
+        // Elevators up from the pavement on both sides, straight onto the platforms.
+        for (d in intArrayOf(47, 55)) { p.set(sa + 8, d, -1, Blocks.ELEVATOR); p.set(sa + 8, d, 11, Blocks.ELEVATOR); for (h in 0..1) p.set(sa + 8, d, h, Blocks.AIR) }
+    }
+    // One metro on each track (west station on the near track, east station on the far one), running end to end.
+    for ((d, sa, dir) in listOf(Triple(50, -36, 1), Triple(52, 36, -1))) {
+        val metro = Cart(p.x(sa + 5 * dir, d) + 0.5f, (p.oy + 11).toFloat(), p.z(sa + 5 * dir, d) + 0.5f, Cart.METRO)
+        metro.hx = p.rx.toFloat() * dir; metro.hz = p.rz.toFloat() * dir; metro.yaw = kotlin.math.atan2(metro.hx, -metro.hz)
+        carts.list.add(metro)
+        carts.list.add(Cart(p.x(sa + 2 * dir, d) + 0.5f, (p.oy + 11).toFloat(), p.z(sa + 2 * dir, d) + 0.5f, Cart.COACH).also { it.leader = metro; it.hx = metro.hx; it.hz = metro.hz; it.yaw = metro.yaw })
+    }
+
+    // ---- The railway station behind the city, with a train.
+    for (a in -52..52) {
+        for (d in 104..110) p.set(a, d, -1, Blocks.RAILWAY_BALLAST)
+        p.set(a, 107, 0, if (a == 0) Blocks.STOP_RAIL else Blocks.RAIL, p.railAcross)
+        if (a !in -10..10) p.set(a, 103, 0, Blocks.IRON_BARS)
+    }
+    for (a in -10..10) {
+        for (d in intArrayOf(104, 105, 106, 108, 109)) { p.set(a, d, 0, Blocks.STATION_PLATFORM); p.set(a, d, 5, Blocks.GLASS) }
+        p.set(a, 107, 5, Blocks.GLASS)
+        if (a % 5 == 0) for (h in 1..4) { p.set(a, 104, h, Blocks.BRICKS); p.set(a, 109, h, Blocks.BRICKS) }
+        if (a % 5 == 2) { p.set(a, 104, 5, Blocks.SEA_LANTERN); p.set(a, 109, 5, Blocks.SEA_LANTERN) }
+    }
+    sign(2, 105, 1, "DV Central Railway Station")
+    p.set(-4, 105, 1, Blocks.SOFA, p.away); p.set(4, 105, 1, Blocks.SOFA, p.away)
+    val engine = Cart(p.x(4, 107) + 0.5f, p.oy.toFloat(), p.z(4, 107) + 0.5f, Cart.ENGINE)
+    engine.hx = p.rx.toFloat(); engine.hz = p.rz.toFloat(); engine.yaw = kotlin.math.atan2(engine.hx, -engine.hz)
+    carts.list.add(engine)
+    var lead = engine
+    for (k in 1..3) {
+        val c = Cart(p.x(4 - 3 * k, 107) + 0.5f, p.oy.toFloat(), p.z(4 - 3 * k, 107) + 0.5f, Cart.COACH).also { it.leader = lead; it.hx = engine.hx; it.hz = engine.hz; it.yaw = engine.yaw }
+        carts.list.add(c); lead = c
+    }
+
+    // ---- Traffic: cars and buses in the left lanes, plus parked ones.
+    fun vehicle(a: Int, d: Int, da: Int, dd: Int, kind: Int, color: Int) {
+        val v = Vehicle(p.x(a, d) + 0.5f, p.oy.toFloat(), p.z(a, d) + 0.5f, kind, color)
+        v.hx = p.rx * da + p.fx * dd; v.hz = p.rz * da + p.fz * dd
+        v.yaw = kotlin.math.atan2(v.hx.toFloat(), -v.hz.toFloat())
+        vehicles.list.add(v)
+    }
+    val car = Vehicle.CAR; val bus = Vehicle.BUS
+    vehicle(-1, 15, 0, 1, car, 14); vehicle(1, 40, 0, -1, car, 11); vehicle(-25, 63, 0, 1, car, 0); vehicle(23, 87, 0, 1, car, 15)
+    vehicle(-12, 28, 1, 0, car, 4); vehicle(12, 26, -1, 0, car, 5); vehicle(36, 76, 1, 0, car, 1); vehicle(-36, 98, -1, 0, car, 8)
+    vehicle(49, 30, 0, -1, car, 10); vehicle(-49, 70, 0, 1, car, 3)
+    vehicle(-1, 63, 0, 1, bus, 0); vehicle(-30, 52, 1, 0, bus, 0); vehicle(8, 2, -1, 0, bus, 0)
+    // Parked: the police cars, an ambulance and cars at the EV chargers.
+    vehicle(-16, 21, 0, 1, car, 11); vehicle(-8, 21, 0, 1, car, 0)
+    vehicle(42, 7, 1, 0, car, 0)
+    vehicle(32, 59, 0, 1, car, 13); vehicle(38, 59, 0, 1, car, 6)
+    uiEvents.add("toast:Welcome to the smart city! Tap a car or bus to drive it; take the elevators up to the metro")
 }

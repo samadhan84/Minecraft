@@ -240,7 +240,7 @@ internal fun Game.aircraftUse(item: com.vishucraft.game.world.ItemDef?, t: RayHi
             return true
         }
         aircraft.riding = a
-        carts.riding = null; boats.riding = null
+        carts.riding = null; boats.riding = null; vehicles.riding = null
         if (a.isPlane) {
             val here = aircraft.nearestAirport(a.x, a.z)
             val choices = aircraft.airports.filter { it !== here }

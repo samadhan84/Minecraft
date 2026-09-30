@@ -272,7 +272,7 @@ class WorldRenderer(private val game: Game) {
         glUniform1f(blockShader.u("uCutout"), 0.5f)
         mobRenderer.draw(blockShader, game.mobs.list, ex, ez, far)
         game.net?.let { n -> mobRenderer.draw(blockShader, n.players.values.map { it.proxy }, ex, ez, far) }
-        dropRenderer.draw(blockShader, game.drops, ex, ez, far, game.timeOfDay, game.carts, game.projectiles, game.boats, game.aircraft)
+        dropRenderer.draw(blockShader, game.drops, ex, ez, far, game.timeOfDay, game.carts, game.projectiles, game.boats, game.aircraft, game.vehicles)
         if (underwater) glUniform3f(blockShader.u("uTint"), 0.55f, 0.7f, 1f)
         if (fancy) drawShadows(ex, ez)
 

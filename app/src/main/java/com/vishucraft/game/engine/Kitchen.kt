@@ -182,6 +182,13 @@ internal fun Game.kitchenBlock(t: RayHit, item: ItemDef?, sel: Int): Boolean {
             sound("splash", cx, cy + 0.5f, cz, 0.4f)
             return true
         }
+        Blocks.EV_CHARGER -> {
+            if (holdingBlock) return false
+            val car = vehicles.list.firstOrNull { !it.isBus && kotlin.math.abs(it.x - cx) < 4f && kotlin.math.abs(it.z - cz) < 4f && kotlin.math.abs(it.y - y) < 2f }
+            say(if (car != null) "Charging the car... ⚡ 100%, fully charged!" else "EV charger: park a car next to it and tap to charge")
+            sound("beep", cx, cy, cz, 0.5f)
+            return true
+        }
         Blocks.DUSTBIN -> {
             val held = heldStack()
             if (held == null) { say("Tap the dustbin while holding something to throw it away"); return true }

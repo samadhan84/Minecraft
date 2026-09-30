@@ -25,13 +25,15 @@ class DropRenderer {
 
     fun draw(shader: Shader, drops: ItemEntities, camX: Float, camZ: Float, maxDist: Float, time: Float,
              carts: com.vishucraft.game.engine.Carts? = null, arrows: com.vishucraft.game.engine.Projectiles? = null,
-             boats: com.vishucraft.game.engine.Boats? = null, aircraft: com.vishucraft.game.engine.Aircrafts? = null) {
+             boats: com.vishucraft.game.engine.Boats? = null, aircraft: com.vishucraft.game.engine.Aircrafts? = null,
+             vehicles: com.vishucraft.game.engine.Vehicles? = null) {
         buf.size = 0
         carts?.list?.forEach { c ->
             if (c.isTrain) train(c.x, c.y, c.z, c.yaw, c.kind, carts.power(c)?.kind ?: c.kind) else cart(c.x, c.y, c.z, c.yaw)
         }
         boats?.list?.forEach { b -> boat(b.x, b.y, b.z, b.yaw) }
         aircraft?.list?.forEach { a -> if (a.isPlane) airplane(a.x, a.y, a.z, a.yaw) else helicopter(a.x, a.y, a.z, a.yaw, a.spin) }
+        vehicles?.list?.forEach { v -> if (v.isBus) bus(v.x, v.y, v.z, v.yaw) else car(v.x, v.y, v.z, v.yaw, v.color) }
         arrows?.list?.forEach { a ->
             val tile = when (a.kind) {
                 com.vishucraft.game.engine.Projectile.SNOWBALL -> snowballTile
@@ -190,6 +192,40 @@ class DropRenderer {
         part(cx, cy, cz, yaw, floatArrayOf(-0.15f, 0f, -3.2f, 0.15f, 0.6f, -2.8f), tyre)
         part(cx, cy, cz, yaw, floatArrayOf(-2f, 1.9f, 3f, 2f, 2.05f, 4f), wing)                         // tail wings
         part(cx, cy, cz, yaw, floatArrayOf(-0.08f, 2.1f, 2.8f, 0.08f, 3.7f, 4f), tail)                   // tail fin
+    }
+
+    /** A car in one of the 16 paint colours: body, cabin with windows all round, lights and four wheels. */
+    private fun car(cx: Float, cy: Float, cz: Float, yaw: Float, color: Int) {
+        val paint = all6("concrete_" + com.vishucraft.game.world.Blocks.DYES[color and 15])
+        val glass = all6("car_window").also { it[0] = paint[0] }
+        val tyre = all6("tyre"); val black = all6("black_plastic")
+        for (sx in floatArrayOf(-1f, 1f)) for (sz in floatArrayOf(-1f, 1f)) {
+            val x0 = if (sx < 0) -0.95f else 0.75f; val z0 = sz * 1f - 0.25f
+            part(cx, cy, cz, yaw, floatArrayOf(x0, 0f, z0, x0 + 0.2f, 0.5f, z0 + 0.5f), tyre)
+        }
+        part(cx, cy, cz, yaw, floatArrayOf(-0.9f, 0.25f, -1.5f, 0.9f, 0.95f, 1.5f), paint)
+        part(cx, cy, cz, yaw, floatArrayOf(-0.8f, 0.95f, -0.7f, 0.8f, 1.55f, 0.85f), glass)
+        part(cx, cy, cz, yaw, floatArrayOf(-0.92f, 0.22f, -1.56f, 0.92f, 0.4f, -1.48f), black)             // bumpers
+        part(cx, cy, cz, yaw, floatArrayOf(-0.92f, 0.22f, 1.48f, 0.92f, 0.4f, 1.56f), black)
+        for (sx in floatArrayOf(-1f, 1f)) {
+            val x0 = if (sx < 0) -0.8f else 0.5f
+            part(cx, cy, cz, yaw, floatArrayOf(x0, 0.6f, -1.53f, x0 + 0.3f, 0.8f, -1.5f), all6("lamp_glow"))
+            part(cx, cy, cz, yaw, floatArrayOf(x0, 0.6f, 1.5f, x0 + 0.3f, 0.8f, 1.53f), all6("concrete_red"))
+        }
+    }
+
+    /** A yellow city bus: three body sections with a row of windows, a big windscreen and six wheels. */
+    private fun bus(cx: Float, cy: Float, cz: Float, yaw: Float) {
+        val side = all6("bus_side").also { it[0] = tile("bus_roof"); it[1] = tile("black_plastic") }
+        val tyre = all6("tyre")
+        for (z0 in floatArrayOf(-3f, -1f, 1f)) {
+            val tiles = side.copyOf()
+            if (z0 < -2f) tiles[3] = tile("bus_front")
+            part(cx, cy, cz, yaw, floatArrayOf(-1.2f, 0.4f, z0, 1.2f, 3f, z0 + 2f), tiles)
+        }
+        for (x0 in floatArrayOf(-1.25f, 1f)) for (z0 in floatArrayOf(-2.4f, 1.6f, 2.2f))
+            part(cx, cy, cz, yaw, floatArrayOf(x0, 0f, z0 - 0.35f, x0 + 0.25f, 0.75f, z0 + 0.35f), tyre)
+        part(cx, cy, cz, yaw, floatArrayOf(-0.6f, 2.72f, -3.04f, 0.6f, 2.95f, -3f), all6("lamp_glow"))    // route sign
     }
 
     /** A helicopter: cabin with big windows, tail boom and fin, skids, and a spinning rotor. */

@@ -177,6 +177,35 @@ object HomeShapes {
                 b(0f, 10f, 7f, 16f, 11f, 9f, "oak_planks"),
                 b(5f, 12f, 5f, 11f, 16f, 11f),
             )
+            // ---- Smart city
+            Blocks.TRAFFIC_LIGHT -> if (collision) listOf(b(5f, 0f, 5f, 11f, 16f, 11f)) else listOf(
+                b(7f, 0f, 7f, 9f, 4f, 9f, "steel"),
+                b(5f, 4f, 6f, 11f, 16f, 10f),
+                b(5f, 15.5f, 10f, 11f, 16f, 12f, "black_plastic"),     // sun visor
+            )
+            // A post (bit 3 set: a piece under the lamp) or the lamp itself: post, arm over the road and a glowing head.
+            Blocks.STREET_LAMP -> if (on || collision) listOf(b(6.5f, 0f, 6.5f, 9.5f, 16f, 9.5f)) else listOf(
+                b(6.5f, 0f, 6.5f, 9.5f, 14f, 9.5f),
+                b(7f, 13f, 7f, 9f, 14.5f, 16f),
+                b(5.5f, 11.5f, 11f, 10.5f, 13f, 16f, "lamp_glow"),
+            )
+            Blocks.BUS_STOP -> if (collision) listOf(b(0f, 0f, 0f, 16f, 16f, 3f), b(0f, 0f, 3f, 16f, 7f, 8f)) else listOf(
+                b(0f, 0f, 0f, 16f, 15f, 1f, "glass"),                  // back wall
+                b(0f, 15f, 0f, 16f, 16f, 14f),                          // roof
+                b(0.5f, 0f, 12.5f, 1.5f, 15f, 13.5f, "steel"), b(14.5f, 0f, 12.5f, 15.5f, 15f, 13.5f, "steel"),
+                b(1f, 6f, 2f, 15f, 7f, 7f, "oak_planks"),               // bench
+                b(2f, 0f, 3f, 3f, 6f, 6f, "steel"), b(13f, 0f, 3f, 14f, 6f, 6f, "steel"),
+                b(4f, 9f, 1f, 12f, 14f, 1.5f),                          // sign with the bus on the front
+            )
+            Blocks.SOLAR_PANEL -> listOf(
+                b(7f, 0f, 7f, 9f, 5f, 9f, "steel"),
+                b(0f, 5f, 0f, 16f, 6f, 16f),
+            )
+            Blocks.EV_CHARGER -> listOf(
+                b(4f, 0f, 5f, 12f, 16f, 11f),
+                b(11.5f, 6f, 11f, 12.5f, 11f, 13f, "black_plastic"),   // cable holder
+                b(3.5f, 5f, 11f, 4.5f, 9f, 12f, "black_plastic"),
+            )
             else -> return null
         }
         val f = (meta and 7).let { if (it < 2 || it > 5) 2 else it }

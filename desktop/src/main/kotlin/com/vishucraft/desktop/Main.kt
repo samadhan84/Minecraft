@@ -1180,11 +1180,33 @@ class App(private val demo: File?) {
                 g.aircraft.riding = a; g.player.yaw = a.yaw + 0.5f; g.player.pitch = -0.1f
             }
             f == 1165 -> shot("04r-airplane-cabin")
-            f == 1166 -> session?.game?.let { g -> g.aircraft.riding = null }
-            f == 1171 -> overlay = Overlay.PAUSE
-            f == 1173 -> shot("05-pause")
-            f == 1177 -> { overlay = Overlay.NONE; leaveWorld(); menu = Menu.CREATE; nameField.text = "Demo survival"; seedField.text = "777"; survival = true }
-            f == 1179 -> demoCreate = true
+            f == 1166 -> session?.game?.let { g ->
+                g.aircraft.riding = null
+                // The smart city, seen from the sky behind the first road.
+                val p = g.player
+                val bx = com.vishucraft.game.world.floorInt(p.x) + 200; val bz = com.vishucraft.game.world.floorInt(p.z) - 200
+                val y = g.world.generator.surfaceHeight(bx, bz)
+                p.yaw = 0f
+                g.placeBuilding(com.vishucraft.game.engine.RayHit(bx, y, bz, 0, 1, 0, Blocks.GRASS), "Smart City")
+                p.x = bx + 0.5f; p.z = bz + 14.5f; p.y = y + 40f; p.yaw = 0f; p.pitch = -0.45f; p.flying = true
+            }
+            f == 1215 -> shot("04s-smart-city")
+            f == 1216 -> session?.game?.let { g ->
+                // Street level on the main road, cars and a bus coming.
+                val p = g.player
+                p.x += 2f; p.z -= 23f; p.y -= 37.5f; p.yaw = 0.1f; p.pitch = -0.05f
+            }
+            f == 1235 -> shot("04t-city-street")
+            f == 1236 -> session?.game?.let { g ->
+                // Up on the west metro platform.
+                val p = g.player
+                p.x -= 34f; p.z -= 36f; p.y += 11f; p.yaw = 1.5708f; p.pitch = -0.1f
+            }
+            f == 1255 -> shot("04u-city-metro")
+            f == 1261 -> overlay = Overlay.PAUSE
+            f == 1263 -> shot("05-pause")
+            f == 1267 -> { overlay = Overlay.NONE; leaveWorld(); menu = Menu.CREATE; nameField.text = "Demo survival"; seedField.text = "777"; survival = true }
+            f == 1269 -> demoCreate = true
             f == 1500 -> shot("06-survival-world")
             f == 1502 -> session?.let {
                 it.game.inventory.add(com.vishucraft.game.world.Items.find("Minecart"), 1)

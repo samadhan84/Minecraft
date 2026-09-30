@@ -70,6 +70,8 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
     val aircraft = Aircrafts(world)
     /** The elevator ride in progress (see Elevator.kt). */
     val lift = Lift()
+    /** Cars and buses (see Vehicles.kt). */
+    val vehicles = Vehicles(world)
     val dimension get() = world.dimension
     private var portalTime = 0f
     private var bowCooldown = 0f
@@ -413,6 +415,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
             val crouchPressed = input.descendHeld && !lastCrouch
             lastJump = input.jumpHeld; lastCrouch = input.descendHeld
             if (liftInput(jumpPressed, crouchPressed)) {}
+            else if (vehicles.riding != null && crouchPressed) leaveVehicle()
             else if (boats.riding != null && crouchPressed) { boats.riding = null; player.y += 0.8f }
             else if (mount != null && crouchPressed) dismount()
             else if (carts.riding != null && crouchPressed) carts.leave(this)
@@ -424,7 +427,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
             lastVy = player.vy
             player.speedMul = (if (input.sprint && !player.flying) 1.3f else 1f) * (if (hasEffect("swiftness")) 1.4f else 1f)
             player.jumpMul = if (hasEffect("leaping")) 1.22f else 1f
-            if (carts.riding == null && mount == null && boats.riding == null && aircraft.riding == null && !sitting && !lift.riding) player.update(dt, world, input.moveForward, input.moveStrafe, input.jumpHeld, input.descendHeld)
+            if (carts.riding == null && mount == null && boats.riding == null && aircraft.riding == null && vehicles.riding == null && !sitting && !lift.riding) player.update(dt, world, input.moveForward, input.moveStrafe, input.jumpHeld, input.descendHeld)
             updateFlight(dt)
             // Fall damage when landing hard (not while flying or in water).
             if (player.onGround && !wasOnGround && !player.flying && !player.inWater && lastVy < -14f && !hasEffect("slow_falling")) {
@@ -473,6 +476,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
         carts.update(dt, this)
         boats.update(dt, this)
         aircraft.update(dt, this)
+        vehicles.update(dt, this)
         updateLift(dt)
         if (bowCooldown > 0f) bowCooldown -= dt
         // Standing in a portal for two seconds travels to the other world.
@@ -1307,6 +1311,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
         if (pack3Early(tgt, item, sel)) return
         if (mount != null) { dismount(); return }
         if (aircraftUse(item, tgt)) return
+        if (vehicleUse(item, tgt)) return
         if (boats.riding != null) { boats.riding = null; player.y += 0.8f; return }
         // Boats: tap to get in; a sword or axe breaks one back into an item.
         boats.raycast(player.x, player.eyeY, player.z, dir[0], dir[1], dir[2], 4f)?.let { b ->
@@ -1740,7 +1745,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
         try {
             dir.mkdirs()
             val tmp = File(dir, "entities.dat.tmp")
-            java.io.DataOutputStream(tmp.outputStream().buffered()).use { d -> mobs.write(d); carts.write(d); boats.write(d); carts.writeExtra(d); aircraft.write(d) }
+            java.io.DataOutputStream(tmp.outputStream().buffered()).use { d -> mobs.write(d); carts.write(d); boats.write(d); carts.writeExtra(d); aircraft.write(d); vehicles.write(d) }
             tmp.renameTo(File(dir, "entities.dat"))
         } catch (_: Exception) {}
     }
@@ -1748,6 +1753,6 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
     private fun loadEntities() {
         val f = File(world.dataDir ?: return, "entities.dat")
         if (!f.exists()) return
-        try { java.io.DataInputStream(f.inputStream().buffered()).use { d -> mobs.read(d); carts.read(d); boats.read(d); carts.readExtra(d); aircraft.read(d) } } catch (_: Exception) {}
+        try { java.io.DataInputStream(f.inputStream().buffered()).use { d -> mobs.read(d); carts.read(d); boats.read(d); carts.readExtra(d); aircraft.read(d); vehicles.read(d) } } catch (_: Exception) {}
     }
 }

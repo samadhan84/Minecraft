@@ -410,12 +410,24 @@ object Blocks {
     const val HELIPAD = 433
     /** Stack them in a column, one per floor: jump to ride up, crouch to ride down. */
     const val ELEVATOR = 434
-    const val COUNT = 435
+    // ---- Smart city (cars and buses drive on road blocks; see engine/Vehicles.kt)
+    const val ROAD = 435
+    /** Road with a white dash in the middle (put one every other block along the centre). */
+    const val ROAD_MARKING = 436
+    /** White road paint: alternate it with road blocks for a zebra crossing. */
+    const val ZEBRA_CROSSING = 437
+    const val TRAFFIC_LIGHT = 438
+    const val STREET_LAMP = 439
+    /** Buses stop next to it for a few seconds. */
+    const val BUS_STOP = 440
+    const val SOLAR_PANEL = 441
+    const val EV_CHARGER = 442
+    const val COUNT = 443
 
     /** The newer crops' texture names, in id order from RICE_CROP. */
     val NEW_CROPS = listOf("rice", "tomato", "lentil", "beetroot")
 
-    fun isKitchenAppliance(id: Int) = id in GAS_STOVE..AIR_CONDITIONER || id in WARDROBE..WATER_COOLER
+    fun isKitchenAppliance(id: Int) = id in GAS_STOVE..AIR_CONDITIONER || id in WARDROBE..WATER_COOLER || id == EV_CHARGER
     /** Two blocks tall (the top half has Shapes.UPPER). */
     fun isTall(id: Int) = id == FRIDGE || id == WARDROBE
     /** Pots and pans that cook when they stand on a gas stove. */
@@ -957,6 +969,21 @@ object Blocks {
         cube(HELIPAD, "Helipad", "helipad", 1.2f, P)
         reg(BlockDef(ELEVATOR, "Elevator", t("elevator_top"), t("elevator_side"), t("steel"), hardness = 1.5f, tool = P, category = Category.HOME))
         extraLight[ELEVATOR] = 6
+        // ---- Smart city
+        cube(ROAD, "Road", "road", 1.2f, P)
+        cube(ROAD_MARKING, "Road Marking", "road_marking", 1.2f, P)
+        cube(ZEBRA_CROSSING, "Zebra Crossing", "zebra", 1.2f, P)
+        reg(BlockDef(TRAFFIC_LIGHT, "Traffic Light", t("black_plastic"), t("black_plastic"), t("black_plastic"), render = RenderType.SHAPE,
+            opaque = false, solid = true, blocksLight = false, hardness = 1f, tool = P, category = H, facing = Facing.HORIZONTAL,
+            front = t("traffic_light"), movable = false))
+        extraLight[TRAFFIC_LIGHT] = 8
+        reg(BlockDef(STREET_LAMP, "Street Lamp", t("street_lamp"), t("street_lamp"), t("street_lamp"), render = RenderType.SHAPE,
+            opaque = false, solid = true, blocksLight = false, hardness = 1f, tool = P, category = H, facing = Facing.HORIZONTAL, movable = false))
+        home(BUS_STOP, "Bus Stop", "bus_stop_roof", "glass", "steel", front = "bus_stop_sign", hardness = 1f)
+        home(SOLAR_PANEL, "Solar Panel", "solar_panel", "steel", hardness = 0.8f, facing = Facing.HORIZONTAL)
+        home(EV_CHARGER, "EV Charger", "white_plastic", "white_plastic", front = "ev_charger", hardness = 1f)
+        extraLight[EV_CHARGER] = 5
+        for (n in listOf("lamp_glow", "car_window", "bus_side", "bus_front", "bus_roof", "concrete_red")) t(n)
         for (n in listOf("plane_body", "plane_front", "plane_wing", "plane_tail", "heli_body", "heli_front", "rotor", "tyre")) t(n)
         for (n in listOf("mirror", "keyboard", "shower_water", "water_bottle_blue", "oak_leaves", "water")) t(n)
         for (n in listOf("steel", "black_plastic", "scarecrow", "train_side", "train_front", "train_roof",
@@ -1007,6 +1034,8 @@ object Blocks {
         CEILING_LIGHT -> if (meta and 8 != 0) 15 else 0
         COMPUTER -> if (meta and 8 != 0) 5 else 0
         TV -> if (meta and 8 != 0) 8 else 0
+        // A street lamp's post pieces (bit 3) give no light, only the lamp on top.
+        STREET_LAMP -> if (meta and 8 != 0) 0 else 15
         OVEN, MICROWAVE -> if (meta and 8 != 0) 7 else 0
         else -> extraLight[id]
     }
