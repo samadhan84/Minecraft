@@ -58,6 +58,10 @@ class Hud(private val game: Game) {
     var sleep = 0f
     var swing = 0f
 
+    /** Today's play time left (see engine/PlayLimit), shown at the top right; red in the last 5 minutes. */
+    var timeLeft: String? = null
+    var timeLow = false
+
     fun toast(s: String, seconds: Float = 2f) { toast = com.vishucraft.game.world.Names.show(s); toastTime = seconds }
 
     /** Seconds since the world opened (the game's name shows big at first). */
@@ -82,6 +86,12 @@ class Hud(private val game: Game) {
             val a = if (sleep > 1.5f) (3f - sleep) / 1.5f else sleep / 1.5f
             ui.rect(0f, 0f, w, h, rgba(0, 0, 0, (255 * a.coerceIn(0f, 1f)).toInt()))
             sleep = maxOf(0f, sleep - dt)
+        }
+        timeLeft?.let { t ->
+            val label = "Time left $t"
+            val tw = ui.textWidth(label, 18f)
+            ui.rect(w - tw - 28, 6f, tw + 20, 30f, rgba(0, 0, 0, 140))
+            ui.text(label, w - tw - 18, 11f, 18f, if (timeLow) rgba(255, 90, 80) else rgba(255, 255, 255))
         }
         // Crosshair
         ui.rect(w / 2 - 10, h / 2 - 1.5f, 20f, 3f, rgba(255, 255, 255, 200))

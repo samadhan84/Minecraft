@@ -10,6 +10,9 @@ class PlayLimit(var day: String, var used: Float) {
     /** Whole minutes left today (rounded up). */
     fun minutesLeft(today: String = today()): Int { newDay(today); return ((LIMIT - used).coerceAtLeast(0f) / 60f).let { kotlin.math.ceil(it).toInt() } }
 
+    /** The time left today as a clock, e.g. "32:05". */
+    fun clock(): String { val s = (LIMIT - used).coerceAtLeast(0f).toInt(); return "%d:%02d".format(s / 60, s % 60) }
+
     /** A new date resets the time used. */
     fun newDay(today: String) { if (today != day) { day = today; used = 0f } }
 

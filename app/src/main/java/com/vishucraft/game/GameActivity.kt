@@ -98,6 +98,7 @@ class GameActivity : Activity() {
     /** The online room (code) this game is open in, if any. */
     @Volatile private var onlineRoom: com.vishucraft.game.net.HostTunnel? = null
     private lateinit var effectsText: TextView
+    private lateinit var timerText: TextView
     private lateinit var lookLabel: TextView
     private lateinit var downButton: HudButton
     private lateinit var root: FrameLayout
@@ -203,7 +204,13 @@ class GameActivity : Activity() {
             setTextColor(Color.rgb(200, 230, 255)); textSize = 13f
             setShadowLayer(2f, 1f, 1f, Color.BLACK); gravity = Gravity.END
         }
-        root.addView(effectsText, lp(-2f, -2f, Gravity.TOP or Gravity.END, t = 64f, r = 16f))
+        root.addView(effectsText, lp(-2f, -2f, Gravity.TOP or Gravity.END, t = 96f, r = 16f))
+        // Today's play time left (see engine/PlayLimit).
+        timerText = TextView(this).apply {
+            setTextColor(Color.WHITE); textSize = 14f; typeface = android.graphics.Typeface.DEFAULT_BOLD
+            setBackgroundColor(Color.argb(140, 0, 0, 0)); setPadding(dpi(8f), dpi(3f), dpi(8f), dpi(3f))
+        }
+        root.addView(timerText, lp(-2f, -2f, Gravity.TOP or Gravity.END, t = 62f, r = 16f))
 
         stats = TextView(this).apply {
             setTextColor(Color.WHITE); textSize = 12f
@@ -867,17 +874,31 @@ class GameActivity : Activity() {
             limitTick = now
             settings.savePlayLimit(playLimit)
             warning?.let { showToast(it) }
-            if (playLimit.over) { releaseInputs(); finish(); return }  // saved in onPause; the menu explains why
+            showTimer()
+            if (playLimit.over) {
+                // Time's up: save the world, then close it (the menu explains why).
+                releaseInputs(); showPause(false)
+                showToast("Daily limit is over. Saving your world…")
+                glView.queueEvent { game.save(); runOnUiThread { finish() } }
+                return
+            }
             handler.postDelayed(this, 1000)
         }
     }
     private lateinit var playLimit: com.vishucraft.game.engine.PlayLimit
+
+    private fun showTimer() {
+        timerText.text = "⏱ " + playLimit.clock()
+        timerText.setTextColor(if (playLimit.used > com.vishucraft.game.engine.PlayLimit.LIMIT - 5 * 60) Color.rgb(255, 110, 100) else Color.WHITE)
+    }
     private var limitTick = 0L
 
     override fun onResume() {
         super.onResume()
         playLimit = settings.playLimit()
         limitTick = android.os.SystemClock.elapsedRealtime()
+        playLimit.newDay(com.vishucraft.game.engine.PlayLimit.today())
+        showTimer()
         handler.postDelayed(limitLoop, 1000)
         glView.onResume()
         sounds.resume()

@@ -192,8 +192,10 @@ class App(private val demo: File?) {
             playLimit.tick(com.vishucraft.game.engine.PlayLimit.today(), dt)?.let { hud?.toast(it, 5f) }
             limitSaveTimer += dt
             if (limitSaveTimer > 10f || playLimit.over) { limitSaveTimer = 0f; prefs.savePlayLimit(playLimit) }
-            if (playLimit.over) { leaveWorld(); menu = Menu.TITLE; limitNotice = true; return }
+            // Time's up: save the world and close it, then say why on the title screen.
+            if (playLimit.over) { s.save(); leaveWorld(); menu = Menu.TITLE; limitNotice = true; return }
         }
+        hud?.timeLeft = playLimit.clock(); hud?.timeLow = playLimit.used > com.vishucraft.game.engine.PlayLimit.LIMIT - 5 * 60
         updateGameInput(s, dt)
         val events = ArrayList<String>()
         s.frame(dt, events)
