@@ -17,6 +17,10 @@ class Lift {
     var z = 0f
     var floor = 0
     val riding get() = !targetY.isNaN()
+    /** True while the player stands on an elevator block (the phone shows the down button then). */
+    @Volatile var standingOn = false
+    /** The elevator block last stepped on, so the hint shows once per step. */
+    var lastBlock = Long.MIN_VALUE
 }
 
 /** The elevator blocks in the column at (x, z), lowest first. */
@@ -27,6 +31,7 @@ internal fun Game.liftFloors(x: Int, z: Int): List<Int> =
 private fun Game.liftUnderfoot(): IntArray? {
     val x = player.blockX(); val z = player.blockZ()
     val y = floorInt(player.y - 0.1f)
+    if (player.y - (y + 1) > 0.3f) return null
     return if (world.getBlock(x, y, z) == Blocks.ELEVATOR) intArrayOf(x, y, z) else null
 }
 
@@ -37,13 +42,15 @@ fun Game.liftTo(x: Int, z: Int, index: Int) {
     lift.x = x + 0.5f; lift.z = z + 0.5f
     lift.targetY = y + 1f
     lift.floor = index
+    // Arriving shows the floor number, not the elevator hint again.
+    lift.lastBlock = com.vishucraft.game.world.RedstoneIds.pack(x, y, z)
     player.x = lift.x; player.z = lift.z
     sound("click", player.x, player.y, player.z)
 }
 
 /** Jump rides up a floor, crouch rides down, when standing on an elevator. Returns true when used. */
 internal fun Game.liftInput(jumpPressed: Boolean, crouchPressed: Boolean): Boolean {
-    if (lift.riding || player.flying || (!jumpPressed && !crouchPressed)) return false
+    if (lift.riding || (!jumpPressed && !crouchPressed)) return false
     val here = liftUnderfoot() ?: return false
     val floors = liftFloors(here[0], here[2])
     val i = floors.indexOf(here[1])
@@ -66,8 +73,20 @@ internal fun Game.liftTap(t: RayHit, sel: Int): Boolean {
     return true
 }
 
-/** Moves a rider smoothly to the chosen floor. */
+/** Moves a rider smoothly to the chosen floor, and explains the elevator when someone steps on one. */
 internal fun Game.updateLift(dt: Float) {
+    val here = if (lift.riding) null else liftUnderfoot()
+    lift.standingOn = here != null
+    if (here != null) {
+        val key = com.vishucraft.game.world.RedstoneIds.pack(here[0], here[1], here[2])
+        if (key != lift.lastBlock) {
+            lift.lastBlock = key
+            val floors = liftFloors(here[0], here[2])
+            val i = floors.indexOf(here[1])
+            uiEvents.add("toast:" + if (floors.size < 2) "Elevator: put more elevator blocks straight above this one, one on each floor"
+                else "Elevator (${if (i == 0) "ground floor" else "floor $i"} of ${floors.size}): jump to go up, ▼ / crouch to go down, or tap it to pick a floor")
+        }
+    } else if (!lift.riding) lift.lastBlock = Long.MIN_VALUE
     if (!lift.riding) return
     val step = 7f * dt
     val dy = lift.targetY - player.y

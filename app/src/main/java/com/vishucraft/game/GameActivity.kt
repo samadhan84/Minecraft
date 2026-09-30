@@ -631,7 +631,8 @@ class GameActivity : Activity() {
         if (look != lastLook) { lastLook = look; lookLabel.text = com.vishucraft.game.world.Names.show(look) }
         val flying = game.player.flying
         flyButton.toggled = flying
-        downButton.visibility = if (flying) View.VISIBLE else View.GONE
+        // The down button also rides an elevator down.
+        downButton.visibility = if (flying || game.lift.standingOn) View.VISIBLE else View.GONE
     }
 
     /** Drag to look, tap to place, touch-and-hold to mine. */
