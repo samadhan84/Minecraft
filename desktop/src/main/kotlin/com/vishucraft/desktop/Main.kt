@@ -1,6 +1,7 @@
 package com.vishucraft.desktop
 
 import com.vishucraft.game.engine.placeBuilding
+import com.vishucraft.game.engine.flyTo
 import com.vishucraft.desktop.Ui.Companion.rgba
 import com.vishucraft.game.engine.GameInput
 import com.vishucraft.game.net.ClientSession
@@ -76,7 +77,7 @@ const val CONTROLS_HELP =
 
 class App(private val demo: File?) {
     private enum class Menu { TITLE, WORLDS, CREATE, JOIN, SETTINGS, CONTROLS, CONFIRM_DELETE }
-    private enum class Overlay { NONE, PAUSE, CREATIVE, CONTAINER, SETTINGS, CONTROLS, NAME_MOB, TRADE, ACHIEVEMENTS, SIGN, ENDING, INTERNET }
+    private enum class Overlay { NONE, PAUSE, CREATIVE, CONTAINER, SETTINGS, CONTROLS, NAME_MOB, TRADE, ACHIEVEMENTS, SIGN, ENDING, INTERNET, FLIGHTS }
 
     private var window = NULL
     private val prefs = Prefs()
@@ -217,6 +218,7 @@ class App(private val demo: File?) {
             Overlay.TRADE -> tradeScreen(s)
             Overlay.ACHIEVEMENTS -> achievementsScreen(s)
             Overlay.SIGN -> signScreen(s)
+            Overlay.FLIGHTS -> flightsScreen(s)
             Overlay.ENDING -> endingScreen()
             Overlay.INTERNET -> internetScreen()
         }
@@ -286,6 +288,7 @@ class App(private val demo: File?) {
                 signPos = e.removePrefix("signedit:").split(',').map { it.toInt() }
                 signField.text = s.game.signText(signPos[0], signPos[1], signPos[2]); ui.focus = signField; overlay = Overlay.SIGN
             }
+            e.startsWith("flights:") -> { flights = e.removePrefix("flights:").split('|'); overlay = Overlay.FLIGHTS }
             e.startsWith("achievement:") -> hud.toast("Achievement unlocked!\n" + e.removePrefix("achievement:"), 4f)
             e.startsWith("trade:") -> { tradeUid = e.removePrefix("trade:").toIntOrNull() ?: -1; tradeMessage = ""; overlay = Overlay.TRADE }
             e.startsWith("name:") -> { namingUid = e.removePrefix("name:").toIntOrNull() ?: -1; nameField.text = ""; ui.focus = nameField; overlay = Overlay.NAME_MOB }
@@ -526,6 +529,21 @@ class App(private val demo: File?) {
                 "The world is still yours: keep building, exploring and playing."
         for (line in text.split('\n')) { ui.text(line, ui.width / 2, y, 19f, rgba(230, 230, 255), 1); y += 28 }
         if (ui.button("Keep playing", ui.width / 2 - 140, y + 20, 280f, 44f)) overlay = Overlay.NONE
+    }
+
+    private var flights = listOf<String>()
+
+    /** Got into an airplane: pick an airport to fly to. */
+    private fun flightsScreen(s: GameSession) {
+        val cx = ui.width / 2; val w = 420f
+        ui.rect(0f, 0f, ui.width, ui.height, rgba(0, 0, 0, 150))
+        title("Where do you want to fly?", ui.height * 0.2f)
+        var y = ui.height * 0.2f + 60
+        for (name in flights.take(8)) {
+            if (ui.button(name, cx - w / 2, y, w, 44f)) { s.game.flyTo(name); overlay = Overlay.NONE }
+            y += 52
+        }
+        if (ui.button("Not now", cx - w / 2, y + 10, w, 44f)) overlay = Overlay.NONE
     }
 
     private fun signScreen(s: GameSession) {
@@ -798,7 +816,7 @@ class App(private val demo: File?) {
             }
             Overlay.PAUSE -> if (key == GLFW_KEY_ESCAPE) overlay = Overlay.NONE
             Overlay.TRADE -> if (key == GLFW_KEY_ESCAPE || key == GLFW_KEY_E) overlay = Overlay.NONE
-            Overlay.SIGN -> if (key == GLFW_KEY_ESCAPE) { ui.focus = null; overlay = Overlay.NONE }
+            Overlay.SIGN, Overlay.FLIGHTS -> if (key == GLFW_KEY_ESCAPE) { ui.focus = null; overlay = Overlay.NONE }
             Overlay.ENDING -> if (key == GLFW_KEY_ESCAPE) overlay = Overlay.NONE
             Overlay.INTERNET -> if (key == GLFW_KEY_ESCAPE) overlay = Overlay.PAUSE
             Overlay.SETTINGS, Overlay.CONTROLS, Overlay.NAME_MOB, Overlay.ACHIEVEMENTS -> if (key == GLFW_KEY_ESCAPE) { ui.focus = null; overlay = Overlay.PAUSE }
@@ -1126,22 +1144,40 @@ class App(private val demo: File?) {
             f == 1108 -> shot("04o-mansion")
             f == 1109 -> session?.game?.let { g -> val p = g.player; p.z -= 21f; p.y -= 11f; p.pitch = -0.1f }
             f == 1110 -> shot("04p-mansion-inside")
-            f == 1111 -> overlay = Overlay.PAUSE
-            f == 1113 -> shot("05-pause")
-            f == 1117 -> { overlay = Overlay.NONE; leaveWorld(); menu = Menu.CREATE; nameField.text = "Demo survival"; seedField.text = "777"; survival = true }
-            f == 1119 -> demoCreate = true
-            f == 1440 -> shot("06-survival-world")
-            f == 1442 -> session?.let {
+            f == 1111 -> session?.game?.let { g ->
+                // An airport, seen from above the terminal, with the airplane and helicopter taking off.
+                val p = g.player
+                val bx = com.vishucraft.game.world.floorInt(p.x) + 200; val bz = com.vishucraft.game.world.floorInt(p.z)
+                val y = g.world.generator.surfaceHeight(bx, bz)
+                p.yaw = 0f
+                g.placeBuilding(com.vishucraft.game.engine.RayHit(bx, y, bz, 0, 1, 0, Blocks.GRASS), "Airport")
+                g.aircraft.list.lastOrNull { !it.isPlane }?.let { it.y += 6f }
+                p.x = bx + 30.5f; p.z = bz - 2.5f; p.y = y + 22f; p.yaw = -0.9f; p.pitch = -0.45f; p.flying = true
+            }
+            f == 1150 -> shot("04q-airport")
+            f == 1151 -> session?.game?.let { g ->
+                // Inside the airplane's cabin.
+                val a = g.aircraft.list.first { it.isPlane }
+                g.aircraft.riding = a; g.player.yaw = a.yaw + 0.5f; g.player.pitch = -0.1f
+            }
+            f == 1165 -> shot("04r-airplane-cabin")
+            f == 1166 -> session?.game?.let { g -> g.aircraft.riding = null }
+            f == 1171 -> overlay = Overlay.PAUSE
+            f == 1173 -> shot("05-pause")
+            f == 1177 -> { overlay = Overlay.NONE; leaveWorld(); menu = Menu.CREATE; nameField.text = "Demo survival"; seedField.text = "777"; survival = true }
+            f == 1179 -> demoCreate = true
+            f == 1500 -> shot("06-survival-world")
+            f == 1502 -> session?.let {
                 it.game.inventory.add(com.vishucraft.game.world.Items.find("Minecart"), 1)
                 it.game.inventory.add(Blocks.LOG, 8)
                 openInventory()
             }
-            f == 1446 -> shot("07-survival-inventory")
-            f == 1448 -> { closeOverlay(); openContainer(ContainerScreen.Mode.CRAFTING) }
-            f == 1452 -> shot("08-crafting-table")
-            f == 1454 -> { closeOverlay(); leaveWorld(); menu = Menu.WORLDS }
-            f == 1458 -> shot("09-worlds")
-            f == 1460 -> glfwSetWindowShouldClose(window, true)
+            f == 1506 -> shot("07-survival-inventory")
+            f == 1508 -> { closeOverlay(); openContainer(ContainerScreen.Mode.CRAFTING) }
+            f == 1512 -> shot("08-crafting-table")
+            f == 1514 -> { closeOverlay(); leaveWorld(); menu = Menu.WORLDS }
+            f == 1518 -> shot("09-worlds")
+            f == 1520 -> glfwSetWindowShouldClose(window, true)
         }
     }
 }

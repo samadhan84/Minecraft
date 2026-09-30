@@ -15,6 +15,7 @@ Welcome to DhruvVishu – a block world that is all yours!
 🍛 REAL KITCHEN – Gas stove, pressure cooker, tawa, fridge, microwave and mixer: cook rice, dal, roti, dosa, chai and pizza.
 🌾 FARMING – Grow wheat, rice, tomatoes, lentils, beetroot, carrots and potatoes. Water them, harvest with a sickle, and they replant themselves.
 🏠 READY-MADE BUILDINGS – Place a house, modern home, farm, watch tower, metro station or swimming pool in one tap.
+✈️ AIRPORTS – Build airports, fly airplanes between them, and take a helicopter anywhere.
 🚆 TRAINS & METRO – Drive a train engine with coaches, or ride the metro from station to station.
 🐺 ANIMALS & MONSTERS – Tame wolves, cats and parrots, ride horses, trade with villagers and defend yourself at night.
 ⚔ SURVIVAL & CREATIVE – Play survival with health, hunger and experience, or build freely in creative mode.

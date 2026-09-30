@@ -25,12 +25,13 @@ class DropRenderer {
 
     fun draw(shader: Shader, drops: ItemEntities, camX: Float, camZ: Float, maxDist: Float, time: Float,
              carts: com.vishucraft.game.engine.Carts? = null, arrows: com.vishucraft.game.engine.Projectiles? = null,
-             boats: com.vishucraft.game.engine.Boats? = null) {
+             boats: com.vishucraft.game.engine.Boats? = null, aircraft: com.vishucraft.game.engine.Aircrafts? = null) {
         buf.size = 0
         carts?.list?.forEach { c ->
             if (c.isTrain) train(c.x, c.y, c.z, c.yaw, c.kind, carts.power(c)?.kind ?: c.kind) else cart(c.x, c.y, c.z, c.yaw)
         }
         boats?.list?.forEach { b -> boat(b.x, b.y, b.z, b.yaw) }
+        aircraft?.list?.forEach { a -> if (a.isPlane) airplane(a.x, a.y, a.z, a.yaw) else helicopter(a.x, a.y, a.z, a.yaw, a.spin) }
         arrows?.list?.forEach { a ->
             val tile = when (a.kind) {
                 com.vishucraft.game.engine.Projectile.SNOWBALL -> snowballTile
@@ -153,6 +154,60 @@ class DropRenderer {
             val x0 = if (side < 0) -w + 0.02f else w - 0.1f
             box(floatArrayOf(x0, 0f, zc - 0.2f, x0 + 0.08f, 0.38f, zc + 0.2f), wheels)
         }
+    }
+
+    /** One box of a model: [b] in the model's own space (front towards -Z), [tiles] per face (+Y, -Y, +Z, -Z, +X, -X). */
+    private fun part(cx: Float, cy: Float, cz: Float, yaw: Float, b: FloatArray, tiles: IntArray) {
+        val c = cos(yaw); val s = sin(yaw)
+        for (f in 0 until 6) {
+            val tile = tiles[f]
+            val u0 = ChunkMesher.tileU(tile); val v0 = ChunkMesher.tileV(tile)
+            buf.ensure(4 * FLOATS_PER_VERTEX)
+            for ((k, cv) in ChunkMesher.CORNERS[f].withIndex()) {
+                val lx = if (cv[0] == 1) b[3] else b[0]; val ly = if (cv[1] == 1) b[4] else b[1]; val lz = if (cv[2] == 1) b[5] else b[2]
+                val uv = ChunkMesher.UVS[k]
+                buf.put(cx + lx * c - lz * s, cy + ly, cz + lx * s + lz * c,
+                    u0 + uv[0] * ChunkMesher.TILE_UV, v0 + uv[1] * ChunkMesher.TILE_UV, ChunkMesher.FACE_SHADE[f])
+            }
+        }
+    }
+
+    private fun all6(name: String) = IntArray(6) { tile(name) }
+    private val planeBody by lazy { intArrayOf(tile("plane_wing"), tile("plane_wing"), tile("plane_wing"), tile("plane_front"), tile("plane_body"), tile("plane_body")) }
+    private val heliBody by lazy { intArrayOf(tile("heli_body"), tile("heli_body"), tile("heli_body"), tile("heli_front"), tile("heli_body"), tile("heli_body")) }
+
+    /** A passenger jet: long body with windows, wings with engines, a tail and wheels. */
+    private fun airplane(cx: Float, cy: Float, cz: Float, yaw: Float) {
+        val wing = all6("plane_wing"); val tail = all6("plane_tail"); val tyre = all6("tyre")
+        part(cx, cy, cz, yaw, floatArrayOf(-0.7f, 0.6f, -4f, 0.7f, 2.1f, 4f), planeBody)
+        part(cx, cy, cz, yaw, floatArrayOf(-0.5f, 0.6f, -4.8f, 0.5f, 1.3f, -4f), wing)                 // nose, below the windscreen
+        part(cx, cy, cz, yaw, floatArrayOf(-5f, 1f, -1f, 5f, 1.25f, 1f), wing)                          // wings
+        for (side in floatArrayOf(-1f, 1f)) {
+            val x0 = if (side < 0) -2.9f else 2.1f
+            part(cx, cy, cz, yaw, floatArrayOf(x0, 0.4f, -1.4f, x0 + 0.8f, 1f, 0.2f), all6("rotor"))  // engines
+            part(cx, cy, cz, yaw, floatArrayOf(side * 1.2f - 0.15f, 0f, 0.3f, side * 1.2f + 0.15f, 0.6f, 0.7f), tyre)
+        }
+        part(cx, cy, cz, yaw, floatArrayOf(-0.15f, 0f, -3.2f, 0.15f, 0.6f, -2.8f), tyre)
+        part(cx, cy, cz, yaw, floatArrayOf(-2f, 1.9f, 3f, 2f, 2.05f, 4f), wing)                         // tail wings
+        part(cx, cy, cz, yaw, floatArrayOf(-0.08f, 2.1f, 2.8f, 0.08f, 3.7f, 4f), tail)                   // tail fin
+    }
+
+    /** A helicopter: cabin with big windows, tail boom and fin, skids, and a spinning rotor. */
+    private fun helicopter(cx: Float, cy: Float, cz: Float, yaw: Float, spin: Float) {
+        val dark = all6("rotor")
+        part(cx, cy, cz, yaw, floatArrayOf(-0.9f, 0.3f, -1.6f, 0.9f, 2.2f, 1.6f), heliBody)
+        part(cx, cy, cz, yaw, floatArrayOf(-0.2f, 1.4f, 1.6f, 0.2f, 1.8f, 5f), all6("heli_body"))
+        part(cx, cy, cz, yaw, floatArrayOf(-0.08f, 1.8f, 4.5f, 0.08f, 2.9f, 5f), all6("heli_body"))
+        for (side in floatArrayOf(-1f, 1f)) {
+            val x0 = side * 0.8f - 0.1f
+            part(cx, cy, cz, yaw, floatArrayOf(x0, 0f, -1.7f, x0 + 0.2f, 0.12f, 1.7f), dark)
+            part(cx, cy, cz, yaw, floatArrayOf(x0, 0.12f, -0.8f, x0 + 0.2f, 0.3f, -0.6f), dark)
+            part(cx, cy, cz, yaw, floatArrayOf(x0, 0.12f, 0.6f, x0 + 0.2f, 0.3f, 0.8f), dark)
+        }
+        part(cx, cy, cz, yaw, floatArrayOf(-0.1f, 2.2f, -0.1f, 0.1f, 2.5f, 0.1f), dark)
+        // Rotor blades turn with the spin angle.
+        part(cx, cy, cz, yaw + spin, floatArrayOf(-4.5f, 2.5f, -0.15f, 4.5f, 2.58f, 0.15f), dark)
+        part(cx, cy, cz, yaw + spin, floatArrayOf(-0.15f, 2.5f, -4.5f, 0.15f, 2.58f, 4.5f), dark)
     }
 
     /** A flat-bottomed rowing boat made of planks. */

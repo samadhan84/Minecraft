@@ -20,6 +20,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import com.vishucraft.game.engine.Game
 import com.vishucraft.game.engine.GameInput
+import com.vishucraft.game.engine.flyTo
 import com.vishucraft.game.render.GameRenderer
 import com.vishucraft.game.ui.CrosshairView
 import com.vishucraft.game.ui.HotbarView
@@ -573,6 +574,14 @@ class GameActivity : Activity() {
                     .setPositiveButton("OK") { _, _ -> val txt = input.text.toString(); glView.queueEvent { game.setSignText(x, y, z, txt) } }
                     .setNegativeButton("Cancel", null).show()
                 input.requestFocus()
+            }
+            e.startsWith("flights:") -> {
+                // Got into an airplane: where to?
+                releaseInputs()
+                val names = e.removePrefix("flights:").split('|').toTypedArray()
+                android.app.AlertDialog.Builder(this).setTitle("Where do you want to fly?")
+                    .setItems(names) { _, i -> val n = names[i]; glView.queueEvent { game.flyTo(n) } }
+                    .setNegativeButton("Not now", null).show()
             }
             e.startsWith("achievement:") -> showToast("Achievement unlocked!\n" + e.removePrefix("achievement:"))
             e.startsWith("trade:") -> e.removePrefix("trade:").toIntOrNull()?.let { showTrades(it) }

@@ -31,7 +31,10 @@ private class Plan(val g: Game, val ox: Int, val oy: Int, val oz: Int, val fx: I
     fun set(a: Int, d: Int, h: Int, id: Int, meta: Int = 0) {
         val y = oy + h
         if (y < 1 || y >= Chunk.HEIGHT) return
-        g.setBlock(x(a, d), y, z(a, d), id, meta)
+        val wx = x(a, d); val wz = z(a, d)
+        // Big buildings reach past the loaded area: load (or generate) the ground there first.
+        g.world.ensureLoaded(wx shr 4, wz shr 4)
+        g.setBlock(wx, y, wz, id, meta)
     }
 
     /** Clears the space above the footprint and fills any gap underneath so it stands on solid ground. */
@@ -62,7 +65,7 @@ internal fun Game.placeBuilding(t: RayHit, name: String): Boolean {
     val p = Plan(this, t.x, oy, t.z, fx, fz)
     if (!buildReady(p, name)) return false
     sound("ding", player.x, player.y, player.z)
-    uiEvents.add("toast:Built a ${name.lowercase()}!")
+    uiEvents.add("toast:Built ${if (name[0].lowercaseChar() in "aeiou") "an" else "a"} ${name.lowercase()}!")
     return true
 }
 
@@ -76,6 +79,7 @@ private fun Game.buildReady(p: Plan, name: String): Boolean {
         "Metro Station" -> metroStation(p)
         "Swimming Pool" -> pool(p)
         "Mansion" -> mansion(p)
+        "Airport" -> airport(p)
         else -> return false
     }
     return true
@@ -347,4 +351,64 @@ private fun Game.mansion(p: Plan) {
     for (a in intArrayOf(-3, -1, 1, 3)) p.set(a, 17, 11, Blocks.SOFA, p.toward)
     p.set(-7, 8, 11, Blocks.PLANT_POT); p.set(7, 8, 11, Blocks.PLANT_POT); p.set(-7, 18, 11, Blocks.PLANT_POT); p.set(7, 18, 11, Blocks.PLANT_POT)
     for (h in 6..10) p.set(0, 19, h, Blocks.LADDER, p.toward)
+}
+
+/**
+ * An airport: a long runway running away from the player, a terminal with seats and check-in desks, a control
+ * tower and a helipad, with an airplane and a helicopter ready to go. Each airport gets a name; airplanes can
+ * fly between any two of them.
+ */
+private fun Game.airport(p: Plan) {
+    val white = Blocks.CONCRETE_FIRST
+    val len = 90
+    val name = "Airport ${aircraft.airports.size + 1}"
+    // Runway with a centre line and edge lights.
+    p.site(-5, 5, 1, len, 12, Blocks.RUNWAY)
+    for (d in 1..len) {
+        p.set(0, d, -1, if (d % 6 < 3) Blocks.RUNWAY_LINE else Blocks.RUNWAY)
+        if (d % 8 == 0) { p.set(-5, d, -1, Blocks.SEA_LANTERN); p.set(5, d, -1, Blocks.SEA_LANTERN) }
+    }
+    for (a in -4..4) { p.set(a, 2, -1, Blocks.RUNWAY_LINE); p.set(a, len - 1, -1, Blocks.RUNWAY_LINE) }
+    // Terminal on the right.
+    p.site(7, 19, 3, 19, 7, Blocks.POLISHED_DIORITE)
+    for (a in 7..19) for (d in 3..19) {
+        p.set(a, d, 5, Blocks.SMOOTH_STONE)
+        if (a == 7 || a == 19 || d == 3 || d == 19) for (h in 0..4) {
+            val column = (a + d) % 4 == 0
+            p.set(a, d, h, if (h in 1..3 && !column) Blocks.GLASS else white)
+        }
+    }
+    for (d in 10..11) { p.set(7, d, 0, Blocks.OAK_DOOR, p.left); p.set(7, d, 1, Blocks.OAK_DOOR, p.left or Shapes.UPPER) }
+    for (d in intArrayOf(5, 7, 13, 15, 17)) for (a in 10..16 step 2) p.set(a, d, 0, Blocks.SOFA, p.left)
+    for (d in 5..8) p.set(18, d, 0, Blocks.KITCHEN_COUNTER, p.left)
+    p.set(18, 9, 0, Blocks.COMPUTER, p.left or 8)
+    p.set(18, 16, 0, Blocks.WATER_COOLER, p.left); p.set(18, 18, 0, Blocks.PLANT_POT); p.set(8, 18, 0, Blocks.PLANT_POT)
+    for ((a, d) in listOf(11 to 6, 15 to 6, 11 to 15, 15 to 15, 13 to 11)) p.set(a, d, 4, Blocks.CEILING_LIGHT, 8)
+    for (a in 8..18) p.set(a, 3, 6, if (a % 2 == 0) Blocks.CONCRETE_FIRST + 11 else white)
+    p.set(6, 12, 0, Blocks.SIGN, p.left)
+    world.blockEntities.sign(p.x(6, 12), p.oy, p.z(6, 12))?.text = name
+    // Control tower.
+    p.site(10, 16, 21, 27, 20, Blocks.SMOOTH_STONE)
+    // A 5x5 shaft as wide as the glass cab on top (an overhang would shade it dark).
+    for (h in 0..14) for (a in 11..15) for (d in 22..26) if (a == 11 || a == 15 || d == 22 || d == 26) p.set(a, d, h, if (h % 5 == 2 && (a == 13 || d == 24)) Blocks.GLASS else white)
+    for (h in 0..15) p.set(14, 23, h, Blocks.LADDER, p.away)
+    p.door(13, 22)
+    for (a in 11..15) for (d in 22..26) {
+        p.set(a, d, 15, Blocks.SMOOTH_STONE)
+        val edge = a == 11 || a == 15 || d == 22 || d == 26
+        for (h in 16..17) p.set(a, d, h, if (edge) Blocks.GLASS else Blocks.AIR)
+        p.set(a, d, 18, white)
+    }
+    p.set(14, 23, 15, Blocks.LADDER, p.away)
+    p.set(12, 23, 16, Blocks.COMPUTER, p.away or 8); p.set(13, 23, 16, Blocks.COMPUTER, p.away or 8)
+    p.set(13, 24, 19, Blocks.REDSTONE_LAMP_ON)
+    // Helipad on the left.
+    p.site(-14, -8, 9, 15, 8, Blocks.RUNWAY)
+    for (a in -13..-9) for (d in 10..14) p.set(a, d, -1, if (a == -11 && d == 12) Blocks.HELIPAD else if (a == -13 || a == -9 || d == 10 || d == 14) Blocks.CONCRETE_FIRST + 4 else Blocks.RUNWAY)
+    // The airport's airplane and helicopter, and the airport itself.
+    val yaw = kotlin.math.atan2(p.fx.toFloat(), -p.fz.toFloat())
+    aircraft.list.add(Aircraft(p.x(0, 7) + 0.5f, p.oy.toFloat(), p.z(0, 7) + 0.5f, Aircraft.PLANE).also { it.yaw = yaw })
+    aircraft.list.add(Aircraft(p.x(-11, 12) + 0.5f, p.oy.toFloat(), p.z(-11, 12) + 0.5f, Aircraft.HELICOPTER).also { it.yaw = yaw })
+    aircraft.airports.add(Airport(name, p.x(0, 3) + 0.5f, p.oy.toFloat(), p.z(0, 3) + 0.5f, p.fx.toFloat(), p.fz.toFloat()))
+    uiEvents.add("toast:$name is open! Build another airport to fly between them")
 }

@@ -107,6 +107,26 @@ class World(val seed: Long, private val saveDir: File?, val dimension: Dimension
 
     fun pendingCount() = pending.size
 
+    /**
+     * Makes sure a chunk is in memory right now, loading or generating it on this thread (big buildings reach
+     * past what has been loaded). Returns false for Wi-Fi guests, whose chunks come from the host.
+     */
+    fun ensureLoaded(cx: Int, cz: Int): Boolean {
+        val key = Chunk.key(cx, cz)
+        if (chunks.containsKey(key)) return true
+        if (remoteLoader != null) return false
+        // A worker is already on it: wait for it to finish.
+        var waited = 0
+        while (pending.contains(key) && waited < 3000) { Thread.sleep(5); waited += 5 }
+        if (chunks.containsKey(key)) return true
+        val loaded = load(cx, cz)
+        val chunk = loaded ?: Chunk(cx, cz).also { generator.generate(it) }
+        if (loaded != null) registerComponents(chunk)
+        chunk.version = 1
+        chunks[key] = chunk
+        return true
+    }
+
     fun unload(chunk: Chunk) {
         chunks.remove(Chunk.key(chunk.cx, chunk.cz))
         components.removeIf { RedstoneIds.x(it) shr 4 == chunk.cx && RedstoneIds.z(it) shr 4 == chunk.cz }

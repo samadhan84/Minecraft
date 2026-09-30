@@ -1783,6 +1783,34 @@ object TextureAtlas {
                 return true
             }
             "beetroot_seeds" -> { mask(t, BEANS, rgb(140, 110, 60)); return true }
+            // ---- Airport
+            "runway" -> { speckle(t, rgb(58, 58, 62), listOf(rgb(70, 70, 76), rgb(48, 48, 52)), 25); return true }
+            "runway_line" -> { speckle(t, rgb(58, 58, 62), listOf(rgb(70, 70, 76), rgb(48, 48, 52)), 25); for (y in 0 until 16) for (x in 6..9) t[x, y] = rgb(236, 236, 236); return true }
+            "helipad" -> {
+                speckle(t, rgb(58, 58, 62), listOf(rgb(70, 70, 76)), 20)
+                for (y in 0 until 16) for (x in 0 until 16) { val r = hypot(x + 0.5f - 8f, y + 0.5f - 8f); if (r in 6.2f..7.6f) t[x, y] = rgb(250, 206, 40) }
+                for (y in 4..11) { t[5, y] = rgb(240, 240, 240); t[6, y] = rgb(240, 240, 240); t[9, y] = rgb(240, 240, 240); t[10, y] = rgb(240, 240, 240) }
+                for (x in 7..8) { t[x, 7] = rgb(240, 240, 240); t[x, 8] = rgb(240, 240, 240) }
+                return true
+            }
+            "plane_body" -> { t.fill { x, y -> when { y in 4..6 && x % 3 != 0 -> 0; y == 10 || y == 11 -> rgb(30, 80, 190); else -> scale(rgb(240, 242, 246), t.jitter(0.01f)) } }; return true }
+            "plane_front" -> { t.fill { x, y -> if (y in 3..8 && x in 2..13) 0 else scale(rgb(240, 242, 246), t.jitter(0.01f)) }; return true }
+            "plane_wing" -> { t.fill { x, y -> if (x % 8 == 0 || y % 8 == 0) rgb(170, 174, 182) else scale(rgb(206, 210, 216), t.jitter(0.02f)) }; return true }
+            "plane_tail" -> { t.fill { _, y -> if (y in 5..9) rgb(250, 190, 40) else rgb(30, 80, 190) }; return true }
+            "heli_body" -> { t.fill { x, y -> when { y in 2..7 && x in 2..13 && x != 7 && x != 8 -> 0; y == 11 -> rgb(250, 250, 250); else -> scale(rgb(210, 40, 40), t.jitter(0.03f)) } }; return true }
+            "heli_front" -> { t.fill { x, y -> if (y in 1..10 && x in 1..14) 0 else scale(rgb(210, 40, 40), t.jitter(0.03f)) }; return true }
+            "rotor" -> { t.fill { _, _ -> scale(rgb(46, 46, 50), t.jitter(0.05f)) }; return true }
+            "tyre" -> { t.fill { x, y -> if (hypot(x + 0.5f - 8f, y + 0.5f - 8f) < 3f) rgb(170, 170, 176) else rgb(24, 24, 26) }; return true }
+            "airplane_item" -> {
+                mask(t, arrayOf("......d.......", "......dd......", "......dmd.....", "dd....dmmd....", "dmd..dmmmmddddd", "dmmmmmmmmmmmmad", "dmd..dmmmmddddd", "dd....dmmd....", "......dmd.....", "......dd......", "......d......."),
+                    rgb(236, 238, 244), rgb(120, 180, 230))
+                return true
+            }
+            "helicopter_item" -> {
+                mask(t, arrayOf("dddddddddddddd", "......dd......", "....dddddd....", "...dmmmmaad...", "dddmmmmmaaad..", "d..dmmmmmmmd..", "...dmmmmmmd...", "....dddddd....", "...d......d...", "..dddddddddd.."),
+                    rgb(210, 40, 40), rgb(160, 210, 240))
+                return true
+            }
             // ---- Household pack
             "stop_rail" -> {
                 sprite(t)

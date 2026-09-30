@@ -403,7 +403,12 @@ object Blocks {
     const val SWING = 428
     const val DRESSING_TABLE = 429
     const val WATER_COOLER = 430
-    const val COUNT = 431
+    // ---- Airport
+    const val RUNWAY = 431
+    /** Runway with the white centre line. */
+    const val RUNWAY_LINE = 432
+    const val HELIPAD = 433
+    const val COUNT = 434
 
     /** The newer crops' texture names, in id order from RICE_CROP. */
     val NEW_CROPS = listOf("rice", "tomato", "lentil", "beetroot")
@@ -945,6 +950,10 @@ object Blocks {
         home(SWING, "Swing", "oak_planks", "oak_planks", hardness = 0.5f, tool = A, solid = false)
         home(DRESSING_TABLE, "Dressing Table", "dark_oak_planks", "dark_oak_planks", front = "counter_front", hardness = 0.8f, tool = A)
         home(WATER_COOLER, "Water Cooler", "white_plastic", "white_plastic", hardness = 0.8f)
+        cube(RUNWAY, "Runway", "runway", 1.2f, P)
+        cube(RUNWAY_LINE, "Runway Centre Line", "runway_line", 1.2f, P)
+        cube(HELIPAD, "Helipad", "helipad", 1.2f, P)
+        for (n in listOf("plane_body", "plane_front", "plane_wing", "plane_tail", "heli_body", "heli_front", "rotor", "tyre")) t(n)
         for (n in listOf("mirror", "keyboard", "shower_water", "water_bottle_blue", "oak_leaves", "water")) t(n)
         for (n in listOf("steel", "black_plastic", "scarecrow", "train_side", "train_front", "train_roof",
             "coach_side", "metro_side", "metro_front", "metro_roof", "train_wheel")) t(n)
