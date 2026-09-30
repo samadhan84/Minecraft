@@ -2,6 +2,7 @@ package com.vishucraft.desktop
 
 import com.vishucraft.game.engine.placeBuilding
 import com.vishucraft.game.engine.flyTo
+import com.vishucraft.game.engine.liftTo
 import com.vishucraft.desktop.Ui.Companion.rgba
 import com.vishucraft.game.engine.GameInput
 import com.vishucraft.game.net.ClientSession
@@ -77,7 +78,7 @@ const val CONTROLS_HELP =
 
 class App(private val demo: File?) {
     private enum class Menu { TITLE, WORLDS, CREATE, JOIN, SETTINGS, CONTROLS, CONFIRM_DELETE }
-    private enum class Overlay { NONE, PAUSE, CREATIVE, CONTAINER, SETTINGS, CONTROLS, NAME_MOB, TRADE, ACHIEVEMENTS, SIGN, ENDING, INTERNET, FLIGHTS }
+    private enum class Overlay { NONE, PAUSE, CREATIVE, CONTAINER, SETTINGS, CONTROLS, NAME_MOB, TRADE, ACHIEVEMENTS, SIGN, ENDING, INTERNET, FLIGHTS, FLOORS }
 
     private var window = NULL
     private val prefs = Prefs()
@@ -219,6 +220,7 @@ class App(private val demo: File?) {
             Overlay.ACHIEVEMENTS -> achievementsScreen(s)
             Overlay.SIGN -> signScreen(s)
             Overlay.FLIGHTS -> flightsScreen(s)
+            Overlay.FLOORS -> floorsScreen(s)
             Overlay.ENDING -> endingScreen()
             Overlay.INTERNET -> internetScreen()
         }
@@ -288,6 +290,7 @@ class App(private val demo: File?) {
                 signPos = e.removePrefix("signedit:").split(',').map { it.toInt() }
                 signField.text = s.game.signText(signPos[0], signPos[1], signPos[2]); ui.focus = signField; overlay = Overlay.SIGN
             }
+            e.startsWith("floors:") -> { floorsEvent = e.removePrefix("floors:").split(',', limit = 4); overlay = Overlay.FLOORS }
             e.startsWith("flights:") -> { flights = e.removePrefix("flights:").split('|'); overlay = Overlay.FLIGHTS }
             e.startsWith("achievement:") -> hud.toast("Achievement unlocked!\n" + e.removePrefix("achievement:"), 4f)
             e.startsWith("trade:") -> { tradeUid = e.removePrefix("trade:").toIntOrNull() ?: -1; tradeMessage = ""; overlay = Overlay.TRADE }
@@ -532,6 +535,22 @@ class App(private val demo: File?) {
     }
 
     private var flights = listOf<String>()
+    private var floorsEvent = listOf<String>()
+
+    /** Tapped an elevator: pick a floor. */
+    private fun floorsScreen(s: GameSession) {
+        val cx = ui.width / 2; val w = 420f
+        ui.rect(0f, 0f, ui.width, ui.height, rgba(0, 0, 0, 150))
+        title("Elevator", ui.height * 0.15f)
+        val (lx, lz, cur, list) = floorsEvent
+        var y = ui.height * 0.15f + 60
+        for ((i, name) in list.split('|').withIndex().toList().take(10)) {
+            val label = if (i == cur.toInt()) "$name  (you are here)" else name
+            if (ui.button(label, cx - w / 2, y, w, 40f)) { s.game.liftTo(lx.toInt(), lz.toInt(), i); overlay = Overlay.NONE }
+            y += 46
+        }
+        if (ui.button("Cancel", cx - w / 2, y + 10, w, 40f)) overlay = Overlay.NONE
+    }
 
     /** Got into an airplane: pick an airport to fly to. */
     private fun flightsScreen(s: GameSession) {
@@ -816,7 +835,7 @@ class App(private val demo: File?) {
             }
             Overlay.PAUSE -> if (key == GLFW_KEY_ESCAPE) overlay = Overlay.NONE
             Overlay.TRADE -> if (key == GLFW_KEY_ESCAPE || key == GLFW_KEY_E) overlay = Overlay.NONE
-            Overlay.SIGN, Overlay.FLIGHTS -> if (key == GLFW_KEY_ESCAPE) { ui.focus = null; overlay = Overlay.NONE }
+            Overlay.SIGN, Overlay.FLIGHTS, Overlay.FLOORS -> if (key == GLFW_KEY_ESCAPE) { ui.focus = null; overlay = Overlay.NONE }
             Overlay.ENDING -> if (key == GLFW_KEY_ESCAPE) overlay = Overlay.NONE
             Overlay.INTERNET -> if (key == GLFW_KEY_ESCAPE) overlay = Overlay.PAUSE
             Overlay.SETTINGS, Overlay.CONTROLS, Overlay.NAME_MOB, Overlay.ACHIEVEMENTS -> if (key == GLFW_KEY_ESCAPE) { ui.focus = null; overlay = Overlay.PAUSE }

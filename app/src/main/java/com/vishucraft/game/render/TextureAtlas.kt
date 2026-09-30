@@ -1783,6 +1783,18 @@ object TextureAtlas {
                 return true
             }
             "beetroot_seeds" -> { mask(t, BEANS, rgb(140, 110, 60)); return true }
+            // ---- Elevator: a steel floor plate with up and down arrows.
+            "elevator_top" -> {
+                t.fill { x, y -> if (x == 0 || y == 0 || x == 15 || y == 15) rgb(120, 122, 128) else scale(rgb(196, 198, 204), (if ((x + y) % 4 == 0) 1.06f else 1f)) }
+                for (k in 0..3) { for (x in 7 - k..8 + k) { t[x, 2 + k] = rgb(60, 200, 90); t[x, 13 - k] = rgb(230, 170, 40) } }
+                for (y in 6..9) { t[7, y] = rgb(60, 60, 66); t[8, y] = rgb(60, 60, 66) }
+                return true
+            }
+            "elevator_side" -> {
+                t.fill { x, y -> if (y < 2 || x == 0 || x == 15) rgb(120, 122, 128) else scale(rgb(196, 198, 204), t.jitter(0.02f)) }
+                for (x in 3..12) t[x, 8] = rgb(255, 236, 160)
+                return true
+            }
             // ---- Airport
             "runway" -> { speckle(t, rgb(58, 58, 62), listOf(rgb(70, 70, 76), rgb(48, 48, 52)), 25); return true }
             "runway_line" -> { speckle(t, rgb(58, 58, 62), listOf(rgb(70, 70, 76), rgb(48, 48, 52)), 25); for (y in 0 until 16) for (x in 6..9) t[x, y] = rgb(236, 236, 236); return true }

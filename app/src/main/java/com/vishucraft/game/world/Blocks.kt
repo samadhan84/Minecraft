@@ -408,7 +408,9 @@ object Blocks {
     /** Runway with the white centre line. */
     const val RUNWAY_LINE = 432
     const val HELIPAD = 433
-    const val COUNT = 434
+    /** Stack them in a column, one per floor: jump to ride up, crouch to ride down. */
+    const val ELEVATOR = 434
+    const val COUNT = 435
 
     /** The newer crops' texture names, in id order from RICE_CROP. */
     val NEW_CROPS = listOf("rice", "tomato", "lentil", "beetroot")
@@ -953,6 +955,8 @@ object Blocks {
         cube(RUNWAY, "Runway", "runway", 1.2f, P)
         cube(RUNWAY_LINE, "Runway Centre Line", "runway_line", 1.2f, P)
         cube(HELIPAD, "Helipad", "helipad", 1.2f, P)
+        reg(BlockDef(ELEVATOR, "Elevator", t("elevator_top"), t("elevator_side"), t("steel"), hardness = 1.5f, tool = P, category = Category.HOME))
+        extraLight[ELEVATOR] = 6
         for (n in listOf("plane_body", "plane_front", "plane_wing", "plane_tail", "heli_body", "heli_front", "rotor", "tyre")) t(n)
         for (n in listOf("mirror", "keyboard", "shower_water", "water_bottle_blue", "oak_leaves", "water")) t(n)
         for (n in listOf("steel", "black_plastic", "scarecrow", "train_side", "train_front", "train_roof",

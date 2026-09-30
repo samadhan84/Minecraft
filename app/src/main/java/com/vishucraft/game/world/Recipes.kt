@@ -392,6 +392,7 @@ object Recipes {
         r(i("Blueprint: Airport"), 1, true, paper to 1, Blocks.SMOOTH_STONE to 64, glass to 24, iron to 16)
         sh(i("Airplane"), 1, listOf(" I ", "IMI", " I "), 'I' to Blocks.IRON_BLOCK, 'M' to i("Minecart"))
         sh(i("Helicopter"), 1, listOf("III", " G ", "IRI"), 'I' to iron, 'G' to glass, 'R' to Blocks.REDSTONE_BLOCK)
+        sh(Blocks.ELEVATOR, 2, listOf("III", "RGR", "III"), 'I' to iron, 'R' to Blocks.REDSTONE_DUST, 'G' to Blocks.GLOWSTONE)
         sh(Blocks.RUNWAY, 8, listOf("SSS", "SCS", "SSS"), 'S' to smooth, 'C' to Blocks.COAL_BLOCK)
         sh(Blocks.RUNWAY_LINE, 4, listOf("RWR"), 'R' to Blocks.RUNWAY, 'W' to i("White Dye"))
         sh(Blocks.HELIPAD, 4, listOf("RYR"), 'R' to Blocks.RUNWAY, 'Y' to i("Yellow Dye"))

@@ -68,6 +68,8 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
     val boats = Boats(world)
     /** Airplanes, helicopters and the airports planes fly between (see Aircraft.kt). */
     val aircraft = Aircrafts(world)
+    /** The elevator ride in progress (see Elevator.kt). */
+    val lift = Lift()
     val dimension get() = world.dimension
     private var portalTime = 0f
     private var bowCooldown = 0f
@@ -410,7 +412,8 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
             val jumpPressed = input.jumpHeld && !lastJump
             val crouchPressed = input.descendHeld && !lastCrouch
             lastJump = input.jumpHeld; lastCrouch = input.descendHeld
-            if (boats.riding != null && crouchPressed) { boats.riding = null; player.y += 0.8f }
+            if (liftInput(jumpPressed, crouchPressed)) {}
+            else if (boats.riding != null && crouchPressed) { boats.riding = null; player.y += 0.8f }
             else if (mount != null && crouchPressed) dismount()
             else if (carts.riding != null && crouchPressed) carts.leave(this)
             else if (carts.riding?.kind == Cart.ENGINE && jumpPressed) sound("train_horn", player.x, player.y + 2f, player.z)
@@ -421,7 +424,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
             lastVy = player.vy
             player.speedMul = (if (input.sprint && !player.flying) 1.3f else 1f) * (if (hasEffect("swiftness")) 1.4f else 1f)
             player.jumpMul = if (hasEffect("leaping")) 1.22f else 1f
-            if (carts.riding == null && mount == null && boats.riding == null && aircraft.riding == null && !sitting) player.update(dt, world, input.moveForward, input.moveStrafe, input.jumpHeld, input.descendHeld)
+            if (carts.riding == null && mount == null && boats.riding == null && aircraft.riding == null && !sitting && !lift.riding) player.update(dt, world, input.moveForward, input.moveStrafe, input.jumpHeld, input.descendHeld)
             updateFlight(dt)
             // Fall damage when landing hard (not while flying or in water).
             if (player.onGround && !wasOnGround && !player.flying && !player.inWater && lastVy < -14f && !hasEffect("slow_falling")) {
@@ -470,6 +473,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
         carts.update(dt, this)
         boats.update(dt, this)
         aircraft.update(dt, this)
+        updateLift(dt)
         if (bowCooldown > 0f) bowCooldown -= dt
         // Standing in a portal for two seconds travels to the other world.
         val here = world.getBlock(player.blockX(), floorInt(player.y + 0.5f), player.blockZ())
@@ -1391,6 +1395,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
             Raycast.cast(world, player.x, player.eyeY, player.z, dir[0], dir[1], dir[2], REACH, hitWater = true)
         } else target
         t ?: return
+        if (liftTap(t, sel)) return
         if (pack3Block(t, item, sel)) return
 
         when (t.block) {

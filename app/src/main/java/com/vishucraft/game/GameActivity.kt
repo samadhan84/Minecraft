@@ -21,6 +21,7 @@ import android.widget.TextView
 import com.vishucraft.game.engine.Game
 import com.vishucraft.game.engine.GameInput
 import com.vishucraft.game.engine.flyTo
+import com.vishucraft.game.engine.liftTo
 import com.vishucraft.game.render.GameRenderer
 import com.vishucraft.game.ui.CrosshairView
 import com.vishucraft.game.ui.HotbarView
@@ -574,6 +575,15 @@ class GameActivity : Activity() {
                     .setPositiveButton("OK") { _, _ -> val txt = input.text.toString(); glView.queueEvent { game.setSignText(x, y, z, txt) } }
                     .setNegativeButton("Cancel", null).show()
                 input.requestFocus()
+            }
+            e.startsWith("floors:") -> {
+                // Tapped an elevator: which floor?
+                releaseInputs()
+                val (lx, lz, cur, list) = e.removePrefix("floors:").split(',', limit = 4)
+                val names = list.split('|').mapIndexed { i, n -> if (i == cur.toInt()) "$n  (you are here)" else n }.toTypedArray()
+                android.app.AlertDialog.Builder(this).setTitle("Elevator")
+                    .setItems(names) { _, i -> glView.queueEvent { game.liftTo(lx.toInt(), lz.toInt(), i) } }
+                    .setNegativeButton("Cancel", null).show()
             }
             e.startsWith("flights:") -> {
                 // Got into an airplane: where to?

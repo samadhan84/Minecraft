@@ -351,6 +351,8 @@ private fun Game.mansion(p: Plan) {
     for (a in intArrayOf(-3, -1, 1, 3)) p.set(a, 17, 11, Blocks.SOFA, p.toward)
     p.set(-7, 8, 11, Blocks.PLANT_POT); p.set(7, 8, 11, Blocks.PLANT_POT); p.set(-7, 18, 11, Blocks.PLANT_POT); p.set(7, 18, 11, Blocks.PLANT_POT)
     for (h in 6..10) p.set(0, 19, h, Blocks.LADDER, p.toward)
+    // An elevator from the ground floor up to the bedrooms and the roof.
+    for (h in intArrayOf(-1, 5, 10)) { p.set(8, 13, h, Blocks.ELEVATOR); for (y in h + 1..h + 2) p.set(8, 13, y, Blocks.AIR) }
 }
 
 /**
@@ -402,6 +404,8 @@ private fun Game.airport(p: Plan) {
     p.set(14, 23, 15, Blocks.LADDER, p.away)
     p.set(12, 23, 16, Blocks.COMPUTER, p.away or 8); p.set(13, 23, 16, Blocks.COMPUTER, p.away or 8)
     p.set(13, 24, 19, Blocks.REDSTONE_LAMP_ON)
+    // An elevator up the tower too (next to the ladder).
+    p.set(12, 25, -1, Blocks.ELEVATOR); p.set(12, 25, 15, Blocks.ELEVATOR)
     // Helipad on the left.
     p.site(-14, -8, 9, 15, 8, Blocks.RUNWAY)
     for (a in -13..-9) for (d in 10..14) p.set(a, d, -1, if (a == -11 && d == 12) Blocks.HELIPAD else if (a == -13 || a == -9 || d == 10 || d == 14) Blocks.CONCRETE_FIRST + 4 else Blocks.RUNWAY)
