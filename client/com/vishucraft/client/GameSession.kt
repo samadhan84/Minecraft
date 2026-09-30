@@ -1,4 +1,4 @@
-package com.vishucraft.desktop
+package com.vishucraft.client
 
 import com.vishucraft.game.engine.Game
 import com.vishucraft.game.engine.GameInput
@@ -13,7 +13,8 @@ import java.io.File
 class GameSession(
     val dir: File?,
     val level: LevelData,
-    val client: com.vishucraft.game.net.ClientSession? = null,
+    /** For a joined Wi-Fi / online game: connects the world to the host (see NetSupport.attach). */
+    remote: ((World, Game) -> Unit)? = null,
 ) {
     val input = GameInput()
     val world: World
@@ -27,10 +28,9 @@ class GameSession(
             Dimension.EMBER -> dir?.let { File(it, "ember") }
             Dimension.SKY -> dir?.let { File(it, "sky") }
         }
-        world = World(level.seed, if (client != null) null else dimDir, level.dimension, level.flat)
-        if (client != null) world.remoteLoader = { cx, cz -> client.requestChunk(cx, cz) }
-        game = Game(world, level, input, if (client != null) null else dir)
-        if (client != null) game.net = client
+        world = World(level.seed, if (remote != null) null else dimDir, level.dimension, level.flat)
+        game = Game(world, level, input, if (remote != null) null else dir)
+        remote?.invoke(world, game)
         renderer = WorldRenderer(game)
         renderer.onSurfaceCreated()
     }

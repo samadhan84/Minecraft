@@ -22,7 +22,7 @@ object Paths {
 }
 
 /** Player preferences (same options as on Android). */
-class Prefs {
+class Prefs : com.vishucraft.client.ClientPrefs {
     private val file = File(Paths.home, "settings.properties")
     private val p = Properties().apply { if (file.exists()) file.inputStream().use { load(it) } }
 
@@ -31,27 +31,27 @@ class Prefs {
     private fun i(k: String, d: Int) = p.getProperty(k)?.toIntOrNull() ?: d
     private fun b(k: String, d: Boolean) = p.getProperty(k)?.toBooleanStrictOrNull() ?: d
 
-    var sensitivity: Float get() = f("sensitivity", 1f); set(v) { p.setProperty("sensitivity", v.toString()); save() }
-    var fov: Int get() = i("fov", 75); set(v) { p.setProperty("fov", v.toString()); save() }
-    var renderDistance: Int get() = i("renderDistance", 8); set(v) { p.setProperty("renderDistance", v.toString()); save() }
-    var soundVolume: Int get() = i("soundVolume", 80); set(v) { p.setProperty("soundVolume", v.toString()); save() }
-    var musicVolume: Int get() = i("musicVolume", 50); set(v) { p.setProperty("musicVolume", v.toString()); save() }
-    var showDebug: Boolean get() = b("showDebug", false); set(v) { p.setProperty("showDebug", v.toString()); save() }
+    override var sensitivity: Float get() = f("sensitivity", 1f); set(v) { p.setProperty("sensitivity", v.toString()); save() }
+    override var fov: Int get() = i("fov", 75); set(v) { p.setProperty("fov", v.toString()); save() }
+    override var renderDistance: Int get() = i("renderDistance", 8); set(v) { p.setProperty("renderDistance", v.toString()); save() }
+    override var soundVolume: Int get() = i("soundVolume", 80); set(v) { p.setProperty("soundVolume", v.toString()); save() }
+    override var musicVolume: Int get() = i("musicVolume", 50); set(v) { p.setProperty("musicVolume", v.toString()); save() }
+    override var showDebug: Boolean get() = b("showDebug", false); set(v) { p.setProperty("showDebug", v.toString()); save() }
     /** Rain, snow and thunderstorms. Off by default. */
-    var weather: Boolean get() = b("weather", false); set(v) { p.setProperty("weather", v.toString()); save() }
-    var fancy: Boolean get() = b("fancy", true); set(v) { p.setProperty("fancy", v.toString()); save() }
+    override var weather: Boolean get() = b("weather", false); set(v) { p.setProperty("weather", v.toString()); save() }
+    override var fancy: Boolean get() = b("fancy", true); set(v) { p.setProperty("fancy", v.toString()); save() }
     var fullscreen: Boolean get() = b("fullscreen", false); set(v) { p.setProperty("fullscreen", v.toString()); save() }
     /** Today's play time (see engine/PlayLimit). */
-    fun playLimit() = com.vishucraft.game.engine.PlayLimit(p.getProperty("playDay") ?: "", f("playUsed", 0f))
-    fun savePlayLimit(l: com.vishucraft.game.engine.PlayLimit) { p.setProperty("playDay", l.day); p.setProperty("playUsed", l.used.toString()); save() }
-    var playerName: String
+    override fun playLimit() = com.vishucraft.game.engine.PlayLimit(p.getProperty("playDay") ?: "", f("playUsed", 0f))
+    override fun savePlayLimit(l: com.vishucraft.game.engine.PlayLimit) { p.setProperty("playDay", l.day); p.setProperty("playUsed", l.used.toString()); save() }
+    override var playerName: String
         get() = p.getProperty("playerName") ?: ("Player" + (100..999).random()).also { p.setProperty("playerName", it); save() }
         set(v) { p.setProperty("playerName", v); save() }
 
     private fun <T> next(options: List<T>, cur: T) = options[(options.indexOf(cur) + 1).mod(options.size)]
 
     /** Label + "change" action for each option, shown as buttons on the settings screen. */
-    fun rows(): List<Pair<() -> String, () -> Unit>> = listOf(
+    override fun rows(): List<Pair<() -> String, () -> Unit>> = listOf(
         { "Mouse sensitivity: ${"%.2f".format(sensitivity)}x" } to { sensitivity = next(listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 2f), sensitivity) },
         { "Field of view: $fov°" } to { fov = next(listOf(60, 75, 90, 105), fov) },
         { "Render distance: $renderDistance chunks" } to { renderDistance = next(listOf(4, 6, 8, 10, 12), renderDistance) },

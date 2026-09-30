@@ -22,15 +22,15 @@ class World(val seed: Long, private val saveDir: File?, val dimension: Dimension
 
     val chunks = ConcurrentHashMap<Long, Chunk>()
     /** Positions (see [RedstoneIds.pack]) of every redstone component in loaded chunks. */
-    val components: MutableSet<Long> = ConcurrentHashMap.newKeySet()
+    val components: MutableSet<Long> = java.util.Collections.newSetFromMap(ConcurrentHashMap())
     val generator: WorldGenerator = when (dimension) {
         Dimension.OVERWORLD -> if (flat) FlatGenerator() else TerrainGenerator(seed, this)
         Dimension.EMBER -> EmberGenerator(seed)
         Dimension.SKY -> SkyGenerator(seed)
     }
 
-    private val pending: MutableSet<Long> = ConcurrentHashMap.newKeySet()
-    val workers: ExecutorService = Executors.newFixedThreadPool(
+    private val pending: MutableSet<Long> = java.util.Collections.newSetFromMap(ConcurrentHashMap())
+    val workers: java.util.concurrent.Executor = makeWorkers?.invoke() ?: Executors.newFixedThreadPool(
         (Runtime.getRuntime().availableProcessors() - 1).coerceIn(1, 3)
     ) { r -> Thread(r, "world-worker").apply { isDaemon = true; priority = Thread.NORM_PRIORITY - 1 } }
 
@@ -183,7 +183,12 @@ class World(val seed: Long, private val saveDir: File?, val dimension: Dimension
     }
 
     fun shutdown() {
-        workers.shutdown()
+        (workers as? ExecutorService)?.shutdown()
+    }
+
+    companion object {
+        /** The browser version has no threads: it runs chunk work between frames with its own executor. */
+        @JvmStatic var makeWorkers: (() -> java.util.concurrent.Executor)? = null
     }
 
     /** Finds a dry spawn point near the origin. */

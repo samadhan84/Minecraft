@@ -1,12 +1,8 @@
 package android.opengl;
 
 import android.graphics.Bitmap;
-import org.lwjgl.BufferUtils;
-import org.lwjgl.opengl.GL11;
 
-import java.nio.ByteBuffer;
-
-/** Desktop stand-in: uploads an ARGB [Bitmap] as an RGBA texture. */
+/** Browser stand-in: uploads an ARGB [Bitmap] as an RGBA texture. */
 public final class GLUtils {
     private GLUtils() {}
 

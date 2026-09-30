@@ -13,9 +13,9 @@ import kotlin.math.sqrt
  * Sound effects, rain and background music mixed in software into one stereo output line
  * (the same synthesised sounds and music as the Android version).
  */
-class Audio {
-    @Volatile var volume = 0.8f
-    @Volatile var musicVolume = 0.5f
+class Audio : com.vishucraft.client.ClientAudio {
+    @Volatile override var volume = 0.8f
+    @Volatile override var musicVolume = 0.5f
     @Volatile private var listenerX = 0f
     @Volatile private var listenerY = 0f
     @Volatile private var listenerZ = 0f
@@ -36,12 +36,12 @@ class Audio {
         thread = Thread({ run() }, "audio").apply { isDaemon = true; start() }
     }
 
-    fun setListener(x: Float, y: Float, z: Float, yaw: Float) {
+    override fun setListener(x: Float, y: Float, z: Float, yaw: Float) {
         listenerX = x; listenerY = y; listenerZ = z; listenerYaw = yaw
     }
 
     /** Plays [name] at a world position (NaN x = not positional). */
-    fun play(name: String, x: Float = Float.NaN, y: Float = 0f, z: Float = 0f, gain: Float = 1f, pitch: Float = 1f) {
+    override fun play(name: String, x: Float, y: Float, z: Float, gain: Float, pitch: Float) {
         val pcm = synchronized(lock) { sounds[name] } ?: return
         var left = 1f; var right = 1f; var v = gain * volume
         if (!x.isNaN()) {
@@ -60,9 +60,9 @@ class Audio {
         }
     }
 
-    fun setRain(strength: Float) { rain = strength }
+    override fun setRain(strength: Float) { rain = strength }
 
-    fun close() { running = false }
+    override fun close() { running = false }
 
     private fun run() {
         for ((name, pcm) in Synth.all()) synchronized(lock) { sounds[name] = pcm }

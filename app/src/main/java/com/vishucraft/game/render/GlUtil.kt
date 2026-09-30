@@ -45,20 +45,25 @@ class Shader(vertexSrc: String, fragmentSrc: String) {
 
 /** Reusable direct buffers so uploads don't allocate every frame. */
 object Buffers {
-    private var floatBuf: FloatBuffer = alloc(1 shl 16)
+    /** The browser version hands arrays straight to WebGL, so it wraps them instead of copying to direct buffers. */
+    @JvmField var wrapArrays = false
+    private var floatBuf: FloatBuffer? = null
 
     private fun alloc(floats: Int): FloatBuffer =
         ByteBuffer.allocateDirect(floats * 4).order(ByteOrder.nativeOrder()).asFloatBuffer()
 
     fun floats(data: FloatArray, count: Int = data.size): FloatBuffer {
-        if (floatBuf.capacity() < count) floatBuf = alloc(Integer.highestOneBit(count) shl 1)
-        floatBuf.clear()
-        floatBuf.put(data, 0, count)
-        floatBuf.flip()
-        return floatBuf
+        if (wrapArrays) return FloatBuffer.wrap(data, 0, count)
+        var b = floatBuf
+        if (b == null || b.capacity() < count) { b = alloc(maxOf(1 shl 16, Integer.highestOneBit(count) shl 1)); floatBuf = b }
+        b.clear()
+        b.put(data, 0, count)
+        b.flip()
+        return b
     }
 
     fun shorts(data: ShortArray): ShortBuffer {
+        if (wrapArrays) return ShortBuffer.wrap(data)
         val b = ByteBuffer.allocateDirect(data.size * 2).order(ByteOrder.nativeOrder()).asShortBuffer()
         b.put(data).flip()
         return b

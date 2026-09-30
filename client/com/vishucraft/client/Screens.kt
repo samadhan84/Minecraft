@@ -1,6 +1,6 @@
-package com.vishucraft.desktop
+package com.vishucraft.client
 
-import com.vishucraft.desktop.Ui.Companion.rgba
+import com.vishucraft.client.Ui.Companion.rgba
 import com.vishucraft.game.engine.Game
 import com.vishucraft.game.world.Blocks
 import com.vishucraft.game.world.Category
@@ -29,8 +29,9 @@ fun Ui.stack(s: ItemStack?, x: Float, y: Float, size: Float, showCount: Boolean 
         val f = (1f - s.damage.toFloat() / def.durability).coerceIn(0f, 1f)
         val by = y + size - pad
         rect(x + pad, by, size - 2 * pad, size * 0.07f, rgba(0, 0, 0))
-        val c = java.awt.Color.HSBtoRGB(f / 3f, 1f, 1f)
-        rect(x + pad, by, (size - 2 * pad) * f, size * 0.05f, c or 0xFF000000.toInt())
+        // Green when new, through yellow, to red when nearly worn out.
+        val c = if (f > 0.5f) rgba(((1f - f) * 2f * 255).toInt(), 255, 0) else rgba(255, (f * 2f * 255).toInt(), 0)
+        rect(x + pad, by, (size - 2 * pad) * f, size * 0.05f, c)
     }
     if (showCount && s.count > 1) text(s.count.toString(), x + size - 2, y + size - size * 0.42f, size * 0.38f, align = 2)
 }

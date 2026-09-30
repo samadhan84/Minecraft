@@ -51,6 +51,8 @@ public final class GLES20 {
     public static final int GL_UNSIGNED_SHORT = GL11.GL_UNSIGNED_SHORT;
     public static final int GL_UNSIGNED_BYTE = GL11.GL_UNSIGNED_BYTE;
     public static final int GL_RGBA = GL11.GL_RGBA;
+    public static final int GL_LINEAR = GL11.GL_LINEAR;
+    public static final int GL_STREAM_DRAW = GL15.GL_STREAM_DRAW;
 
     public static void glActiveTexture(int t) { GL13.glActiveTexture(t); }
     public static void glAttachShader(int p, int s) { GL20.glAttachShader(p, s); }
@@ -134,6 +136,27 @@ public final class GLES20 {
     }
 
     public static void glUseProgram(int p) { GL20.glUseProgram(p); }
+    public static void glUniform2f(int l, float a, float b) { GL20.glUniform2f(l, a, b); }
+    public static void glDisableVertexAttribArray(int i) { GL20.glDisableVertexAttribArray(i); }
+
+    public static void glDeleteTextures(int n, int[] ids, int offset) {
+        for (int i = 0; i < n; i++) GL11.glDeleteTextures(ids[offset + i]);
+    }
+
+    /** Uploads [n] floats straight from an array (the UI's vertex batches). */
+    public static void bufferFloats(int target, float[] data, int n, int usage) {
+        FloatBuffer buf = org.lwjgl.BufferUtils.createFloatBuffer(n);
+        buf.put(data, 0, n).flip();
+        GL15.glBufferData(target, buf, usage);
+    }
+
+    /** Uploads ARGB pixels (as Android bitmaps hold them) as an RGBA texture. */
+    public static void texImageArgb(int w, int h, int[] argb) {
+        ByteBuffer buf = org.lwjgl.BufferUtils.createByteBuffer(w * h * 4);
+        for (int c : argb) buf.put((byte) (c >> 16)).put((byte) (c >> 8)).put((byte) c).put((byte) (c >>> 24));
+        buf.flip();
+        GL11.glTexImage2D(GL11.GL_TEXTURE_2D, 0, GL11.GL_RGBA, w, h, 0, GL11.GL_RGBA, GL11.GL_UNSIGNED_BYTE, buf);
+    }
     public static void glVertexAttribPointer(int i, int size, int type, boolean norm, int stride, int offset) {
         GL20.glVertexAttribPointer(i, size, type, norm, stride, (long) offset);
     }

@@ -1,23 +1,16 @@
-package com.vishucraft.desktop
+package com.vishucraft.client
 
 import com.vishucraft.game.render.TextureAtlas
 import com.vishucraft.game.world.Blocks
 import com.vishucraft.game.world.Facing
 import com.vishucraft.game.world.Items
 import com.vishucraft.game.world.RenderType
-import org.lwjgl.BufferUtils
-import org.lwjgl.opengl.GL11.*
-import org.lwjgl.opengl.GL15.*
-import org.lwjgl.opengl.GL20.*
-import java.awt.Font
-import java.awt.RenderingHints
-import java.awt.geom.AffineTransform
-import java.awt.image.BufferedImage
-import java.nio.ByteBuffer
+import android.opengl.GLES20.*
 
 /**
- * A tiny immediate-mode 2D toolkit on top of OpenGL: coloured rectangles, textured images, text and buttons.
- * Coordinates are in "UI units" (pixels divided by [scale]) with the origin at the top left.
+ * A tiny immediate-mode 2D toolkit on top of OpenGL ES 2 / WebGL: coloured rectangles, textured images, text and
+ * buttons, shared by the desktop and browser versions. Coordinates are in "UI units" (pixels divided by [scale])
+ * with the origin at the top left.
  */
 class Ui {
     var width = 1f
@@ -45,15 +38,14 @@ class Ui {
 
     init {
         program = link(
-            """#version 120
-attribute vec2 aPos; attribute vec2 aUv; attribute vec4 aColor;
+            """attribute vec2 aPos; attribute vec2 aUv; attribute vec4 aColor;
 uniform vec2 uSize; varying vec2 vUv; varying vec4 vColor;
 void main() { gl_Position = vec4(aPos.x / uSize.x * 2.0 - 1.0, 1.0 - aPos.y / uSize.y * 2.0, 0.0, 1.0); vUv = aUv; vColor = aColor; }""",
-            """#version 120
+            """precision mediump float;
 uniform sampler2D uTex; varying vec2 vUv; varying vec4 vColor;
 void main() { gl_FragColor = texture2D(uTex, vUv) * vColor; }""",
         )
-        vbo = glGenBuffers()
+        vbo = IntArray(1).also { glGenBuffers(1, it, 0) }[0]
         white = texture(1, 1, intArrayOf(-1), false)
         atlasTex = texture(TextureAtlas.SIZE, TextureAtlas.SIZE, TextureAtlas.pixels, false)
         font = FontAtlas()
@@ -62,30 +54,29 @@ void main() { gl_FragColor = texture2D(uTex, vUv) * vColor; }""",
     private fun link(vs: String, fs: String): Int {
         fun compile(type: Int, src: String) = glCreateShader(type).also { s ->
             glShaderSource(s, src); glCompileShader(s)
-            if (glGetShaderi(s, GL_COMPILE_STATUS) == 0) error(glGetShaderInfoLog(s))
+            val ok = IntArray(1); glGetShaderiv(s, GL_COMPILE_STATUS, ok, 0)
+            if (ok[0] == 0) error(glGetShaderInfoLog(s))
         }
         val p = glCreateProgram()
         glAttachShader(p, compile(GL_VERTEX_SHADER, vs)); glAttachShader(p, compile(GL_FRAGMENT_SHADER, fs))
         glBindAttribLocation(p, 0, "aPos"); glBindAttribLocation(p, 1, "aUv"); glBindAttribLocation(p, 2, "aColor")
         glLinkProgram(p)
-        if (glGetProgrami(p, GL_LINK_STATUS) == 0) error(glGetProgramInfoLog(p))
+        val ok = IntArray(1); glGetProgramiv(p, GL_LINK_STATUS, ok, 0)
+        if (ok[0] == 0) error(glGetProgramInfoLog(p))
         return p
     }
 
     companion object {
         /** Uploads ARGB pixels as a texture. */
         fun texture(w: Int, h: Int, argb: IntArray, smooth: Boolean): Int {
-            val buf: ByteBuffer = BufferUtils.createByteBuffer(w * h * 4)
-            for (c in argb) buf.put((c shr 16).toByte()).put((c shr 8).toByte()).put(c.toByte()).put((c ushr 24).toByte())
-            buf.flip()
-            val t = glGenTextures()
+            val t = IntArray(1).also { glGenTextures(1, it, 0) }[0]
             glBindTexture(GL_TEXTURE_2D, t)
             val f = if (smooth) GL_LINEAR else GL_NEAREST
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, f)
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, f)
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, 0x812F)
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, 0x812F)
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, buf)
+            texImageArgb(w, h, argb)
             return t
         }
 
@@ -98,13 +89,14 @@ void main() { gl_FragColor = texture2D(uTex, vUv) * vColor; }""",
         // Keep the UI a comfortable size on small and large screens.
         scale = (minOf(pixelW / 960f, pixelH / 540f)).coerceIn(0.75f, 3f)
         width = pixelW / scale; height = pixelH / scale
+        fieldRects.clear()
         glViewport(0, 0, pixelW, pixelH)
         glDisable(GL_DEPTH_TEST); glDisable(GL_CULL_FACE)
         glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
         glUseProgram(program)
         glUniform2f(glGetUniformLocation(program, "uSize"), width, height)
         glUniform1i(glGetUniformLocation(program, "uTex"), 0)
-        glActiveTexture(org.lwjgl.opengl.GL13.GL_TEXTURE0)
+        glActiveTexture(GL_TEXTURE0)
         boundTex = -1
     }
 
@@ -125,14 +117,12 @@ void main() { gl_FragColor = texture2D(uTex, vUv) * vColor; }""",
     fun flush() {
         if (count == 0) return
         glBindBuffer(GL_ARRAY_BUFFER, vbo)
-        val buf = BufferUtils.createFloatBuffer(count)
-        buf.put(data, 0, count).flip()
-        glBufferData(GL_ARRAY_BUFFER, buf, GL_STREAM_DRAW)
+        bufferFloats(GL_ARRAY_BUFFER, data, count, GL_STREAM_DRAW)
         for (i in 0..2) glEnableVertexAttribArray(i)
-        for (i in 3..7) glDisableVertexAttribArray(i)
-        glVertexAttribPointer(0, 2, GL_FLOAT, false, 32, 0L)
-        glVertexAttribPointer(1, 2, GL_FLOAT, false, 32, 8L)
-        glVertexAttribPointer(2, 4, GL_FLOAT, false, 32, 16L)
+        for (i in 3..3) glDisableVertexAttribArray(i)
+        glVertexAttribPointer(0, 2, GL_FLOAT, false, 32, 0)
+        glVertexAttribPointer(1, 2, GL_FLOAT, false, 32, 8)
+        glVertexAttribPointer(2, 4, GL_FLOAT, false, 32, 16)
         glDrawArrays(GL_TRIANGLES, 0, count / 8)
         count = 0
     }
@@ -209,7 +199,11 @@ void main() { gl_FragColor = texture2D(uTex, vUv) * vColor; }""",
     /** The focused field receives typed characters (see [type] / [backspace]). */
     var focus: Field? = null
 
+    /** Where this frame's text boxes are, in pixels (x, y, w, h each): the browser opens the phone's keyboard there. */
+    val fieldRects = ArrayList<Float>()
+
     fun field(f: Field, x: Float, y: Float, w: Float, h: Float = 36f) {
+        fieldRects.add(x * scale); fieldRects.add(y * scale); fieldRects.add(w * scale); fieldRects.add(h * scale)
         if (clicked) { if (hover(x, y, w, h)) focus = f else if (focus === f) focus = null }
         f.focused = focus === f
         rect(x, y, w, h, rgba(20, 20, 20))
@@ -228,7 +222,7 @@ void main() { gl_FragColor = texture2D(uTex, vUv) * vColor; }""",
 
     // ---------------------------------------------------------------- font
 
-    /** Glyphs rendered once from the computer's sans-serif font into a texture. */
+    /** Glyphs rendered once into a texture by the platform's font (see [Ui.fonts]). */
     private class FontAtlas {
         companion object { const val CELL = 32 }
         class Glyph(val w: Float, val u0: Float, val v0: Float, val u1: Float, val v1: Float)
@@ -236,40 +230,33 @@ void main() { gl_FragColor = texture2D(uTex, vUv) * vColor; }""",
         val tex: Int
 
         init {
-            val chars = (32..126).map { it.toChar() } + listOf('°', '·', '…', '•', '▲', '▼', '♥', 'é', '●', '◆', '×', '→')
-            val cols = 16
-            val rows = (chars.size + cols - 1) / cols
-            val img = BufferedImage(cols * CELL * 2, rows * CELL, BufferedImage.TYPE_INT_ARGB)
-            val g = img.createGraphics()
-            g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON)
-            g.font = Font(Font.SANS_SERIF, Font.BOLD, 26)
-            g.color = java.awt.Color.WHITE
-            val fm = g.fontMetrics
-            val cellW = CELL * 2
+            val chars = (32..126).map { it.toChar() } + listOf('°', '·', '…', '•', '▲', '▼', '♥', 'é', '●', '◆', '×', '→', '✓', '○', '⏱')
+            val sheet = fonts(chars, CELL)
             for ((i, ch) in chars.withIndex()) {
-                val x = (i % cols) * cellW; val y = (i / cols) * CELL
-                g.drawString(ch.toString(), x + 1, y + fm.ascent - 2)
-                val w = fm.charWidth(ch).toFloat() + 1
-                glyphs[ch] = Glyph(w, x / img.width.toFloat(), y / img.height.toFloat(), (x + w) / img.width.toFloat(), (y + CELL) / img.height.toFloat())
+                val x = sheet.x[i]; val y = sheet.y[i]; val w = sheet.widths[i]
+                glyphs[ch] = Glyph(w, x / sheet.width.toFloat(), y / sheet.height.toFloat(), (x + w) / sheet.width.toFloat(), (y + CELL) / sheet.height.toFloat())
             }
-            g.dispose()
-            val px = IntArray(img.width * img.height)
-            img.getRGB(0, 0, img.width, img.height, px, 0, img.width)
-            tex = texture(img.width, img.height, px, true)
+            tex = texture(sheet.width, sheet.height, sheet.pixels, true)
         }
 
         fun glyph(c: Char) = glyphs[c] ?: glyphs['?']!!
-        fun width(s: String) = s.sumOf { glyph(it).w.toDouble() }.toFloat()
+        fun width(s: String): Float { var w = 0f; for (c in s) w += glyph(c).w; return w }
     }
 }
 
-/** Block and item icons drawn with Java2D from the atlas and packed into one texture. */
+/** Text drawn by the platform (Java2D on computers, the browser's canvas on the web): white glyphs on clear. */
+class FontSheet(val pixels: IntArray, val width: Int, val height: Int, val x: IntArray, val y: IntArray, val widths: FloatArray)
+
+/** Draws [chars] in cells [cell] pixels high into one image. Set by each platform before the first [Ui]. */
+lateinit var fonts: (chars: List<Char>, cell: Int) -> FontSheet
+
+/** Block and item icons (isometric cubes for blocks) painted from the atlas and packed into one texture. */
 class IconAtlas {
     data class Ref(val tex: Int, val u0: Float, val v0: Float, val u1: Float, val v1: Float)
 
     private val size = 64
     private val perRow = 32
-    private val img = BufferedImage(size * perRow, size * perRow, BufferedImage.TYPE_INT_ARGB)
+    private val img = IntArray(size * perRow * size * perRow)
     private val slots = HashMap<Int, Int>()
     private var tex = 0
     private var dirty = true
@@ -282,58 +269,66 @@ class IconAtlas {
     }
 
     private fun upload() {
-        val px = IntArray(img.width * img.height)
-        img.getRGB(0, 0, img.width, img.height, px, 0, img.width)
-        if (tex != 0) org.lwjgl.opengl.GL11.glDeleteTextures(tex)
-        tex = Ui.texture(img.width, img.height, px, false)
+        if (tex != 0) glDeleteTextures(1, intArrayOf(tex), 0)
+        tex = Ui.texture(size * perRow, size * perRow, img, false)
         dirty = false
     }
 
     private fun draw(index: Int, slot: Int) {
-        val g = img.createGraphics()
-        paint(g, slot, (index % perRow) * size, (index / perRow) * size, size)
-        g.dispose()
+        val icon = paint(slot, size)
+        val ox = (index % perRow) * size; val oy = (index / perRow) * size
+        val stride = size * perRow
+        for (y in 0 until size) System.arraycopy(icon, y * size, img, (oy + y) * stride + ox, size)
     }
 
     companion object {
-        private val atlas: BufferedImage by lazy {
-            BufferedImage(TextureAtlas.SIZE, TextureAtlas.SIZE, BufferedImage.TYPE_INT_ARGB).apply {
-                setRGB(0, 0, TextureAtlas.SIZE, TextureAtlas.SIZE, TextureAtlas.pixels, 0, TextureAtlas.SIZE)
+        private fun texel(tile: Int, u: Int, v: Int): Int {
+            val tx = (tile % TextureAtlas.TILES_PER_ROW) * 16 + u.coerceIn(0, 15)
+            val ty = (tile / TextureAtlas.TILES_PER_ROW) * 16 + v.coerceIn(0, 15)
+            return TextureAtlas.pixels[ty * TextureAtlas.SIZE + tx]
+        }
+
+        private fun shade(c: Int, k: Float): Int {
+            if (k >= 1f) return c
+            val r = (((c shr 16) and 255) * k).toInt(); val g = (((c shr 8) and 255) * k).toInt(); val b = ((c and 255) * k).toInt()
+            return (c and 0xFF000000.toInt()) or (r shl 16) or (g shl 8) or b
+        }
+
+        /** Maps the tile onto the parallelogram (p0, p1, p2) = (top-left, top-right, bottom-left) of [out]. */
+        private fun face(out: IntArray, size: Int, tile: Int, p: FloatArray, k: Float) {
+            val ax = p[2] - p[0]; val ay = p[3] - p[1]; val bx = p[4] - p[0]; val by = p[5] - p[1]
+            val det = ax * by - ay * bx
+            if (kotlin.math.abs(det) < 1e-4f) return
+            for (y in 0 until size) for (x in 0 until size) {
+                val dx = x + 0.5f - p[0]; val dy = y + 0.5f - p[1]
+                val u = (dx * by - dy * bx) / det; val v = (ax * dy - ay * dx) / det
+                if (u < 0f || u >= 1f || v < 0f || v >= 1f) continue
+                val c = texel(tile, (u * 16).toInt(), (v * 16).toInt())
+                if (c ushr 24 < 128) continue
+                out[y * size + x] = shade(c, k)
             }
         }
 
-        private fun tile(i: Int): BufferedImage = atlas.getSubimage((i % TextureAtlas.TILES_PER_ROW) * 16, (i / TextureAtlas.TILES_PER_ROW) * 16, 16, 16)
-
-        /** Affine map of the unit tile square to the parallelogram (p0, p1, p2) = (top-left, top-right, bottom-left). */
-        private fun face(g: java.awt.Graphics2D, t: BufferedImage, p: FloatArray, shade: Float, ox: Int, oy: Int) {
-            val at = AffineTransform((p[2] - p[0]) / 16.0, (p[3] - p[1]) / 16.0, (p[4] - p[0]) / 16.0, (p[5] - p[1]) / 16.0, (ox + p[0]).toDouble(), (oy + p[1]).toDouble())
-            val shaded = if (shade >= 1f) t else BufferedImage(16, 16, BufferedImage.TYPE_INT_ARGB).also { s ->
-                for (y in 0 until 16) for (x in 0 until 16) {
-                    val c = t.getRGB(x, y)
-                    val r = (((c shr 16) and 255) * shade).toInt(); val gg = (((c shr 8) and 255) * shade).toInt(); val b = ((c and 255) * shade).toInt()
-                    s.setRGB(x, y, (c and 0xFF000000.toInt()) or (r shl 16) or (gg shl 8) or b)
-                }
-            }
-            g.drawImage(shaded, at, null)
-        }
-
-        /** Draws the icon for a block (isometric cube) or item into [g] at (ox, oy). */
-        fun paint(g: java.awt.Graphics2D, slot: Int, ox: Int, oy: Int, size: Int) {
-            g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR)
+        /** The icon for a block (isometric cube) or item, as [size] x [size] ARGB pixels. */
+        fun paint(slot: Int, size: Int): IntArray {
+            val out = IntArray(size * size)
             val item = Items[slot]
             val s = size.toFloat()
+            fun flat(tile: Int) { for (y in 0 until size) for (x in 0 until size) out[y * size + x] = texel(tile, x * 16 / size, y * 16 / size) }
             if (item != null) {
-                g.drawImage(tile(item.icon), ox, oy, size, size, null)
-                if (item.enchanted) {
-                    g.color = java.awt.Color(190, 110, 255, 90)
-                    g.composite = java.awt.AlphaComposite.getInstance(java.awt.AlphaComposite.SRC_ATOP, 0.5f)
-                    for (k in -size until size * 2 step 22) g.fillPolygon(intArrayOf(ox + k, ox + k + 10, ox + k + 10 - size, ox + k - size), intArrayOf(oy, oy, oy + size, oy + size), 4)
-                    g.composite = java.awt.AlphaComposite.SrcOver
+                flat(item.icon)
+                if (item.enchanted) for (y in 0 until size) for (x in 0 until size) {
+                    val i = y * size + x
+                    if (out[i] ushr 24 > 0 && ((x + y) % 22) < 10) {
+                        val c = out[i]
+                        val r = minOf(255, ((c shr 16) and 255) + 50); val g = minOf(255, ((c shr 8) and 255) + 20); val b = minOf(255, (c and 255) + 70)
+                        out[i] = (c and 0xFF000000.toInt()) or (r shl 16) or (g shl 8) or b
+                    }
                 }
             } else if (slot in 1 until Blocks.COUNT) {
                 val d = Blocks[slot]
                 if (d.render == RenderType.CROSS || d.render == RenderType.FLAT || d.render == RenderType.RAIL || slot == Blocks.LEVER) {
-                    g.drawImage(tile(d.top), ox, oy, size, size, null)
+                    flat(d.top)
                 } else {
                     val top = if (d.facing == Facing.ALL) d.front else d.top
                     val left = if (d.facing == Facing.HORIZONTAL) d.front else d.side
@@ -343,18 +338,15 @@ class IconAtlas {
                         else -> Blocks.iconHeight(slot)
                     }
                     val o = (1f - h) * s * 0.5f
-                    face(g, tile(top), floatArrayOf(0f, s * 0.25f + o, s * 0.5f, o, s * 0.5f, s * 0.5f + o), 1f, ox, oy)
-                    face(g, tile(left), floatArrayOf(0f, s * 0.25f + o, s * 0.5f, s * 0.5f + o, 0f, s * 0.75f), 0.8f, ox, oy)
-                    face(g, tile(d.side), floatArrayOf(s * 0.5f, s * 0.5f + o, s, s * 0.25f + o, s * 0.5f, s), 0.6f, ox, oy)
+                    face(out, size, top, floatArrayOf(0f, s * 0.25f + o, s * 0.5f, o, s * 0.5f, s * 0.5f + o), 1f)
+                    face(out, size, left, floatArrayOf(0f, s * 0.25f + o, s * 0.5f, s * 0.5f + o, 0f, s * 0.75f), 0.8f)
+                    face(out, size, d.side, floatArrayOf(s * 0.5f, s * 0.5f + o, s, s * 0.25f + o, s * 0.5f, s), 0.6f)
                 }
             }
+            return out
         }
 
         /** The game's icon: a grass block. */
-        fun appIcon(size: Int): BufferedImage = BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB).also { img ->
-            val g = img.createGraphics()
-            paint(g, Blocks.GRASS, 0, 0, size)
-            g.dispose()
-        }
+        fun appIcon(size: Int): IntArray = paint(Blocks.GRASS, size)
     }
 }

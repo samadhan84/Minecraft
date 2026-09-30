@@ -26,6 +26,8 @@ sourceSets {
     main {
         kotlin {
             srcDir("../app/src/main/java")
+            // Menus, inventory screens and the 2D toolkit, shared with the browser version.
+            srcDir("../client")
             // Android-only parts (views, activities, Android audio) are replaced by desktop code.
             exclude(
                 "com/vishucraft/game/ui/**",
@@ -37,6 +39,8 @@ sourceSets {
                 "com/vishucraft/game/render/GameRenderer.kt",
             )
         }
+        // Pure-Java stand-ins for Android's Matrix and Bitmap, shared with the browser version.
+        java { srcDir("../shims") }
     }
 }
 
