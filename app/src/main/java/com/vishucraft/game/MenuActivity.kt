@@ -120,6 +120,7 @@ class MenuActivity : Activity() {
                 .show()
         }
         migrateOldWorld()
+        limitOver()
         playButton.text = if (hasWorld()) "Play" else "Create world"
         @Suppress("DEPRECATION")
         window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY or
@@ -197,7 +198,16 @@ class MenuActivity : Activity() {
 
     private fun hasWorld() = worlds().isNotEmpty()
 
+    /** True (after saying so) when today's 45 minutes of play are used up (see engine/PlayLimit). */
+    private fun limitOver(): Boolean {
+        if (com.vishucraft.game.ui.Settings(this).playLimit().minutesLeft() > 0) return false
+        AlertDialog.Builder(this).setTitle(com.vishucraft.game.engine.PlayLimit.TITLE)
+            .setMessage(com.vishucraft.game.engine.PlayLimit.MESSAGE).setPositiveButton("OK", null).show()
+        return true
+    }
+
     private fun startGame(dirName: String, seed: Long? = null, name: String? = null, survival: Boolean = false) {
+        if (limitOver()) return
         val i = Intent(this, GameActivity::class.java)
         i.putExtra(GameActivity.EXTRA_WORLD, dirName)
         if (seed != null) i.putExtra(GameActivity.EXTRA_SEED, seed)
@@ -271,6 +281,7 @@ class MenuActivity : Activity() {
 
     /** Joins a friend's game anywhere with the room code they see. */
     private fun joinOnline() {
+        if (limitOver()) return
         val input = EditText(this).apply { hint = "Room code (6 numbers)"; inputType = InputType.TYPE_CLASS_NUMBER }
         AlertDialog.Builder(this).setTitle("Join online game").setView(input)
             .setMessage("Ask your friend to open their game with \"Play online (room code)\" in the game menu, then type the code they see.")
@@ -310,6 +321,7 @@ class MenuActivity : Activity() {
     }
 
     private fun connect(address: String) {
+        if (limitOver()) return
         val wait = AlertDialog.Builder(this).setTitle("Joining…").setMessage("Connecting to $address").show()
         val name = com.vishucraft.game.ui.Settings(this).playerName
         Thread {

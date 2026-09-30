@@ -188,6 +188,12 @@ class App(private val demo: File?) {
             return
         }
 
+        if (demo == null) {
+            playLimit.tick(com.vishucraft.game.engine.PlayLimit.today(), dt)?.let { hud?.toast(it, 5f) }
+            limitSaveTimer += dt
+            if (limitSaveTimer > 10f || playLimit.over) { limitSaveTimer = 0f; prefs.savePlayLimit(playLimit) }
+            if (playLimit.over) { leaveWorld(); menu = Menu.TITLE; limitNotice = true; return }
+        }
         updateGameInput(s, dt)
         val events = ArrayList<String>()
         s.frame(dt, events)
@@ -328,7 +334,20 @@ class App(private val demo: File?) {
         hud?.toast("Welcome to $name")
     }
 
+    /** Today's play time; the demo run doesn't count (see engine/PlayLimit). */
+    private val playLimit by lazy { prefs.playLimit() }
+    private var limitSaveTimer = 0f
+    /** Shown on the title screen once the daily limit is over. */
+    private var limitNotice = false
+
     private fun startSession(s: GameSession) {
+        if (demo == null && playLimit.minutesLeft() <= 0) {
+            // No playing until tomorrow: close the world that was just opened.
+            s.close(); session = null; overlay = Overlay.NONE; setCapture(false)
+            menu = Menu.TITLE; limitNotice = true
+            return
+        }
+        val first = session == null
         session = s
         s.resize(fbW, fbH)
         s.game.soundSink = { name, x, y, z, gain ->
@@ -341,9 +360,11 @@ class App(private val demo: File?) {
         container = ContainerScreen(s.game)
         overlay = Overlay.NONE
         applySettings()
+        if (first && demo == null) hud?.toast("Play time left today: ${playLimit.minutesLeft()} minutes", 4f)
     }
 
     private fun leaveWorld() {
+        if (demo == null && session != null) prefs.savePlayLimit(playLimit)
         onlineRoom?.let { r -> Thread { r.close() }.start() }
         onlineRoom = null
         val s = session ?: return
@@ -385,6 +406,13 @@ class App(private val demo: File?) {
         val bw = 400f
         when (menu) {
             Menu.TITLE -> {
+                if (limitNotice) {
+                    title(com.vishucraft.game.engine.PlayLimit.TITLE, ui.height * 0.3f)
+                    for ((k, line) in com.vishucraft.game.engine.PlayLimit.MESSAGE.split("\n").filter { it.isNotBlank() }.withIndex())
+                        ui.text(line, cx, ui.height * 0.3f + 60 + k * 30, 20f, rgba(230, 230, 230), 1)
+                    if (ui.button("OK", cx - 100, ui.height * 0.62f, 200f)) limitNotice = false
+                    return
+                }
                 ui.text("DhruvVishu", cx, ui.height * 0.16f, 72f, rgba(255, 220, 90), 1)
                 ui.text("Build, explore and survive", cx, ui.height * 0.16f + 84, 20f, rgba(220, 220, 220), 1)
                 var y = ui.height * 0.42f

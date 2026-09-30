@@ -354,6 +354,7 @@ class GameActivity : Activity() {
         addMenu("Controls") { showControls() }
         root.addView(pauseMenu, FrameLayout.LayoutParams(-1, -1))
         if (!touch) handler.postDelayed({ showToast("Press MENU / Y for controls help in the pause menu (Back)") }, 800)
+        handler.postDelayed({ showToast("Play time left today: ${settings.playLimit().minutesLeft()} minutes") }, 3600)
     }
 
     /**
@@ -858,8 +859,26 @@ class GameActivity : Activity() {
             or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN)
     }
 
+    /** Counts today's play time once a second; closes the world when the daily 45 minutes are used up. */
+    private val limitLoop = object : Runnable {
+        override fun run() {
+            val now = android.os.SystemClock.elapsedRealtime()
+            val warning = playLimit.tick(com.vishucraft.game.engine.PlayLimit.today(), (now - limitTick) / 1000f)
+            limitTick = now
+            settings.savePlayLimit(playLimit)
+            warning?.let { showToast(it) }
+            if (playLimit.over) { releaseInputs(); finish(); return }  // saved in onPause; the menu explains why
+            handler.postDelayed(this, 1000)
+        }
+    }
+    private lateinit var playLimit: com.vishucraft.game.engine.PlayLimit
+    private var limitTick = 0L
+
     override fun onResume() {
         super.onResume()
+        playLimit = settings.playLimit()
+        limitTick = android.os.SystemClock.elapsedRealtime()
+        handler.postDelayed(limitLoop, 1000)
         glView.onResume()
         sounds.resume()
         // New versions download in the background while playing; they install back on the menu.
@@ -867,6 +886,11 @@ class GameActivity : Activity() {
     }
 
     override fun onPause() {
+        handler.removeCallbacks(limitLoop)
+        if (::playLimit.isInitialized) {
+            playLimit.tick(com.vishucraft.game.engine.PlayLimit.today(), (android.os.SystemClock.elapsedRealtime() - limitTick) / 1000f)
+            settings.savePlayLimit(playLimit)
+        }
         Updater.detach(this)
         sounds.pause()
         releaseInputs()

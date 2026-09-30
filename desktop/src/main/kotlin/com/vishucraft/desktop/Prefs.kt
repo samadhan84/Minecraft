@@ -41,6 +41,9 @@ class Prefs {
     var weather: Boolean get() = b("weather", false); set(v) { p.setProperty("weather", v.toString()); save() }
     var fancy: Boolean get() = b("fancy", true); set(v) { p.setProperty("fancy", v.toString()); save() }
     var fullscreen: Boolean get() = b("fullscreen", false); set(v) { p.setProperty("fullscreen", v.toString()); save() }
+    /** Today's play time (see engine/PlayLimit). */
+    fun playLimit() = com.vishucraft.game.engine.PlayLimit(p.getProperty("playDay") ?: "", f("playUsed", 0f))
+    fun savePlayLimit(l: com.vishucraft.game.engine.PlayLimit) { p.setProperty("playDay", l.day); p.setProperty("playUsed", l.used.toString()); save() }
     var playerName: String
         get() = p.getProperty("playerName") ?: ("Player" + (100..999).random()).also { p.setProperty("playerName", it); save() }
         set(v) { p.setProperty("playerName", v); save() }

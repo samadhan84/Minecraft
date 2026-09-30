@@ -37,6 +37,9 @@ class Settings(context: Context) {
     var largeButtons: Boolean
         get() = prefs.getBoolean("largeButtons", false)
         set(v) = prefs.edit().putBoolean("largeButtons", v).apply()
+    /** Today's play time (see engine/PlayLimit). */
+    fun playLimit() = com.vishucraft.game.engine.PlayLimit(prefs.getString("playDay", "") ?: "", prefs.getFloat("playUsed", 0f))
+    fun savePlayLimit(l: com.vishucraft.game.engine.PlayLimit) = prefs.edit().putString("playDay", l.day).putFloat("playUsed", l.used).apply()
 
     companion object {
         private fun <T> next(options: List<T>, current: T): T = options[(options.indexOf(current) + 1).mod(options.size)]
