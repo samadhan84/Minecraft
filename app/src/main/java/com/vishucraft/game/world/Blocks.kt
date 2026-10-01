@@ -422,7 +422,9 @@ object Blocks {
     const val BUS_STOP = 440
     const val SOLAR_PANEL = 441
     const val EV_CHARGER = 442
-    const val COUNT = 443
+    /** A glowing board: its text is drawn large across the billboard blocks next to it (tap to write). */
+    const val BILLBOARD = 443
+    const val COUNT = 444
 
     /** The newer crops' texture names, in id order from RICE_CROP. */
     val NEW_CROPS = listOf("rice", "tomato", "lentil", "beetroot")
@@ -983,6 +985,11 @@ object Blocks {
         home(SOLAR_PANEL, "Solar Panel", "solar_panel", "steel", hardness = 0.8f, facing = Facing.HORIZONTAL)
         home(EV_CHARGER, "EV Charger", "white_plastic", "white_plastic", front = "ev_charger", hardness = 1f)
         extraLight[EV_CHARGER] = 5
+        reg(BlockDef(BILLBOARD, "Billboard", t("steel"), t("billboard_back"), t("steel"), hardness = 1f, tool = P,
+            category = Category.HOME, facing = Facing.HORIZONTAL, front = t("billboard"), movable = false))
+        extraLight[BILLBOARD] = 9
+        for (i in 0 until PixelFont.TILES) t("font_$i")
+        for (n in listOf("bullet_side", "bullet_front", "bullet_roof")) t(n)
         for (n in listOf("lamp_glow", "car_window", "bus_side", "bus_front", "bus_roof", "concrete_red")) t(n)
         for (n in listOf("plane_body", "plane_front", "plane_wing", "plane_tail", "heli_body", "heli_front", "rotor", "tyre")) t(n)
         for (n in listOf("mirror", "keyboard", "shower_water", "water_bottle_blue", "oak_leaves", "water")) t(n)

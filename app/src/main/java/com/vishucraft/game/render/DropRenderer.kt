@@ -26,8 +26,9 @@ class DropRenderer {
     fun draw(shader: Shader, drops: ItemEntities, camX: Float, camZ: Float, maxDist: Float, time: Float,
              carts: com.vishucraft.game.engine.Carts? = null, arrows: com.vishucraft.game.engine.Projectiles? = null,
              boats: com.vishucraft.game.engine.Boats? = null, aircraft: com.vishucraft.game.engine.Aircrafts? = null,
-             vehicles: com.vishucraft.game.engine.Vehicles? = null) {
+             vehicles: com.vishucraft.game.engine.Vehicles? = null, world: com.vishucraft.game.world.World? = null) {
         buf.size = 0
+        if (world != null) billboards(world, camX, camZ, maxDist)
         carts?.list?.forEach { c ->
             if (c.isTrain) train(c.x, c.y, c.z, c.yaw, c.kind, carts.power(c)?.kind ?: c.kind) else cart(c.x, c.y, c.z, c.yaw)
         }
@@ -116,6 +117,8 @@ class DropRenderer {
     private val engineTiles by lazy { intArrayOf(tile("train_roof"), tile("train_roof"), tile("train_front"), tile("train_front"), tile("train_side"), tile("train_side")) }
     private val coachTiles by lazy { intArrayOf(tile("train_roof"), tile("train_roof"), tile("train_roof"), tile("train_roof"), tile("coach_side"), tile("coach_side")) }
     private val metroTiles by lazy { intArrayOf(tile("metro_roof"), tile("metro_roof"), tile("metro_front"), tile("metro_front"), tile("metro_side"), tile("metro_side")) }
+    private val bulletTiles by lazy { intArrayOf(tile("bullet_roof"), tile("bullet_roof"), tile("bullet_front"), tile("bullet_front"), tile("bullet_side"), tile("bullet_side")) }
+    private val bulletCoachTiles by lazy { intArrayOf(tile("bullet_roof"), tile("bullet_roof"), tile("bullet_roof"), tile("bullet_roof"), tile("bullet_side"), tile("bullet_side")) }
     private val metroCoachTiles by lazy { intArrayOf(tile("metro_roof"), tile("metro_roof"), tile("metro_roof"), tile("metro_roof"), tile("metro_side"), tile("metro_side")) }
     private val wheelTile by lazy { tile("train_wheel") }
 
@@ -123,13 +126,60 @@ class DropRenderer {
      * An engine, metro car or coach: a long body with see-through windows (so a rider sitting inside can look
      * out), a floor and wheels. Coaches behind a metro are painted like the metro. Local -Z is the front.
      */
+    /** Writing on billboards: each one's text, centred across the wall of billboard blocks it is part of. */
+    private fun billboards(world: com.vishucraft.game.world.World, camX: Float, camZ: Float, maxDist: Float) {
+        for ((p, e) in world.blockEntities.map) {
+            val text = (e as? com.vishucraft.game.world.SignEntity)?.text?.trim()
+            if (text.isNullOrEmpty()) continue
+            val x = com.vishucraft.game.world.RedstoneIds.x(p); val y = com.vishucraft.game.world.RedstoneIds.y(p); val z = com.vishucraft.game.world.RedstoneIds.z(p)
+            val dx = x + 0.5f - camX; val dz = z + 0.5f - camZ
+            if (dx * dx + dz * dz > maxDist * maxDist) continue
+            if (world.getBlock(x, y, z) != Blocks.BILLBOARD) continue
+            val meta = world.getMeta(x, y, z)
+            val f = (meta and 7).let { if (it < 2 || it > 5) 2 else it }
+            val n = ChunkMesher.NORMALS[f]
+            val rx = n[2]; val rz = -n[0]   // to the right, seen from the front
+            fun board(k: Int, up: Int) = world.getBlock(x + rx * k, y + up, z + rz * k) == Blocks.BILLBOARD && (world.getMeta(x + rx * k, y + up, z + rz * k) and 7) == (meta and 7)
+            var left = 0; while (left < 12 && board(-(left + 1), 0)) left++
+            var right = 0; while (right < 12 && board(right + 1, 0)) right++
+            var below = 0; while (below < 4 && board(0, -(below + 1))) below++
+            var above = 0; while (above < 4 && board(0, above + 1)) above++
+            val width = (left + right + 1).toFloat(); val height = (below + above + 1).toFloat()
+            // Letters as tall as fits: up to 60% of the board's height, and the whole line within 90% of its width.
+            val chars = text.length
+            val h = minOf(height * 0.6f, width * 0.9f / (chars * 6f / 7f)).coerceAtMost(1.6f)
+            val w = h * 5f / 7f; val adv = h * 6f / 7f
+            val total = chars * adv - (adv - w)
+            val mid = (right - left) / 2f                 // centre of the board, in blocks to the right
+            val yc = y + 0.5f + (above - below) / 2f
+            val ox = x + 0.5f + n[0] * 0.505f; val oz = z + 0.5f + n[2] * 0.505f
+            val tu = ChunkMesher.TILE_UV
+            for ((i, ch) in text.withIndex()) {
+                val g = com.vishucraft.game.world.PixelFont.cell(ch) ?: continue
+                val tile = tile("font_${g / 4}")
+                val cu = ChunkMesher.tileU(tile) + (g % 4 % 2) * 0.5f * tu; val cv = ChunkMesher.tileV(tile) + (g % 4 / 2) * 0.5f * tu
+                val u0 = cu + tu / 16f; val u1 = cu + tu * 6f / 16f; val v0 = cv; val v1 = cv + tu * 7f / 16f
+                val l = mid - total / 2f + i * adv; val r = l + w
+                val top = yc + h / 2f; val bot = yc - h / 2f
+                buf.ensure(4 * FLOATS_PER_VERTEX)
+                buf.put(ox + rx * l, top, oz + rz * l, u0, v0, 2f)
+                buf.put(ox + rx * r, top, oz + rz * r, u1, v0, 2f)
+                buf.put(ox + rx * r, bot, oz + rz * r, u1, v1, 2f)
+                buf.put(ox + rx * l, bot, oz + rz * l, u0, v1, 2f)
+            }
+        }
+    }
+
     private fun train(cx: Float, cy: Float, cz: Float, yaw: Float, kind: Int, headKind: Int) {
         val c = cos(yaw); val s = sin(yaw)
-        val metroStyle = kind == com.vishucraft.game.engine.Cart.METRO || headKind == com.vishucraft.game.engine.Cart.METRO
-        val half = when (kind) { com.vishucraft.game.engine.Cart.ENGINE -> 1.35f; com.vishucraft.game.engine.Cart.METRO -> 1.6f; else -> 1.4f }
+        val bullet = kind == com.vishucraft.game.engine.Cart.BULLET || headKind == com.vishucraft.game.engine.Cart.BULLET
+        val metroStyle = bullet || kind == com.vishucraft.game.engine.Cart.METRO || headKind == com.vishucraft.game.engine.Cart.METRO
+        val half = when (kind) { com.vishucraft.game.engine.Cart.ENGINE -> 1.35f; com.vishucraft.game.engine.Cart.METRO -> 1.6f; com.vishucraft.game.engine.Cart.BULLET -> 1.9f; else -> 1.4f }
         val w = if (metroStyle) 0.6f else 0.55f
-        val top = if (metroStyle) 2.4f else 2.3f
+        val top = if (bullet) 2.2f else if (metroStyle) 2.4f else 2.3f
         val body = when {
+            kind == com.vishucraft.game.engine.Cart.BULLET -> bulletTiles
+            bullet -> bulletCoachTiles
             kind == com.vishucraft.game.engine.Cart.METRO -> metroTiles
             kind == com.vishucraft.game.engine.Cart.ENGINE -> engineTiles
             metroStyle -> metroCoachTiles
@@ -149,6 +199,13 @@ class DropRenderer {
             }
         }
         box(floatArrayOf(-w, 0.3f, -half, w, top, half), body)
+        if (kind == com.vishucraft.game.engine.Cart.BULLET) {
+            // The long pointed nose, in three steps (the front is towards -Z).
+            val nose = IntArray(6) { bulletTiles[0] }.also { it[3] = bulletTiles[3] }
+            box(floatArrayOf(-w * 0.9f, 0.35f, -half - 0.6f, w * 0.9f, top * 0.72f, -half), nose)
+            box(floatArrayOf(-w * 0.7f, 0.4f, -half - 1.1f, w * 0.7f, top * 0.5f, -half - 0.6f), nose)
+            box(floatArrayOf(-w * 0.45f, 0.45f, -half - 1.45f, w * 0.45f, top * 0.32f, -half - 1.1f), IntArray(6) { bulletTiles[0] })
+        }
         val floor = body[0]
         box(floatArrayOf(-w + 0.02f, 0.3f, -half + 0.02f, w - 0.02f, 0.4f, half - 0.02f), IntArray(6) { floor })
         val wheels = IntArray(6) { wheelTile }

@@ -19,7 +19,7 @@ import kotlin.math.sqrt
  */
 
 /** An airport: where planes land (the start of its runway) and which way the runway points. */
-class Airport(val name: String, val x: Float, val y: Float, val z: Float, val dx: Float, val dz: Float)
+class Airport(var name: String, val x: Float, val y: Float, val z: Float, val dx: Float, val dz: Float)
 
 class Aircraft(var x: Float, var y: Float, var z: Float, val kind: Int) {
     var yaw = 0f
@@ -154,7 +154,10 @@ class Aircrafts(private val world: World) {
                 val px = dest.x - dest.dx * 120f; val pz = dest.z - dest.dz * 120f
                 turnTowards(atan2(px - a.x, -(pz - a.z)), 0.5f)
                 val pd = sqrt((px - a.x) * (px - a.x) + (pz - a.z) * (pz - a.z))
-                if (pd < 40f || dist < 130f) a.phase = Aircraft.APPROACH
+                if (pd < 40f || dist < 130f) {
+                    a.phase = Aircraft.APPROACH
+                    if (riding === a) game.uiEvents.add("toast:Now landing at ${dest.name}. Please stay seated")
+                }
             }
             Aircraft.APPROACH -> {
                 a.speed = maxOf(18f, minOf(a.speed, 12f + dist * 0.15f))

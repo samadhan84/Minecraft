@@ -51,6 +51,14 @@ private class Plan(val g: Game, val ox: Int, val oy: Int, val oz: Int, val fx: I
     fun door(a: Int, d: Int, id: Int = Blocks.OAK_DOOR) { set(a, d, 0, id, toward); set(a, d, 1, id, toward or Shapes.UPPER) }
 
     /** A bed with its head [headDir] (a face index) from the foot at (a, d). */
+    /** A billboard [w] blocks wide and [h] high facing [face], with [text] written across it (on the middle block). */
+    fun billboard(a0: Int, d0: Int, h0: Int, w: Int, h: Int, face: Int, alongA: Boolean, text: String) {
+        for (i in 0 until w) for (k in 0 until h) set(if (alongA) a0 + i else a0, if (alongA) d0 else d0 + i, h0 + k, Blocks.BILLBOARD, face)
+        val mid = w / 2
+        val ma = if (alongA) a0 + mid else a0; val md = if (alongA) d0 else d0 + mid
+        g.world.blockEntities.sign(x(ma, md), oy + h0, z(ma, md))?.text = text
+    }
+
     fun bed(a: Int, d: Int, da: Int, dd: Int, headDir: Int, color: Int = 14) {
         set(a, d, 0, Blocks.BED_FIRST + color, headDir)
         set(a + da, d + dd, 0, Blocks.BED_FIRST + color, headDir or Shapes.UPPER)
@@ -199,9 +207,11 @@ private fun Game.metroStation(p: Plan) {
         if (a % 4 == 0) for (h in 1..4) { p.set(a, 1, h, Blocks.QUARTZ_BLOCK); p.set(a, 7, h, Blocks.QUARTZ_BLOCK) }
         if (a % 4 == 2) { p.set(a, 1, 5, Blocks.SEA_LANTERN); p.set(a, 7, 5, Blocks.SEA_LANTERN) }
     }
-    // The station's name board.
+    // The station's name, on a sign and a big billboard over the platform (tap either to rename the station).
+    val name = stationName(p.x(0, 4), p.z(0, 4))
     p.set(0, 2, 1, Blocks.SIGN, p.toward)
-    world.blockEntities.sign(p.x(0, 2), p.oy + 1, p.z(0, 2))?.text = "DV Metro"
+    world.blockEntities.sign(p.x(0, 2), p.oy + 1, p.z(0, 2))?.text = name
+    p.billboard(-3, 1, 3, 7, 2, p.away, true, name)
     // And a metro train waiting at the platform.
     val metro = Cart(p.x(-2, 4) + 0.5f, p.oy.toFloat(), p.z(-2, 4) + 0.5f, Cart.METRO)
     metro.hx = p.rx.toFloat(); metro.hz = p.rz.toFloat(); metro.yaw = kotlin.math.atan2(metro.hx, -metro.hz)
@@ -394,6 +404,8 @@ private fun Game.airport(p: Plan) {
     for (a in 8..18) p.set(a, 3, 6, if (a % 2 == 0) Blocks.CONCRETE_FIRST + 11 else white)
     p.set(6, 12, 0, Blocks.SIGN, p.left)
     world.blockEntities.sign(p.x(6, 12), p.oy, p.z(6, 12))?.text = name
+    // The airport's name on a billboard on the terminal roof, facing the runway (tap it to rename the airport).
+    p.billboard(7, 7, 6, 9, 2, p.left, false, name)
     // Control tower.
     p.site(10, 16, 21, 27, 20, Blocks.SMOOTH_STONE)
     // A 5x5 shaft as wide as the glass cab on top (an overhang would shade it dark).
@@ -681,6 +693,9 @@ private fun Game.smartCity(p: Plan) {
         }
         p.set(sa, 50, 11, Blocks.STOP_RAIL, p.railAcross); p.set(sa, 52, 11, Blocks.STOP_RAIL, p.railAcross)
         sign(sa, 48, 12, name); sign(sa, 54, 12, name, p.away)
+        // Billboards under the roof, facing the tracks: riders see the station's name as the train pulls in.
+        p.billboard(sa - 3, 48, 13, 7, 2, p.away, true, name)
+        p.billboard(sa - 3, 54, 13, 7, 2, p.toward, true, name)
         p.set(sa - 3, 49, 12, Blocks.SOFA, p.away); p.set(sa + 3, 53, 12, Blocks.SOFA, p.toward)
         // Elevators up from the pavement on both sides, straight onto the platforms.
         for (d in intArrayOf(47, 55)) { p.set(sa + 8, d, -1, Blocks.ELEVATOR); p.set(sa + 8, d, 11, Blocks.ELEVATOR); for (h in 0..1) p.set(sa + 8, d, h, Blocks.AIR) }
@@ -691,6 +706,15 @@ private fun Game.smartCity(p: Plan) {
         metro.hx = p.rx.toFloat() * dir; metro.hz = p.rz.toFloat() * dir; metro.yaw = kotlin.math.atan2(metro.hx, -metro.hz)
         carts.list.add(metro)
         carts.list.add(Cart(p.x(sa + 2 * dir, d) + 0.5f, (p.oy + 11).toFloat(), p.z(sa + 2 * dir, d) + 0.5f, Cart.COACH).also { it.leader = metro; it.hx = metro.hx; it.hz = metro.hz; it.yaw = metro.yaw })
+    }
+    // A bullet train shares the near track with the metro (trains on one track keep their distance).
+    val bullet = Cart(p.x(16, 50) + 0.5f, (p.oy + 11).toFloat(), p.z(16, 50) + 0.5f, Cart.BULLET)
+    bullet.hx = p.rx.toFloat(); bullet.hz = p.rz.toFloat(); bullet.yaw = kotlin.math.atan2(bullet.hx, -bullet.hz)
+    carts.list.add(bullet)
+    var lastCar = bullet
+    for (a in intArrayOf(12, 9)) {
+        val c = Cart(p.x(a, 50) + 0.5f, (p.oy + 11).toFloat(), p.z(a, 50) + 0.5f, Cart.COACH).also { it.leader = lastCar; it.hx = bullet.hx; it.hz = bullet.hz; it.yaw = bullet.yaw }
+        carts.list.add(c); lastCar = c
     }
 
     // ---- The railway station behind the city, with a train.
@@ -706,6 +730,7 @@ private fun Game.smartCity(p: Plan) {
         if (a % 5 == 2) { p.set(a, 104, 5, Blocks.SEA_LANTERN); p.set(a, 109, 5, Blocks.SEA_LANTERN) }
     }
     sign(2, 105, 1, "DV Central Railway Station")
+    p.billboard(-4, 104, 3, 9, 2, p.away, true, "DV Central")
     p.set(-4, 105, 1, Blocks.SOFA, p.away); p.set(4, 105, 1, Blocks.SOFA, p.away)
     val engine = Cart(p.x(4, 107) + 0.5f, p.oy.toFloat(), p.z(4, 107) + 0.5f, Cart.ENGINE)
     engine.hx = p.rx.toFloat(); engine.hz = p.rz.toFloat(); engine.yaw = kotlin.math.atan2(engine.hx, -engine.hz)
@@ -733,4 +758,11 @@ private fun Game.smartCity(p: Plan) {
     vehicle(42, 7, 1, 0, car, 0)
     vehicle(32, 59, 0, 1, car, 13); vehicle(38, 59, 0, 1, car, 6)
     uiEvents.add("toast:Welcome to the smart city! Tap a car or bus to drive it; take the elevators up to the metro")
+}
+
+/** A name for a new metro station, picked from its position (tap its sign or billboard to change it). */
+private fun stationName(x: Int, z: Int): String {
+    val names = listOf("Central", "Green Park", "Lake View", "Market", "City Hall", "Park Street", "River Side", "Hill Top",
+        "Garden City", "Airport Road", "Old Town", "Sunrise", "Tech Park", "Rose Garden", "Station Road", "Lotus")
+    return names[((x * 73856093) xor (z * 19349663)).mod(names.size)]
 }

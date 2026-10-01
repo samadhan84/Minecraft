@@ -1074,8 +1074,16 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
 
     /** Writes text on a sign (from the sign screen). */
     fun setSignText(x: Int, y: Int, z: Int, text: String) {
-        if (world.getBlock(x, y, z) != Blocks.SIGN) return
-        world.blockEntities.sign(x, y, z)?.text = text.take(60)
+        val b = world.getBlock(x, y, z)
+        if (b != Blocks.SIGN && b != Blocks.BILLBOARD) return
+        val t = text.take(60)
+        world.blockEntities.sign(x, y, z)?.text = t
+        // A sign or billboard at an airport gives the airport its name.
+        val name = t.trim()
+        if (name.isNotEmpty()) aircraft.airports.filter { (it.x - x) * (it.x - x) + (it.z - z) * (it.z - z) < 40f * 40f && kotlin.math.abs(it.y - y) < 30f }
+            .minByOrNull { (it.x - x) * (it.x - x) + (it.z - z) * (it.z - z) }?.let { ap ->
+                if (ap.name != name) { uiEvents.add("toast:Airport renamed: ${ap.name} is now $name"); ap.name = name }
+            }
     }
 
     fun signText(x: Int, y: Int, z: Int): String = (world.blockEntities.get(x, y, z) as? com.vishucraft.game.world.SignEntity)?.text ?: ""
@@ -1152,7 +1160,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
     fun lookedAtBlockLabel(): String? {
         val t = target ?: return null
         return when (t.block) {
-            Blocks.SIGN -> signText(t.x, t.y, t.z).ifEmpty { null }?.let { "“$it”" }
+            Blocks.SIGN, Blocks.BILLBOARD -> signText(t.x, t.y, t.z).ifEmpty { null }?.let { "“$it”" }
             Blocks.ITEM_FRAME -> (world.blockEntities.get(t.x, t.y, t.z) as? com.vishucraft.game.world.ItemHolderEntity)?.stack?.let { Items.displayName(it.id) }
             Blocks.JUKEBOX -> (world.blockEntities.get(t.x, t.y, t.z) as? com.vishucraft.game.world.ItemHolderEntity)?.stack?.let { "Playing: " + Items.displayName(it.id) }
             Blocks.COMPOSTER -> "Composter ${world.getMeta(t.x, t.y, t.z).coerceAtMost(7)}/7"
@@ -1371,7 +1379,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
             } else {
                 carts.enter(c, dir[0], dir[2])
                 if (c.isTrain) uiEvents.add(when (carts.power(c)?.kind) {
-                    Cart.METRO, Cart.ENGINE -> "toast:All aboard! It stops for 10 seconds at every Station Stop Rail and turns back at the end of the line"
+                    Cart.METRO, Cart.ENGINE, Cart.BULLET -> "toast:All aboard! It stops for 10 seconds at every Station Stop Rail and turns back at the end of the line"
                     else -> "toast:A coach on its own: press forward to push it, or hook it behind an engine or metro"
                 })
             }
@@ -1436,6 +1444,8 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
             Blocks.BREWING_STAND -> { brew(); return }
             Blocks.CAKE -> { eatCake(t.x, t.y, t.z); return }
             Blocks.SIGN -> { uiEvents.add("signedit:${t.x},${t.y},${t.z}"); return }
+            // Tap a billboard to write on it (holding a billboard adds one next to it instead).
+            Blocks.BILLBOARD -> if (sel != Blocks.BILLBOARD) { uiEvents.add("signedit:${t.x},${t.y},${t.z}"); return }
             Blocks.ITEM_FRAME -> { useFrame(t.x, t.y, t.z); return }
             Blocks.JUKEBOX -> { useJukebox(t.x, t.y, t.z); return }
             Blocks.CAMPFIRE -> if (item != null && campfireCooks(item.name) != null) { cookOnCampfire(t.x, t.y, t.z, item); return }

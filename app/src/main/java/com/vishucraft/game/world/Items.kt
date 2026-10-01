@@ -335,6 +335,8 @@ object Items {
         add("Blueprint: Smart City", "blueprint", use = ItemUse.BLUEPRINT, maxStack = 16)
         add("Car", "car_item", maxStack = 1)
         add("Bus", "bus_item", maxStack = 1)
+        // Runs on metro tracks too, sharing them with metros (see engine/Projectiles Carts).
+        add("Bullet Train", "bullet_train", use = ItemUse.CART, maxStack = 1)
 
         all = list
         for (i in all) { byId[i.id] = i; byName[i.name] = i.id }

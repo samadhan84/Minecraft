@@ -1772,6 +1772,19 @@ object TextureAtlas {
     private val PLAN = arrayOf("dddddddddddd", "daaaaaaaaaad", "daaaalaaaaad", "daaallllaaad", "daallllllaad", "daalaaaalaad", "daalaallaaad", "daallllllaad", "daaaaaaaaaad", "dddddddddddd")
 
     private fun kitchenTile(name: String, t: Tile): Boolean {
+        if (name.startsWith("font_")) {
+            // Four PixelFont glyphs per tile, each in an 8 x 8 cell, warm white on clear.
+            val tile = name.removePrefix("font_").toInt()
+            t.fill { _, _ -> 0 }
+            for (cell in 0 until 4) {
+                val g = tile * 4 + cell
+                if (g >= com.vishucraft.game.world.PixelFont.chars.size) break
+                val rows = com.vishucraft.game.world.PixelFont.rows(g)
+                val ox = (cell % 2) * 8 + 1; val oy = (cell / 2) * 8
+                for ((y, row) in rows.withIndex()) for ((x, ch) in row.withIndex()) if (ch == '#') t[ox + x, oy + y] = rgb(255, 238, 150)
+            }
+            return true
+        }
         for (c in Blocks.NEW_CROPS) if (name.startsWith("${c}_stage_")) { newCrop(t, c, name.substringAfterLast('_').toInt()); return true }
         when (name) {
             "scarecrow" -> { t.fill { x, y -> if ((x / 4 + y / 4) % 2 == 0) rgb(170, 50, 40) else rgb(120, 30, 30) }; return true }
@@ -1821,6 +1834,37 @@ object TextureAtlas {
             "helicopter_item" -> {
                 mask(t, arrayOf("dddddddddddddd", "......dd......", "....dddddd....", "...dmmmmaad...", "dddmmmmmaaad..", "d..dmmmmmmmd..", "...dmmmmmmd...", "....dddddd....", "...d......d...", "..dddddddddd.."),
                     rgb(210, 40, 40), rgb(160, 210, 240))
+                return true
+            }
+            // ---- Billboards (text drawn on them with PixelFont) and the bullet train
+            "billboard" -> {
+                t.fill { x, y -> if (x == 0 || y == 0 || x == 15 || y == 15) rgb(70, 74, 82) else scale(rgb(18, 34, 70), if ((x + y) % 2 == 0) 1.06f else 1f) }
+                return true
+            }
+            "billboard_back" -> { t.fill { x, y -> if (x % 5 == 0 || y % 5 == 0) rgb(96, 100, 108) else rgb(132, 136, 144) }; return true }
+            "bullet_side" -> {
+                t.fill { x, y -> when {
+                    y in 3..6 && x % 4 != 0 -> 0
+                    y == 9 || y == 10 -> rgb(30, 70, 190)
+                    y == 11 -> rgb(220, 170, 40)
+                    y >= 14 -> rgb(70, 72, 80)
+                    else -> scale(rgb(244, 246, 250), t.jitter(0.01f))
+                } }
+                return true
+            }
+            "bullet_front" -> {
+                t.fill { x, y -> when {
+                    y in 2..6 && x in 3..12 -> 0
+                    y == 9 || y == 10 -> rgb(30, 70, 190)
+                    y == 12 && (x in 2..4 || x in 11..13) -> rgb(255, 250, 220)
+                    else -> scale(rgb(244, 246, 250), t.jitter(0.01f))
+                } }
+                return true
+            }
+            "bullet_roof" -> { t.fill { x, _ -> scale(rgb(230, 232, 238), if (x % 6 == 0) 0.94f else 1f) }; return true }
+            "bullet_train" -> {
+                mask(t, arrayOf("..........dddd", "......ddddmmmd", "...dddaamaamamd", ".ddmmmmmmmmmmmd", "dmmbbbbbbbbbbbd", "dmmmmmmmmmmmmmd", ".dddddddddddddd", "..d..d....d..d."),
+                    rgb(240, 242, 248), rgb(40, 60, 90), rgb(30, 70, 190))
                 return true
             }
             // ---- Smart city

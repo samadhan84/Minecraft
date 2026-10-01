@@ -617,6 +617,12 @@ class App(demo: File?) : ClientApp(demo) {
                 p.x -= 34f; p.z -= 36f; p.y += 11f; p.yaw = 1.5708f; p.pitch = -0.1f
             }
             f == 1255 -> shot("04u-city-metro")
+            f == 1256 -> session?.game?.let { g ->
+                // On the far platform, looking at the station's billboard across the tracks.
+                val p = g.player
+                p.x -= 4f; p.z -= 8f; p.y -= 0.5f; p.yaw = 3.14159f; p.pitch = 0.3f
+            }
+            f == 1260 -> shot("04v-station-billboard")
             f == 1261 -> overlay = Overlay.PAUSE
             f == 1263 -> shot("05-pause")
             f == 1267 -> { overlay = Overlay.NONE; leaveWorld(); menu = Menu.CREATE; nameField.text = "Demo survival"; seedField.text = "777"; survival = true }

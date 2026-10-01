@@ -395,6 +395,8 @@ object Recipes {
         // ---- Smart city
         r(i("Blueprint: Smart City"), 1, true, paper to 1, Blocks.SMOOTH_STONE to 64, Blocks.IRON_BLOCK to 8, glass to 32)
         sh(i("Car"), 1, listOf(" G ", "III", "C C"), 'I' to iron, 'G' to glass, 'C' to Blocks.COAL_BLOCK)
+        sh(i("Bullet Train"), 1, listOf("GGG", "IMI", "DRD"), 'G' to glass, 'I' to Blocks.IRON_BLOCK, 'M' to i("Metro Train"), 'D' to i("Diamond"), 'R' to Blocks.REDSTONE_BLOCK)
+        sh(Blocks.BILLBOARD, 4, listOf("III", "IGI", "III"), 'I' to iron, 'G' to Blocks.GLOWSTONE)
         sh(i("Bus"), 1, listOf("GGG", "III", "C C"), 'I' to Blocks.IRON_BLOCK, 'G' to glass, 'C' to Blocks.COAL_BLOCK)
         r(Blocks.ROAD, 8, true, Blocks.GRAVEL to 4, Blocks.COAL_BLOCK to 1)
         r(Blocks.ROAD_MARKING, 4, true, Blocks.ROAD to 4, i("Bone Meal") to 1)

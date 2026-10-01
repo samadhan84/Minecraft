@@ -100,6 +100,23 @@ class BlockEntities {
     fun furnace(x: Int, y: Int, z: Int) = map.getOrPut(RedstoneIds.pack(x, y, z)) { FurnaceEntity() } as? FurnaceEntity
     fun remove(x: Int, y: Int, z: Int) = map.remove(RedstoneIds.pack(x, y, z))
     fun sign(x: Int, y: Int, z: Int) = map.getOrPut(RedstoneIds.pack(x, y, z)) { SignEntity() } as? SignEntity
+    /**
+     * The name written nearest to (x, y, z) on a sign or billboard within [radius] blocks (a station's or an
+     * airport's name board), or null.
+     */
+    fun nameNear(x: Int, y: Int, z: Int, radius: Int): String? {
+        var best: String? = null; var bestD = Int.MAX_VALUE
+        for ((p, e) in map) {
+            val text = (e as? SignEntity)?.text?.trim()
+            if (text.isNullOrEmpty()) continue
+            val dx = RedstoneIds.x(p) - x; val dy = RedstoneIds.y(p) - y; val dz = RedstoneIds.z(p) - z
+            if (kotlin.math.abs(dx) > radius || kotlin.math.abs(dz) > radius || kotlin.math.abs(dy) > 12) continue
+            val d = dx * dx + dz * dz + dy * dy
+            if (d < bestD) { bestD = d; best = text }
+        }
+        return best
+    }
+
     fun holder(x: Int, y: Int, z: Int) = map.getOrPut(RedstoneIds.pack(x, y, z)) { ItemHolderEntity() } as? ItemHolderEntity
 
     companion object {
