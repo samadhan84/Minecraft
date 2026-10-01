@@ -68,7 +68,7 @@ object Items {
     val DISCS = listOf("Meadow", "Caves", "Stars")
 
     /** Ready-made buildings a blueprint can place (see engine/Buildings.kt). */
-    val BUILDINGS = listOf("Small House", "Modern House", "Farm", "Watch Tower", "Metro Station", "Swimming Pool", "Mansion", "Airport", "Smart City")
+    val BUILDINGS = listOf("Small House", "Modern House", "Farm", "Watch Tower", "Metro Station", "Swimming Pool", "Mansion", "Airport", "Smart City", "Big City", "Mega City")
 
     val all: List<ItemDef>
     private val byId = HashMap<Int, ItemDef>()
@@ -337,6 +337,11 @@ object Items {
         add("Bus", "bus_item", maxStack = 1)
         // Runs on metro tracks too, sharing them with metros (see engine/Projectiles Carts).
         add("Bullet Train", "bullet_train", use = ItemUse.CART, maxStack = 1)
+        add("Blueprint: Big City", "blueprint", use = ItemUse.BLUEPRINT, maxStack = 16)
+        add("Blueprint: Mega City", "blueprint", use = ItemUse.BLUEPRINT, maxStack = 16)
+        // Spawn eggs for the city people (appended after the other eggs' list so item ids stay the same).
+        for (t in listOf(com.vishucraft.game.engine.MobType.CITIZEN, com.vishucraft.game.engine.MobType.CITIZEN_WOMAN, com.vishucraft.game.engine.MobType.CITIZEN_KID))
+            add("${t.displayName} Spawn Egg", "spawn_egg_${t.name.lowercase()}", use = ItemUse.SPAWN)
 
         all = list
         for (i in all) { byId[i.id] = i; byName[i.name] = i.id }

@@ -623,22 +623,40 @@ class App(demo: File?) : ClientApp(demo) {
                 p.x -= 4f; p.z -= 8f; p.y -= 0.5f; p.yaw = 3.14159f; p.pitch = 0.3f
             }
             f == 1260 -> shot("04v-station-billboard")
-            f == 1261 -> overlay = Overlay.PAUSE
-            f == 1263 -> shot("05-pause")
-            f == 1267 -> { overlay = Overlay.NONE; leaveWorld(); menu = Menu.CREATE; nameField.text = "Demo survival"; seedField.text = "777"; survival = true }
-            f == 1269 -> demoCreate = true
-            f == 1500 -> shot("06-survival-world")
-            f == 1502 -> session?.let {
+            f == 1262 -> session?.game?.let { g ->
+                // A mega city, from the sky.
+                val p = g.player
+                val bx = com.vishucraft.game.world.floorInt(p.x) + 500; val bz = com.vishucraft.game.world.floorInt(p.z) + 300
+                val y = g.world.generator.surfaceHeight(bx, bz)
+                p.yaw = 0f
+                g.placeBuilding(com.vishucraft.game.engine.RayHit(bx, y, bz, 0, 1, 0, Blocks.GRASS), "Mega City")
+                p.x = bx + 0.5f; p.z = bz + 30.5f; p.y = y + 75f; p.yaw = 0f; p.pitch = -0.55f; p.flying = true
+            }
+            f == 1320 -> shot("04w-mega-city")
+            f == 1321 -> session?.game?.let { g ->
+                // People on a pavement, close up.
+                val m = g.mobs.list.filter { it.type.isCitizen }.minByOrNull { kotlin.math.abs(it.x - g.player.x) + kotlin.math.abs(it.z - g.player.z - 60f) } ?: return@let
+                val near = g.mobs.list.filter { it.type.isCitizen }
+                for ((k, o) in near.take(3).withIndex()) { o.x = m.x + k * 1.2f; o.z = m.z; o.y = m.y; o.yaw = 3.14159f; o.wandering = false; o.aiTimer = 99f }
+                g.player.x = m.x + 1.2f; g.player.z = m.z + 4.5f; g.player.y = m.y + 0.2f; g.player.yaw = 0f; g.player.pitch = -0.12f
+            }
+            f == 1345 -> shot("04x-city-people")
+            f == 1361 -> overlay = Overlay.PAUSE
+            f == 1363 -> shot("05-pause")
+            f == 1367 -> { overlay = Overlay.NONE; leaveWorld(); menu = Menu.CREATE; nameField.text = "Demo survival"; seedField.text = "777"; survival = true }
+            f == 1369 -> demoCreate = true
+            f == 1600 -> shot("06-survival-world")
+            f == 1602 -> session?.let {
                 it.game.inventory.add(com.vishucraft.game.world.Items.find("Minecart"), 1)
                 it.game.inventory.add(Blocks.LOG, 8)
                 openInventory()
             }
-            f == 1506 -> shot("07-survival-inventory")
-            f == 1508 -> { closeOverlay(); openContainer(ContainerScreen.Mode.CRAFTING) }
-            f == 1512 -> shot("08-crafting-table")
-            f == 1514 -> { closeOverlay(); leaveWorld(); menu = Menu.WORLDS }
-            f == 1518 -> shot("09-worlds")
-            f == 1520 -> glfwSetWindowShouldClose(window, true)
+            f == 1606 -> shot("07-survival-inventory")
+            f == 1608 -> { closeOverlay(); openContainer(ContainerScreen.Mode.CRAFTING) }
+            f == 1612 -> shot("08-crafting-table")
+            f == 1614 -> { closeOverlay(); leaveWorld(); menu = Menu.WORLDS }
+            f == 1618 -> shot("09-worlds")
+            f == 1620 -> glfwSetWindowShouldClose(window, true)
         }
     }
 }

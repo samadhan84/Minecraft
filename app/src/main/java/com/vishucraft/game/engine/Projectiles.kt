@@ -118,7 +118,7 @@ class Cart(var x: Float, var y: Float, var z: Float, var kind: Int = MINECART) {
     /** Half the length of the car body. */
     val half get() = when (kind) { ENGINE -> 1.35f; METRO -> 1.6f; BULLET -> 1.9f; COACH -> 1.4f; else -> 0.6f }
     val height get() = if (isTrain) 2.4f else 0.8f
-    val maxSpeed get() = when (kind) { ENGINE -> 16f; METRO -> 20f; BULLET -> 34f; else -> 12f }
+    val maxSpeed get() = when (kind) { ENGINE -> 16f; METRO -> 20f; BULLET -> 50f; else -> 12f }   // the bullet train beats an airplane (42)
     /** Metros and bullet trains chime and announce stations; engines blow the horn. */
     val isMetroLike get() = kind == METRO || kind == BULLET
 
@@ -361,7 +361,7 @@ class Carts(private val world: World) {
             // Trains with an engine or a metro car drive themselves.
             if (power(c) != null && autoDrive(c, dt, game)) continue
             // Fast trains move in small steps so they never skip a curve.
-            val n = kotlin.math.ceil(c.speed * dt / 0.3f).toInt().coerceIn(1, 8)
+            val n = kotlin.math.ceil(c.speed * dt / 0.3f).toInt().coerceIn(1, 14)
             repeat(n) { step(c, dt / n, game) }
             record(c)
         }
@@ -417,7 +417,8 @@ class Carts(private val world: World) {
         if (h.atEnd) { reverse(h, game); return true }
         val ahead = stopAhead(h, game)
         val max = engine.maxSpeed
-        var target = if (ahead != null) minOf(max, 1.5f + ahead * 2.2f) else max
+        // Brake in time for the next station (fast trains look further ahead).
+        var target = if (ahead != null) minOf(max, 1.5f + kotlin.math.sqrt(24f * ahead)) else max
         // Trains sharing a track keep their distance; when two meet head on, one turns back.
         val (gap, other) = trainAhead(h)
         if (gap != null) {
@@ -436,7 +437,7 @@ class Carts(private val world: World) {
             }
         }
         h.waited = 0f
-        h.speed = if (h.speed < target) minOf(target, h.speed + (if (engine.kind == Cart.BULLET) 7f else 5f) * dt) else maxOf(target, h.speed - 14f * dt)
+        h.speed = if (h.speed < target) minOf(target, h.speed + (if (engine.kind == Cart.BULLET) 10f else 5f) * dt) else maxOf(target, h.speed - 14f * dt)
         if (h.speed < 0.3f) h.speed = 0.3f
         return false
     }
@@ -485,7 +486,7 @@ class Carts(private val world: World) {
             if (mine.any { it === o } || kotlin.math.abs(o.y - h.y) > 3f) continue
             val dx = o.x - h.x; val dz = o.z - h.z
             val along = dx * h.hx + dz * h.hz
-            if (along <= 0f || along > 70f || kotlin.math.abs(dx * h.hz - dz * h.hx) > 1.3f) continue
+            if (along <= 0f || along > 140f || kotlin.math.abs(dx * h.hz - dz * h.hx) > 1.3f) continue
             val gap = along - h.half - o.half
             if (best == null || gap < best) { best = gap; car = o }
         }
@@ -498,11 +499,12 @@ class Carts(private val world: World) {
         return if (railAt(bx, by, bz) == 0) null else intArrayOf(bx, by, bz)
     }
 
-    /** Blocks until the next stop rail ahead, up to 8 ahead; riders hear which station comes next. */
+    /** Blocks until the next stop rail ahead (further ahead the faster it goes); riders hear which station comes next. */
     private fun stopAhead(c: Cart, game: Game? = null): Int? {
         val cell = railCell(c) ?: return null
         val sx = kotlin.math.round(c.hx).toInt(); val sz = kotlin.math.round(c.hz).toInt()
-        for (k in 0..8) {
+        val range = maxOf(8, (c.speed * c.speed / 24f).toInt() + 6).coerceAtMost(120)
+        for (k in 0..range) {
             val x = cell[0] + sx * k; val z = cell[2] + sz * k
             for (dy in -1..1) {
                 val y = cell[1] + dy

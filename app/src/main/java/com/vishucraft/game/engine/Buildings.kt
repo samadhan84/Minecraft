@@ -72,9 +72,11 @@ internal fun Game.placeBuilding(t: RayHit, name: String): Boolean {
     val oy = if (t.ny == 1) t.y + 1 else t.y
     if (oy + 16 >= Chunk.HEIGHT) { uiEvents.add("toast:No room to build here"); return false }
     val p = Plan(this, t.x, oy, t.z, fx, fz)
+    val toastsBefore = uiEvents.count { it.startsWith("toast:") }
     if (!buildReady(p, name)) return false
     sound("ding", player.x, player.y, player.z)
-    uiEvents.add("toast:Built ${if (name[0].lowercaseChar() in "aeiou") "an" else "a"} ${name.lowercase()}!")
+    // Buildings that say something themselves (a city's welcome, a station joining the line) keep their message.
+    if (uiEvents.count { it.startsWith("toast:") } == toastsBefore) uiEvents.add("toast:Built ${if (name[0].lowercaseChar() in "aeiou") "an" else "a"} ${name.lowercase()}!")
     return true
 }
 
@@ -91,7 +93,12 @@ private fun Game.buildReady(p: Plan, name: String): Boolean {
         "Airport" -> airport(p)
         "Smart City" -> {
             if (p.oy + 46 >= Chunk.HEIGHT) { uiEvents.add("toast:Too high up for the city's tallest tower: build lower down"); return false }
-            smartCity(p)
+            city(p, 4, "the smart city", "DV Metro", "DV Central")
+        }
+        "Big City", "Mega City" -> {
+            if (p.oy + 52 >= Chunk.HEIGHT) { uiEvents.add("toast:Too high up for the city's tallest towers: build lower down"); return false }
+            if (name == "Big City") city(p, 6, "the big city", "Big City Metro", "Big City Junction")
+            else city(p, 8, "the mega city", "Mega Metro", "Mega City Terminus")
         }
         else -> return false
     }
@@ -212,6 +219,13 @@ private fun Game.metroStation(p: Plan) {
     p.set(0, 2, 1, Blocks.SIGN, p.toward)
     world.blockEntities.sign(p.x(0, 2), p.oy + 1, p.z(0, 2))?.text = name
     p.billboard(-3, 1, 3, 7, 2, p.away, true, name)
+    // Its track joins the nearest other metro station or city line, however far away.
+    val group = metroNet.newGroup()
+    val line = joinMetro(listOf(
+        TrackEnd(p.x(len, 4), p.oy, p.z(len, 4), p.rx, p.rz, group),
+        TrackEnd(p.x(-len, 4), p.oy, p.z(-len, 4), -p.rx, -p.rz, group),
+    ))
+    if (line > 0) uiEvents.add("toast:$name metro station is open! Its track joins the nearest station ($line blocks of new track)")
     // And a metro train waiting at the platform.
     val metro = Cart(p.x(-2, 4) + 0.5f, p.oy.toFloat(), p.z(-2, 4) + 0.5f, Cart.METRO)
     metro.hx = p.rx.toFloat(); metro.hz = p.rz.toFloat(); metro.yaw = kotlin.math.atan2(metro.hx, -metro.hz)
@@ -441,16 +455,20 @@ private fun Game.airport(p: Plan) {
  * sixteen city blocks: skyscrapers with elevators, a hospital with a helipad and helicopter, a school, a police
  * station, shops, parks, a cricket ground, houses, and a solar farm with EV chargers.
  */
-private fun Game.smartCity(p: Plan) {
-    val roads = intArrayOf(-48, -24, 0, 24, 48)     // road centres, across
-    val rows = intArrayOf(3, 27, 51, 75, 99)        // road centres, away
+private fun Game.city(p: Plan, n: Int, title: String, metroName: String, railName: String) {
+    // n x n city blocks, 24 apart, with roads between and round them.
+    val half = n * 12
+    val roads = IntArray(n + 1) { -half + it * 24 }    // road centres, across
+    val rows = IntArray(n + 1) { 3 + it * 24 }         // road centres, away
+    val far = rows.last() + 2                           // the last row of road, away
+    val mr = rows[n / 2]                                // the road the metro runs over
     val white = Blocks.CONCRETE_FIRST
     fun concrete(c: Int) = Blocks.CONCRETE_FIRST + c
     val pave = Blocks.SMOOTH_STONE
-    p.site(-52, 52, 1, 112, 50, Blocks.GRASS)
+    p.site(-half - 4, half + 4, 1, far + 11, 50, Blocks.GRASS)
 
     // ---- Roads, pavements and grass.
-    for (a in -50..50) for (d in 1..101) {
+    for (a in -half - 2..half + 2) for (d in 1..far) {
         val ra = roads.firstOrNull { abs(a - it) <= 2 }; val rd = rows.firstOrNull { abs(d - it) <= 2 }
         val lotEdge = roads.any { abs(a - it) == 3 } || rows.any { abs(d - it) == 3 }
         p.set(a, d, -1, when {
@@ -461,12 +479,12 @@ private fun Game.smartCity(p: Plan) {
             else -> Blocks.GRASS
         })
     }
-    for (a in -52..52) for (d in 102..103) p.set(a, d, -1, pave)
+    for (a in -half - 4..half + 4) for (d in far + 1..far + 2) p.set(a, d, -1, pave)
     // Zebra crossings on every road just before each junction (white stripes along the road).
     for (ra in roads) for (rd in rows) for (k in 3..5) for (s in intArrayOf(-1, 1)) for (o in -2..2 step 2) {
         val d = rd + s * k; val a = ra + s * k
-        if (d in 1..101 && rows.none { abs(d - it) <= 2 }) p.set(ra + o, d, -1, Blocks.ZEBRA_CROSSING)
-        if (a in -50..50 && roads.none { abs(a - it) <= 2 }) p.set(a, rd + o, -1, Blocks.ZEBRA_CROSSING)
+        if (d in 1..far && rows.none { abs(d - it) <= 2 }) p.set(ra + o, d, -1, Blocks.ZEBRA_CROSSING)
+        if (a in -half - 2..half + 2 && roads.none { abs(a - it) <= 2 }) p.set(a, rd + o, -1, Blocks.ZEBRA_CROSSING)
     }
 
     fun lamp(a: Int, d: Int, face: Int) {
@@ -661,83 +679,112 @@ private fun Game.smartCity(p: Plan) {
     }
     fun villa(ca: Int, cd: Int) { modernHouse(sub(ca, cd - 9)); pool(sub(ca, cd)) }
 
-    park(-36, 15); police(-12, 15); shops(12, 15); hospital(36, 15)
-    school(-36, 39); skyscraper(-12, 39, 8, concrete(11), "Tech Park"); skyscraper(12, 39, 10, concrete(9), "Sky Towers"); houses(36, 39)
-    houses(-36, 63); skyscraper(-12, 63, 9, concrete(7), "City Centre"); cricket(12, 63); solarFarm(36, 63)
-    villa(-36, 87); skyscraper(-12, 87, 11, concrete(15), "DV Tower"); villa(12, 87); park(36, 87)
+    if (n == 4) {
+        park(-36, 15); police(-12, 15); shops(12, 15); hospital(36, 15)
+        school(-36, 39); skyscraper(-12, 39, 8, concrete(11), "Tech Park"); skyscraper(12, 39, 10, concrete(9), "Sky Towers"); houses(36, 39)
+        houses(-36, 63); skyscraper(-12, 63, 9, concrete(7), "City Centre"); cricket(12, 63); solarFarm(36, 63)
+        villa(-36, 87); skyscraper(-12, 87, 11, concrete(15), "DV Tower"); villa(12, 87); park(36, 87)
+    } else {
+        // Bigger cities: a mix of everything, with more towers towards the middle.
+        val kinds = listOf("sky", "houses", "shops", "park", "villa", "sky", "school", "houses", "solar", "sky", "cricket", "police", "hospital", "villa", "shops", "sky")
+        val towers = listOf("Tech Park", "Sky Towers", "City Centre", "DV Tower", "Lotus Tower", "Ocean View", "Galaxy Heights", "Royal Plaza",
+            "Sun Tower", "Silver Oak", "Diamond Point", "Pearl Tower", "Orchid Heights", "Metro Plaza", "Unity Tower", "Rainbow Tower")
+        val frames = intArrayOf(11, 9, 7, 15, 3, 14, 13, 1)
+        for (i in 0 until n) for (j in 0 until n) {
+            val ca = roads[i] + 12; val cd = rows[j] + 12
+            val central = abs(i * 2 + 1 - n) <= 2 && abs(j * 2 + 1 - n) <= 2
+            val kind = if (central && (i + j) % 2 == 0) "sky" else kinds[(i * 7 + j * 3 + i * j) % kinds.size]
+            when (kind) {
+                "sky" -> skyscraper(ca, cd, if (central) 10 + (i + j) % 3 else 6 + (i * 3 + j * 5) % 5, concrete(frames[(i + j * 3) % frames.size]), towers[(i * n + j) % towers.size])
+                "houses" -> houses(ca, cd)
+                "shops" -> shops(ca, cd)
+                "park" -> park(ca, cd)
+                "villa" -> villa(ca, cd)
+                "school" -> school(ca, cd)
+                "solar" -> solarFarm(ca, cd)
+                "cricket" -> cricket(ca, cd)
+                "police" -> police(ca, cd)
+                else -> hospital(ca, cd)
+            }
+        }
+    }
 
     // ---- Street lamps along every pavement, traffic lights at the corners, and bus stops.
-    for (i in 0..3) for (j in 0..3) {
+    for (i in 0 until n) for (j in 0 until n) {
         val a0 = roads[i] + 3; val a1 = roads[i + 1] - 3; val d0 = rows[j] + 3; val d1 = rows[j + 1] - 3
         for (d in d0 + 2..d1 - 2 step 6) { lamp(a0, d, p.left); lamp(a1, d, p.right) }
         for (a in a0 + 2..a1 - 2 step 6) { lamp(a, d0, p.toward); lamp(a, d1, p.away) }
         trafficLight(a0, d0, p.toward); trafficLight(a1, d0, p.right); trafficLight(a0, d1, p.left); trafficLight(a1, d1, p.away)
     }
-    for (j in 0..3) { p.set(-3, rows[j] + 13, 0, Blocks.BUS_STOP, p.right); p.set(3, rows[j] + 13, 0, Blocks.BUS_STOP, p.left) }
-    for (a in intArrayOf(-40, 32)) { p.set(a, 48, 0, Blocks.BUS_STOP, p.away); p.set(a, 54, 0, Blocks.BUS_STOP, p.toward) }
+    for (j in 0 until n) { p.set(-3, rows[j] + 13, 0, Blocks.BUS_STOP, p.right); p.set(3, rows[j] + 13, 0, Blocks.BUS_STOP, p.left) }
+    for (a in intArrayOf(roads[0] + 8, roads[n - 1] + 8)) { p.set(a, mr - 3, 0, Blocks.BUS_STOP, p.away); p.set(a, mr + 3, 0, Blocks.BUS_STOP, p.toward) }
 
-    // ---- The elevated metro over the middle road, with two stations.
-    for (a in -50..50) {
-        for (d in 48..54) p.set(a, d, 10, if ((d == 48 || d == 54) && a % 8 == 0) Blocks.SEA_LANTERN else concrete(8))
-        p.set(a, 48, 11, Blocks.GLASS_PANE); p.set(a, 54, 11, Blocks.GLASS_PANE)
-        p.set(a, 50, 11, Blocks.RAIL, p.railAcross); p.set(a, 52, 11, Blocks.RAIL, p.railAcross)
+    // ---- The elevated metro over the middle road, with stations at both ends (and the middle in big cities).
+    for (a in -half - 2..half + 2) {
+        for (d in mr - 3..mr + 3) p.set(a, d, 10, if ((d == mr - 3 || d == mr + 3) && a % 8 == 0) Blocks.SEA_LANTERN else concrete(8))
+        p.set(a, mr - 3, 11, Blocks.GLASS_PANE); p.set(a, mr + 3, 11, Blocks.GLASS_PANE)
+        p.set(a, mr - 1, 11, Blocks.RAIL, p.railAcross); p.set(a, mr + 1, 11, Blocks.RAIL, p.railAcross)
     }
-    for (a in intArrayOf(-36, -12, 12, 36)) for (h in 0..9) { p.set(a, 48, h, concrete(8)); p.set(a, 54, h, concrete(8)) }
-    for ((sa, name) in listOf(-36 to "DV Metro West", 36 to "DV Metro East")) {
+    for (i in 0 until n) for (h in 0..9) { p.set(roads[i] + 12, mr - 3, h, concrete(8)); p.set(roads[i] + 12, mr + 3, h, concrete(8)) }
+    val stations = listOf(roads[0] + 12 to "$metroName West", roads[n - 1] + 12 to "$metroName East") +
+        (if (n >= 6) listOf(roads[n / 2] + 12 to "$metroName Central") else emptyList())
+    for ((sa, name) in stations) {
         for (a in sa - 8..sa + 8) {
-            for (d in intArrayOf(48, 49, 53, 54)) p.set(a, d, 11, Blocks.STATION_PLATFORM)
-            for (d in 48..54) p.set(a, d, 15, Blocks.GLASS)
-            if ((a - sa) % 4 == 0) for (h in 12..14) { p.set(a, 48, h, Blocks.QUARTZ_BLOCK); p.set(a, 54, h, Blocks.QUARTZ_BLOCK) }
-            else if (a != sa + 8) { p.set(a, 48, 12, Blocks.GLASS_PANE); p.set(a, 54, 12, Blocks.GLASS_PANE) }
-            if ((a - sa) % 4 == 2) { p.set(a, 48, 15, Blocks.SEA_LANTERN); p.set(a, 54, 15, Blocks.SEA_LANTERN) }
+            for (d in intArrayOf(mr - 3, mr - 2, mr + 2, mr + 3)) p.set(a, d, 11, Blocks.STATION_PLATFORM)
+            for (d in mr - 3..mr + 3) p.set(a, d, 15, Blocks.GLASS)
+            if ((a - sa) % 4 == 0) for (h in 12..14) { p.set(a, mr - 3, h, Blocks.QUARTZ_BLOCK); p.set(a, mr + 3, h, Blocks.QUARTZ_BLOCK) }
+            else if (a != sa + 8) { p.set(a, mr - 3, 12, Blocks.GLASS_PANE); p.set(a, mr + 3, 12, Blocks.GLASS_PANE) }
+            if ((a - sa) % 4 == 2) { p.set(a, mr - 3, 15, Blocks.SEA_LANTERN); p.set(a, mr + 3, 15, Blocks.SEA_LANTERN) }
         }
-        p.set(sa, 50, 11, Blocks.STOP_RAIL, p.railAcross); p.set(sa, 52, 11, Blocks.STOP_RAIL, p.railAcross)
-        sign(sa, 48, 12, name); sign(sa, 54, 12, name, p.away)
+        p.set(sa, mr - 1, 11, Blocks.STOP_RAIL, p.railAcross); p.set(sa, mr + 1, 11, Blocks.STOP_RAIL, p.railAcross)
+        sign(sa, mr - 3, 12, name); sign(sa, mr + 3, 12, name, p.away)
         // Billboards under the roof, facing the tracks: riders see the station's name as the train pulls in.
-        p.billboard(sa - 3, 48, 13, 7, 2, p.away, true, name)
-        p.billboard(sa - 3, 54, 13, 7, 2, p.toward, true, name)
-        p.set(sa - 3, 49, 12, Blocks.SOFA, p.away); p.set(sa + 3, 53, 12, Blocks.SOFA, p.toward)
+        p.billboard(sa - 3, mr - 3, 13, 7, 2, p.away, true, name)
+        p.billboard(sa - 3, mr + 3, 13, 7, 2, p.toward, true, name)
+        p.set(sa - 3, mr - 2, 12, Blocks.SOFA, p.away); p.set(sa + 3, mr + 2, 12, Blocks.SOFA, p.toward)
         // Elevators up from the pavement on both sides, straight onto the platforms.
-        for (d in intArrayOf(47, 55)) { p.set(sa + 8, d, -1, Blocks.ELEVATOR); p.set(sa + 8, d, 11, Blocks.ELEVATOR); for (h in 0..1) p.set(sa + 8, d, h, Blocks.AIR) }
+        for (d in intArrayOf(mr - 4, mr + 4)) { p.set(sa + 8, d, -1, Blocks.ELEVATOR); p.set(sa + 8, d, 11, Blocks.ELEVATOR); for (h in 0..1) p.set(sa + 8, d, h, Blocks.AIR) }
     }
     // One metro on each track (west station on the near track, east station on the far one), running end to end.
-    for ((d, sa, dir) in listOf(Triple(50, -36, 1), Triple(52, 36, -1))) {
+    val west = roads[0] + 12; val east = roads[n - 1] + 12
+    for ((d, sa, dir) in listOf(Triple(mr - 1, west, 1), Triple(mr + 1, east, -1))) {
         val metro = Cart(p.x(sa + 5 * dir, d) + 0.5f, (p.oy + 11).toFloat(), p.z(sa + 5 * dir, d) + 0.5f, Cart.METRO)
         metro.hx = p.rx.toFloat() * dir; metro.hz = p.rz.toFloat() * dir; metro.yaw = kotlin.math.atan2(metro.hx, -metro.hz)
         carts.list.add(metro)
         carts.list.add(Cart(p.x(sa + 2 * dir, d) + 0.5f, (p.oy + 11).toFloat(), p.z(sa + 2 * dir, d) + 0.5f, Cart.COACH).also { it.leader = metro; it.hx = metro.hx; it.hz = metro.hz; it.yaw = metro.yaw })
     }
     // A bullet train shares the near track with the metro (trains on one track keep their distance).
-    val bullet = Cart(p.x(16, 50) + 0.5f, (p.oy + 11).toFloat(), p.z(16, 50) + 0.5f, Cart.BULLET)
+    val bullet = Cart(p.x(16, mr - 1) + 0.5f, (p.oy + 11).toFloat(), p.z(16, mr - 1) + 0.5f, Cart.BULLET)
     bullet.hx = p.rx.toFloat(); bullet.hz = p.rz.toFloat(); bullet.yaw = kotlin.math.atan2(bullet.hx, -bullet.hz)
     carts.list.add(bullet)
     var lastCar = bullet
     for (a in intArrayOf(12, 9)) {
-        val c = Cart(p.x(a, 50) + 0.5f, (p.oy + 11).toFloat(), p.z(a, 50) + 0.5f, Cart.COACH).also { it.leader = lastCar; it.hx = bullet.hx; it.hz = bullet.hz; it.yaw = bullet.yaw }
+        val c = Cart(p.x(a, mr - 1) + 0.5f, (p.oy + 11).toFloat(), p.z(a, mr - 1) + 0.5f, Cart.COACH).also { it.leader = lastCar; it.hx = bullet.hx; it.hz = bullet.hz; it.yaw = bullet.yaw }
         carts.list.add(c); lastCar = c
     }
 
     // ---- The railway station behind the city, with a train.
-    for (a in -52..52) {
-        for (d in 104..110) p.set(a, d, -1, Blocks.RAILWAY_BALLAST)
-        p.set(a, 107, 0, if (a == 0) Blocks.STOP_RAIL else Blocks.RAIL, p.railAcross)
-        if (a !in -10..10) p.set(a, 103, 0, Blocks.IRON_BARS)
+    val rb = far + 3                                    // the railway's first row (104 in the smart city)
+    for (a in -half - 4..half + 4) {
+        for (d in rb..rb + 6) p.set(a, d, -1, Blocks.RAILWAY_BALLAST)
+        p.set(a, rb + 3, 0, if (a == 0) Blocks.STOP_RAIL else Blocks.RAIL, p.railAcross)
+        if (a !in -10..10) p.set(a, rb - 1, 0, Blocks.IRON_BARS)
     }
     for (a in -10..10) {
-        for (d in intArrayOf(104, 105, 106, 108, 109)) { p.set(a, d, 0, Blocks.STATION_PLATFORM); p.set(a, d, 5, Blocks.GLASS) }
-        p.set(a, 107, 5, Blocks.GLASS)
-        if (a % 5 == 0) for (h in 1..4) { p.set(a, 104, h, Blocks.BRICKS); p.set(a, 109, h, Blocks.BRICKS) }
-        if (a % 5 == 2) { p.set(a, 104, 5, Blocks.SEA_LANTERN); p.set(a, 109, 5, Blocks.SEA_LANTERN) }
+        for (d in intArrayOf(rb, rb + 1, rb + 2, rb + 4, rb + 5)) { p.set(a, d, 0, Blocks.STATION_PLATFORM); p.set(a, d, 5, Blocks.GLASS) }
+        p.set(a, rb + 3, 5, Blocks.GLASS)
+        if (a % 5 == 0) for (h in 1..4) { p.set(a, rb, h, Blocks.BRICKS); p.set(a, rb + 5, h, Blocks.BRICKS) }
+        if (a % 5 == 2) { p.set(a, rb, 5, Blocks.SEA_LANTERN); p.set(a, rb + 5, 5, Blocks.SEA_LANTERN) }
     }
-    sign(2, 105, 1, "DV Central Railway Station")
-    p.billboard(-4, 104, 3, 9, 2, p.away, true, "DV Central")
-    p.set(-4, 105, 1, Blocks.SOFA, p.away); p.set(4, 105, 1, Blocks.SOFA, p.away)
-    val engine = Cart(p.x(4, 107) + 0.5f, p.oy.toFloat(), p.z(4, 107) + 0.5f, Cart.ENGINE)
+    sign(2, rb + 1, 1, "$railName Railway Station")
+    p.billboard(-4, rb, 3, 9, 2, p.away, true, railName)
+    p.set(-4, rb + 1, 1, Blocks.SOFA, p.away); p.set(4, rb + 1, 1, Blocks.SOFA, p.away)
+    val engine = Cart(p.x(4, rb + 3) + 0.5f, p.oy.toFloat(), p.z(4, rb + 3) + 0.5f, Cart.ENGINE)
     engine.hx = p.rx.toFloat(); engine.hz = p.rz.toFloat(); engine.yaw = kotlin.math.atan2(engine.hx, -engine.hz)
     carts.list.add(engine)
     var lead = engine
     for (k in 1..3) {
-        val c = Cart(p.x(4 - 3 * k, 107) + 0.5f, p.oy.toFloat(), p.z(4 - 3 * k, 107) + 0.5f, Cart.COACH).also { it.leader = lead; it.hx = engine.hx; it.hz = engine.hz; it.yaw = engine.yaw }
+        val c = Cart(p.x(4 - 3 * k, rb + 3) + 0.5f, p.oy.toFloat(), p.z(4 - 3 * k, rb + 3) + 0.5f, Cart.COACH).also { it.leader = lead; it.hx = engine.hx; it.hz = engine.hz; it.yaw = engine.yaw }
         carts.list.add(c); lead = c
     }
 
@@ -749,16 +796,47 @@ private fun Game.smartCity(p: Plan) {
         vehicles.list.add(v)
     }
     val car = Vehicle.CAR; val bus = Vehicle.BUS
-    vehicle(-1, 15, 0, 1, car, 14); vehicle(1, 40, 0, -1, car, 11); vehicle(-25, 63, 0, 1, car, 0); vehicle(23, 87, 0, 1, car, 15)
-    vehicle(-12, 28, 1, 0, car, 4); vehicle(12, 26, -1, 0, car, 5); vehicle(36, 76, 1, 0, car, 1); vehicle(-36, 98, -1, 0, car, 8)
-    vehicle(49, 30, 0, -1, car, 10); vehicle(-49, 70, 0, 1, car, 3)
-    vehicle(-1, 63, 0, 1, bus, 0); vehicle(-30, 52, 1, 0, bus, 0); vehicle(8, 2, -1, 0, bus, 0)
-    // Parked: the police cars, an ambulance and cars at the EV chargers.
-    vehicle(-16, 21, 0, 1, car, 11); vehicle(-8, 21, 0, 1, car, 0)
-    vehicle(42, 7, 1, 0, car, 0)
-    vehicle(32, 59, 0, 1, car, 13); vehicle(38, 59, 0, 1, car, 6)
-    uiEvents.add("toast:Welcome to the smart city! Tap a car or bus to drive it; take the elevators up to the metro")
+    if (n == 4) {
+        vehicle(-1, 15, 0, 1, car, 14); vehicle(1, 40, 0, -1, car, 11); vehicle(-25, 63, 0, 1, car, 0); vehicle(23, 87, 0, 1, car, 15)
+        vehicle(-12, 28, 1, 0, car, 4); vehicle(12, 26, -1, 0, car, 5); vehicle(36, 76, 1, 0, car, 1); vehicle(-36, 98, -1, 0, car, 8)
+        vehicle(49, 30, 0, -1, car, 10); vehicle(-49, 70, 0, 1, car, 3)
+        vehicle(-1, 63, 0, 1, bus, 0); vehicle(-30, 52, 1, 0, bus, 0); vehicle(8, 2, -1, 0, bus, 0)
+        // Parked: the police cars, an ambulance and cars at the EV chargers.
+        vehicle(-16, 21, 0, 1, car, 11); vehicle(-8, 21, 0, 1, car, 0)
+        vehicle(42, 7, 1, 0, car, 0)
+        vehicle(32, 59, 0, 1, car, 13); vehicle(38, 59, 0, 1, car, 6)
+    } else {
+        // Traffic in the middle of every other stretch of road, both ways, and buses on the main avenue.
+        var color = 0
+        for (i in 0..n) for (j in 0 until n) if ((i + j) % 2 == 0) {
+            val dMid = rows[j] + 12
+            if ((i + j) % 4 == 0) vehicle(roads[i] - 1, dMid, 0, 1, car, color++ % 16) else vehicle(roads[i] + 1, dMid, 0, -1, car, color++ % 16)
+        }
+        for (j in 0 until n) if (j % 2 == 1) vehicle(roads[j] + 12, rows[j] + 1, 1, 0, car, color++ % 16)
+        for (j in 0 until n step 2) vehicle(-1, rows[j] + 8, 0, 1, bus, 0)
+        vehicle(roads[1] + 6, mr + 1, 1, 0, bus, 0)
+    }
+    // ---- People walking on the pavements and in the parks.
+    val rnd = java.util.Random(p.ox * 31L + p.oz)
+    val folk = listOf(MobType.CITIZEN, MobType.CITIZEN_WOMAN, MobType.CITIZEN_KID)
+    repeat(n * n * 2) {
+        val i = rnd.nextInt(n); val j = rnd.nextInt(n)
+        val a0 = roads[i] + 3; val d0 = rows[j] + 3
+        // On the pavement ring round a city block.
+        val k = rnd.nextInt(19)
+        val (a, d) = when (rnd.nextInt(4)) { 0 -> a0 + k to d0; 1 -> a0 + k to d0 + 18; 2 -> a0 to d0 + k; else -> a0 + 18 to d0 + k }
+        mobs.list.add(Mob(folk[rnd.nextInt(folk.size)], p.x(a, d) + 0.5f, p.oy.toFloat() + 0.5f, p.z(a, d) + 0.5f).also { it.yaw = rnd.nextFloat() * 6.28f })
+    }
+    // Its metro line joins any other metro station or city by itself.
+    val group = metroNet.newGroup()
+    val line = joinMetro(listOf(
+        TrackEnd(p.x(-half - 2, mr - 1), p.oy + 11, p.z(-half - 2, mr - 1), -p.rx, -p.rz, group),
+        TrackEnd(p.x(half + 2, mr - 1), p.oy + 11, p.z(half + 2, mr - 1), p.rx, p.rz, group),
+    ))
+    uiEvents.add("toast:Welcome to $title! Tap a car or bus to drive it; take the elevators up to the metro" +
+        if (line > 0) "\nIts metro line now joins the nearest station ($line blocks of new track)" else "")
 }
+
 
 /** A name for a new metro station, picked from its position (tap its sign or billboard to change it). */
 private fun stationName(x: Int, z: Int): String {

@@ -72,7 +72,13 @@ enum class MobType(
     PANDA("Panda", 0.6f, 1.25f, 20, false, 1.1f),
     POLAR_BEAR("Polar Bear", 0.65f, 1.4f, 30, false, 2.3f),
     LLAMA("Llama", 0.45f, 1.87f, 22, false, 1.8f),
-    MOOSHROOM("Mooshroom", 0.45f, 1.4f, 10, false, 1.3f);
+    MOOSHROOM("Mooshroom", 0.45f, 1.4f, 10, false, 1.3f),
+    // ---- City people (appended): walk the pavements and parks of the cities, and say hello when tapped.
+    CITIZEN("Man", 0.3f, 1.85f, 20, false, 1.1f),
+    CITIZEN_WOMAN("Woman", 0.3f, 1.75f, 20, false, 1.1f),
+    CITIZEN_KID("Child", 0.25f, 1.25f, 14, false, 1.4f);
+
+    val isCitizen get() = this == CITIZEN || this == CITIZEN_WOMAN || this == CITIZEN_KID
 
     val swims get() = this == SQUID || this == COD || this == AXOLOTL
     /** Fly without gravity. */
@@ -723,6 +729,16 @@ class Mobs(private val world: World) {
             m.wanderYaw = rnd.nextFloat() * 6.2832f
         }
         if (!m.wandering) return 0f to 0f
+        if (m.type.isCitizen) {
+            // People keep off the road (except at zebra crossings): turn round at the kerb.
+            val ax = floorInt(m.x + sin(m.wanderYaw) * 0.9f); val az = floorInt(m.z - cos(m.wanderYaw) * 0.9f)
+            val under = world.getBlock(ax, floorInt(m.y) - 1, az)
+            if (under == Blocks.ROAD || under == Blocks.ROAD_MARKING) {
+                m.wanderYaw += 3.1416f + (rnd.nextFloat() - 0.5f)
+                m.yaw = m.wanderYaw
+                return 0f to 0f
+            }
+        }
         m.yaw = turn(m.yaw, m.wanderYaw, dt * 3f)
         return sin(m.yaw) to -cos(m.yaw)
     }
@@ -866,7 +882,7 @@ class Mobs(private val world: World) {
 
     private fun trySpawn(game: Game) {
         val p = game.player
-        val passive = list.count { !it.type.hostile && it.type != MobType.VILLAGER && it.type != MobType.BAT && it.type != MobType.IRON_GOLEM && !it.tamed }
+        val passive = list.count { !it.type.hostile && it.type != MobType.VILLAGER && it.type != MobType.BAT && it.type != MobType.IRON_GOLEM && !it.type.isCitizen && !it.tamed }
         val hostile = list.count { it.type.hostile }
 
         // Villagers waiting from world generation.

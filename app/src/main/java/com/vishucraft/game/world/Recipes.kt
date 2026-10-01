@@ -394,6 +394,8 @@ object Recipes {
         sh(i("Helicopter"), 1, listOf("III", " G ", "IRI"), 'I' to iron, 'G' to glass, 'R' to Blocks.REDSTONE_BLOCK)
         // ---- Smart city
         r(i("Blueprint: Smart City"), 1, true, paper to 1, Blocks.SMOOTH_STONE to 64, Blocks.IRON_BLOCK to 8, glass to 32)
+        r(i("Blueprint: Big City"), 1, true, i("Blueprint: Smart City") to 1, Blocks.IRON_BLOCK to 16, glass to 64)
+        r(i("Blueprint: Mega City"), 1, true, i("Blueprint: Big City") to 1, Blocks.GOLD_BLOCK to 8, Blocks.DIAMOND_BLOCK to 2)
         sh(i("Car"), 1, listOf(" G ", "III", "C C"), 'I' to iron, 'G' to glass, 'C' to Blocks.COAL_BLOCK)
         sh(i("Bullet Train"), 1, listOf("GGG", "IMI", "DRD"), 'G' to glass, 'I' to Blocks.IRON_BLOCK, 'M' to i("Metro Train"), 'D' to i("Diamond"), 'R' to Blocks.REDSTONE_BLOCK)
         sh(Blocks.BILLBOARD, 4, listOf("III", "IGI", "III"), 'I' to iron, 'G' to Blocks.GLOWSTONE)

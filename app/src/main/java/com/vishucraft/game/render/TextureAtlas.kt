@@ -963,6 +963,41 @@ object TextureAtlas {
             "villager_tunic" -> { noisy(t, rgb(70, 130, 70), 0.06f, 0.15f); for (x in 0 until 16) t[x, 12] = rgb(110, 80, 40) }
             "villager_pants" -> noisy(t, rgb(100, 80, 60), 0.06f, 0.15f)
             "explorer_hair" -> noisy(t, rgb(96, 64, 38), 0.08f, 0.2f)
+            // ---- City people
+            "citizen_hair" -> noisy(t, rgb(30, 24, 22), 0.08f, 0.2f)
+            "woman_hair" -> noisy(t, rgb(24, 18, 16), 0.08f, 0.2f)
+            "citizen_face", "woman_face", "kid_face" -> {
+                val hair = if (name == "woman_face") rgb(24, 18, 16) else rgb(30, 24, 22)
+                t.fill { _, y -> if (y < (if (name == "kid_face") 3 else 4)) scale(hair, t.jitter(0.08f)) else scale(rgb(196, 146, 104), t.jitter(0.03f)) }
+                if (name == "woman_face") { for (y in 4..9) { t[0, y] = hair; t[1, y] = hair; t[14, y] = hair; t[15, y] = hair }; t[7, 5] = rgb(200, 30, 40); t[8, 5] = rgb(200, 30, 40) }
+                t[4, 7] = rgb(250, 250, 250); t[5, 7] = rgb(40, 28, 20); t[10, 7] = rgb(40, 28, 20); t[11, 7] = rgb(250, 250, 250)
+                if (name == "citizen_face") for (x in 5..10) t[x, 10] = rgb(40, 30, 26)   // moustache
+                for (x in 6..9) t[x, 12] = rgb(160, 80, 70)
+            }
+            "citizen_shirt" -> noisy(t, rgb(70, 130, 200), 0.04f, 0.1f)
+            "citizen_shirt_front" -> {
+                noisy(t, rgb(70, 130, 200), 0.04f, 0.1f)
+                for (x in 5..10) t[x, 0] = rgb(196, 146, 104)
+                for (y in 1..15) t[8, y] = rgb(50, 100, 170)
+                for (y in 3..13 step 3) t[7, y] = rgb(240, 240, 240)
+            }
+            "citizen_jeans" -> { noisy(t, rgb(40, 56, 96), 0.05f, 0.12f); for (x in 0 until 16) { t[x, 14] = rgb(50, 40, 34); t[x, 15] = rgb(40, 32, 28) } }
+            "kurta" -> { noisy(t, rgb(220, 70, 120), 0.04f, 0.1f); for (y in 0 until 16) if (y % 5 == 2) for (x in 0 until 16) if ((x + y) % 4 == 0) t[x, y] = rgb(250, 210, 80) }
+            "kurta_front" -> {
+                noisy(t, rgb(220, 70, 120), 0.04f, 0.1f)
+                for (x in 4..11) t[x, 0] = rgb(196, 146, 104)
+                for (x in 0 until 16) { t[x, 2] = rgb(250, 210, 80); t[x, 3] = rgb(250, 210, 80) }       // dupatta
+                for (y in 6..15) for (x in 6..9) if ((x + y) % 3 == 0) t[x, y] = rgb(250, 210, 80)
+            }
+            "kurta_pants" -> { noisy(t, rgb(240, 236, 226), 0.03f, 0.08f); for (x in 0 until 16) { t[x, 15] = rgb(150, 90, 50) } }
+            "kid_shirt" -> noisy(t, rgb(236, 236, 240), 0.02f, 0.06f)
+            "kid_shirt_front" -> {
+                noisy(t, rgb(236, 236, 240), 0.02f, 0.06f)
+                for (y in 1..9) t[8, y] = rgb(40, 70, 160)   // school tie
+                t[7, 1] = rgb(40, 70, 160); t[9, 1] = rgb(40, 70, 160)
+            }
+            "kid_shorts" -> { noisy(t, rgb(40, 70, 160), 0.04f, 0.1f); for (x in 0 until 16) for (y in 9..15) t[x, y] = rgb(196, 146, 104) }
+            "school_bag" -> { noisy(t, rgb(200, 60, 40), 0.05f, 0.1f); for (x in 2..13) t[x, 4] = rgb(240, 200, 60) }
             "explorer_face" -> {
                 t.fill { _, y -> if (y < 4) scale(rgb(96, 64, 38), t.jitter(0.08f)) else scale(rgb(214, 170, 132), t.jitter(0.03f)) }
                 t[2, 4] = rgb(96, 64, 38); t[13, 4] = rgb(96, 64, 38); t[2, 5] = rgb(96, 64, 38); t[13, 5] = rgb(96, 64, 38)
@@ -1350,6 +1385,8 @@ object TextureAtlas {
 
     /** Colours for spawn eggs: base and spots. */
     private val EGG_COLORS = mapOf(
+        "citizen" to (rgb(70, 130, 200) to rgb(196, 146, 104)), "citizen_woman" to (rgb(220, 70, 120) to rgb(250, 210, 80)),
+        "citizen_kid" to (rgb(236, 236, 240) to rgb(40, 70, 160)),
         "cow" to (rgb(68, 50, 38) to rgb(160, 160, 160)), "pig" to (rgb(238, 166, 166) to rgb(200, 110, 110)),
         "sheep" to (rgb(230, 230, 230) to rgb(250, 180, 180)), "zombie" to (rgb(0, 170, 170) to rgb(110, 140, 90)),
         "boomling" to (rgb(62, 60, 66) to rgb(240, 124, 34)), "rattler" to (rgb(92, 70, 46) to rgb(80, 140, 60)),

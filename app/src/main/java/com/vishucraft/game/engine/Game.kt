@@ -72,6 +72,8 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
     val lift = Lift()
     /** Cars and buses (see Vehicles.kt). */
     val vehicles = Vehicles(world)
+    /** Metro track ends that new stations join up to (see MetroNetwork.kt). */
+    val metroNet = MetroNetwork()
     val dimension get() = world.dimension
     private var portalTime = 0f
     private var bowCooldown = 0f
@@ -1224,6 +1226,14 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
         val weapon = item?.tool == ToolType.SWORD || item?.tool == ToolType.AXE
         if (name == "Name Tag") { uiEvents.add("name:${mob.uid}"); return true }
         if (mob.type == MobType.VILLAGER && !weapon) { uiEvents.add("trade:${mob.uid}"); return true }
+        if (mob.type.isCitizen && !weapon) {
+            val hello = if (mob.type == MobType.CITIZEN_KID) listOf("Hi! I'm going to school!", "Do you want to play cricket?", "I love the metro!", "My school bag is so heavy!")
+                else listOf("Namaste!", "Hello! Lovely day in the city.", "The metro is the fastest way to get around!", "Have you seen the new bullet train?",
+                    "I'm going to the market.", "Take the bus from the bus stop!", "The park is lovely in the evening.", "Welcome to our city!")
+            uiEvents.add("toast:" + (mob.customName?.let { "$it: " } ?: "") + hello[(mob.uid + (timeOfDay * 100).toInt()) % hello.size])
+            mob.yaw = kotlin.math.atan2(player.x - mob.x, -(player.z - mob.z))
+            return true
+        }
         if (name == "Lead" && !mob.type.hostile) {
             mob.leashed = !mob.leashed
             uiEvents.add("toast:" + if (mob.leashed) "The ${mob.type.displayName.lowercase()} follows you on the lead" else "Let go of the lead")
@@ -1617,7 +1627,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
         sound("door", x + 0.5f, y + 0.5f, z + 0.5f)
     }
 
-    private fun updateRail(x: Int, y: Int, z: Int) {
+    internal fun updateRail(x: Int, y: Int, z: Int) {
         val id = world.getBlock(x, y, z)
         if (!com.vishucraft.game.world.Rails.isRail(id)) return
         val m = world.getMeta(x, y, z)
@@ -1764,7 +1774,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
         try {
             dir.mkdirs()
             val tmp = File(dir, "entities.dat.tmp")
-            java.io.DataOutputStream(tmp.outputStream().buffered()).use { d -> mobs.write(d); carts.write(d); boats.write(d); carts.writeExtra(d); aircraft.write(d); vehicles.write(d) }
+            java.io.DataOutputStream(tmp.outputStream().buffered()).use { d -> mobs.write(d); carts.write(d); boats.write(d); carts.writeExtra(d); aircraft.write(d); vehicles.write(d); metroNet.write(d) }
             tmp.renameTo(File(dir, "entities.dat"))
         } catch (_: Exception) {}
     }
@@ -1772,6 +1782,6 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
     private fun loadEntities() {
         val f = File(world.dataDir ?: return, "entities.dat")
         if (!f.exists()) return
-        try { java.io.DataInputStream(f.inputStream().buffered()).use { d -> mobs.read(d); carts.read(d); boats.read(d); carts.readExtra(d); aircraft.read(d); vehicles.read(d) } } catch (_: Exception) {}
+        try { java.io.DataInputStream(f.inputStream().buffered()).use { d -> mobs.read(d); carts.read(d); boats.read(d); carts.readExtra(d); aircraft.read(d); vehicles.read(d); metroNet.read(d) } } catch (_: Exception) {}
     }
 }

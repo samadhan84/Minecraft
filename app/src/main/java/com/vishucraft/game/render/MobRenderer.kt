@@ -285,6 +285,33 @@ object MobModels {
             box(-0.2f, 1.35f, -0.2f, 0.0f, 1.55f, 0.0f, tiles("red_mushroom_block")),
             box(0.1f, 1.35f, 0.2f, 0.3f, 1.55f, 0.4f, tiles("red_mushroom_block")),
         ) + legs(0.25f, 0.45f, 0.22f, 0.6f, "mooshroom_leg"),
+        // City people: a man in a shirt and jeans, a woman in a kurta, and a child in a school uniform.
+        MobType.CITIZEN to listOf(
+            box(-0.25f, 0f, -0.125f, 0f, 0.8f, 0.125f, tiles("citizen_jeans"), 1),
+            box(0f, 0f, -0.125f, 0.25f, 0.8f, 0.125f, tiles("citizen_jeans"), -1),
+            box(-0.26f, 0.8f, -0.14f, 0.26f, 1.4f, 0.14f, tiles("citizen_shirt", front = "citizen_shirt_front")),
+            box(-0.24f, 1.4f, -0.24f, 0.24f, 1.85f, 0.24f, tiles("citizen_hair", front = "citizen_face")),
+            box(-0.44f, 0.82f, -0.1f, -0.26f, 1.4f, 0.1f, tiles("citizen_shirt"), -1, pivotY = 1.36f),
+            box(0.26f, 0.82f, -0.1f, 0.44f, 1.4f, 0.1f, tiles("citizen_shirt"), 1, pivotY = 1.36f),
+        ),
+        MobType.CITIZEN_WOMAN to listOf(
+            box(-0.22f, 0f, -0.12f, 0f, 0.72f, 0.12f, tiles("kurta_pants"), 1),
+            box(0f, 0f, -0.12f, 0.22f, 0.72f, 0.12f, tiles("kurta_pants"), -1),
+            box(-0.27f, 0.45f, -0.15f, 0.27f, 1.32f, 0.15f, tiles("kurta", front = "kurta_front")),
+            box(-0.23f, 1.32f, -0.23f, 0.23f, 1.75f, 0.23f, tiles("woman_hair", front = "woman_face")),
+            box(-0.12f, 1.0f, 0.2f, 0.12f, 1.5f, 0.32f, tiles("woman_hair")),      // plait
+            box(-0.42f, 0.78f, -0.09f, -0.27f, 1.3f, 0.09f, tiles("kurta"), -1, pivotY = 1.26f),
+            box(0.27f, 0.78f, -0.09f, 0.42f, 1.3f, 0.09f, tiles("kurta"), 1, pivotY = 1.26f),
+        ),
+        MobType.CITIZEN_KID to listOf(
+            box(-0.17f, 0f, -0.1f, 0f, 0.5f, 0.1f, tiles("kid_shorts"), 1),
+            box(0f, 0f, -0.1f, 0.17f, 0.5f, 0.1f, tiles("kid_shorts"), -1),
+            box(-0.19f, 0.5f, -0.11f, 0.19f, 0.92f, 0.11f, tiles("kid_shirt", front = "kid_shirt_front")),
+            box(-0.2f, 0.92f, -0.2f, 0.2f, 1.25f, 0.2f, tiles("citizen_hair", front = "kid_face")),
+            box(-0.3f, 0.52f, -0.07f, -0.19f, 0.92f, 0.07f, tiles("kid_shirt"), -1, pivotY = 0.9f),
+            box(0.19f, 0.52f, -0.07f, 0.3f, 0.92f, 0.07f, tiles("kid_shirt"), 1, pivotY = 0.9f),
+            box(-0.17f, 0.55f, 0.11f, 0.17f, 0.9f, 0.22f, tiles("school_bag")),
+        ),
     )
 }
 
