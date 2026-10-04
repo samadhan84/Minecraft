@@ -641,14 +641,6 @@ class App(demo: File?) : ClientApp(demo) {
                 g.player.x = m.x + 1.2f; g.player.z = m.z + 4.5f; g.player.y = m.y + 0.2f; g.player.yaw = 0f; g.player.pitch = -0.12f
             }
             f == 1345 -> shot("04x-city-people")
-            f == 1346 -> session?.game?.let { g ->
-                // The mega city's supertall towers, looking up from the edge of town.
-                val (e0, e1) = g.metroNet.ends.takeLast(2)
-                val cx = (e0.x + e1.x) / 2f; val cz = e0.z + 98f
-                g.player.x = cx + 0.5f; g.player.z = cz + 12.5f; g.player.y = e0.y + 40f; g.player.flying = true
-                g.player.yaw = 0f; g.player.pitch = 0.78f
-            }
-            f == 1360 -> shot("04y-supertall-towers")
             f == 1361 -> overlay = Overlay.PAUSE
             f == 1363 -> shot("05-pause")
             f == 1367 -> { overlay = Overlay.NONE; leaveWorld(); menu = Menu.CREATE; nameField.text = "Demo survival"; seedField.text = "777"; survival = true }

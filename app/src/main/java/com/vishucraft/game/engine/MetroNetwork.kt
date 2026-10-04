@@ -99,7 +99,7 @@ class MetroLine(val pts: IntArray, val ya: Int, val yb: Int, val ends: IntArray)
 class MetroNetwork {
     val ends = ArrayList<TrackEnd>()
     val lines = ArrayList<MetroLine>()
-    /** City metro lines (by group) that already have the latest buildings. */
+    /** City metro lines (by group) whose cities were given 66- to 100-floor towers, to be put back to 12 floors. */
     val upgraded = HashSet<Int>()
     private var nextGroup = 1
 
