@@ -99,16 +99,19 @@ class ChunkMesher {
     private val opaque = Blocks.opaque
     private val blocksLight = Blocks.blocksLight
 
+    /** Height of the tallest chunk in the 3x3 area being meshed: everything from here up is open sky. */
+    private var top = H
+
     private fun pidx(px: Int, y: Int, pz: Int) = (y * P + pz) * P + px
 
     private fun block(px: Int, y: Int, pz: Int): Int {
         if (y < 0) return Blocks.BEDROCK
-        if (y >= H) return Blocks.AIR
+        if (y >= top) return Blocks.AIR
         return pad[pidx(px, y, pz)].toInt() and 0xFFFF
     }
 
     private fun sky(px: Int, y: Int, pz: Int): Float {
-        if (y >= H) return 1f
+        if (y >= top) return 1f
         if (y < 0) return 0f
         return if (y > topY[pz * P + px]) 1f else 0f
     }
@@ -118,6 +121,9 @@ class ChunkMesher {
         for (dz in -1..1) for (dx in -1..1) {
             grid[(dz + 1) * 3 + dx + 1] = world.getChunk(chunk.cx + dx, chunk.cz + dz) ?: return false
         }
+        top = 0
+        for (c in grid) top = maxOf(top, c!!.height)
+        top = top.coerceAtMost(H)
         for (pz in 0 until P) {
             val lzRaw = pz - 1
             val gz = if (lzRaw < 0) 0 else if (lzRaw >= Chunk.SIZE) 2 else 1
@@ -129,16 +135,18 @@ class ChunkMesher {
                 val srcChunk = grid[gz * 3 + gx]!!
                 val src = srcChunk.blocks
                 val srcMeta = srcChunk.meta
-                var top = -1
-                for (y in 0 until H) {
+                val n = minOf(src.size, srcMeta.size)
+                var high = -1
+                for (y in 0 until top) {
                     val si = Chunk.index(lx, y, lz)
-                    val b = src[si]
                     val pi = pidx(px, y, pz)
+                    if (si >= n) { pad[pi] = 0; padMeta[pi] = 0; continue }
+                    val b = src[si]
                     pad[pi] = b
                     padMeta[pi] = srcMeta[si]
-                    if (blocksLight[b.toInt() and 0xFFFF]) top = y
+                    if (blocksLight[b.toInt() and 0xFFFF]) high = y
                 }
-                topY[pz * P + px] = top
+                topY[pz * P + px] = high
             }
         }
         return true
@@ -147,11 +155,11 @@ class ChunkMesher {
     private fun lidx(lx: Int, y: Int, lz: Int) = (y * LW + lz) * LW + lx
 
     private fun blockAtL(lx: Int, y: Int, lz: Int): Int =
-        grid[(lz shr 4) * 3 + (lx shr 4)]!!.blocks[Chunk.index(lx and 15, y, lz and 15)].toInt() and 0xFFFF
+        grid[(lz shr 4) * 3 + (lx shr 4)]!!.get(lx and 15, y, lz and 15)
 
     /** Flood-fills block light from every emitter in the 3x3 chunk area (light travels at most 14 blocks). */
     private fun computeLight() {
-        light.fill(0)
+        light.fill(0, 0, LW * LW * top)
         var qn = 0
         fun push(i: Int) {
             if (qn == lightQueue.size) lightQueue = lightQueue.copyOf(qn * 2)
@@ -161,10 +169,11 @@ class ChunkMesher {
             val c = grid[g]!!
             val ox = (g % 3) * 16; val oz = (g / 3) * 16
             val b = c.blocks
-            for (i in b.indices) {
+            val m = c.meta
+            for (i in 0 until minOf(b.size, m.size, Chunk.SIZE * Chunk.SIZE * top)) {
                 val id = b[i].toInt() and 0xFFFF
                 if (id == 0) continue
-                val level = Blocks.lightLevel(id, c.meta[i].toInt() and 0xFF)
+                val level = Blocks.lightLevel(id, m[i].toInt() and 0xFF)
                 if (level <= 0) continue
                 val li = lidx(ox + (i and 15), i shr 8, oz + ((i shr 4) and 15))
                 if (level > light[li]) { light[li] = level.toByte(); push(li) }
@@ -179,7 +188,7 @@ class ChunkMesher {
             for (f in 0 until 6) {
                 val n = NORMALS[f]
                 val nx = lx + n[0]; val ny = y + n[1]; val nz = lz + n[2]
-                if (nx < 0 || nz < 0 || nx >= LW || nz >= LW || ny < 0 || ny >= H) continue
+                if (nx < 0 || nz < 0 || nx >= LW || nz >= LW || ny < 0 || ny >= top) continue
                 val ni = lidx(nx, ny, nz)
                 if (light[ni] >= l) continue
                 if (opaque[blockAtL(nx, ny, nz)]) continue
@@ -191,7 +200,7 @@ class ChunkMesher {
 
     /** Block light (0..15) at a padded coordinate. */
     private fun blockLight(px: Int, y: Int, pz: Int): Int {
-        if (y < 0 || y >= H) return 0
+        if (y < 0 || y >= top) return 0
         return light[lidx(px + 15, y, pz + 15)].toInt()
     }
 
@@ -206,7 +215,7 @@ class ChunkMesher {
         opaqueOut.size = 0
         transOut.size = 0
 
-        for (y in 0 until H) for (z in 0 until Chunk.SIZE) for (x in 0 until Chunk.SIZE) {
+        for (y in 0 until top) for (z in 0 until Chunk.SIZE) for (x in 0 until Chunk.SIZE) {
             val px = x + 1; val pz = z + 1
             val pi = pidx(px, y, pz)
             val id = pad[pi].toInt() and 0xFFFF

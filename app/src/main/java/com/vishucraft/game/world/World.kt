@@ -21,6 +21,8 @@ class World(val seed: Long, private val saveDir: File?, val dimension: Dimension
     val pendingVillagers = java.util.concurrent.ConcurrentLinkedQueue<Triple<Int, Int, Int>>()
 
     val chunks = ConcurrentHashMap<Long, Chunk>()
+    /** Keys of chunks that have just been loaded or generated, for the game to look at (long metro lines). */
+    val arrived = java.util.concurrent.ConcurrentLinkedQueue<Long>()
     /** Positions (see [RedstoneIds.pack]) of every redstone component in loaded chunks. */
     val components: MutableSet<Long> = java.util.Collections.newSetFromMap(ConcurrentHashMap())
     val generator: WorldGenerator = when (dimension) {
@@ -56,6 +58,9 @@ class World(val seed: Long, private val saveDir: File?, val dimension: Dimension
 
     fun isLoaded(x: Int, z: Int) = getChunk(x shr 4, z shr 4) != null
 
+    /** Everything at this height and above in the column at (x, z) is air. */
+    fun columnHeight(x: Int, z: Int): Int = getChunk(x shr 4, z shr 4)?.height ?: Chunk.BASE
+
     fun setBlock(x: Int, y: Int, z: Int, id: Int, meta: Int = 0): Boolean {
         if (y < 0 || y >= Chunk.HEIGHT) return false
         val cx = x shr 4; val cz = z shr 4
@@ -84,6 +89,7 @@ class World(val seed: Long, private val saveDir: File?, val dimension: Dimension
         val key = Chunk.key(c.cx, c.cz)
         registerComponents(c)
         chunks[key] = c
+        arrived.add(key)
         pending.remove(key)
     }
 
@@ -99,6 +105,7 @@ class World(val seed: Long, private val saveDir: File?, val dimension: Dimension
                 if (loaded != null) registerComponents(chunk)
                 chunk.version = 1
                 chunks[key] = chunk
+                arrived.add(key)
             } finally {
                 pending.remove(key)
             }
@@ -124,6 +131,7 @@ class World(val seed: Long, private val saveDir: File?, val dimension: Dimension
         if (loaded != null) registerComponents(chunk)
         chunk.version = 1
         chunks[key] = chunk
+        arrived.add(key)
         return true
     }
 

@@ -74,6 +74,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
     val vehicles = Vehicles(world)
     /** Metro track ends that new stations join up to (see MetroNetwork.kt). */
     val metroNet = MetroNetwork()
+    private var cityCheck = 1f
     val dimension get() = world.dimension
     private var portalTime = 0f
     private var bowCooldown = 0f
@@ -415,7 +416,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
                 if (level.arriving) arrive()
                 else {
                     // Drop the player onto the actual generated surface.
-                    var y = Chunk.HEIGHT - 2
+                    var y = world.columnHeight(player.blockX(), player.blockZ()) - 2
                     while (y > 1 && !Blocks.solid[world.getBlock(player.blockX(), y, player.blockZ())]) y--
                     player.y = y + 1f
                 }
@@ -484,6 +485,9 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
             else { rain = maxOf(0f, rain - dt * 0.5f); raining = false; thunder = false }
         }
         projectiles.update(dt, this)
+        layMetro()
+        cityCheck -= dt
+        if (cityCheck <= 0f) { cityCheck = 2f; upgradeCities() }
         carts.update(dt, this)
         boats.update(dt, this)
         aircraft.update(dt, this)

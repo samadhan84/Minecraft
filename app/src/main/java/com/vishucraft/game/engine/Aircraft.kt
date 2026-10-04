@@ -133,7 +133,7 @@ class Aircrafts(private val world: World) {
         }
         val tx = dest.x - a.x; val tz = dest.z - a.z
         val dist = sqrt(tx * tx + tz * tz)
-        val cruiseY = (Chunk.HEIGHT - 8).toFloat()
+        val cruiseY = (Chunk.BASE - 8).toFloat()
         fun turnTowards(targetYaw: Float, rate: Float) {
             var d = targetYaw - a.yaw
             while (d > Math.PI) d -= (2 * Math.PI).toFloat()

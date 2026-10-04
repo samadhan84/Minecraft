@@ -214,7 +214,7 @@ class WorldRenderer(private val game: Game) {
         glClear(GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT)
 
         val far = game.renderDistance * 16f + 24f
-        Matrix.perspectiveM(proj, 0, if (game.zoomed) 18f else game.fov, width.toFloat() / height, 0.05f, 400f)
+        Matrix.perspectiveM(proj, 0, if (game.zoomed) 18f else game.fov, width.toFloat() / height, 0.05f, 700f)
         p.lookDir(dir)
         val bobY = sin(bobbing * 2f) * 0.04f
         val shake = game.shake * 0.25f
@@ -584,7 +584,7 @@ class WorldRenderer(private val game: Game) {
         if (cx != columnX || cz != columnZ || columnTimer <= 0f) {
             columnX = cx; columnZ = cz; columnTimer = 0.5f
             for (dz in -10..10) for (dx in -10..10) {
-                var y = Chunk.HEIGHT - 1
+                var y = game.world.columnHeight(cx + dx, cz + dz) - 1
                 while (y > 0 && !Blocks.blocksLight[game.world.getBlock(cx + dx, y, cz + dz)] && !Blocks.isLiquid(game.world.getBlock(cx + dx, y, cz + dz))) y--
                 columnTop[(dz + 10) * 21 + dx + 10] = y
             }

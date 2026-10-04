@@ -784,7 +784,7 @@ class Mobs(private val world: World) {
     }
 
     fun skyExposed(x: Int, y: Int, z: Int): Boolean {
-        for (yy in max(y, 0) until Chunk.HEIGHT) if (Blocks.blocksLight[world.getBlock(x, yy, z)]) return false
+        for (yy in max(y, 0) until world.columnHeight(x, z)) if (Blocks.blocksLight[world.getBlock(x, yy, z)]) return false
         return true
     }
 
@@ -845,7 +845,7 @@ class Mobs(private val world: World) {
     // ---------------------------------------------------------------- spawning
 
     private fun surfaceY(x: Int, z: Int): Int {
-        for (y in Chunk.HEIGHT - 2 downTo 1) {
+        for (y in world.columnHeight(x, z) - 2 downTo 1) {
             val b = world.getBlock(x, y, z)
             if (b != Blocks.AIR && Blocks[b].render != com.vishucraft.game.world.RenderType.CROSS) return y
         }

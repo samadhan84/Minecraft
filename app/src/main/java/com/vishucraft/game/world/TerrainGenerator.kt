@@ -67,7 +67,7 @@ class TerrainGenerator(private val seed: Long, private val world: World? = null)
             val n = mountainNoise.fbm2(x * 0.02 + 40.0, z * 0.02, 3)
             if (n > -0.05) h += floor((minOf(n + 0.05, 0.5) * 70 * bad) / 5) * 5
         }
-        return h.toInt().coerceIn(6, Chunk.HEIGHT - 12)
+        return h.toInt().coerceIn(6, Chunk.BASE - 12)
     }
 
     private fun temp(x: Int, z: Int) = tempNoise.fbm2(x * 0.0022, z * 0.0022, 3)
@@ -221,7 +221,7 @@ class TerrainGenerator(private val seed: Long, private val world: World? = null)
             var y = 1 + rnd.nextInt(maxY)
             var z = rnd.nextInt(Chunk.SIZE)
             repeat(size) {
-                if (x in 0 until Chunk.SIZE && z in 0 until Chunk.SIZE && y in 1 until Chunk.HEIGHT) {
+                if (x in 0 until Chunk.SIZE && z in 0 until Chunk.SIZE && y in 1 until Chunk.BASE) {
                     val here = chunk.get(x, y, z)
                     if (here == Blocks.STONE) chunk.set(x, y, z, ore)
                     else if (here == Blocks.DEEPSLATE) chunk.set(x, y, z, deepslateVersion(ore))
@@ -241,7 +241,7 @@ class TerrainGenerator(private val seed: Long, private val world: World? = null)
         // Ground cover.
         for (z in 0 until Chunk.SIZE) for (x in 0 until Chunk.SIZE) {
             val h = tops[z * Chunk.SIZE + x]
-            if (h + 1 >= Chunk.HEIGHT) continue
+            if (h + 1 >= Chunk.BASE) continue
             val ground = chunk.get(x, h, z)
             val r = rnd.nextInt(1000)
             // Sea and lake floors: kelp forests and seagrass.
@@ -270,7 +270,7 @@ class TerrainGenerator(private val seed: Long, private val world: World? = null)
                     if (biome == Biome.CHERRY && r < 150) { chunk.set(x, h + 1, z, if (r < 120) Blocks.FLOWER_FIRST else Blocks.FLOWER_FIRST + 3 + r % 4); continue }
                     if (biome == Biome.JUNGLE && r >= 980) {
                         val tall = 4 + rnd.nextInt(6)
-                        for (i in 1..tall) if (h + i < Chunk.HEIGHT) chunk.set(x, h + i, z, Blocks.BAMBOO)
+                        for (i in 1..tall) if (h + i < Chunk.BASE) chunk.set(x, h + i, z, Blocks.BAMBOO)
                         continue
                     }
                     if ((biome == Biome.FOREST || biome == Biome.PLAINS) && r in 970..973) { chunk.set(x, h + 1, z, Blocks.BERRY_BUSH, 3); continue }
@@ -328,7 +328,7 @@ class TerrainGenerator(private val seed: Long, private val world: World? = null)
             val h = tops[z * Chunk.SIZE + x]
             val ground = chunk.get(x, h, z)
             if (ground != Blocks.GRASS && ground != Blocks.SNOW_GRASS && ground != Blocks.MYCELIUM && ground != Blocks.MUD) return@repeat
-            if (h + 16 >= Chunk.HEIGHT) return@repeat
+            if (h + 16 >= Chunk.BASE) return@repeat
             when {
                 biome == Biome.MUSHROOM -> hugeMushroom(chunk, rnd, x, h + 1, z)
                 biome == Biome.SWAMP -> if (rnd.nextInt(3) != 0) mangrove(chunk, rnd, x, h + 1, z) else oak(chunk, rnd, x, h + 1, z, Blocks.LOG, Blocks.LEAVES)
@@ -347,7 +347,7 @@ class TerrainGenerator(private val seed: Long, private val world: World? = null)
     }
 
     private fun setIfReplaceable(chunk: Chunk, x: Int, y: Int, z: Int, id: Int) {
-        if (x !in 0 until Chunk.SIZE || z !in 0 until Chunk.SIZE || y !in 0 until Chunk.HEIGHT) return
+        if (x !in 0 until Chunk.SIZE || z !in 0 until Chunk.SIZE || y !in 0 until Chunk.BASE) return
         val cur = chunk.get(x, y, z)
         if (cur == Blocks.AIR || Blocks[cur].render == RenderType.CROSS) {
             chunk.set(x, y, z, id)
@@ -397,7 +397,7 @@ class TerrainGenerator(private val seed: Long, private val world: World? = null)
 
     /** A bee nest hanging on the side of a trunk. */
     private fun beeNest(chunk: Chunk, x: Int, y: Int, z: Int) {
-        if (x + 1 < Chunk.SIZE && y < Chunk.HEIGHT && chunk.get(x + 1, y, z).let { it == Blocks.AIR || Blocks[it].name.endsWith("Leaves") }) {
+        if (x + 1 < Chunk.SIZE && y < Chunk.BASE && chunk.get(x + 1, y, z).let { it == Blocks.AIR || Blocks[it].name.endsWith("Leaves") }) {
             chunk.set(x + 1, y, z, Blocks.BEE_NEST, 4 or (3 shl 3))
         }
     }

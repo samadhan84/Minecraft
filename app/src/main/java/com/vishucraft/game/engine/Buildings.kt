@@ -59,9 +59,9 @@ private class Plan(val g: Game, val ox: Int, val oy: Int, val oz: Int, val fx: I
         g.world.blockEntities.sign(x(ma, md), oy + h0, z(ma, md))?.text = text
     }
 
-    fun bed(a: Int, d: Int, da: Int, dd: Int, headDir: Int, color: Int = 14) {
-        set(a, d, 0, Blocks.BED_FIRST + color, headDir)
-        set(a + da, d + dd, 0, Blocks.BED_FIRST + color, headDir or Shapes.UPPER)
+    fun bed(a: Int, d: Int, da: Int, dd: Int, headDir: Int, color: Int = 14, h: Int = 0) {
+        set(a, d, h, Blocks.BED_FIRST + color, headDir)
+        set(a + da, d + dd, h, Blocks.BED_FIRST + color, headDir or Shapes.UPPER)
     }
 }
 
@@ -96,7 +96,7 @@ private fun Game.buildReady(p: Plan, name: String): Boolean {
             city(p, 4, "the smart city", "DV Metro", "DV Central")
         }
         "Big City", "Mega City" -> {
-            if (p.oy + 52 >= Chunk.HEIGHT) { uiEvents.add("toast:Too high up for the city's tallest towers: build lower down"); return false }
+            if (p.oy + SUPERTALL_HEIGHT >= Chunk.HEIGHT) { uiEvents.add("toast:Too high up for the city's tallest towers: build lower down"); return false }
             if (name == "Big City") city(p, 6, "the big city", "Big City Metro", "Big City Junction")
             else city(p, 8, "the mega city", "Mega Metro", "Mega City Terminus")
         }
@@ -693,7 +693,9 @@ private fun Game.city(p: Plan, n: Int, title: String, metroName: String, railNam
         for (i in 0 until n) for (j in 0 until n) {
             val ca = roads[i] + 12; val cd = rows[j] + 12
             val central = abs(i * 2 + 1 - n) <= 2 && abs(j * 2 + 1 - n) <= 2
-            val kind = if (central && (i + j) % 2 == 0) "sky" else kinds[(i * 7 + j * 3 + i * j) % kinds.size]
+            // The four blocks in the middle get the supertall towers (below).
+            if (central) continue
+            val kind = kinds[(i * 7 + j * 3 + i * j) % kinds.size]
             when (kind) {
                 "sky" -> skyscraper(ca, cd, if (central) 10 + (i + j) % 3 else 6 + (i * 3 + j * 5) % 5, concrete(frames[(i + j * 3) % frames.size]), towers[(i * n + j) % towers.size])
                 "houses" -> houses(ca, cd)
@@ -707,6 +709,7 @@ private fun Game.city(p: Plan, n: Int, title: String, metroName: String, railNam
                 else -> hospital(ca, cd)
             }
         }
+        cityTowers(p, n)
     }
 
     // ---- Street lamps along every pavement, traffic lights at the corners, and bus stops.
@@ -829,6 +832,7 @@ private fun Game.city(p: Plan, n: Int, title: String, metroName: String, railNam
     }
     // Its metro line joins any other metro station or city by itself.
     val group = metroNet.newGroup()
+    if (n >= 6) metroNet.upgraded.add(group)
     val line = joinMetro(listOf(
         TrackEnd(p.x(-half - 2, mr - 1), p.oy + 11, p.z(-half - 2, mr - 1), -p.rx, -p.rz, group),
         TrackEnd(p.x(half + 2, mr - 1), p.oy + 11, p.z(half + 2, mr - 1), p.rx, p.rz, group),
@@ -843,4 +847,135 @@ private fun stationName(x: Int, z: Int): String {
     val names = listOf("Central", "Green Park", "Lake View", "Market", "City Hall", "Park Street", "River Side", "Hill Top",
         "Garden City", "Airport Road", "Old Town", "Sunrise", "Tech Park", "Rose Garden", "Station Road", "Lotus")
     return names[((x * 73856093) xor (z * 19349663)).mod(names.size)]
+}
+
+/** How far above the ground the supertall towers reach (the 100-floor one, with its spire). */
+private const val SUPERTALL_HEIGHT = 100 * 4 + 24
+
+/** The supertall towers in the four city blocks in the middle of a big or mega city: 66, 95, 98 and 100 floors. */
+private fun Game.cityTowers(p: Plan, n: Int) {
+    val half = n * 12; val c = n / 2
+    val towers = listOf(
+        Triple(c - 1, c - 1, 66) to ("Sky Needle" to 3),
+        Triple(c, c - 1, 95) to ("Dhruv Tower" to 11),
+        Triple(c - 1, c, 98) to ("Vishu Tower" to 14),
+        Triple(c, c, 100) to ("DV Supertall" to 15),
+    )
+    for ((lot, look) in towers) {
+        val (i, j, floors) = lot
+        supertall(p, -half + i * 24 + 12, 3 + j * 24 + 12, floors, Blocks.CONCRETE_FIRST + look.second, look.first)
+    }
+}
+
+/**
+ * A supertall tower, 15 blocks wide at the bottom and stepping in twice on the way up, with [floors] floors of
+ * offices, flats and sky lounges, an express elevator to every floor and the roof, its name lit up near the top,
+ * and a spire with a warning light.
+ */
+private fun Game.supertall(p: Plan, ca: Int, cd: Int, floors: Int, frame: Int, name: String) {
+    fun radius(k: Int) = when { k < floors * 6 / 10 -> 7; k < floors * 85 / 100 -> 6; else -> 5 }
+    val top = floors * 4 - 1
+    // Floor slabs (a terrace where the tower steps in), and the walls of each floor.
+    for (k in 0..floors) {
+        val r = radius(k); val below = if (k == 0) 7 else radius(k - 1)
+        val rs = maxOf(r, below)
+        for (a in -rs..rs) for (d in -rs..rs) p.set(ca + a, cd + d, k * 4 - 1, when {
+            k == 0 -> Blocks.POLISHED_DIORITE
+            k == floors -> frame
+            abs(a) > r || abs(d) > r -> Blocks.SMOOTH_STONE
+            else -> Blocks.QUARTZ_BLOCK
+        })
+        if (k == floors) break
+        for (a in -r..r) for (d in -r..r) {
+            val edgeA = abs(a) == r; val edgeD = abs(d) == r
+            if (!edgeA && !edgeD) continue
+            val column = (edgeA && edgeD) || (edgeA && d % 3 == 0) || (edgeD && a % 3 == 0)
+            for (h in 0..2) p.set(ca + a, cd + d, k * 4 + h, if (column) frame else Blocks.GLASS)
+        }
+    }
+    p.door(ca, cd - 7); p.door(ca - 1, cd - 7)
+    p.set(ca + 2, cd - 8, 0, Blocks.SIGN, p.toward)
+    world.blockEntities.sign(p.x(ca + 2, cd - 8), p.oy, p.z(ca + 2, cd - 8))?.text = "$name ($floors floors)"
+    // An express elevator to every floor and the roof.
+    for (k in 0..floors) p.set(ca + 3, cd + 3, k * 4 - 1, Blocks.ELEVATOR)
+    for (k in 0 until floors) {
+        val h = k * 4
+        p.set(ca, cd, h + 2, Blocks.CEILING_LIGHT, 8)
+        when {
+            k == 0 -> {
+                for (a in ca - 3..ca - 1) p.set(a, cd - 2, h, Blocks.KITCHEN_COUNTER, p.toward)
+                p.set(ca - 2, cd - 2, h + 1, Blocks.COMPUTER, p.toward or 8)
+                p.set(ca + 2, cd - 4, h, Blocks.SOFA, p.away); p.set(ca + 3, cd - 4, h, Blocks.SOFA, p.away)
+                p.set(ca - 6, cd - 6, h, Blocks.PLANT_POT); p.set(ca + 6, cd - 6, h, Blocks.PLANT_POT)
+            }
+            k % 10 == 0 -> {
+                // A sky lounge every ten floors.
+                for (a in intArrayOf(ca - 3, ca - 2, ca - 1)) p.set(a, cd - 3, h, Blocks.SOFA, p.away)
+                p.set(ca - 2, cd - 1, h, Blocks.DINING_TABLE)
+                p.set(ca - 4, cd - 4, h, Blocks.PLANT_POT); p.set(ca + 4, cd - 4, h, Blocks.PLANT_POT)
+            }
+            k % 2 == 1 -> {
+                // Offices.
+                for (a in intArrayOf(ca - 3, ca - 1)) { p.set(a, cd + 2, h, Blocks.STUDY_TABLE, p.toward); p.set(a, cd + 2, h + 1, Blocks.COMPUTER, p.toward or 8); p.set(a, cd + 1, h, Blocks.CHAIR, p.away) }
+                p.set(ca - 4, cd - 4, h, Blocks.WATER_COOLER, p.away)
+            }
+            else -> {
+                // Flats.
+                p.bed(ca - 3, cd + 2, 0, 1, p.away, 14, h)
+                p.set(ca + 1, cd - 3, h, Blocks.SOFA, p.away); p.set(ca + 2, cd - 3, h, Blocks.SOFA, p.away)
+                p.set(ca - 3, cd - 3, h, Blocks.KITCHEN_COUNTER, p.toward)
+            }
+        }
+    }
+    // Roof: a railing, the name lit up just below it, and a spire with a warning light.
+    val rt = radius(floors - 1)
+    for (a in -rt..rt) for (d in -rt..rt) if (abs(a) == rt || abs(d) == rt) p.set(ca + a, cd + d, top + 1, Blocks.GLASS_PANE)
+    p.billboard(ca - 3, cd - rt - 1, top - 3, 7, 2, p.toward, true, name)
+    val spire = 10 + floors / 10
+    for (h in 1..spire) p.set(ca, cd, top + h, if (h <= 4) frame else Blocks.IRON_BARS)
+    p.set(ca, cd, top + spire + 1, Blocks.REDSTONE_LAMP_ON)
+}
+
+/**
+ * Brings big and mega cities built by older versions up to date: when the player comes near one, its four middle
+ * city blocks are cleared and get the supertall towers. A city is found from its metro line's two track ends,
+ * which sit 148 (big city) or 196 (mega city) blocks apart in line with each other.
+ */
+internal fun Game.upgradeCities() {
+    if (isClient) return
+    val net = metroNet
+    for ((group, ends) in net.ends.groupBy { it.group }) {
+        if (group in net.upgraded || ends.size != 2) continue
+        val (e0, e1) = ends
+        // b is the end the other one points at: a city's track ends point away from each other.
+        val (a, b) = if (e1.dx * (e1.x - e0.x) + e1.dz * (e1.z - e0.z) > 0) e0 to e1 else e1 to e0
+        val len = abs(b.x - a.x) + abs(b.z - a.z)
+        val n = when (len) { 148 -> 6; 196 -> 8; else -> { net.upgraded.add(group); continue } }
+        if (a.y != b.y || a.dx != -b.dx || a.dz != -b.dz || b.x - a.x != b.dx * len || b.z - a.z != b.dz * len) { net.upgraded.add(group); continue }
+        val half = n * 12; val mr = 3 + n / 2 * 24
+        // The metro runs across the city (a's way round to b) over the road at mr, 11 blocks up.
+        val rx = b.dx; val rz = b.dz; val fx = rz; val fz = -rx
+        val mx = a.x + rx * (half + 2); val mz = a.z + rz * (half + 2)
+        val dx = player.x - mx; val dz = player.z - mz
+        if (dx * dx + dz * dz > 260f * 260f) continue
+        val p = Plan(this, mx - fx * (mr - 1), a.y - 11, mz - fz * (mr - 1), fx, fz)
+        if (p.oy + SUPERTALL_HEIGHT >= Chunk.HEIGHT) { net.upgraded.add(group); continue }
+        net.upgraded.add(group)
+        val c = n / 2
+        for (i in c - 1..c) for (j in c - 1..c) {
+            val ca = -half + i * 24 + 12; val cd = 3 + j * 24 + 12
+            // Clear the old buildings (and any helicopter on a roof) down to a paved plaza.
+            val xs = intArrayOf(p.x(ca - 8, cd - 8), p.x(ca + 8, cd + 8)); val zs = intArrayOf(p.z(ca - 8, cd - 8), p.z(ca + 8, cd + 8))
+            aircraft.list.removeAll { it.x >= xs.min() && it.x <= xs.max() + 1 && it.z >= zs.min() && it.z <= zs.max() + 1 }
+            for (a2 in ca - 8..ca + 8) for (d in cd - 8..cd + 8) {
+                for (h in 0..60) p.set(a2, d, h, Blocks.AIR)
+                p.set(a2, d, -1, Blocks.SMOOTH_STONE)
+                if (world.getBlock(p.x(a2, d), p.oy - 2, p.z(a2, d)) == Blocks.WATER) p.set(a2, d, -2, Blocks.DIRT)
+            }
+        }
+        cityTowers(p, n)
+        // The middle metro station's elevators stand at the edge of two of those blocks: put them back.
+        for (d in intArrayOf(mr - 4, mr + 4)) { p.set(20, d, -1, Blocks.ELEVATOR); p.set(20, d, 11, Blocks.ELEVATOR) }
+        uiEvents.add("toast:Your ${if (n == 6) "big" else "mega"} city has grown: four new supertall towers of 66, 95, 98 and 100 floors!")
+    }
 }

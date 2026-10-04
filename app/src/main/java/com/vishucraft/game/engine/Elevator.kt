@@ -25,7 +25,7 @@ class Lift {
 
 /** The elevator blocks in the column at (x, z), lowest first. */
 internal fun Game.liftFloors(x: Int, z: Int): List<Int> =
-    (1 until Chunk.HEIGHT - 1).filter { world.getBlock(x, it, z) == Blocks.ELEVATOR }
+    (1 until world.columnHeight(x, z) - 1).filter { world.getBlock(x, it, z) == Blocks.ELEVATOR }
 
 /** The elevator block the player stands on, if any: (x, y, z). */
 private fun Game.liftUnderfoot(): IntArray? {
@@ -88,8 +88,9 @@ internal fun Game.updateLift(dt: Float) {
         }
     } else if (!lift.riding) lift.lastBlock = Long.MIN_VALUE
     if (!lift.riding) return
-    val step = 7f * dt
     val dy = lift.targetY - player.y
+    // Express in tall towers: up to 40 blocks a second, slowing down for the last few floors.
+    val step = minOf(40f, 7f + kotlin.math.abs(dy) * 0.8f) * dt
     player.x = lift.x; player.z = lift.z
     player.vx = 0f; player.vy = 0f; player.vz = 0f
     if (kotlin.math.abs(dy) <= step) {

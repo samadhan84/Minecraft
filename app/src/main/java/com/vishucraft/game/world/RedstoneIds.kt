@@ -4,10 +4,13 @@ package com.vishucraft.game.world
 object RedstoneIds {
     private const val OFF = 1L shl 26 // keeps packed values positive (bit 63 clear)
 
-    fun pack(x: Int, y: Int, z: Int): Long = ((x + OFF) shl 36) or ((z + OFF) shl 8) or (y.toLong() and 0xFF)
+    // z takes bits 8..34 and the low 8 bits of y bits 0..7; y's 9th bit (heights 256..511) goes in bit 35, which
+    // was always clear before the world got taller, so positions saved by older versions read back the same.
+    fun pack(x: Int, y: Int, z: Int): Long =
+        ((x + OFF) shl 36) or ((z + OFF) shl 8) or (y.toLong() and 0xFF) or ((y.toLong() and 0x100) shl 27)
     fun x(p: Long): Int = ((p ushr 36) - OFF).toInt()
-    fun z(p: Long): Int = (((p ushr 8) and 0xFFFFFFFL) - OFF).toInt()
-    fun y(p: Long): Int = (p and 0xFF).toInt()
+    fun z(p: Long): Int = (((p ushr 8) and 0x7FFFFFFL) - OFF).toInt()
+    fun y(p: Long): Int = ((p and 0xFF) or ((p ushr 27) and 0x100)).toInt()
 
     private val component = BooleanArray(Blocks.COUNT).also {
         for (id in intArrayOf(

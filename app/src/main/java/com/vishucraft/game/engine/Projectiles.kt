@@ -581,6 +581,12 @@ class Carts(private val world: World) {
         val nx = c.x + c.hx * c.speed * dt; val nz = c.z + c.hz * c.speed * dt
         // Trains stop at the end of the track instead of rolling off it.
         c.atEnd = false
+        if (c.isTrain && (floorInt(nx) != bx || floorInt(nz) != bz)) game.metroCatchUp(floorInt(nx), floorInt(nz))
+        if (c.isTrain && !world.isLoaded(floorInt(nx), floorInt(nz))) {
+            // The ground ahead (and a long line's track on it) is still loading: wait for it.
+            c.speed = 0f
+            return
+        }
         if (c.isTrain && (floorInt(nx) != bx || floorInt(nz) != bz) && (-1..1).none { railAt(floorInt(nx), by + it, floorInt(nz)) != 0 }) {
             c.speed = 0f; c.atEnd = true
             c.x += (bx + 0.5f - c.x) * minOf(1f, dt * 10f); c.z += (bz + 0.5f - c.z) * minOf(1f, dt * 10f)

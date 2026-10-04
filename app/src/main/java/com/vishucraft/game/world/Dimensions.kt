@@ -35,9 +35,9 @@ class EmberGenerator(private val seed: Long) : WorldGenerator {
         for (z in 0 until 16) for (x in 0 until 16) {
             val wx = chunk.cx * 16 + x; val wz = chunk.cz * 16 + z
             val ash = floor.noise2(wx * 0.04, wz * 0.04) > 0.35
-            for (y in 0 until Chunk.HEIGHT) {
+            for (y in 0 until Chunk.BASE) {
                 val id = when {
-                    y == 0 || y >= Chunk.HEIGHT - 2 -> Blocks.BEDROCK
+                    y == 0 || y >= Chunk.BASE - 2 -> Blocks.BEDROCK
                     y >= 110 -> Blocks.NETHERRACK
                     solidAt(wx, y, wz) -> {
                         val airAbove = !solidAt(wx, y + 1, wz)
@@ -117,7 +117,7 @@ class Structures(private val seed: Long, private val gen: TerrainGenerator, priv
     }
 
     private fun set(p: Put, x: Int, y: Int, z: Int, id: Int, meta: Int = 0) {
-        if (!p.inside(x, z) || y < 1 || y >= Chunk.HEIGHT) return
+        if (!p.inside(x, z) || y < 1 || y >= Chunk.BASE) return
         p.chunk.set(x - p.x0, y, z - p.z0, id, meta)
     }
 

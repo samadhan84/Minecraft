@@ -478,11 +478,29 @@ abstract class ClientApp(protected val demo: File?) {
         ui.rect(0f, 0f, ui.width, ui.height, rgba(0, 0, 0, 150))
         title("Elevator", ui.height * 0.15f)
         val (lx, lz, cur, list) = floorsEvent
+        val names = list.split('|')
         var y = ui.height * 0.15f + 60
-        for ((i, name) in list.split('|').withIndex().toList().take(10)) {
-            val label = if (i == cur.toInt()) "$name  (you are here)" else name
-            if (ui.button(label, cx - w / 2, y, w, 40f)) { s.game.liftTo(lx.toInt(), lz.toInt(), i); overlay = Overlay.NONE }
-            y += 46
+        if (names.size <= 10) {
+            for ((i, name) in names.withIndex()) {
+                val label = if (i == cur.toInt()) "$name  (you are here)" else name
+                if (ui.button(label, cx - w / 2, y, w, 40f)) { s.game.liftTo(lx.toInt(), lz.toInt(), i); overlay = Overlay.NONE }
+                y += 46
+            }
+        } else {
+            // A tall tower: a grid of floor numbers (G is the ground floor), the current one marked with a star.
+            val cols = 10
+            val gap = 4f
+            val rows = (names.size + cols - 1) / cols
+            val bh = ((ui.height * 0.8f - y - 60) / rows - gap).coerceIn(18f, 40f)
+            val bw = minOf(64f, (ui.width - 32f) / cols - gap)
+            val x0 = cx - (cols * (bw + gap) - gap) / 2
+            for (i in names.indices) {
+                val label = (if (i == 0) "G" else "$i") + if (i == cur.toInt()) "*" else ""
+                if (ui.button(label, x0 + (i % cols) * (bw + gap), y + (i / cols) * (bh + gap), bw, bh)) {
+                    s.game.liftTo(lx.toInt(), lz.toInt(), i); overlay = Overlay.NONE
+                }
+            }
+            y += rows * (bh + gap)
         }
         if (ui.button("Cancel", cx - w / 2, y + 10, w, 40f)) overlay = Overlay.NONE
     }

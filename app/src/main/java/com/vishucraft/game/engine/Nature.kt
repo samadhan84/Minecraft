@@ -19,7 +19,7 @@ class Nature(private val world: World, private val set: (Int, Int, Int, Int, Int
         for (cz in pcz - 4..pcz + 4) for (cx in pcx - 4..pcx + 4) {
             val c = world.getChunk(cx, cz) ?: continue
             repeat(64) {
-                val lx = rnd.nextInt(16); val lz = rnd.nextInt(16); val y = 1 + rnd.nextInt(Chunk.HEIGHT - 2)
+                val lx = rnd.nextInt(16); val lz = rnd.nextInt(16); val y = 1 + rnd.nextInt(c.height - 2)
                 val id = c.get(lx, y, lz)
                 if (id == Blocks.AIR || id == Blocks.STONE) return@repeat
                 randomTick(cx * 16 + lx, y, cz * 16 + lz, id, c.getMeta(lx, y, lz))
