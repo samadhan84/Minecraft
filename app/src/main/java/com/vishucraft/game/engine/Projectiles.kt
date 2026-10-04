@@ -111,8 +111,6 @@ class Cart(var x: Float, var y: Float, var z: Float, var kind: Int = MINECART) {
     var atEnd = false
     /** The station rail last announced as the next station (not saved). */
     var announced = Long.MIN_VALUE
-    /** Seconds stopped behind another train on the same track (not saved). */
-    var waited = 0f
 
     val isTrain get() = kind != MINECART
     /** Half the length of the car body. */
@@ -419,24 +417,12 @@ class Carts(private val world: World) {
         val max = engine.maxSpeed
         // Brake in time for the next station (fast trains look further ahead).
         var target = if (ahead != null) minOf(max, 1.5f + kotlin.math.sqrt(24f * ahead)) else max
-        // Trains sharing a track keep their distance; when two meet head on, one turns back.
-        val (gap, other) = trainAhead(h)
+        // Trains going the same way keep their distance; trains coming the other way pass straight through.
+        val gap = trainAhead(h)
         if (gap != null) {
             target = minOf(target, kotlin.math.sqrt(2f * 12f * maxOf(0f, gap - 3f)))
-            if (target < 0.3f) {
-                h.speed = 0f
-                h.waited += dt
-                val oh = other?.let { head(it) }
-                // Head on: the train with track behind it backs off (if both have, the first one does).
-                if (oh != null && h.waited > 3f && oh.hx * h.hx + oh.hz * h.hz < -0.5f && canBack(h) && (!canBack(oh) || list.indexOf(h) < list.indexOf(oh))) {
-                    h.waited = 0f
-                    if (riderIn(h)) game.uiEvents.add("toast:Another train is on this track: turning back")
-                    reverse(h, game, quiet = true)
-                }
-                return true
-            }
+            if (target < 0.3f) { h.speed = 0f; return true }
         }
-        h.waited = 0f
         h.speed = if (h.speed < target) minOf(target, h.speed + (if (engine.kind == Cart.BULLET) 10f else 5f) * dt) else maxOf(target, h.speed - 14f * dt)
         if (h.speed < 0.3f) h.speed = 0.3f
         return false
@@ -446,7 +432,7 @@ class Carts(private val world: World) {
      * At the end of the track the whole train turns round: the last car becomes the front, every car faces the
      * other way, and it waits 10 seconds like at a station.
      */
-    fun reverse(h: Cart, game: Game, quiet: Boolean = false) {
+    fun reverse(h: Cart, game: Game) {
         val cars = chain(h)
         for (c in cars) { c.hx = -c.hx; c.hz = -c.hz; c.yaw = kotlin.math.atan2(c.hx, -c.hz); c.leader = null; c.trail.clear(); c.speed = 0f; c.atEnd = false }
         val rev = cars.reversed()
@@ -463,34 +449,28 @@ class Carts(private val world: World) {
         nh.stopTimer = STOP_SECONDS
         nh.lastStation = Long.MIN_VALUE
         game.sound(if (power(nh)?.isMetroLike == true) "metro_chime" else "train_horn", nh.x, nh.y + 2f, nh.z, 0.8f)
-        if (quiet) nh.stopTimer = 3f
-        else if (riderIn(nh)) game.uiEvents.add("toast:End of the line. The train goes back the other way in 10 seconds")
-    }
-
-    /** Whether there is track behind the train's last car, so it can turn back. */
-    private fun canBack(h: Cart): Boolean {
-        val tail = chain(h).last()
-        val d = tail.half + 2f
-        val x = floorInt(tail.x - h.hx * d); val z = floorInt(tail.z - h.hz * d); val y = floorInt(tail.y + 0.1f)
-        return (-1..1).any { railAt(x, y + it, z) != 0 }
+        if (riderIn(nh)) game.uiEvents.add("toast:End of the line. The train goes back the other way in 10 seconds")
     }
 
     /**
-     * The nearest car of another train (or a minecart) ahead on the same track, within 70 blocks: the gap to it
-     * in blocks, and the car. Cars on the next track (2 blocks over) don't count.
+     * The gap in blocks to the nearest car ahead on the same track (within 140 blocks) that this train has to wait
+     * behind: another train going the same way, or a minecart or coach on its own. Trains coming the other way
+     * don't count (they pass through), nor do cars on the next track (2 blocks over).
      */
-    private fun trainAhead(h: Cart): Pair<Float?, Cart?> {
+    private fun trainAhead(h: Cart): Float? {
         val mine = chain(h)
-        var best: Float? = null; var car: Cart? = null
+        var best: Float? = null
         for (o in list) {
             if (mine.any { it === o } || kotlin.math.abs(o.y - h.y) > 3f) continue
+            val oh = head(o)
+            if (power(oh) != null && oh.hx * h.hx + oh.hz * h.hz < -0.5f) continue
             val dx = o.x - h.x; val dz = o.z - h.z
             val along = dx * h.hx + dz * h.hz
             if (along <= 0f || along > 140f || kotlin.math.abs(dx * h.hz - dz * h.hx) > 1.3f) continue
             val gap = along - h.half - o.half
-            if (best == null || gap < best) { best = gap; car = o }
+            if (best == null || gap < best) best = gap
         }
-        return best to car
+        return best
     }
 
     private fun railCell(c: Cart): IntArray? {
