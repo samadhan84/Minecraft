@@ -866,7 +866,7 @@ class GameActivity : Activity() {
             or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN)
     }
 
-    /** Counts today's play time once a second; closes the world when the daily 45 minutes are used up. */
+    /** Counts today's play time once a second; closes the world when the daily 2 hours are used up. */
     private val limitLoop = object : Runnable {
         override fun run() {
             val now = android.os.SystemClock.elapsedRealtime()

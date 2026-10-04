@@ -198,7 +198,7 @@ class MenuActivity : Activity() {
 
     private fun hasWorld() = worlds().isNotEmpty()
 
-    /** True (after saying so) when today's 45 minutes of play are used up (see engine/PlayLimit). */
+    /** True (after saying so) when today's 2 hours of play are used up (see engine/PlayLimit). */
     private fun limitOver(): Boolean {
         if (com.vishucraft.game.ui.Settings(this).playLimit().minutesLeft() > 0) return false
         AlertDialog.Builder(this).setTitle(com.vishucraft.game.engine.PlayLimit.TITLE)
