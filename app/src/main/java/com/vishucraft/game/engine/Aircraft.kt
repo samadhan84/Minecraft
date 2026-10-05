@@ -15,6 +15,8 @@ import kotlin.math.sqrt
 /*
  * Airplanes and helicopters. Airplanes fly themselves from wherever they stand to the airport you pick:
  * a take-off run, a climb, a cruise high above the land, an approach and a landing on the runway.
+ * Once there are two airports, airplanes also fly on their own: a plane parked at an airport waits a while and
+ * then flies to the next airport, with or without passengers, and so on round all the airports.
  * Helicopters are flown by the rider and can take off and land anywhere.
  */
 
@@ -29,6 +31,8 @@ class Aircraft(var x: Float, var y: Float, var z: Float, val kind: Int) {
     var spin = 0f
     var phase = PARKED
     var dest: Airport? = null
+    /** Seconds until a parked airplane leaves on its next flight by itself. */
+    var wait = 20f + (Math.random() * 20).toFloat()
 
     val isPlane get() = kind == PLANE
     /** Half the length of the body (for tapping it). */
@@ -112,13 +116,16 @@ class Aircrafts(private val world: World) {
         a.y = ny
     }
 
+    /** Where the scheduled flight from airport [here] goes: the next airport in the order they were built. */
+    fun nextAirport(here: Airport): Airport = airports[(airports.indexOf(here) + 1) % airports.size]
+
     /** Starts a flight to [dest]. */
     fun takeOff(a: Aircraft, dest: Airport, game: Game) {
         a.dest = dest
         a.phase = Aircraft.TAKEOFF
         a.speed = 0f
         game.sound("train_horn", a.x, a.y, a.z, 0.5f)
-        game.uiEvents.add("toast:Flight to ${dest.name}. Fasten your seat belt!")
+        if (riding === a) game.uiEvents.add("toast:Flight to ${dest.name}. Fasten your seat belt!")
     }
 
     /** The airplane's autopilot. */
@@ -126,9 +133,22 @@ class Aircrafts(private val world: World) {
         val dest = a.dest
         if (a.phase == Aircraft.PARKED || dest == null) {
             a.speed = maxOf(0f, a.speed - 10f * dt)
-            // Parked planes sit on the ground.
-            val g = groundBelow(a)
-            if (a.y > g + 0.01f) a.y = maxOf(g, a.y - 8f * dt)
+            // Parked planes sit on the ground (where it has loaded).
+            if (world.isLoaded(floorInt(a.x), floorInt(a.z))) {
+                val g = groundBelow(a)
+                if (a.y > g + 0.01f) a.y = maxOf(g, a.y - 8f * dt)
+            }
+            // At an airport, the next flight leaves by itself after a while.
+            if (airports.size >= 2 && !game.isClient) {
+                val here = nearestAirport(a.x, a.z, 100f) ?: return
+                val before = a.wait
+                a.wait -= dt
+                if (riding === a && before > 10f && a.wait <= 10f) game.uiEvents.add("toast:This flight leaves in 10 seconds for ${nextAirport(here).name}")
+                if (a.wait <= 0f) {
+                    a.wait = 30f + (Math.random() * 20).toFloat()
+                    takeOff(a, nextAirport(here), game)
+                }
+            }
             return
         }
         val tx = dest.x - a.x; val tz = dest.z - a.z
