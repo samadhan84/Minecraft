@@ -204,35 +204,52 @@ private fun Game.watchTower(p: Plan) {
 
 private fun Game.metroStation(p: Plan) {
     val len = 24
-    // Track bed and rails running across in front of the player, through the station.
-    p.site(-len, len, 1, 7, 6, Blocks.RAILWAY_BALLAST)
-    for (a in -len..len) p.set(a, 4, 0, if (a == 0) Blocks.STOP_RAIL else Blocks.RAIL, p.railAcross)
-    for (a in -8..8) {
-        for (d in 1..3) p.set(a, d, 0, Blocks.STATION_PLATFORM)
-        for (d in 5..7) p.set(a, d, 0, Blocks.STATION_PLATFORM)
-        for (d in 1..7) p.set(a, d, 5, Blocks.GLASS)
-        if (a % 4 == 0) for (h in 1..4) { p.set(a, 1, h, Blocks.QUARTZ_BLOCK); p.set(a, 7, h, Blocks.QUARTZ_BLOCK) }
-        if (a % 4 == 2) { p.set(a, 1, 5, Blocks.SEA_LANTERN); p.set(a, 7, 5, Blocks.SEA_LANTERN) }
-    }
-    // The station's name, on a sign and a big billboard over the platform (tap either to rename the station).
     val name = stationName(p.x(0, 4), p.z(0, 4))
-    p.set(0, 2, 1, Blocks.SIGN, p.toward)
-    world.blockEntities.sign(p.x(0, 2), p.oy + 1, p.z(0, 2))?.text = name
-    p.billboard(-3, 1, 3, 7, 2, p.away, true, name)
-    // Its track joins the nearest other metro station or city line, however far away.
+    stationLayout(p, 1, name)
+    // Its two tracks (rows 4 and 6) join the nearest other metro station or city line, however far away.
     val group = metroNet.newGroup()
     val line = joinMetro(listOf(
-        TrackEnd(p.x(len, 4), p.oy, p.z(len, 4), p.rx, p.rz, group),
-        TrackEnd(p.x(-len, 4), p.oy, p.z(-len, 4), -p.rx, -p.rz, group),
+        TrackEnd(p.x(len, 4), p.oy, p.z(len, 4), p.rx, p.rz, group, ox = p.fx * 2, oz = p.fz * 2),
+        TrackEnd(p.x(-len, 4), p.oy, p.z(-len, 4), -p.rx, -p.rz, group, ox = p.fx * 2, oz = p.fz * 2),
     ))
-    if (line > 0) uiEvents.add("toast:$name metro station is open! Its track joins the nearest station ($line blocks of new track)")
-    // And a metro train waiting at the platform.
-    val metro = Cart(p.x(-2, 4) + 0.5f, p.oy.toFloat(), p.z(-2, 4) + 0.5f, Cart.METRO)
-    metro.hx = p.rx.toFloat(); metro.hz = p.rz.toFloat(); metro.yaw = kotlin.math.atan2(metro.hx, -metro.hz)
-    carts.list.add(metro)
-    val coach = Cart(p.x(-5, 4) + 0.5f, p.oy.toFloat(), p.z(-5, 4) + 0.5f, Cart.COACH).also { it.leader = metro; it.hx = metro.hx; it.hz = metro.hz }
-    carts.list.add(coach)
+    metroNet.stations.add(intArrayOf(p.x(0, 5), p.oy, p.z(0, 5)))
+    if (line > 0) uiEvents.add("toast:$name metro station is open! Its two tracks join the nearest station ($line blocks of new track)")
+    // A metro train waiting at each platform, each on its left-hand track.
+    for ((row, dir) in listOf(4 to -1, 6 to 1)) {
+        val metro = Cart(p.x(2 * dir, row) + 0.5f, p.oy.toFloat(), p.z(2 * dir, row) + 0.5f, Cart.METRO)
+        metro.hx = (p.rx * dir).toFloat(); metro.hz = (p.rz * dir).toFloat(); metro.yaw = kotlin.math.atan2(metro.hx, -metro.hz)
+        carts.list.add(metro)
+        val coach = Cart(p.x(-1 * dir, row) + 0.5f, p.oy.toFloat(), p.z(-1 * dir, row) + 0.5f, Cart.COACH).also { it.leader = metro; it.hx = metro.hx; it.hz = metro.hz; it.yaw = metro.yaw }
+        carts.list.add(coach)
+    }
 }
+
+/**
+ * A metro station's building: two tracks running across through it, at rows 4 and 4 + 2 x [side] (6 or 2), with
+ * a stop rail each in the middle, a platform on both outer sides and an island platform between the tracks,
+ * a glass roof, and the station's [name] on a sign and on billboards facing both platforms.
+ */
+private fun Game.stationLayout(p: Plan, side: Int, name: String) {
+    val len = 24
+    val lo = if (side > 0) 4 else 2; val hi = lo + 2
+    p.site(-len, len, lo - 3, hi + 3, 6, Blocks.RAILWAY_BALLAST)
+    for (a in -len..len) for (d in intArrayOf(lo, hi)) p.set(a, d, 0, if (a == 0) Blocks.STOP_RAIL else Blocks.RAIL, p.railAcross)
+    for (a in -8..8) {
+        for (d in (lo - 3..lo - 1) + (lo + 1) + (hi + 1..hi + 3)) p.set(a, d, 0, Blocks.STATION_PLATFORM)
+        for (d in lo - 3..hi + 3) p.set(a, d, 5, Blocks.GLASS)
+        if (a % 4 == 0) for (h in 1..4) { p.set(a, lo - 3, h, Blocks.QUARTZ_BLOCK); p.set(a, hi + 3, h, Blocks.QUARTZ_BLOCK) }
+        if (a % 4 == 2) { p.set(a, lo - 3, 5, Blocks.SEA_LANTERN); p.set(a, hi + 3, 5, Blocks.SEA_LANTERN) }
+    }
+    // The station's name, on a sign and big billboards over both platforms (tap one to rename the station).
+    p.set(0, lo - 2, 1, Blocks.SIGN, p.toward)
+    world.blockEntities.sign(p.x(0, lo - 2), p.oy + 1, p.z(0, lo - 2))?.text = name
+    p.billboard(-3, lo - 3, 3, 7, 2, p.away, true, name)
+    p.billboard(-3, hi + 3, 3, 7, 2, p.toward, true, name)
+}
+
+/** Rebuilds a metro station from an older version with its second track (see [stationLayout]). */
+internal fun Game.rebuildStation(ox: Int, oy: Int, oz: Int, fx: Int, fz: Int, side: Int, name: String) =
+    stationLayout(Plan(this, ox, oy, oz, fx, fz), side, name)
 
 private fun Game.pool(p: Plan) {
     p.site(-4, 4, 1, 8, 3, Blocks.QUARTZ_BLOCK)
@@ -750,18 +767,19 @@ private fun Game.city(p: Plan, n: Int, title: String, metroName: String, railNam
     }
     // One metro on each track (west station on the near track, east station on the far one), running end to end.
     val west = roads[0] + 12; val east = roads[n - 1] + 12
-    for ((d, sa, dir) in listOf(Triple(mr - 1, west, 1), Triple(mr + 1, east, -1))) {
+    // (Trains keep to the left-hand track: the near track runs one way, the far one the other.)
+    for ((d, sa, dir) in listOf(Triple(mr - 1, east, -1), Triple(mr + 1, west, 1))) {
         val metro = Cart(p.x(sa + 5 * dir, d) + 0.5f, (p.oy + 11).toFloat(), p.z(sa + 5 * dir, d) + 0.5f, Cart.METRO)
         metro.hx = p.rx.toFloat() * dir; metro.hz = p.rz.toFloat() * dir; metro.yaw = kotlin.math.atan2(metro.hx, -metro.hz)
         carts.list.add(metro)
         carts.list.add(Cart(p.x(sa + 2 * dir, d) + 0.5f, (p.oy + 11).toFloat(), p.z(sa + 2 * dir, d) + 0.5f, Cart.COACH).also { it.leader = metro; it.hx = metro.hx; it.hz = metro.hz; it.yaw = metro.yaw })
     }
     // A bullet train shares the near track with the metro (trains on one track keep their distance).
-    val bullet = Cart(p.x(16, mr - 1) + 0.5f, (p.oy + 11).toFloat(), p.z(16, mr - 1) + 0.5f, Cart.BULLET)
-    bullet.hx = p.rx.toFloat(); bullet.hz = p.rz.toFloat(); bullet.yaw = kotlin.math.atan2(bullet.hx, -bullet.hz)
+    val bullet = Cart(p.x(-16, mr - 1) + 0.5f, (p.oy + 11).toFloat(), p.z(-16, mr - 1) + 0.5f, Cart.BULLET)
+    bullet.hx = -p.rx.toFloat(); bullet.hz = -p.rz.toFloat(); bullet.yaw = kotlin.math.atan2(bullet.hx, -bullet.hz)
     carts.list.add(bullet)
     var lastCar = bullet
-    for (a in intArrayOf(12, 9)) {
+    for (a in intArrayOf(-12, -9)) {
         val c = Cart(p.x(a, mr - 1) + 0.5f, (p.oy + 11).toFloat(), p.z(a, mr - 1) + 0.5f, Cart.COACH).also { it.leader = lastCar; it.hx = bullet.hx; it.hz = bullet.hz; it.yaw = bullet.yaw }
         carts.list.add(c); lastCar = c
     }
@@ -833,9 +851,10 @@ private fun Game.city(p: Plan, n: Int, title: String, metroName: String, railNam
     // Its metro line joins any other metro station or city by itself.
     val group = metroNet.newGroup()
     val line = joinMetro(listOf(
-        TrackEnd(p.x(-half - 2, mr - 1), p.oy + 11, p.z(-half - 2, mr - 1), -p.rx, -p.rz, group),
-        TrackEnd(p.x(half + 2, mr - 1), p.oy + 11, p.z(half + 2, mr - 1), p.rx, p.rz, group),
+        TrackEnd(p.x(-half - 2, mr - 1), p.oy + 11, p.z(-half - 2, mr - 1), -p.rx, -p.rz, group, ox = p.fx * 2, oz = p.fz * 2),
+        TrackEnd(p.x(half + 2, mr - 1), p.oy + 11, p.z(half + 2, mr - 1), p.rx, p.rz, group, ox = p.fx * 2, oz = p.fz * 2),
     ))
+    for ((sa, _) in stations) metroNet.stations.add(intArrayOf(p.x(sa, mr), p.oy + 11, p.z(sa, mr)))
     uiEvents.add("toast:Welcome to $title! Tap a car or bus to drive it; take the elevators up to the metro" +
         if (line > 0) "\nIts metro line now joins the nearest station ($line blocks of new track)" else "")
 }

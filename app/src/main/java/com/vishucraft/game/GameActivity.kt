@@ -22,6 +22,7 @@ import com.vishucraft.game.engine.Game
 import com.vishucraft.game.engine.GameInput
 import com.vishucraft.game.engine.flyTo
 import com.vishucraft.game.engine.liftTo
+import com.vishucraft.game.engine.metroTo
 import com.vishucraft.game.render.GameRenderer
 import com.vishucraft.game.ui.CrosshairView
 import com.vishucraft.game.ui.HotbarView
@@ -617,6 +618,15 @@ class GameActivity : Activity() {
                 val names = e.removePrefix("flights:").split('|').toTypedArray()
                 android.app.AlertDialog.Builder(this).setTitle("Where do you want to fly?")
                     .setItems(names) { _, i -> val n = names[i]; glView.queueEvent { game.flyTo(n) } }
+                    .setNegativeButton("Not now", null).show()
+            }
+            e.startsWith("metro:") -> {
+                // Got on a metro or bullet train: which station, non-stop?
+                releaseInputs()
+                val names = e.removePrefix("metro:").split('|')
+                val items = (names + "Stop at every station").toTypedArray()
+                android.app.AlertDialog.Builder(this).setTitle("Which station? (non-stop)")
+                    .setItems(items) { _, i -> val n = if (i < names.size) names[i] else ""; glView.queueEvent { game.metroTo(n) } }
                     .setNegativeButton("Not now", null).show()
             }
             e.startsWith("achievement:") -> showToast("Achievement unlocked!\n" + e.removePrefix("achievement:"))

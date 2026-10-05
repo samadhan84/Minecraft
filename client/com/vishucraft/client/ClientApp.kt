@@ -3,6 +3,7 @@ package com.vishucraft.client
 import android.opengl.GLES20.*
 import com.vishucraft.client.Ui.Companion.rgba
 import com.vishucraft.game.engine.flyTo
+import com.vishucraft.game.engine.metroTo
 import com.vishucraft.game.engine.liftTo
 import com.vishucraft.game.net.ClientSession
 import com.vishucraft.game.net.Discovery
@@ -63,7 +64,7 @@ interface NetSupport {
  */
 abstract class ClientApp(protected val demo: File?) {
     protected enum class Menu { TITLE, WORLDS, CREATE, JOIN, SETTINGS, CONTROLS, CONFIRM_DELETE }
-    protected enum class Overlay { NONE, PAUSE, CREATIVE, CONTAINER, SETTINGS, CONTROLS, NAME_MOB, TRADE, ACHIEVEMENTS, SIGN, ENDING, INTERNET, FLIGHTS, FLOORS }
+    protected enum class Overlay { NONE, PAUSE, CREATIVE, CONTAINER, SETTINGS, CONTROLS, NAME_MOB, TRADE, ACHIEVEMENTS, SIGN, ENDING, INTERNET, FLIGHTS, FLOORS, METRO }
 
     // ---------------------------------------------------------------- platform parts
     protected abstract val prefs: ClientPrefs
@@ -170,6 +171,7 @@ abstract class ClientApp(protected val demo: File?) {
             Overlay.ACHIEVEMENTS -> achievementsScreen(s)
             Overlay.SIGN -> signScreen(s)
             Overlay.FLIGHTS -> flightsScreen(s)
+            Overlay.METRO -> metroScreen(s)
             Overlay.FLOORS -> floorsScreen(s)
             Overlay.ENDING -> endingScreen()
             Overlay.INTERNET -> internetScreen()
@@ -203,6 +205,7 @@ abstract class ClientApp(protected val demo: File?) {
             }
             e.startsWith("floors:") -> { floorsEvent = e.removePrefix("floors:").split(',', limit = 4); overlay = Overlay.FLOORS }
             e.startsWith("flights:") -> { flights = e.removePrefix("flights:").split('|'); overlay = Overlay.FLIGHTS }
+            e.startsWith("metro:") -> { metroStations = e.removePrefix("metro:").split('|'); overlay = Overlay.METRO }
             e.startsWith("achievement:") -> hud.toast("Achievement unlocked!\n" + e.removePrefix("achievement:"), 4f)
             e.startsWith("trade:") -> { tradeUid = e.removePrefix("trade:").toIntOrNull() ?: -1; tradeMessage = ""; overlay = Overlay.TRADE }
             e.startsWith("name:") -> { namingUid = e.removePrefix("name:").toIntOrNull() ?: -1; nameField.text = ""; ui.focus = nameField; overlay = Overlay.NAME_MOB }
@@ -470,6 +473,24 @@ abstract class ClientApp(protected val demo: File?) {
     }
 
     protected var flights = listOf<String>()
+    protected var metroStations = listOf<String>()
+
+    /** Got on a metro or bullet train: pick a station to go to non-stop. */
+    protected fun metroScreen(s: GameSession) {
+        val cx = ui.width / 2
+        ui.rect(0f, 0f, ui.width, ui.height, rgba(0, 0, 0, 150))
+        title("Which station? (non-stop)", ui.height * 0.12f)
+        val cols = if (metroStations.size > 6) 2 else 1
+        val w = if (cols == 2) minOf(300f, (ui.width - 48f) / 2) else 420f
+        val x0 = cx - (cols * w + (cols - 1) * 10f) / 2
+        var y = ui.height * 0.12f + 56
+        for ((i, name) in metroStations.take(16).withIndex()) {
+            val col = i % cols; val row = i / cols
+            if (ui.button(name, x0 + col * (w + 10f), y + row * 46f, w, 40f)) { s.game.metroTo(name); overlay = Overlay.NONE }
+        }
+        y += ((minOf(metroStations.size, 16) + cols - 1) / cols) * 46f + 10
+        if (ui.button("Stop at every station", cx - 210f, y, 420f, 40f)) { s.game.metroTo(""); overlay = Overlay.NONE }
+    }
     protected var floorsEvent = listOf<String>()
 
     /** Tapped an elevator: pick a floor. */

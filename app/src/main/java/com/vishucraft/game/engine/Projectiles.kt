@@ -111,6 +111,8 @@ class Cart(var x: Float, var y: Float, var z: Float, var kind: Int = MINECART) {
     var atEnd = false
     /** The station rail last announced as the next station (not saved). */
     var announced = Long.MIN_VALUE
+    /** A station (x, y, z) this train is running to non-stop, passing the others (not saved). */
+    var dest: IntArray? = null
 
     val isTrain get() = kind != MINECART
     /** Half the length of the car body. */
@@ -434,7 +436,14 @@ class Carts(private val world: World) {
      */
     fun reverse(h: Cart, game: Game) {
         val cars = chain(h)
+        val dest = h.dest
+        h.dest = null
         for (c in cars) { c.hx = -c.hx; c.hz = -c.hz; c.yaw = kotlin.math.atan2(c.hx, -c.hz); c.leader = null; c.trail.clear(); c.speed = 0f; c.atEnd = false }
+        // On a two-track line, cross over to the other track: trains keep to the left.
+        val lx = kotlin.math.round(h.hz).toInt() * 2; val lz = -kotlin.math.round(h.hx).toInt() * 2
+        if (cars.all { c -> railCell(c)?.let { (x, y, z) -> (-1..1).any { railAt(x + lx, y + it, z + lz) != 0 } } == true }) {
+            for (c in cars) { c.x += lx; c.z += lz }
+        }
         val rev = cars.reversed()
         for (k in 1 until rev.size) {
             val front = rev[k - 1]; val back = rev[k]
@@ -446,10 +455,13 @@ class Carts(private val world: World) {
             }
         }
         val nh = rev[0]
-        nh.stopTimer = STOP_SECONDS
+        nh.dest = dest
+        // A non-stop train only turns round; otherwise it waits like at a station.
+        nh.stopTimer = if (dest != null) 2f else STOP_SECONDS
         nh.lastStation = Long.MIN_VALUE
         game.sound(if (power(nh)?.isMetroLike == true) "metro_chime" else "train_horn", nh.x, nh.y + 2f, nh.z, 0.8f)
-        if (riderIn(nh)) game.uiEvents.add("toast:End of the line. The train goes back the other way in 10 seconds")
+        if (riderIn(nh)) game.uiEvents.add("toast:" + if (dest != null) "End of the line: turning round, still non-stop to ${game.metroStationName(dest)}"
+            else "End of the line. The train goes back the other way in 10 seconds")
     }
 
     /**
@@ -489,6 +501,8 @@ class Carts(private val world: World) {
             for (dy in -1..1) {
                 val y = cell[1] + dy
                 if (world.getBlock(x, y, z) == Blocks.STOP_RAIL && RedstoneIds.pack(x, y, z) != c.lastStation) {
+                    // Non-stop trains run straight through every station but theirs.
+                    if (!stopsAt(c, x, z)) continue
                     val key = RedstoneIds.pack(x, y, z)
                     if (game != null && key != c.announced) {
                         c.announced = key
@@ -510,13 +524,25 @@ class Carts(private val world: World) {
         val fx = c.x - (bx + 0.5f); val fz = c.z - (bz + 0.5f)
         if (fx * c.hx + fz * c.hz < 0f) return
         c.lastStation = key
+        if (!stopsAt(c, bx, bz)) {
+            if (riderIn(c)) game.uiEvents.add("toast:Passing ${stationName(bx, by, bz) ?: "a station"}: non-stop to ${game.metroStationName(c.dest!!)}")
+            return
+        }
+        val arrived = c.dest != null
+        c.dest = null
         c.stopTimer = STOP_SECONDS
         c.speed = 0f
         game.sound(if (engine.isMetroLike) "metro_chime" else "train_horn", c.x, c.y + 2f, c.z, 0.8f)
         if (riderIn(c)) {
             val name = stationName(bx, by, bz)
-            game.uiEvents.add("toast:" + (if (name != null) "This is $name.\n" else "") + "Station stop for 10 seconds. Crouch or tap to get off, forward to leave now")
+            game.uiEvents.add("toast:" + (if (name != null) "This is $name.\n" else "") + (if (arrived) "You have arrived! " else "") + "Station stop for 10 seconds. Crouch or tap to get off, forward to leave now")
         }
+    }
+
+    /** Whether train [c] stops at the stop rail at (x, z): every one, or only its non-stop destination. */
+    private fun stopsAt(c: Cart, x: Int, z: Int): Boolean {
+        val d = c.dest ?: return true
+        return abs(x - d[0]) <= 6 && abs(z - d[2]) <= 6
     }
 
     companion object {

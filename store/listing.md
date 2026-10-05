@@ -16,7 +16,7 @@ Welcome to DhruvVishu – a block world that is all yours!
 🌾 FARMING – Grow wheat, rice, tomatoes, lentils, beetroot, carrots and potatoes. Water them, harvest with a sickle, and they replant themselves.
 🏠 READY-MADE BUILDINGS – Place a house, modern home, farm, watch tower, metro station or swimming pool in one tap.
 ✈️ AIRPORTS – Build airports, fly airplanes between them, and take a helicopter anywhere.
-🏙️ SMART CITIES – One blueprint builds a whole city (smart, big or mega): roads with traffic lights, people, cars and buses you can drive, a metro and bullet train, a railway station, skyscrapers with elevators, a hospital, school and more. Metro stations join up by themselves, however far apart.
+🏙️ SMART CITIES – One blueprint builds a whole city (smart, big or mega): roads with traffic lights, people, cars and buses you can drive, a metro and bullet train, a railway station, skyscrapers with elevators, a hospital, school and more. Metro stations have two tracks and join up by themselves, however far apart; pick a station and ride non-stop.
 🚆 TRAINS & METRO – Drive a train engine with coaches, or ride the metro from station to station.
 🐺 ANIMALS & MONSTERS – Tame wolves, cats and parrots, ride horses, trade with villagers and defend yourself at night.
 ⚔ SURVIVAL & CREATIVE – Play survival with health, hunger and experience, or build freely in creative mode.

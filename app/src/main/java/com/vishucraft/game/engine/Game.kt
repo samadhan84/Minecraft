@@ -434,7 +434,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
             else if (carts.riding?.kind == Cart.ENGINE && jumpPressed) sound("train_horn", player.x, player.y + 2f, player.z)
             else if (carts.riding == null && jumpPressed && !player.flying) {
                 val len = sqrt(dir[0] * dir[0] + dir[2] * dir[2]).coerceAtLeast(0.01f)
-                carts.nearby(player.x, player.y, player.z, dir[0] / len, dir[2] / len)?.let { carts.enter(it, dir[0], dir[2]) }
+                carts.nearby(player.x, player.y, player.z, dir[0] / len, dir[2] / len)?.let { carts.enter(it, dir[0], dir[2]); offerMetroStations(it) }
             }
             lastVy = player.vy
             player.speedMul = (if (input.sprint && !player.flying) 1.3f else 1f) * (if (hasEffect("swiftness")) 1.4f else 1f)
@@ -1396,6 +1396,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
                     Cart.METRO, Cart.ENGINE, Cart.BULLET -> "toast:All aboard! It stops for 10 seconds at every Station Stop Rail and turns back at the end of the line"
                     else -> "toast:A coach on its own: press forward to push it, or hook it behind an engine or metro"
                 })
+                offerMetroStations(c)
             }
             return
         }
