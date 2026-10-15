@@ -123,6 +123,10 @@ class Mob(val type: MobType, var x: Float, var y: Float, var z: Float, val uid: 
     internal var shootTimer = 0f
     /** Crawlers become aggressive when hit. */
     internal var angry = false
+    /** The train car or airplane this person is travelling in (see Passengers.kt), or null. */
+    internal var ride: Any? = null
+    /** Stations to go before getting off. */
+    internal var rideStops = 0
     internal var swoopTime = 0f
     /** Given with a name tag; named mobs never despawn. */
     var customName: String? = null
@@ -211,6 +215,8 @@ class Mobs(private val world: World) {
             val dx = m.x - p.x; val dz = m.z - p.z
             val far = dx * dx + dz * dz > 110f * 110f
             if (m.dead && m.deathTime > 0.8f) { it.remove(); continue }
+            // Travellers go wherever their train or plane goes (moved by Passengers.kt), near or far.
+            if (m.ride != null) continue
             if (far || !world.isLoaded(floorInt(m.x), floorInt(m.z)) || (!hostileEnabled && m.type.hostile && !m.tamed)) {
                 if (persistent(m) && !m.dead && (far || !world.isLoaded(floorInt(m.x), floorInt(m.z)))) parked.add(m)
                 it.remove(); continue

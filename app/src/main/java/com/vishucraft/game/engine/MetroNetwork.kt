@@ -21,12 +21,18 @@ import kotlin.math.abs
 /**
  * An open end of a metro track: the last rail at (x, y, z), with the track carrying on outwards towards (dx, dz).
  * A two-track end has its second track at (x + ox, z + oz), 2 blocks to one side; (0, 0) for a single track.
+ * [kind] is [METRO] or [RAILWAY]: metro stations join metro stations, railway stations join railway stations.
  */
 class TrackEnd(val x: Int, val y: Int, val z: Int, val dx: Int, val dz: Int, val group: Int, var joined: Boolean = false,
-               var ox: Int = 0, var oz: Int = 0) {
+               var ox: Int = 0, var oz: Int = 0, var kind: Int = METRO) {
     val double get() = ox != 0 || oz != 0
     /** The end of the other track. */
-    fun twin() = TrackEnd(x + ox, y, z + oz, dx, dz, group, joined, -ox, -oz)
+    fun twin() = TrackEnd(x + ox, y, z + oz, dx, dz, group, joined, -ox, -oz, kind)
+
+    companion object {
+        const val METRO = 0
+        const val RAILWAY = 1
+    }
 }
 
 /** Which side of direction (dx, dz) the offset (ox, oz) points to: 1 for the right, -1 for the left, 0 for neither. */
@@ -42,6 +48,8 @@ class MetroLine(val pts: IntArray, val ya: Int, val yb: Int, val ends: IntArray)
     val laid = HashSet<Long>()
     /** Built in full when it was made (lines from older versions). */
     var complete = false
+    /** [TrackEnd.METRO] (on a concrete viaduct) or [TrackEnd.RAILWAY] (on ballast, with stone pillars). */
+    var kind = TrackEnd.METRO
     private val segs = pts.size / 2 - 1
     /** Index of the first rail of each straight run; the last entry is the number of rails. */
     private val start = IntArray(segs + 1)
@@ -133,7 +141,7 @@ class MetroLine(val pts: IntArray, val ya: Int, val yb: Int, val ends: IntArray)
         }
         val e = ends
         val twinEnds = intArrayOf(e[0] + nx[0], e[1], e[2] + nz[0], e[3] + nx[n - 1], e[4], e[5] + nz[n - 1])
-        return MetroLine(out, ya, yb, twinEnds)
+        return MetroLine(out, ya, yb, twinEnds).also { it.kind = kind }
     }
 
     fun write(d: java.io.DataOutputStream) {
@@ -158,9 +166,12 @@ class MetroNetwork {
     val lines = ArrayList<MetroLine>()
     /** City metro lines (by group) whose cities were given 66- to 100-floor towers, to be put back to 12 floors. */
     val upgraded = HashSet<Int>()
-    /** Where the metro stations are (x, y, z: the middle of the platforms); their names are on their signs. */
+    /**
+     * Where the stations are (x, y, z: the middle of the platforms, and the kind: [TrackEnd.METRO] or
+     * [TrackEnd.RAILWAY]); their names are on their signs.
+     */
     val stations = ArrayList<IntArray>()
-    /** 2 once stations and lines have two tracks; older saves are brought up to date when loaded. */
+    /** 2 once stations and lines have two tracks (older saves are brought up to date when loaded); 3 with railways. */
     var version = VERSION
     private var nextGroup = 1
 
@@ -175,11 +186,15 @@ class MetroNetwork {
         d.writeInt(upgraded.size)
         for (g in upgraded) d.writeInt(g)
         // Version 2: second tracks and the list of stations.
-        d.writeInt(version)
+        d.writeInt(if (version < 2) version else VERSION)
         for (e in ends) { d.writeByte(e.ox + 2); d.writeByte(e.oz + 2) }
         for (l in lines) d.writeBoolean(l.complete)
         d.writeInt(stations.size)
         for (s in stations) { d.writeInt(s[0]); d.writeInt(s[1]); d.writeInt(s[2]) }
+        // Version 3: railways.
+        for (e in ends) d.writeByte(e.kind)
+        for (l in lines) d.writeByte(l.kind)
+        for (s in stations) d.writeByte(s[3])
     }
 
     fun read(d: java.io.DataInputStream) {
@@ -196,12 +211,17 @@ class MetroNetwork {
             version = d.readInt()
             for (e in ends) { e.ox = d.readByte() - 2; e.oz = d.readByte() - 2 }
             for (l in lines) l.complete = d.readBoolean()
-            repeat(d.readInt()) { stations.add(intArrayOf(d.readInt(), d.readInt(), d.readInt())) }
+            repeat(d.readInt()) { stations.add(intArrayOf(d.readInt(), d.readInt(), d.readInt(), TrackEnd.METRO)) }
+            if (version >= 3) {
+                for (e in ends) e.kind = d.readByte().toInt()
+                for (l in lines) l.kind = d.readByte().toInt()
+                for (s in stations) s[3] = d.readByte().toInt()
+            }
         } catch (_: java.io.EOFException) {}
     }
 
     companion object {
-        const val VERSION = 2
+        const val VERSION = 3
     }
 }
 
@@ -212,7 +232,8 @@ class MetroNetwork {
  */
 internal fun Game.joinMetro(newEnds: List<TrackEnd>): Int {
     val net = metroNet
-    val open = net.ends.filter { !it.joined }
+    val kind = newEnds.first().kind
+    val open = net.ends.filter { !it.joined && it.kind == kind }
     net.ends.addAll(newEnds)
     var best: Pair<TrackEnd, TrackEnd>? = null
     var bestD = Long.MAX_VALUE
@@ -229,9 +250,10 @@ internal fun Game.joinMetro(newEnds: List<TrackEnd>): Int {
         val s = sideOf(a.ox, a.oz, a.dx, a.dz)
         val to = if (sideOf(b.ox, b.oz, -b.dx, -b.dz) == s) b else b.twin()
         val main = planLine(a, to, 5)
+        main.kind = kind
         new.add(main)
         main.twin(s)?.let { new.add(it) }
-    } else new.add(planLine(a, b, 5))
+    } else new.add(planLine(a, b, 5).also { it.kind = kind })
     for (l in new) addLine(l)
     return new[0].size
 }
@@ -271,7 +293,9 @@ private fun Game.layLine(line: MetroLine, cx: Int, cz: Int): Boolean {
     line.railsIn(cx, cz) { rails.add(it) }
     if (rails.isEmpty()) return false
     line.laid.add(key)
-    val deck = Blocks.CONCRETE_FIRST + 8
+    val railway = line.kind == TrackEnd.RAILWAY
+    val deck = if (railway) Blocks.RAILWAY_BALLAST else Blocks.CONCRETE_FIRST + 8
+    val pillar = if (railway) Blocks.STONE_BRICKS else deck
     for (k in rails) {
         val (x, z) = line.cell(k).let { it[0] to it[1] }
         val y = line.y(k)
@@ -282,7 +306,7 @@ private fun Game.layLine(line: MetroLine, cx: Int, cz: Int): Boolean {
         // Pillars down to the ground every 8 rails where the line is up in the air.
         if (k % 8 == 0) {
             var h = y - 2
-            while (h > 1 && y - h < 64 && !Blocks.solid[world.getBlock(x, h, z)]) { setBlock(x, h, z, deck); h-- }
+            while (h > 1 && y - h < 64 && !Blocks.solid[world.getBlock(x, h, z)]) { setBlock(x, h, z, pillar); h-- }
         }
         setBlock(x, y, z, Blocks.RAIL, 0)
     }
@@ -305,7 +329,7 @@ private fun Game.layLine(line: MetroLine, cx: Int, cz: Int): Boolean {
 
 /** Lays any metro track due in newly loaded chunks (and brings older saves' metro up to date first). */
 internal fun Game.layMetro() {
-    if (!isClient && metroNet.version < MetroNetwork.VERSION) upgradeMetro()
+    if (!isClient && metroNet.version < 2) upgradeMetro()
     val lines = metroNet.lines
     while (true) {
         val key = world.arrived.poll() ?: break
@@ -328,9 +352,9 @@ internal fun Game.metroStationName(s: IntArray): String = world.blockEntities.na
 /** Getting on a metro or bullet train: offer the stations it can run to non-stop. */
 internal fun Game.offerMetroStations(c: Cart) {
     val power = carts.power(c) ?: return
-    if (!power.isMetroLike) return
+    val kind = if (power.isMetroLike) TrackEnd.METRO else TrackEnd.RAILWAY
     val here = c.x to c.z
-    val choices = metroNet.stations.filter { (it[0] - here.first) * (it[0] - here.first) + (it[2] - here.second) * (it[2] - here.second) > 30f * 30f }
+    val choices = metroNet.stations.filter { it[3] == kind }.filter { (it[0] - here.first) * (it[0] - here.first) + (it[2] - here.second) * (it[2] - here.second) > 30f * 30f }
     if (choices.isEmpty()) return
     uiEvents.add("metro:" + choices.joinToString("|") { metroStationName(it) })
 }
@@ -341,10 +365,11 @@ fun Game.metroTo(name: String) {
     val h = carts.power(c) ?: return
     val head = carts.head(c)
     if (name.isEmpty()) { head.dest = null; uiEvents.add("toast:Stopping at every station"); return }
-    val s = metroNet.stations.firstOrNull { metroStationName(it) == name } ?: return
+    val kind = if (h.isMetroLike) TrackEnd.METRO else TrackEnd.RAILWAY
+    val s = metroNet.stations.firstOrNull { it[3] == kind && metroStationName(it) == name } ?: return
     head.dest = s
     head.stopTimer = minOf(head.stopTimer, 1f)
-    if (h.isMetroLike) uiEvents.add("toast:Non-stop to $name")
+    uiEvents.add("toast:Non-stop to $name")
 }
 
 // ---------------------------------------------------------------- bringing older metros up to date
@@ -434,10 +459,10 @@ private fun Game.upgradeMetro() {
         if (s.city == 0) {
             val name = world.blockEntities.nameNear(s.x(0, 4), s.oy + 1, s.z(0, 4), 14) ?: "Station"
             rebuildStation(s.ox, s.oy, s.oz, s.fx, s.fz, o, name)
-            net.stations.add(intArrayOf(s.x(0, 4 + o), s.oy, s.z(0, 4 + o)))
+            net.stations.add(intArrayOf(s.x(0, 4 + o), s.oy, s.z(0, 4 + o), TrackEnd.METRO))
         } else {
             val n = s.city; val half = n * 12; val mr = 3 + n / 2 * 24
-            for (sa in listOfNotNull(-half + 12, half - 12, if (n >= 6) 12 else null)) net.stations.add(intArrayOf(s.x(sa, mr), s.oy + 11, s.z(sa, mr)))
+            for (sa in listOfNotNull(-half + 12, half - 12, if (n >= 6) 12 else null)) net.stations.add(intArrayOf(s.x(sa, mr), s.oy + 11, s.z(sa, mr), TrackEnd.METRO))
         }
     }
     // The second track beside each line whose two ends now have matching second tracks.

@@ -75,6 +75,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
     /** Metro track ends that new stations join up to (see MetroNetwork.kt). */
     val metroNet = MetroNetwork()
     private var cityCheck = 1f
+    internal val travel = Travel()
     val dimension get() = world.dimension
     private var portalTime = 0f
     private var bowCooldown = 0f
@@ -492,6 +493,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
         boats.update(dt, this)
         aircraft.update(dt, this)
         vehicles.update(dt, this)
+        updatePassengers()
         updateLift(dt)
         if (bowCooldown > 0f) bowCooldown -= dt
         // Standing in a portal for two seconds travels to the other world.

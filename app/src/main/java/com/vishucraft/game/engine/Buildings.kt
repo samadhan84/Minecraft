@@ -91,6 +91,7 @@ private fun Game.buildReady(p: Plan, name: String): Boolean {
         "Swimming Pool" -> pool(p)
         "Mansion" -> mansion(p)
         "Airport" -> airport(p)
+        "Railway Station" -> railwayStation(p)
         "Smart City" -> {
             if (p.oy + 46 >= Chunk.HEIGHT) { uiEvents.add("toast:Too high up for the city's tallest tower: build lower down"); return false }
             city(p, 4, "the smart city", "DV Metro", "DV Central")
@@ -212,7 +213,8 @@ private fun Game.metroStation(p: Plan) {
         TrackEnd(p.x(len, 4), p.oy, p.z(len, 4), p.rx, p.rz, group, ox = p.fx * 2, oz = p.fz * 2),
         TrackEnd(p.x(-len, 4), p.oy, p.z(-len, 4), -p.rx, -p.rz, group, ox = p.fx * 2, oz = p.fz * 2),
     ))
-    metroNet.stations.add(intArrayOf(p.x(0, 5), p.oy, p.z(0, 5)))
+    metroNet.stations.add(intArrayOf(p.x(0, 5), p.oy, p.z(0, 5), TrackEnd.METRO))
+    stationPeople(p, intArrayOf(2, 5, 8))
     if (line > 0) uiEvents.add("toast:$name metro station is open! Its two tracks join the nearest station ($line blocks of new track)")
     // A metro train waiting at each platform, each on its left-hand track.
     for ((row, dir) in listOf(4 to -1, 6 to 1)) {
@@ -245,6 +247,76 @@ private fun Game.stationLayout(p: Plan, side: Int, name: String) {
     world.blockEntities.sign(p.x(0, lo - 2), p.oy + 1, p.z(0, lo - 2))?.text = name
     p.billboard(-3, lo - 3, 3, 7, 2, p.away, true, name)
     p.billboard(-3, hi + 3, 3, 7, 2, p.toward, true, name)
+}
+
+/**
+ * A railway station: two tracks on ballast running across in front of the player (rows 4 and 6, with a stop rail
+ * each), a platform on both sides and an island platform between them under brick-pillared roofs, a ticket office,
+ * the station's name on billboards, and a train (an engine and two coaches) on each track. Its tracks join the
+ * nearest other railway station (or a city's railway) by themselves, however far away.
+ */
+private fun Game.railwayStation(p: Plan) {
+    val len = 30
+    val names = listOf("Junction", "Central", "Terminus", "Road", "Cantonment", "City", "Nagar", "Halt")
+    val towns = listOf("Rampur", "Sundar", "Green Valley", "Lakeside", "Hill View", "Riverbank", "Sonpur", "Chandan")
+    val h = (p.x(0, 4) * 73856093) xor (p.z(0, 4) * 19349663)
+    val name = towns[h.mod(towns.size)] + " " + names[(h / 7).mod(names.size)]
+    p.site(-len, len, 0, 10, 7, Blocks.RAILWAY_BALLAST)
+    for (a in -len..len) for (d in intArrayOf(4, 6)) p.set(a, d, 0, if (a == 0) Blocks.STOP_RAIL else Blocks.RAIL, p.railAcross)
+    for (a in -12..12) {
+        for (d in intArrayOf(1, 2, 3, 5, 7, 8, 9)) p.set(a, d, 0, Blocks.STATION_PLATFORM)
+        // Roofs over the outer platforms and the island, on brick pillars.
+        for (d in 1..9) p.set(a, d, 5, if (d == 4 || d == 6) Blocks.GLASS else Blocks.SPRUCE_PLANKS)
+        if (a % 4 == 0) for (hh in 1..4) for (d in intArrayOf(1, 5, 9)) p.set(a, d, hh, Blocks.BRICKS)
+        if (a % 4 == 2) for (d in intArrayOf(2, 8)) p.set(a, d, 4, Blocks.LANTERN)
+        if (a % 6 == 3) { p.set(a, 2, 1, Blocks.SOFA, p.away); p.set(a, 8, 1, Blocks.SOFA, p.toward) }
+    }
+    // A ticket office at the near end of the platform.
+    for (a in -16..-13) for (d in 1..3) {
+        p.set(a, d, 0, Blocks.STATION_PLATFORM)
+        for (hh in 1..4) {
+            val edge = a == -16 || a == -13 || d == 1 || d == 3
+            p.set(a, d, hh, if (hh == 4) Blocks.BRICKS else if (!edge) Blocks.AIR else if (hh == 2 && d == 2) Blocks.GLASS_PANE else Blocks.BRICKS)
+        }
+    }
+    p.set(-14, 1, 1, Blocks.OAK_DOOR, p.toward); p.set(-14, 1, 2, Blocks.OAK_DOOR, p.toward or Shapes.UPPER)
+    p.set(-15, 2, 1, Blocks.KITCHEN_COUNTER, p.left); p.set(-15, 2, 2, Blocks.COMPUTER, p.left or 8)
+    p.set(0, 1, 1, Blocks.SIGN, p.toward)
+    world.blockEntities.sign(p.x(0, 1), p.oy + 1, p.z(0, 1))?.text = name
+    p.billboard(-4, 1, 3, 9, 1, p.away, true, name)
+    p.billboard(-4, 9, 3, 9, 1, p.toward, true, name)
+    // Its two tracks join the nearest other railway station, however far away.
+    val group = metroNet.newGroup()
+    val line = joinMetro(listOf(
+        TrackEnd(p.x(len, 4), p.oy, p.z(len, 4), p.rx, p.rz, group, ox = p.fx * 2, oz = p.fz * 2, kind = TrackEnd.RAILWAY),
+        TrackEnd(p.x(-len, 4), p.oy, p.z(-len, 4), -p.rx, -p.rz, group, ox = p.fx * 2, oz = p.fz * 2, kind = TrackEnd.RAILWAY),
+    ))
+    metroNet.stations.add(intArrayOf(p.x(0, 5), p.oy, p.z(0, 5), TrackEnd.RAILWAY))
+    uiEvents.add("toast:$name railway station is open!" + if (line > 0) " Its two tracks join the nearest railway station ($line blocks of new track)"
+        else " Build another railway station and the line joins them by itself")
+    // A train waiting at each platform, on its left-hand track: an engine and two coaches.
+    for ((row, dir) in listOf(4 to -1, 6 to 1)) {
+        val engine = Cart(p.x(3 * dir, row) + 0.5f, p.oy.toFloat(), p.z(3 * dir, row) + 0.5f, Cart.ENGINE)
+        engine.hx = (p.rx * dir).toFloat(); engine.hz = (p.rz * dir).toFloat(); engine.yaw = kotlin.math.atan2(engine.hx, -engine.hz)
+        carts.list.add(engine)
+        var lead = engine
+        for (k in 1..2) {
+            val a = 3 * dir - 3 * k * dir
+            val c = Cart(p.x(a, row) + 0.5f, p.oy.toFloat(), p.z(a, row) + 0.5f, Cart.COACH).also { it.leader = lead; it.hx = engine.hx; it.hz = engine.hz; it.yaw = engine.yaw }
+            carts.list.add(c); lead = c
+        }
+    }
+    stationPeople(p, intArrayOf(2, 5, 8))
+}
+
+/** A few people waiting on a station's platforms (rows [rows]), ready to travel. */
+private fun Game.stationPeople(p: Plan, rows: IntArray, across: IntRange = -6..6) {
+    val folk = listOf(MobType.CITIZEN, MobType.CITIZEN_WOMAN, MobType.CITIZEN_KID)
+    val rnd = java.util.Random(p.ox * 31L + p.oz)
+    repeat(4) {
+        val a = across.first + rnd.nextInt(across.last - across.first + 1); val d = rows[rnd.nextInt(rows.size)]
+        mobs.list.add(Mob(folk[rnd.nextInt(folk.size)], p.x(a, d) + 0.5f, p.oy + 0.5f, p.z(a, d) + 0.5f).also { it.yaw = rnd.nextFloat() * 6.28f })
+    }
 }
 
 /** Rebuilds a metro station from an older version with its second track (see [stationLayout]). */
@@ -462,6 +534,8 @@ private fun Game.airport(p: Plan) {
     aircraft.list.add(Aircraft(p.x(0, 7) + 0.5f, p.oy.toFloat(), p.z(0, 7) + 0.5f, Aircraft.PLANE).also { it.yaw = yaw })
     aircraft.list.add(Aircraft(p.x(-11, 12) + 0.5f, p.oy.toFloat(), p.z(-11, 12) + 0.5f, Aircraft.HELICOPTER).also { it.yaw = yaw })
     aircraft.airports.add(Airport(name, p.x(0, 3) + 0.5f, p.oy.toFloat(), p.z(0, 3) + 0.5f, p.fx.toFloat(), p.fz.toFloat()))
+    // Travellers waiting in the terminal.
+    stationPeople(p, intArrayOf(6, 12, 16), 9..17)
     uiEvents.add("toast:$name is open! Build another airport to fly between them")
 }
 
@@ -798,6 +872,13 @@ private fun Game.city(p: Plan, n: Int, title: String, metroName: String, railNam
         if (a % 5 == 2) { p.set(a, rb, 5, Blocks.SEA_LANTERN); p.set(a, rb + 5, 5, Blocks.SEA_LANTERN) }
     }
     sign(2, rb + 1, 1, "$railName Railway Station")
+    // The railway joins the nearest railway station by itself.
+    val railGroup = metroNet.newGroup()
+    joinMetro(listOf(
+        TrackEnd(p.x(-half - 4, rb + 3), p.oy, p.z(-half - 4, rb + 3), -p.rx, -p.rz, railGroup, kind = TrackEnd.RAILWAY),
+        TrackEnd(p.x(half + 4, rb + 3), p.oy, p.z(half + 4, rb + 3), p.rx, p.rz, railGroup, kind = TrackEnd.RAILWAY),
+    ))
+    metroNet.stations.add(intArrayOf(p.x(0, rb + 3), p.oy, p.z(0, rb + 3), TrackEnd.RAILWAY))
     p.billboard(-4, rb, 3, 9, 2, p.away, true, railName)
     p.set(-4, rb + 1, 1, Blocks.SOFA, p.away); p.set(4, rb + 1, 1, Blocks.SOFA, p.away)
     val engine = Cart(p.x(4, rb + 3) + 0.5f, p.oy.toFloat(), p.z(4, rb + 3) + 0.5f, Cart.ENGINE)
@@ -854,7 +935,7 @@ private fun Game.city(p: Plan, n: Int, title: String, metroName: String, railNam
         TrackEnd(p.x(-half - 2, mr - 1), p.oy + 11, p.z(-half - 2, mr - 1), -p.rx, -p.rz, group, ox = p.fx * 2, oz = p.fz * 2),
         TrackEnd(p.x(half + 2, mr - 1), p.oy + 11, p.z(half + 2, mr - 1), p.rx, p.rz, group, ox = p.fx * 2, oz = p.fz * 2),
     ))
-    for ((sa, _) in stations) metroNet.stations.add(intArrayOf(p.x(sa, mr), p.oy + 11, p.z(sa, mr)))
+    for ((sa, _) in stations) metroNet.stations.add(intArrayOf(p.x(sa, mr), p.oy + 11, p.z(sa, mr), TrackEnd.METRO))
     uiEvents.add("toast:Welcome to $title! Tap a car or bus to drive it; take the elevators up to the metro" +
         if (line > 0) "\nIts metro line now joins the nearest station ($line blocks of new track)" else "")
 }

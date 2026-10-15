@@ -642,15 +642,15 @@ class App(demo: File?) : ClientApp(demo) {
             }
             f == 1345 -> shot("04x-city-people")
             f == 1346 -> session?.game?.let { g ->
-                // A two-track metro station, from above one end.
+                // A railway station, from above one end.
                 val p = g.player
                 val bx = com.vishucraft.game.world.floorInt(p.x) - 300; val bz = com.vishucraft.game.world.floorInt(p.z) + 200
                 val y = g.world.generator.surfaceHeight(bx, bz)
                 p.yaw = 0f
-                g.placeBuilding(com.vishucraft.game.engine.RayHit(bx, y, bz, 0, 1, 0, Blocks.GRASS), "Metro Station")
-                p.x = bx + 16.5f; p.z = bz + 6.5f; p.y = y + 9f; p.yaw = -1.25f; p.pitch = -0.5f; p.flying = true
+                g.placeBuilding(com.vishucraft.game.engine.RayHit(bx, y, bz, 0, 1, 0, Blocks.GRASS), "Railway Station")
+                p.x = bx + 22.5f; p.z = bz + 8.5f; p.y = y + 10f; p.yaw = -1.25f; p.pitch = -0.5f; p.flying = true
             }
-            f == 1360 -> shot("04y-two-track-station")
+            f == 1360 -> shot("04y-railway-station")
             f == 1361 -> overlay = Overlay.PAUSE
             f == 1363 -> shot("05-pause")
             f == 1367 -> { overlay = Overlay.NONE; leaveWorld(); menu = Menu.CREATE; nameField.text = "Demo survival"; seedField.text = "777"; survival = true }

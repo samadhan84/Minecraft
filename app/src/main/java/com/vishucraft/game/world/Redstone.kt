@@ -9,7 +9,7 @@ import kotlin.math.sqrt
  * A compact redstone simulation, stepped at 10 ticks per second.
  *
  * - Sources: lever (on), stone button (pressed, 1 s), redstone block, redstone torch (lit).
- * - Dust carries power 15 and loses 1 per block; it climbs up or down one block like stairs.
+ * - Dust carries power any distance without losing any; it climbs up or down one block like stairs.
  * - Levers, buttons and torches strongly power the block they sit on / above; strongly powered blocks
  *   feed adjacent dust. Powered dust weakly powers the block under it and blocks beside it.
  * - A torch turns off when the block it stands on is powered (the classic inverter / clock).
@@ -204,14 +204,15 @@ class Redstone(private val world: World, private val set: (Int, Int, Int, Int, I
         while (queue.isNotEmpty()) {
             val q = queue.poll()
             val l = dust[q] ?: continue
-            if (l <= 1) continue
+            if (l <= 0) continue
+            // No loss along the way: a line of dust carries the signal however long it is.
             val aboveOpen = !opaqueAt(dir(q, 0))
             for (f in 2 until 6) {
                 val n = dir(q, f)
                 if (n < 0) continue
-                seed(n, l - 1)
-                if (aboveOpen) seed(dir(n, 0), l - 1)
-                if (!opaqueAt(n)) seed(dir(n, 1), l - 1)
+                seed(n, l)
+                if (aboveOpen) seed(dir(n, 0), l)
+                if (!opaqueAt(n)) seed(dir(n, 1), l)
             }
         }
 
@@ -237,7 +238,7 @@ class Redstone(private val world: World, private val set: (Int, Int, Int, Int, I
             return false
         }
 
-        // Powered rails pass power along connected powered rails, up to 8 blocks from the source.
+        // Powered rails pass power along connected powered rails, however many there are.
         val railPower = HashMap<Long, Int>()
         val railQueue = ArrayDeque<Long>()
         for (p in comps) if (id(p) == Blocks.POWERED_RAIL && activated(p)) { railPower[p] = 8; railQueue.add(p) }
@@ -249,8 +250,8 @@ class Redstone(private val world: World, private val set: (Int, Int, Int, Int, I
             for (e in Rails.exits(shape)) for (dy in -1..1) {
                 val n = offset(p, e[0], dy, e[1])
                 if (n < 0 || id(n) != Blocks.POWERED_RAIL) continue
-                if ((railPower[n] ?: -1) >= left - 1) continue
-                railPower[n] = left - 1
+                if (railPower.containsKey(n)) continue
+                railPower[n] = left
                 railQueue.add(n)
             }
         }
