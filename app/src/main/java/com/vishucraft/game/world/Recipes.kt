@@ -410,6 +410,7 @@ object Recipes {
         sh(Blocks.SOLAR_PANEL, 2, listOf("GGG", "BBB", "III"), 'G' to glass, 'B' to i("Lapis Lazuli"), 'I' to iron)
         sh(Blocks.EV_CHARGER, 1, listOf("III", "IRI", "ICI"), 'I' to iron, 'R' to Blocks.REDSTONE_BLOCK, 'C' to i("Copper Ingot"))
         sh(Blocks.ELEVATOR, 2, listOf("III", "RGR", "III"), 'I' to iron, 'R' to Blocks.REDSTONE_DUST, 'G' to Blocks.GLOWSTONE)
+        sh(Blocks.ESCALATOR, 4, listOf("I  ", "IR ", "III"), 'I' to iron, 'R' to Blocks.REDSTONE_DUST)
         sh(Blocks.RUNWAY, 8, listOf("SSS", "SCS", "SSS"), 'S' to smooth, 'C' to Blocks.COAL_BLOCK)
         sh(Blocks.RUNWAY_LINE, 4, listOf("RWR"), 'R' to Blocks.RUNWAY, 'W' to i("White Dye"))
         sh(Blocks.HELIPAD, 4, listOf("RYR"), 'R' to Blocks.RUNWAY, 'Y' to i("Yellow Dye"))

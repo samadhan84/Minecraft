@@ -424,7 +424,9 @@ object Blocks {
     const val EV_CHARGER = 442
     /** A glowing board: its text is drawn large across the billboard blocks next to it (tap to write). */
     const val BILLBOARD = 443
-    const val COUNT = 444
+    /** Moving steps: carries you up (or down, bit 3) along a line of escalators, away from where it was placed from. */
+    const val ESCALATOR = 444
+    const val COUNT = 445
 
     /** The newer crops' texture names, in id order from RICE_CROP. */
     val NEW_CROPS = listOf("rice", "tomato", "lentil", "beetroot")
@@ -988,6 +990,8 @@ object Blocks {
         reg(BlockDef(BILLBOARD, "Billboard", t("steel"), t("billboard_back"), t("steel"), hardness = 1f, tool = P,
             category = Category.HOME, facing = Facing.HORIZONTAL, front = t("billboard"), movable = false))
         extraLight[BILLBOARD] = 9
+        home(ESCALATOR, "Escalator", "escalator_step", "steel", hardness = 1.5f, solid = false)
+        for (n in listOf("glass", "black_plastic")) t(n)
         for (i in 0 until PixelFont.TILES) t("font_$i")
         for (n in listOf("bullet_side", "bullet_front", "bullet_roof")) t(n)
         for (n in listOf("lamp_glow", "car_window", "bus_side", "bus_front", "bus_roof", "concrete_red")) t(n)

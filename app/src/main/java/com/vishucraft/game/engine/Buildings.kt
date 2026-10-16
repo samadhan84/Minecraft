@@ -313,9 +313,16 @@ private fun Game.railwayStation(p: Plan) {
 private fun Game.stationPeople(p: Plan, rows: IntArray, across: IntRange = -6..6) {
     val folk = listOf(MobType.CITIZEN, MobType.CITIZEN_WOMAN, MobType.CITIZEN_KID)
     val rnd = java.util.Random(p.ox * 31L + p.oz)
-    repeat(4) {
+    var placed = 0
+    repeat(40) {
+        if (placed >= 4) return
         val a = across.first + rnd.nextInt(across.last - across.first + 1); val d = rows[rnd.nextInt(rows.size)]
-        mobs.list.add(Mob(folk[rnd.nextInt(folk.size)], p.x(a, d) + 0.5f, p.oy + 0.5f, p.z(a, d) + 0.5f).also { it.yaw = rnd.nextFloat() * 6.28f })
+        // On the platform (or the floor), only where there is room to stand: not inside a pillar or a bench.
+        val x = p.x(a, d); val z = p.z(a, d)
+        val y = if (Blocks.solid[world.getBlock(x, p.oy, z)]) p.oy + 1 else p.oy
+        if (world.getBlock(x, y, z) != Blocks.AIR || world.getBlock(x, y + 1, z) != Blocks.AIR) return@repeat
+        placed++
+        mobs.list.add(Mob(folk[rnd.nextInt(folk.size)], x + 0.5f, y.toFloat(), z + 0.5f).also { it.yaw = rnd.nextFloat() * 6.28f })
     }
 }
 

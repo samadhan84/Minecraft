@@ -177,6 +177,13 @@ object HomeShapes {
                 b(0f, 10f, 7f, 16f, 11f, 9f, "oak_planks"),
                 b(5f, 12f, 5f, 11f, 16f, 11f),
             )
+            // Four steps rising away from the front, with glass sides and a black handrail along the top of each.
+            Blocks.ESCALATOR -> (0..3).flatMap { i ->
+                val z0 = 12f - 4f * i; val top = 4f * (i + 1)
+                listOf(b(1f, 0f, z0, 15f, top, z0 + 4f)) + listOf(0f, 15f).flatMap { x ->
+                    listOf(b(x, 0f, z0, x + 1f, top + 12f, z0 + 4f, "glass"), b(x - 0.25f, top + 12f, z0, x + 1.25f, top + 13f, z0 + 4f, "black_plastic"))
+                }
+            }
             // ---- Smart city
             Blocks.TRAFFIC_LIGHT -> if (collision) listOf(b(5f, 0f, 5f, 11f, 16f, 11f)) else listOf(
                 b(7f, 0f, 7f, 9f, 4f, 9f, "steel"),

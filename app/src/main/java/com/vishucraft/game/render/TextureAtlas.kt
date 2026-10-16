@@ -1840,6 +1840,11 @@ object TextureAtlas {
                 for (y in 6..9) { t[7, y] = rgb(60, 60, 66); t[8, y] = rgb(60, 60, 66) }
                 return true
             }
+            // ---- Escalator: grooved steel treads with a yellow safety edge.
+            "escalator_step" -> {
+                t.fill { x, y -> when { y < 2 -> rgb(236, 196, 40); x % 3 == 0 -> rgb(70, 72, 78); else -> scale(rgb(150, 152, 158), t.jitter(0.03f)) } }
+                return true
+            }
             "elevator_side" -> {
                 t.fill { x, y -> if (y < 2 || x == 0 || x == 15) rgb(120, 122, 128) else scale(rgb(196, 198, 204), t.jitter(0.02f)) }
                 for (x in 3..12) t[x, 8] = rgb(255, 236, 160)

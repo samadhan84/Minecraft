@@ -649,6 +649,11 @@ class App(demo: File?) : ClientApp(demo) {
                 p.yaw = 0f
                 g.placeBuilding(com.vishucraft.game.engine.RayHit(bx, y, bz, 0, 1, 0, Blocks.GRASS), "Railway Station")
                 p.x = bx + 22.5f; p.z = bz + 8.5f; p.y = y + 10f; p.yaw = -1.25f; p.pitch = -0.5f; p.flying = true
+                // An escalator up to a little landing, in front of the camera.
+                val ex = com.vishucraft.game.world.floorInt(p.x + kotlin.math.sin(p.yaw) * 9f); val ez = com.vishucraft.game.world.floorInt(p.z - kotlin.math.cos(p.yaw) * 9f)
+                for (cx in ((ex - 6) shr 4)..((ex + 4) shr 4)) for (cz in ((ez - 2) shr 4)..((ez + 2) shr 4)) g.world.ensureLoaded(cx, cz)
+                for (k in 0 until 6) g.setBlock(ex + 3 - k, y + 1 + k, ez, Blocks.ESCALATOR, 4)
+                for (x in ex - 5..ex - 3) for (z in ez - 1..ez + 1) for (h in y + 1..y + 6) g.setBlock(x, h, z, Blocks.STONE_BRICKS)
             }
             f == 1360 -> shot("04y-railway-station")
             f == 1361 -> overlay = Overlay.PAUSE
