@@ -36,7 +36,7 @@ android {
         }
     }
 
-    // Two versions of the game:
+    // Two versions of the app:
     //  direct - the APK on the download link (Android TV, phones); updates itself from that link.
     //  play   - the app bundle for Google Play; Google Play does the updating, so it has no updater and does not
     //           ask for permission to install apps.
@@ -57,17 +57,30 @@ android {
             signingConfig = signingConfigs.getByName("dhruvvishu")
         }
         release {
-            isMinifyEnabled = true
-            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"))
+            // Off: the Claude SDK reads its JSON classes by reflection, which code shrinking would break.
+            isMinifyEnabled = false
             // Signed with the flavor's key (see productFlavors).
         }
     }
 
     compileOptions {
+        // The Claude SDK uses java.time, which older Android versions (7.x) only get through desugaring.
+        isCoreLibraryDesugaringEnabled = true
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
     kotlinOptions {
         jvmTarget = "17"
     }
+    packaging {
+        resources.excludes += setOf("META-INF/versions/**", "META-INF/LICENSE*", "META-INF/NOTICE*", "META-INF/DEPENDENCIES")
+    }
+}
+
+dependencies {
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
+    // Claude (Anthropic) API: writes, changes, explains and fixes Arduino code.
+    implementation("com.anthropic:anthropic-java:3.3.0")
+    // QR codes, to copy a sketch from the TV to a phone or computer.
+    implementation("com.google.zxing:core:3.5.3")
 }
