@@ -312,6 +312,16 @@ object MobModels {
             box(0.19f, 0.52f, -0.07f, 0.3f, 0.92f, 0.07f, tiles("kid_shirt"), 1, pivotY = 0.9f),
             box(-0.17f, 0.55f, 0.11f, 0.17f, 0.9f, 0.22f, tiles("school_bag")),
         ),
+        // The helper robot: a boxy body with a screen, a visor face with glowing eyes, an antenna and a jet.
+        MobType.ROBOT to listOf(
+            box(-0.14f, 0.02f, -0.1f, 0.14f, 0.2f, 0.1f, tiles("steel", top = "robot_light")),
+            box(-0.24f, 0.2f, -0.17f, 0.24f, 0.58f, 0.17f, tiles("robot_body", front = "robot_chest")),
+            box(-0.2f, 0.58f, -0.19f, 0.2f, 0.9f, 0.19f, tiles("robot_body", front = "robot_face")),
+            box(-0.025f, 0.9f, -0.025f, 0.025f, 1.04f, 0.025f, tiles("steel")),
+            box(-0.055f, 1.04f, -0.055f, 0.055f, 1.13f, 0.055f, tiles("robot_light")),
+            box(-0.34f, 0.24f, -0.06f, -0.24f, 0.54f, 0.06f, tiles("robot_body"), -1, pivotY = 0.54f),
+            box(0.24f, 0.24f, -0.06f, 0.34f, 0.54f, 0.06f, tiles("robot_body"), 1, pivotY = 0.54f),
+        ),
     )
 }
 

@@ -997,6 +997,18 @@ object TextureAtlas {
                 t[7, 1] = rgb(40, 70, 160); t[9, 1] = rgb(40, 70, 160)
             }
             "kid_shorts" -> { noisy(t, rgb(40, 70, 160), 0.04f, 0.1f); for (x in 0 until 16) for (y in 9..15) t[x, y] = rgb(196, 146, 104) }
+            "robot_body" -> { t.fill { x, y -> if (x == 0 || y == 0 || x == 15 || y == 15) rgb(150, 160, 176) else scale(rgb(232, 236, 244), t.jitter(0.02f)) }; for (x in 1..14) t[x, 8] = rgb(60, 130, 230) }
+            "robot_chest" -> {
+                t.fill { x, y -> if (x == 0 || y == 0 || x == 15 || y == 15) rgb(150, 160, 176) else rgb(232, 236, 244) }
+                for (y in 3..10) for (x in 3..12) t[x, y] = if ((x + y) % 5 == 0) rgb(80, 230, 160) else rgb(20, 40, 60)
+                t[5, 13] = rgb(240, 80, 70); t[8, 13] = rgb(250, 200, 60); t[11, 13] = rgb(80, 200, 110)
+            }
+            "robot_face" -> {
+                t.fill { x, y -> if (y in 3..11 && x in 1..14) rgb(24, 28, 40) else rgb(232, 236, 244) }
+                for (y in 5..8) { for (x in 3..5) t[x, y] = rgb(90, 230, 255); for (x in 10..12) t[x, y] = rgb(90, 230, 255) }
+                for (x in 6..9) t[x, 10] = rgb(90, 230, 255)
+            }
+            "robot_light" -> t.fill { x, y -> if ((x + y) % 3 == 0) rgb(255, 150, 140) else rgb(240, 60, 50) }
             "school_bag" -> { noisy(t, rgb(200, 60, 40), 0.05f, 0.1f); for (x in 2..13) t[x, 4] = rgb(240, 200, 60) }
             "explorer_face" -> {
                 t.fill { _, y -> if (y < 4) scale(rgb(96, 64, 38), t.jitter(0.08f)) else scale(rgb(214, 170, 132), t.jitter(0.03f)) }
@@ -1386,7 +1398,7 @@ object TextureAtlas {
     /** Colours for spawn eggs: base and spots. */
     private val EGG_COLORS = mapOf(
         "citizen" to (rgb(70, 130, 200) to rgb(196, 146, 104)), "citizen_woman" to (rgb(220, 70, 120) to rgb(250, 210, 80)),
-        "citizen_kid" to (rgb(236, 236, 240) to rgb(40, 70, 160)),
+        "citizen_kid" to (rgb(236, 236, 240) to rgb(40, 70, 160)), "robot" to (rgb(232, 236, 244) to rgb(60, 130, 230)),
         "cow" to (rgb(68, 50, 38) to rgb(160, 160, 160)), "pig" to (rgb(238, 166, 166) to rgb(200, 110, 110)),
         "sheep" to (rgb(230, 230, 230) to rgb(250, 180, 180)), "zombie" to (rgb(0, 170, 170) to rgb(110, 140, 90)),
         "boomling" to (rgb(62, 60, 66) to rgb(240, 124, 34)), "rattler" to (rgb(92, 70, 46) to rgb(80, 140, 60)),
@@ -1838,6 +1850,14 @@ object TextureAtlas {
                 t.fill { x, y -> if (x == 0 || y == 0 || x == 15 || y == 15) rgb(120, 122, 128) else scale(rgb(196, 198, 204), (if ((x + y) % 4 == 0) 1.06f else 1f)) }
                 for (k in 0..3) { for (x in 7 - k..8 + k) { t[x, 2 + k] = rgb(60, 200, 90); t[x, 13 - k] = rgb(230, 170, 40) } }
                 for (y in 6..9) { t[7, y] = rgb(60, 60, 66); t[8, y] = rgb(60, 60, 66) }
+                return true
+            }
+            // ---- Train call button: a red push button on a steel panel, with a little train above it.
+            "call_button" -> {
+                t.fill { x, y -> if (x == 0 || y == 0 || x == 15 || y == 15) rgb(90, 92, 98) else rgb(186, 188, 194) }
+                for (y in 8..13) for (x in 4..11) if (hypot(x - 7.5f, y - 10.5f) < 3.2f) t[x, y] = if (y < 10) rgb(255, 90, 80) else rgb(210, 30, 30)
+                for (x in 4..11) { t[x, 3] = rgb(40, 90, 200); t[x, 4] = rgb(40, 90, 200) }
+                t[5, 5] = rgb(30, 30, 30); t[10, 5] = rgb(30, 30, 30)
                 return true
             }
             // ---- Escalator: grooved steel treads with a yellow safety edge.

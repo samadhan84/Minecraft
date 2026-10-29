@@ -76,6 +76,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
     val metroNet = MetroNetwork()
     private var cityCheck = 1f
     internal val travel = Travel()
+    internal val robots = HashMap<Int, RobotBrain>()
     val dimension get() = world.dimension
     private var portalTime = 0f
     private var bowCooldown = 0f
@@ -494,7 +495,8 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
         boats.update(dt, this)
         aircraft.update(dt, this)
         vehicles.update(dt, this)
-        updatePassengers()
+        updatePassengers(dt)
+        updateRobots(dt)
         updateLift(dt)
         if (bowCooldown > 0f) bowCooldown -= dt
         // Standing in a portal for two seconds travels to the other world.
@@ -1233,6 +1235,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
         val weapon = item?.tool == ToolType.SWORD || item?.tool == ToolType.AXE
         if (name == "Name Tag") { uiEvents.add("name:${mob.uid}"); return true }
         if (mob.type == MobType.VILLAGER && !weapon) { uiEvents.add("trade:${mob.uid}"); return true }
+        if (!weapon && robotTap(mob)) return true
         if (mob.type.isCitizen && !weapon) {
             val hello = if (mob.type == MobType.CITIZEN_KID) listOf("Hi! I'm going to school!", "Do you want to play cricket?", "I love the metro!", "My school bag is so heavy!")
                 else listOf("Namaste!", "Hello! Lovely day in the city.", "The metro is the fastest way to get around!", "Have you seen the new bullet train?",
@@ -1396,7 +1399,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
             } else {
                 carts.enter(c, dir[0], dir[2])
                 if (c.isTrain) uiEvents.add(when (carts.power(c)?.kind) {
-                    Cart.METRO, Cart.ENGINE, Cart.BULLET -> "toast:All aboard! It stops for 10 seconds at every Station Stop Rail and turns back at the end of the line"
+                    Cart.METRO, Cart.ENGINE, Cart.BULLET -> "toast:All aboard! It stops for 5 seconds at every Station Stop Rail (bullet trains run express) and turns back at the end of the line"
                     else -> "toast:A coach on its own: press forward to push it, or hook it behind an engine or metro"
                 })
                 offerMetroStations(c)
@@ -1437,6 +1440,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
         t ?: return
         if (liftTap(t, sel)) return
         if (escalatorTap(t, sel)) return
+        if (callButtonTap(t, sel)) return
         if (pack3Block(t, item, sel)) return
 
         when (t.block) {

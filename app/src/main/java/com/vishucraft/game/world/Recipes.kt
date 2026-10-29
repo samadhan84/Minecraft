@@ -388,6 +388,7 @@ object Recipes {
         r(i("Blueprint: Farm"), 1, true, paper to 1, planks to 16, i("Wheat Seeds") to 8, i("Water Bucket") to 1)
         r(i("Blueprint: Watch Tower"), 1, true, paper to 1, cobble to 48, planks to 8)
         r(i("Blueprint: Metro Station"), 1, true, paper to 1, iron to 16, smooth to 24, glass to 8)
+        r(i("Robot Spawn Egg"), 1, true, iron to 8, Blocks.REDSTONE_DUST to 4, Blocks.GLASS to 1)
         r(i("Blueprint: Railway Station"), 1, true, paper to 1, iron to 16, Blocks.BRICKS to 24, Blocks.GRAVEL to 16)
         r(i("Blueprint: Mansion"), 1, true, paper to 1, Blocks.QUARTZ_BLOCK to 48, glass to 32, i("Gold Ingot") to 8)
         r(i("Blueprint: Airport"), 1, true, paper to 1, Blocks.SMOOTH_STONE to 64, glass to 24, iron to 16)

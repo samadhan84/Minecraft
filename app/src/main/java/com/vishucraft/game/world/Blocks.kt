@@ -426,7 +426,9 @@ object Blocks {
     const val BILLBOARD = 443
     /** Moving steps: carries you up (or down, bit 3) along a line of escalators, away from where it was placed from. */
     const val ESCALATOR = 444
-    const val COUNT = 445
+    /** On station platforms: press it to call a train of your own (see engine/TrainCall.kt). */
+    const val CALL_BUTTON = 445
+    const val COUNT = 446
 
     /** The newer crops' texture names, in id order from RICE_CROP. */
     val NEW_CROPS = listOf("rice", "tomato", "lentil", "beetroot")
@@ -991,6 +993,8 @@ object Blocks {
             category = Category.HOME, facing = Facing.HORIZONTAL, front = t("billboard"), movable = false))
         extraLight[BILLBOARD] = 9
         home(ESCALATOR, "Escalator", "escalator_step", "steel", hardness = 1.5f, solid = false)
+        home(CALL_BUTTON, "Train Call Button", "steel", "steel", front = "call_button", hardness = 1f)
+        extraLight[CALL_BUTTON] = 7
         for (n in listOf("glass", "black_plastic")) t(n)
         for (i in 0 until PixelFont.TILES) t("font_$i")
         for (n in listOf("bullet_side", "bullet_front", "bullet_roof")) t(n)

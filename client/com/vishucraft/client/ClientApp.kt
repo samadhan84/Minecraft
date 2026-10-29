@@ -4,6 +4,8 @@ import android.opengl.GLES20.*
 import com.vishucraft.client.Ui.Companion.rgba
 import com.vishucraft.game.engine.flyTo
 import com.vishucraft.game.engine.metroTo
+import com.vishucraft.game.engine.callTrain
+import com.vishucraft.game.engine.robotCommand
 import com.vishucraft.game.engine.liftTo
 import com.vishucraft.game.net.ClientSession
 import com.vishucraft.game.net.Discovery
@@ -64,7 +66,7 @@ interface NetSupport {
  */
 abstract class ClientApp(protected val demo: File?) {
     protected enum class Menu { TITLE, WORLDS, CREATE, JOIN, SETTINGS, CONTROLS, CONFIRM_DELETE }
-    protected enum class Overlay { NONE, PAUSE, CREATIVE, CONTAINER, SETTINGS, CONTROLS, NAME_MOB, TRADE, ACHIEVEMENTS, SIGN, ENDING, INTERNET, FLIGHTS, FLOORS, METRO }
+    protected enum class Overlay { NONE, PAUSE, CREATIVE, CONTAINER, SETTINGS, CONTROLS, NAME_MOB, TRADE, ACHIEVEMENTS, SIGN, ENDING, INTERNET, FLIGHTS, FLOORS, METRO, CALL_TRAIN, ROBOT }
 
     // ---------------------------------------------------------------- platform parts
     protected abstract val prefs: ClientPrefs
@@ -137,7 +139,7 @@ abstract class ClientApp(protected val demo: File?) {
             // Time's up: save the world and close it, then say why on the title screen.
             if (playLimit.over) { s.save(); leaveWorld(); menu = Menu.TITLE; limitNotice = true; return }
         }
-        hud?.timeLeft = playLimit.clock(); hud?.timeLow = playLimit.used > com.vishucraft.game.engine.PlayLimit.LIMIT - 5 * 60
+        hud?.timeLeft = if (com.vishucraft.game.engine.PlayLimit.ENABLED) playLimit.clock() else null; hud?.timeLow = playLimit.used > com.vishucraft.game.engine.PlayLimit.LIMIT - 5 * 60
         updateGameInput(s, dt)
         val events = ArrayList<String>()
         s.frame(dt, events)
@@ -172,6 +174,8 @@ abstract class ClientApp(protected val demo: File?) {
             Overlay.SIGN -> signScreen(s)
             Overlay.FLIGHTS -> flightsScreen(s)
             Overlay.METRO -> metroScreen(s)
+            Overlay.CALL_TRAIN -> callTrainScreen(s)
+            Overlay.ROBOT -> robotScreen(s)
             Overlay.FLOORS -> floorsScreen(s)
             Overlay.ENDING -> endingScreen()
             Overlay.INTERNET -> internetScreen()
@@ -205,6 +209,8 @@ abstract class ClientApp(protected val demo: File?) {
             }
             e.startsWith("floors:") -> { floorsEvent = e.removePrefix("floors:").split(',', limit = 4); overlay = Overlay.FLOORS }
             e.startsWith("flights:") -> { flights = e.removePrefix("flights:").split('|'); overlay = Overlay.FLIGHTS }
+            e.startsWith("robot:") -> { robotUid = e.removePrefix("robot:").toInt(); robotField.text = ""; ui.focus = robotField; overlay = Overlay.ROBOT }
+            e.startsWith("calltrain:") -> { callAt = e.removePrefix("calltrain:").split(',').map { it.toInt() }; overlay = Overlay.CALL_TRAIN }
             e.startsWith("metro:") -> { metroStations = e.removePrefix("metro:").split('|'); overlay = Overlay.METRO }
             e.startsWith("achievement:") -> hud.toast("Achievement unlocked!\n" + e.removePrefix("achievement:"), 4f)
             e.startsWith("trade:") -> { tradeUid = e.removePrefix("trade:").toIntOrNull() ?: -1; tradeMessage = ""; overlay = Overlay.TRADE }
@@ -268,7 +274,7 @@ abstract class ClientApp(protected val demo: File?) {
         container = ContainerScreen(s.game)
         overlay = Overlay.NONE
         applySettings()
-        if (first && demo == null) hud?.toast("Play time left today: ${playLimit.minutesLeft()} minutes", 4f)
+        if (first && demo == null && com.vishucraft.game.engine.PlayLimit.ENABLED) hud?.toast("Play time left today: ${playLimit.minutesLeft()} minutes", 4f)
     }
 
     protected open fun leaveWorld() {
@@ -474,6 +480,42 @@ abstract class ClientApp(protected val demo: File?) {
 
     protected var flights = listOf<String>()
     protected var metroStations = listOf<String>()
+    protected var callAt = listOf(0, 0, 0)
+    protected var robotUid = -1
+    protected val robotField = Ui.Field("", "e.g. follow me, mine, chop trees, build a house", 80)
+
+    /** Tapped the robot: type what it should do. */
+    protected fun robotScreen(s: GameSession) {
+        val cx = ui.width / 2; val w = minOf(620f, ui.width - 32f)
+        ui.rect(0f, 0f, ui.width, ui.height, rgba(0, 0, 0, 150))
+        title("What should the robot do?", ui.height * 0.25f)
+        ui.field(robotField, cx - w / 2, ui.height * 0.4f, w)
+        val y = ui.height * 0.4f + 60
+        if (ui.button("Do it", cx - w / 2, y, w / 2 - 5, 44f) || ui.takeSubmit()) {
+            s.game.robotCommand(robotUid, robotField.text); ui.focus = null; overlay = Overlay.NONE
+        }
+        if (ui.button("Cancel", cx + 5, y, w / 2 - 5, 44f)) { ui.focus = null; overlay = Overlay.NONE }
+        // Quick choices.
+        val quick = listOf("follow me", "mine", "chop trees", "farm", "guard me", "build a house")
+        for ((i, h) in quick.withIndex()) {
+            if (ui.button(h, cx - w / 2 + (i % 3) * (w / 3), y + 64 + (i / 3) * 46f, w / 3 - 6, 40f)) {
+                s.game.robotCommand(robotUid, h); ui.focus = null; overlay = Overlay.NONE
+            }
+        }
+    }
+
+    /** Pressed a station's call button: which kind of train? */
+    protected fun callTrainScreen(s: GameSession) {
+        val cx = ui.width / 2
+        ui.rect(0f, 0f, ui.width, ui.height, rgba(0, 0, 0, 150))
+        title("Call a train, just for you", ui.height * 0.2f)
+        var y = ui.height * 0.2f + 60
+        for (name in com.vishucraft.game.engine.TRAIN_CHOICES) {
+            if (ui.button(name, cx - 210f, y, 420f, 44f)) { s.game.callTrain(name, callAt[0], callAt[1], callAt[2]); overlay = Overlay.NONE }
+            y += 52
+        }
+        if (ui.button("Cancel", cx - 210f, y + 10, 420f, 44f)) overlay = Overlay.NONE
+    }
 
     /** Got on a metro or bullet train: pick a station to go to non-stop. */
     protected fun metroScreen(s: GameSession) {

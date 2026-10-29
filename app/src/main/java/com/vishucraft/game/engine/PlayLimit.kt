@@ -6,9 +6,9 @@ package com.vishucraft.game.engine
  * the next day (a new day starts fresh). The phone and PC versions keep [day] and [used] in their settings.
  */
 class PlayLimit(var day: String, var used: Float) {
-    val over get() = used >= LIMIT
+    val over get() = ENABLED && used >= LIMIT
     /** Whole minutes left today (rounded up). */
-    fun minutesLeft(today: String = today()): Int { newDay(today); return ((LIMIT - used).coerceAtLeast(0f) / 60f).let { kotlin.math.ceil(it).toInt() } }
+    fun minutesLeft(today: String = today()): Int { if (!ENABLED) return Int.MAX_VALUE; newDay(today); return ((LIMIT - used).coerceAtLeast(0f) / 60f).let { kotlin.math.ceil(it).toInt() } }
 
     /** The time left today as a clock, e.g. "1:32:05" (or "32:05" in the last hour). */
     fun clock(): String {
@@ -21,6 +21,7 @@ class PlayLimit(var day: String, var used: Float) {
 
     /** Adds [seconds] of play on [today]; returns a warning to show when one is due, or null. */
     fun tick(today: String, seconds: Float): String? {
+        if (!ENABLED) return null
         newDay(today)
         val before = used
         used += seconds.coerceIn(0f, 5f)
@@ -30,6 +31,8 @@ class PlayLimit(var day: String, var used: Float) {
     }
 
     companion object {
+        /** Off: no daily limit and no countdown clock (the code stays here in case it is wanted again). */
+        const val ENABLED = false
         const val LIMIT = 30 * 60f
         private val WARNINGS = intArrayOf(10 * 60, 5 * 60, 60)
         const val TITLE = "Daily limit is over"

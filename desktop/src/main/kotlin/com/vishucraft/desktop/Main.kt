@@ -248,7 +248,7 @@ class App(demo: File?) : ClientApp(demo) {
             }
             Overlay.PAUSE -> if (key == GLFW_KEY_ESCAPE) overlay = Overlay.NONE
             Overlay.TRADE -> if (key == GLFW_KEY_ESCAPE || key == GLFW_KEY_E) overlay = Overlay.NONE
-            Overlay.SIGN, Overlay.FLIGHTS, Overlay.FLOORS, Overlay.METRO -> if (key == GLFW_KEY_ESCAPE) { ui.focus = null; overlay = Overlay.NONE }
+            Overlay.SIGN, Overlay.FLIGHTS, Overlay.FLOORS, Overlay.METRO, Overlay.CALL_TRAIN, Overlay.ROBOT -> if (key == GLFW_KEY_ESCAPE) { ui.focus = null; overlay = Overlay.NONE }
             Overlay.ENDING -> if (key == GLFW_KEY_ESCAPE) overlay = Overlay.NONE
             Overlay.INTERNET -> if (key == GLFW_KEY_ESCAPE) overlay = Overlay.PAUSE
             Overlay.SETTINGS, Overlay.CONTROLS, Overlay.NAME_MOB, Overlay.ACHIEVEMENTS -> if (key == GLFW_KEY_ESCAPE) { ui.focus = null; overlay = Overlay.PAUSE }
@@ -654,6 +654,9 @@ class App(demo: File?) : ClientApp(demo) {
                 for (cx in ((ex - 6) shr 4)..((ex + 4) shr 4)) for (cz in ((ez - 2) shr 4)..((ez + 2) shr 4)) g.world.ensureLoaded(cx, cz)
                 for (k in 0 until 6) g.setBlock(ex + 3 - k, y + 1 + k, ez, Blocks.ESCALATOR, 4)
                 for (x in ex - 5..ex - 3) for (z in ez - 1..ez + 1) for (h in y + 1..y + 6) g.setBlock(x, h, z, Blocks.STONE_BRICKS)
+                // The helper robot, hovering beside the escalator, looking at the camera; and a train call button.
+                g.mobs.list.add(com.vishucraft.game.engine.Mob(com.vishucraft.game.engine.MobType.ROBOT, ex + 1.5f, y + 3.5f, ez - 2.5f).also { it.yaw = p.yaw + 3.1416f })
+                g.setBlock(ex + 3, y + 1, ez - 3, Blocks.CALL_BUTTON, 4)
             }
             f == 1360 -> shot("04y-railway-station")
             f == 1361 -> overlay = Overlay.PAUSE

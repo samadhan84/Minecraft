@@ -177,6 +177,12 @@ object HomeShapes {
                 b(0f, 10f, 7f, 16f, 11f, 9f, "oak_planks"),
                 b(5f, 12f, 5f, 11f, 16f, 11f),
             )
+            // A post with a panel on top and a big red button on its front.
+            Blocks.CALL_BUTTON -> if (collision) listOf(b(5f, 0f, 5f, 11f, 16f, 11f)) else listOf(
+                b(7f, 0f, 7f, 9f, 10f, 9f, "steel"),
+                b(4f, 10f, 6f, 12f, 16f, 10f),
+                b(6f, 11.5f, 10f, 10f, 14.5f, 11f, "lamp_glow"),
+            )
             // Four steps rising away from the front, with glass sides and a black handrail along the top of each.
             Blocks.ESCALATOR -> (0..3).flatMap { i ->
                 val z0 = 12f - 4f * i; val top = 4f * (i + 1)

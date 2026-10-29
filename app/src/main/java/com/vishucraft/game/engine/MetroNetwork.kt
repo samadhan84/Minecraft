@@ -221,7 +221,8 @@ class MetroNetwork {
     }
 
     companion object {
-        const val VERSION = 3
+        /** 3: railways; 4: every station has a train call button. */
+        const val VERSION = 4
     }
 }
 
@@ -330,6 +331,11 @@ private fun Game.layLine(line: MetroLine, cx: Int, cz: Int): Boolean {
 /** Lays any metro track due in newly loaded chunks (and brings older saves' metro up to date first). */
 internal fun Game.layMetro() {
     if (!isClient && metroNet.version < 2) upgradeMetro()
+    if (!isClient && metroNet.version < 4) {
+        // Older stations get their train call buttons.
+        metroNet.version = MetroNetwork.VERSION
+        for (s in metroNet.stations) { world.ensureLoaded(s[0] shr 4, s[2] shr 4); placeCallButton(s[0], s[1], s[2]) }
+    }
     val lines = metroNet.lines
     while (true) {
         val key = world.arrived.poll() ?: break
@@ -350,9 +356,9 @@ internal fun Game.metroCatchUp(x: Int, z: Int) {
 internal fun Game.metroStationName(s: IntArray): String = world.blockEntities.nameNear(s[0], s[1], s[2], 14) ?: "Station"
 
 /** Getting on a metro or bullet train: offer the stations it can run to non-stop. */
-internal fun Game.offerMetroStations(c: Cart) {
+internal fun Game.offerMetroStations(c: Cart, line: Int? = null) {
     val power = carts.power(c) ?: return
-    val kind = if (power.isMetroLike) TrackEnd.METRO else TrackEnd.RAILWAY
+    val kind = line ?: if (power.isMetroLike) TrackEnd.METRO else TrackEnd.RAILWAY
     val here = c.x to c.z
     val choices = metroNet.stations.filter { it[3] == kind }.filter { (it[0] - here.first) * (it[0] - here.first) + (it[2] - here.second) * (it[2] - here.second) > 30f * 30f }
     if (choices.isEmpty()) return
@@ -366,7 +372,8 @@ fun Game.metroTo(name: String) {
     val head = carts.head(c)
     if (name.isEmpty()) { head.dest = null; uiEvents.add("toast:Stopping at every station"); return }
     val kind = if (h.isMetroLike) TrackEnd.METRO else TrackEnd.RAILWAY
-    val s = metroNet.stations.firstOrNull { it[3] == kind && metroStationName(it) == name } ?: return
+    val s = metroNet.stations.firstOrNull { it[3] == kind && metroStationName(it) == name }
+        ?: metroNet.stations.firstOrNull { metroStationName(it) == name } ?: return
     head.dest = s
     head.stopTimer = minOf(head.stopTimer, 1f)
     uiEvents.add("toast:Non-stop to $name")
@@ -405,7 +412,7 @@ private fun siteOf(ends: List<TrackEnd>): Site? {
  */
 private fun Game.upgradeMetro() {
     val net = metroNet
-    net.version = MetroNetwork.VERSION
+    net.version = 2
     val groups = net.ends.groupBy { it.group }
     val sites = HashMap<Int, Site>()
     for ((g, e) in groups) siteOf(e)?.let { sites[g] = it }

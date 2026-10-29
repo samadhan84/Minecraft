@@ -76,7 +76,9 @@ enum class MobType(
     // ---- City people (appended): walk the pavements and parks of the cities, and say hello when tapped.
     CITIZEN("Man", 0.3f, 1.85f, 20, false, 1.1f),
     CITIZEN_WOMAN("Woman", 0.3f, 1.75f, 20, false, 1.1f),
-    CITIZEN_KID("Child", 0.25f, 1.25f, 14, false, 1.4f);
+    CITIZEN_KID("Child", 0.25f, 1.25f, 14, false, 1.4f),
+    /** A little helper that hovers after you and does what you tell it (see Robot.kt). */
+    ROBOT("Robot", 0.3f, 0.95f, 60, false, 2f);
 
     val isCitizen get() = this == CITIZEN || this == CITIZEN_WOMAN || this == CITIZEN_KID
 
@@ -215,8 +217,9 @@ class Mobs(private val world: World) {
             val dx = m.x - p.x; val dz = m.z - p.z
             val far = dx * dx + dz * dz > 110f * 110f
             if (m.dead && m.deathTime > 0.8f) { it.remove(); continue }
-            // Travellers go wherever their train or plane goes (moved by Passengers.kt), near or far.
-            if (m.ride != null) continue
+            // Travellers go wherever their train or plane goes (moved by Passengers.kt), near or far;
+            // robots fly where they are told (Robot.kt).
+            if (m.ride != null || m.type == MobType.ROBOT) continue
             if (far || !world.isLoaded(floorInt(m.x), floorInt(m.z)) || (!hostileEnabled && m.type.hostile && !m.tamed)) {
                 if (persistent(m) && !m.dead && (far || !world.isLoaded(floorInt(m.x), floorInt(m.z)))) parked.add(m)
                 it.remove(); continue
@@ -784,7 +787,7 @@ class Mobs(private val world: World) {
     fun voice(t: MobType) = when (t) {
         MobType.WARDEN -> "enderman"
         MobType.DROWNED -> "zombie"; MobType.RABBIT, MobType.SQUID, MobType.COD -> "none"
-        MobType.IRON_GOLEM, MobType.SNOW_GOLEM, MobType.TURTLE, MobType.AXOLOTL -> "none"
+        MobType.IRON_GOLEM, MobType.SNOW_GOLEM, MobType.TURTLE, MobType.AXOLOTL, MobType.ROBOT -> "none"
         MobType.MOOSHROOM -> "cow"; MobType.POLAR_BEAR, MobType.PANDA -> "bear"
         else -> t.name.lowercase()
     }

@@ -343,6 +343,7 @@ object Items {
         for (t in listOf(com.vishucraft.game.engine.MobType.CITIZEN, com.vishucraft.game.engine.MobType.CITIZEN_WOMAN, com.vishucraft.game.engine.MobType.CITIZEN_KID))
             add("${t.displayName} Spawn Egg", "spawn_egg_${t.name.lowercase()}", use = ItemUse.SPAWN)
         add("Blueprint: Railway Station", "blueprint", use = ItemUse.BLUEPRINT, maxStack = 16)
+        add("Robot Spawn Egg", "spawn_egg_robot", use = ItemUse.SPAWN)
 
         all = list
         for (i in all) { byId[i.id] = i; byName[i.name] = i.id }

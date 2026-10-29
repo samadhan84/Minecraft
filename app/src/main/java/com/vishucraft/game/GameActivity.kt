@@ -23,6 +23,8 @@ import com.vishucraft.game.engine.GameInput
 import com.vishucraft.game.engine.flyTo
 import com.vishucraft.game.engine.liftTo
 import com.vishucraft.game.engine.metroTo
+import com.vishucraft.game.engine.callTrain
+import com.vishucraft.game.engine.robotCommand
 import com.vishucraft.game.render.GameRenderer
 import com.vishucraft.game.ui.CrosshairView
 import com.vishucraft.game.ui.HotbarView
@@ -362,7 +364,7 @@ class GameActivity : Activity() {
         addMenu("Controls") { showControls() }
         root.addView(pauseMenu, FrameLayout.LayoutParams(-1, -1))
         if (!touch) handler.postDelayed({ showToast("Press MENU / Y for controls help in the pause menu (Back)") }, 800)
-        handler.postDelayed({ showToast("Play time left today: ${settings.playLimit().minutesLeft()} minutes") }, 3600)
+        if (com.vishucraft.game.engine.PlayLimit.ENABLED) handler.postDelayed({ showToast("Play time left today: ${settings.playLimit().minutesLeft()} minutes") }, 3600)
     }
 
     /**
@@ -619,6 +621,29 @@ class GameActivity : Activity() {
                 android.app.AlertDialog.Builder(this).setTitle("Where do you want to fly?")
                     .setItems(names) { _, i -> val n = names[i]; glView.queueEvent { game.flyTo(n) } }
                     .setNegativeButton("Not now", null).show()
+            }
+            e.startsWith("robot:") -> {
+                // Tapped the robot: what should it do?
+                val uid = e.removePrefix("robot:").toIntOrNull() ?: return
+                releaseInputs()
+                val input = android.widget.EditText(this).apply { hint = "e.g. follow me, mine, chop trees, build a house"; setSingleLine() }
+                val quick = arrayOf("follow me", "stay here", "mine", "chop trees", "farm", "guard me", "build a house", "help")
+                android.app.AlertDialog.Builder(this).setTitle("What should the robot do?").setView(input)
+                    .setPositiveButton("Do it") { _, _ -> val txt = input.text.toString(); glView.queueEvent { game.robotCommand(uid, txt) } }
+                    .setNeutralButton("Quick…") { _, _ ->
+                        android.app.AlertDialog.Builder(this).setTitle("Robot").setItems(quick) { _, i -> glView.queueEvent { game.robotCommand(uid, quick[i]) } }.show()
+                    }
+                    .setNegativeButton("Cancel", null).show()
+                input.requestFocus()
+            }
+            e.startsWith("calltrain:") -> {
+                // Pressed a station's call button: which kind of train?
+                releaseInputs()
+                val (x, y, z) = e.removePrefix("calltrain:").split(',').map { it.toInt() }
+                val names = com.vishucraft.game.engine.TRAIN_CHOICES.toTypedArray()
+                android.app.AlertDialog.Builder(this).setTitle("Call a train, just for you")
+                    .setItems(names) { _, i -> glView.queueEvent { game.callTrain(names[i], x, y, z) } }
+                    .setNegativeButton("Cancel", null).show()
             }
             e.startsWith("metro:") -> {
                 // Got on a metro or bullet train: which station, non-stop?
@@ -898,6 +923,7 @@ class GameActivity : Activity() {
     private lateinit var playLimit: com.vishucraft.game.engine.PlayLimit
 
     private fun showTimer() {
+        timerText.visibility = if (com.vishucraft.game.engine.PlayLimit.ENABLED) View.VISIBLE else View.GONE
         timerText.text = "⏱ " + playLimit.clock()
         timerText.setTextColor(if (playLimit.used > com.vishucraft.game.engine.PlayLimit.LIMIT - 5 * 60) Color.rgb(255, 110, 100) else Color.WHITE)
     }

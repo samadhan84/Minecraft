@@ -8,7 +8,8 @@ import kotlin.math.sin
 /*
  * People travel too. When a metro, bullet train or railway train stops at a station, city people waiting nearby
  * get on, ride one to three stations and get off onto the platform. When an airplane is about to leave an
- * airport, people in and around the terminal board it and get off at the next airport.
+ * airport, people in and around the terminal board it and get off at the next airport. New travellers keep
+ * arriving at the stations and airports near the player.
  */
 
 /** Which trains were standing at a station and which planes were parked, last frame. */
@@ -17,11 +18,14 @@ internal class Travel {
     val parked = HashSet<Aircraft>()
     val boarded = HashSet<Aircraft>()
     val rnd = java.util.Random()
+    var arrivals = 5f
 }
 
-internal fun Game.updatePassengers() {
+internal fun Game.updatePassengers(dt: Float = 0f) {
     if (isClient) return
     val t = travel
+    t.arrivals -= dt
+    if (t.arrivals <= 0f) { t.arrivals = 12f; newTravellers() }
     // Travellers sit in their car or plane, two by two.
     val seats = HashMap<Any, Int>()
     for (m in mobs.list) {
@@ -54,6 +58,7 @@ internal fun Game.updatePassengers() {
         for (m in mobs.list) if (m.ride is Cart && cars.any { it === m.ride }) {
             if (--m.rideStops <= 0) { getOff(m, m.ride as Cart); off.add(m) }
         }
+        if (h.private) continue   // a called train carries only the player
         val seatsFor = cars.filter { it.kind == Cart.COACH }.ifEmpty { cars }
         var aboard = mobs.list.count { m -> cars.any { it === m.ride } }
         for (m in waiting(h.x, h.y, h.z, 14f)) {
@@ -109,4 +114,33 @@ private fun getOffPlane(m: Mob, a: Aircraft) {
     val rx = cos(a.yaw); val rz = sin(a.yaw)
     val side = if (m.uid % 2 == 0) 6f else -6f
     m.x = a.x + rx * side; m.z = a.z + rz * side; m.y = a.y + 0.5f
+}
+
+/** A new traveller turns up at each station and airport near the player that has only a few people waiting. */
+private fun Game.newTravellers() {
+    val folk = listOf(MobType.CITIZEN, MobType.CITIZEN_WOMAN, MobType.CITIZEN_KID)
+    val near = mobs.list.count { it.type.isCitizen && (it.x - player.x) * (it.x - player.x) + (it.z - player.z) * (it.z - player.z) < 100f * 100f }
+    if (near >= 80) return
+    val spots = metroNet.stations.map { Triple(it[0], it[1], it[2]) } +
+        aircraft.airports.map { Triple(floorInt(it.x), floorInt(it.y), floorInt(it.z)) }
+    for ((x, y, z) in spots) {
+        val dx = x - player.x; val dz = z - player.z
+        if (dx * dx + dz * dz > 80f * 80f || !world.isLoaded(x, z)) continue
+        if (waiting(x + 0.5f, y.toFloat(), z + 0.5f, 16f).size >= 6) continue
+        val spot = standingSpot(x, y, z) ?: continue
+        mobs.list.add(Mob(folk[travel.rnd.nextInt(folk.size)], spot[0] + 0.5f, spot[1].toFloat(), spot[2] + 0.5f).also { it.yaw = travel.rnd.nextFloat() * 6.28f })
+    }
+}
+
+/** A free place to stand (on a platform or the ground) within a few blocks of (x, y, z), picked at random. */
+private fun Game.standingSpot(x: Int, y: Int, z: Int): IntArray? {
+    repeat(20) {
+        val bx = x + travel.rnd.nextInt(9) - 4; val bz = z + travel.rnd.nextInt(9) - 4
+        for (by in y..y + 1) {
+            val below = world.getBlock(bx, by - 1, bz)
+            if (world.getBlock(bx, by, bz) == Blocks.AIR && world.getBlock(bx, by + 1, bz) == Blocks.AIR &&
+                Blocks.solid[below] && !com.vishucraft.game.world.Rails.isRail(below) && below != Blocks.RAILWAY_BALLAST) return intArrayOf(bx, by, bz)
+        }
+    }
+    return null
 }
