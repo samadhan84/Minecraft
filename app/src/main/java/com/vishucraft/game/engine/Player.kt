@@ -1,0 +1,160 @@
+package com.vishucraft.game.engine
+
+import com.vishucraft.game.world.Blocks
+import com.vishucraft.game.world.World
+import com.vishucraft.game.world.floorInt
+import kotlin.math.cos
+import kotlin.math.floor
+import kotlin.math.sin
+import kotlin.math.sqrt
+
+/** First-person player with AABB collision, walking, swimming and creative flight. */
+class Player {
+    companion object {
+        const val HALF_WIDTH = 0.3f
+        const val HEIGHT = 1.8f
+        const val EYE = 1.62f
+        const val WALK_SPEED = 4.3f
+        const val FLY_SPEED = 10.5f
+        const val GRAVITY = 30f
+        const val JUMP_VELOCITY = 9.2f
+        const val MAX_PITCH = 1.55f
+    }
+
+    var x = 0f; var y = 0f; var z = 0f
+    var vx = 0f; var vy = 0f; var vz = 0f
+    /** Walking speed and jump height multipliers (sprinting, potions). */
+    var speedMul = 1f
+    var jumpMul = 1f
+    var yaw = 0f
+    var pitch = 0f
+    var onGround = false
+    var flying = false
+    var inWater = false
+    var headInWater = false
+    var headInLava = false
+    var onLadder = false
+    /** Distance walked, drives view bobbing. */
+    var walkDist = 0f
+
+    val eyeY get() = y + EYE
+
+    fun lookDir(out: FloatArray) {
+        val cp = cos(pitch)
+        out[0] = cp * sin(yaw)
+        out[1] = sin(pitch)
+        out[2] = -cp * cos(yaw)
+    }
+
+    fun rotate(dYaw: Float, dPitch: Float) {
+        yaw = (yaw + dYaw) % (2 * Math.PI.toFloat())
+        pitch = (pitch + dPitch).coerceIn(-MAX_PITCH, MAX_PITCH)
+    }
+
+    /**
+     * @param moveF forward input (-1..1), [moveS] strafe input (-1..1)
+     */
+    fun update(dt: Float, world: World, moveF: Float, moveS: Float, jump: Boolean, descend: Boolean) {
+        val feet = world.getBlock(floorInt(x), floorInt(y + 0.1f), floorInt(z))
+        val head = world.getBlock(floorInt(x), floorInt(eyeY), floorInt(z))
+        inWater = feet == Blocks.WATER || feet == Blocks.LAVA
+        headInWater = head == Blocks.WATER
+        headInLava = head == Blocks.LAVA
+
+        val sy = sin(yaw); val cy = cos(yaw)
+        // forward = (sin yaw, 0, -cos yaw), right = (cos yaw, 0, sin yaw)
+        var wx = sy * moveF + cy * moveS
+        var wz = -cy * moveF + sy * moveS
+        val len = sqrt(wx * wx + wz * wz)
+        if (len > 1f) { wx /= len; wz /= len }
+
+        if (flying) {
+            val speed = FLY_SPEED
+            vx = approach(vx, wx * speed, 40f * dt)
+            vz = approach(vz, wz * speed, 40f * dt)
+            val targetY = (if (jump) speed else 0f) - (if (descend) speed else 0f)
+            vy = approach(vy, targetY, 40f * dt)
+        } else if (inWater) {
+            val speed = WALK_SPEED * 0.55f
+            vx = approach(vx, wx * speed, 20f * dt)
+            vz = approach(vz, wz * speed, 20f * dt)
+            vy -= GRAVITY * 0.25f * dt
+            if (jump) vy = approach(vy, 4f, 30f * dt)
+            vy = vy.coerceIn(-3f, 5f)
+        } else {
+            val speed = WALK_SPEED * speedMul
+            val accel = if (onGround) 50f else 12f
+            vx = approach(vx, wx * speed, accel * dt)
+            vz = approach(vz, wz * speed, accel * dt)
+            vy -= GRAVITY * dt
+            if (vy < -55f) vy = -55f
+            if (jump && onGround) vy = JUMP_VELOCITY * jumpMul
+        }
+
+        // Ladders: climb when pushing forward or jumping, otherwise slide down slowly.
+        fun climbable(b: Int) = b == Blocks.LADDER || b == Blocks.SCAFFOLDING
+        val ladder = climbable(world.getBlock(floorInt(x), floorInt(y + 0.1f), floorInt(z))) ||
+            climbable(world.getBlock(floorInt(x), floorInt(y + 1f), floorInt(z)))
+        onLadder = ladder && !flying
+        if (onLadder) {
+            vy = if (jump || moveF > 0.3f) 3.2f else if (descend) -3f else maxOf(vy, -1.2f)
+        }
+
+        val startX = x; val startZ = z
+        val wantX = vx * dt; val wantZ = vz * dt
+        val hitX = !moveAxis(world, 0, wantX)
+        val hitZ = !moveAxis(world, 2, wantZ)
+        onGround = false
+        if (!moveAxis(world, 1, vy * dt)) {
+            if (vy < 0) onGround = true
+            vy = 0f
+        }
+        if (hitX) vx = 0f
+        if (hitZ) vz = 0f
+
+        // Auto-jump onto single-block steps when walking into them (mobile friendly).
+        if (!flying && !onLadder && onGround && (hitX || hitZ) && len > 0.1f && canStepUp(world, wantX, wantZ)) {
+            vy = JUMP_VELOCITY
+        }
+
+        if (onGround) {
+            val dx = x - startX; val dz = z - startZ
+            walkDist += sqrt(dx * dx + dz * dz)
+        }
+        if (onGround && flying) flying = false
+    }
+
+    private fun approach(v: Float, target: Float, step: Float): Float =
+        if (v < target) minOf(v + step, target) else maxOf(v - step, target)
+
+    private fun canStepUp(world: World, dx: Float, dz: Float): Boolean {
+        val ax = x + Math.signum(dx) * (HALF_WIDTH + 0.3f)
+        val az = z + Math.signum(dz) * (HALF_WIDTH + 0.3f)
+        val bx = floorInt(ax); val bz = floorInt(az)
+        val by = floorInt(y + 0.01f)
+        return Blocks.solid[world.getBlock(bx, by, bz)] &&
+            !Blocks.solid[world.getBlock(bx, by + 1, bz)] &&
+            !Blocks.solid[world.getBlock(bx, by + 2, bz)] &&
+            !Blocks.solid[world.getBlock(floorInt(x), by + 2, floorInt(z))]
+    }
+
+    private val posBuf = FloatArray(3)
+
+    /** Moves along one axis, stopping at blocks (using their real shapes). Returns false if blocked. */
+    private fun moveAxis(world: World, axis: Int, delta: Float): Boolean {
+        posBuf[0] = x; posBuf[1] = y; posBuf[2] = z
+        val ok = com.vishucraft.game.world.Collision.sweep(world, posBuf, HALF_WIDTH, HEIGHT, axis, delta)
+        x = posBuf[0]; y = posBuf[1]; z = posBuf[2]
+        return ok
+    }
+
+    /** True if a block at (bx, by, bz) would overlap the player's body. */
+    fun intersectsBlock(bx: Int, by: Int, bz: Int): Boolean =
+        x + HALF_WIDTH > bx && x - HALF_WIDTH < bx + 1 &&
+            y + HEIGHT > by && y < by + 1 &&
+            z + HALF_WIDTH > bz && z - HALF_WIDTH < bz + 1
+
+    fun blockX() = floor(x).toInt()
+    fun blockZ() = floor(z).toInt()
+    fun blockY() = floor(eyeY).toInt()
+}

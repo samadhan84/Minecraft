@@ -1,0 +1,941 @@
+package com.vishucraft.game
+
+import android.annotation.SuppressLint
+import android.app.Activity
+import android.content.pm.PackageManager
+import android.graphics.Color
+import android.opengl.GLSurfaceView
+import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import android.os.SystemClock
+import android.view.Gravity
+import android.view.InputDevice
+import android.view.KeyEvent
+import android.view.MotionEvent
+import android.view.View
+import android.view.WindowManager
+import android.widget.FrameLayout
+import android.widget.LinearLayout
+import android.widget.TextView
+import com.vishucraft.game.engine.Game
+import com.vishucraft.game.engine.GameInput
+import com.vishucraft.game.engine.flyTo
+import com.vishucraft.game.engine.liftTo
+import com.vishucraft.game.engine.metroTo
+import com.vishucraft.game.render.GameRenderer
+import com.vishucraft.game.ui.CrosshairView
+import com.vishucraft.game.ui.HotbarView
+import com.vishucraft.game.ui.HudButton
+import com.vishucraft.game.ui.InventoryView
+import com.vishucraft.game.ui.JoystickView
+import com.vishucraft.game.ui.dp
+import com.vishucraft.game.ui.dpi
+import com.vishucraft.game.ui.menuButton
+import android.widget.ImageView
+import com.vishucraft.game.ui.BlockIcons
+import com.vishucraft.game.world.Items
+import com.vishucraft.game.world.LevelData
+import com.vishucraft.game.world.GameMode
+import com.vishucraft.game.world.ItemStack
+import com.vishucraft.game.ui.ContainerScreen
+import com.vishucraft.game.ui.Settings
+import com.vishucraft.game.ui.StatusView
+import com.vishucraft.game.ui.settingsDialog
+import com.vishucraft.game.world.World
+import java.io.File
+import javax.microedition.khronos.egl.EGL10
+import javax.microedition.khronos.egl.EGLConfig
+import javax.microedition.khronos.egl.EGLDisplay
+import kotlin.math.abs
+
+class GameActivity : Activity() {
+    companion object {
+        const val EXTRA_SEED = "seed"
+        const val EXTRA_WORLD = "world"
+        const val EXTRA_NAME = "name"
+        const val EXTRA_MODE = "mode"
+        const val EXTRA_JOIN = "join"
+
+        fun worldsRoot(activity: Activity) = File(activity.filesDir, "worlds").apply { mkdirs() }
+
+        const val CONTROLS_HELP =
+            "TV remote:\n" +
+                "• Up / Down: walk forward / back\n" +
+                "• Left / Right: turn\n" +
+                "• Channel + / Channel −: look up / down\n" +
+                "• OK: place, use, attack. Hold OK: mine\n" +
+                "• Menu: block inventory\n" +
+                "• Rewind / Fast-forward: previous / next hotbar slot\n" +
+                "• Back: pause menu\n\n" +
+                "Gamepad:\n" +
+                "• Left stick: move, right stick: look\n" +
+                "• RT: mine, LT: place / attack\n" +
+                "• A: jump / fly up, left stick click: fly down\n" +
+                "• X: toggle flying, Y: inventory\n" +
+                "• LB / RB: hotbar slot, B or Start: pause\n\n" +
+                "Keyboard:\n" +
+                "• W A S D: move, arrows: turn, R / V: look up / down\n" +
+                "• Space: jump, C or Shift: fly down, F: fly\n" +
+                "• Enter or K: place, J: mine, E: inventory, 1-9 / Tab: slots, Q: drop item, Ctrl: sprint"
+    }
+
+    private lateinit var glView: GLSurfaceView
+    private lateinit var game: Game
+    private lateinit var world: World
+    private lateinit var level: LevelData
+    private val input = GameInput()
+    private lateinit var hotbar: HotbarView
+    private lateinit var stats: TextView
+    private lateinit var toast: TextView
+    private lateinit var hand: ImageView
+    private lateinit var hurtFlash: View
+    private lateinit var pauseMenu: android.widget.ScrollView
+    private lateinit var pauseList: LinearLayout
+    private lateinit var inventory: InventoryView
+    private lateinit var flyButton: HudButton
+    private lateinit var runButton: HudButton
+    private var sprinting = false
+    /** The online room (code) this game is open in, if any. */
+    @Volatile private var onlineRoom: com.vishucraft.game.net.HostTunnel? = null
+    private lateinit var effectsText: TextView
+    private lateinit var timerText: TextView
+    private lateinit var lookLabel: TextView
+    private lateinit var downButton: HudButton
+    private lateinit var root: FrameLayout
+    private lateinit var settings: Settings
+    private lateinit var worldDirForDim: File
+    private lateinit var sounds: com.vishucraft.game.audio.Sounds
+    private lateinit var status: StatusView
+    private lateinit var screen: ContainerScreen
+    private val handler = Handler(Looper.getMainLooper())
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+
+        val client = if (intent.getBooleanExtra(EXTRA_JOIN, false)) com.vishucraft.game.net.Net.pendingClient else null
+        val dir = File(worldsRoot(this), intent.getStringExtra(EXTRA_WORLD) ?: "world1")
+        level = if (client != null) LevelData.create(client.seed, client.worldName, client.mode).apply {
+            hasPlayer = true; x = client.spawnX + 1.5f; y = client.spawnY + 0.5f; z = client.spawnZ + 0.5f; timeOfDay = client.time
+        } else LevelData.read(dir) ?: LevelData.create(
+            intent.getLongExtra(EXTRA_SEED, System.currentTimeMillis()),
+            intent.getStringExtra(EXTRA_NAME) ?: "My World",
+            if (intent.getBooleanExtra(EXTRA_MODE, false)) GameMode.SURVIVAL else GameMode.CREATIVE,
+        )
+        // Each dimension keeps its own chunks in a sub-folder of the world.
+        val dimDir = when (level.dimension) {
+            com.vishucraft.game.world.Dimension.OVERWORLD -> dir
+            com.vishucraft.game.world.Dimension.EMBER -> File(dir, "ember")
+            com.vishucraft.game.world.Dimension.SKY -> File(dir, "sky")
+        }
+        world = World(level.seed, if (client != null) null else dimDir, level.dimension, level.flat)
+        if (client != null) world.remoteLoader = { cx, cz -> client.requestChunk(cx, cz) }
+        game = Game(world, level, input, if (client != null) null else dir)
+        worldDirForDim = dir
+        if (client != null) { game.net = client; com.vishucraft.game.net.Net.pendingClient = null }
+        settings = Settings(this)
+        sounds = com.vishucraft.game.audio.Sounds(this)
+        game.soundSink = { name, x, y, z, gain ->
+            if (name.startsWith("mat:")) sounds.play(com.vishucraft.game.audio.Sounds.material(name.substring(4).toInt()), x, y, z, gain, 0.9f + Math.random().toFloat() * 0.2f)
+            else sounds.play(name, x, y, z, gain)
+        }
+        game.listener = { x, y, z, yaw -> sounds.setListener(x, y, z, yaw) }
+        applySettings()
+
+        glView = GLSurfaceView(this).apply {
+            setEGLContextClientVersion(2)
+            setEGLConfigChooser(DepthConfigChooser())
+            preserveEGLContextOnPause = true
+            setRenderer(GameRenderer(game, { e -> runOnUiThread { onGameEvent(e) } }) { text -> runOnUiThread { onStats(text) } })
+            renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
+            setOnTouchListener(LookTouchHandler())
+        }
+
+        root = FrameLayout(this)
+        root.addView(glView, FrameLayout.LayoutParams(-1, -1))
+        root.addView(CrosshairView(this), FrameLayout.LayoutParams(-1, -1))
+        buildHud()
+        setContentView(root)
+        hideSystemUi()
+    }
+
+    private fun lp(w: Float, h: Float, gravity: Int, l: Float = 0f, t: Float = 0f, r: Float = 0f, b: Float = 0f) =
+        FrameLayout.LayoutParams(if (w < 0) w.toInt() else dpi(w), if (h < 0) h.toInt() else dpi(h), gravity).apply {
+            setMargins(dpi(l), dpi(t), dpi(r), dpi(b))
+        }
+
+    private fun buildHud() {
+        // Movement
+        val touch = packageManager.hasSystemFeature(PackageManager.FEATURE_TOUCHSCREEN)
+        if (touch) root.addView(JoystickView(this, input), lp(200f, 200f, Gravity.BOTTOM or Gravity.START, l = 8f, b = 52f))
+
+        val jump = HudButton(this, "▲") { input.jumpHeld = it }
+        if (touch) root.addView(jump, lp(76f, 76f, Gravity.BOTTOM or Gravity.END, r = 24f, b = 64f))
+        runButton = HudButton(this, "RUN") { if (it) { sprinting = !sprinting; input.sprint = sprinting; runButton.toggled = sprinting } }
+        if (touch) root.addView(runButton, lp(64f, 44f, Gravity.BOTTOM or Gravity.END, r = 30f, b = 150f))
+        downButton = HudButton(this, "▼") { input.descendHeld = it }
+        if (touch) root.addView(downButton, lp(64f, 64f, Gravity.BOTTOM or Gravity.END, r = 112f, b = 64f))
+        downButton.visibility = View.GONE
+
+        flyButton = HudButton(this, "FLY") { if (it) input.actions.add(GameInput.Action.TOGGLE_FLY) }
+        root.addView(flyButton, lp(56f, 44f, Gravity.TOP or Gravity.END, t = 12f, r = 76f))
+        if (game.survival) flyButton.visibility = View.GONE
+        val menu = HudButton(this, "II") { if (it) handler.post { showPause(true) } }
+        root.addView(menu, lp(52f, 44f, Gravity.TOP or Gravity.END, t = 12f, r = 16f))
+
+        // Hotbar + inventory button
+        val bar = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        hotbar = HotbarView(this, game.inventory, game.survival) { slot -> selectSlot(slot) }
+        hotbar.selected = level.selectedSlot
+        bar.addView(hotbar, LinearLayout.LayoutParams(dpi(9 * 42f), dpi(42f)))
+        val inv = HudButton(this, "•••") { if (it) handler.post { showInventory(true) } }
+        bar.addView(inv, LinearLayout.LayoutParams(dpi(46f), dpi(42f)).apply { leftMargin = dpi(4f) })
+        // Throw the held item away (one at a time).
+        val drop = HudButton(this, "DROP") { if (it) input.actions.add(GameInput.Action.DROP) }
+        if (touch) bar.addView(drop, LinearLayout.LayoutParams(dpi(52f), dpi(42f)).apply { leftMargin = dpi(4f) })
+        root.addView(bar, lp(-2f, -2f, Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL, b = 4f))
+
+        lookLabel = TextView(this).apply {
+            setTextColor(Color.WHITE); textSize = 15f
+            setShadowLayer(3f, 2f, 2f, Color.BLACK); gravity = Gravity.CENTER
+        }
+        root.addView(lookLabel, lp(-2f, -2f, Gravity.TOP or Gravity.CENTER_HORIZONTAL, t = 60f))
+        effectsText = TextView(this).apply {
+            setTextColor(Color.rgb(200, 230, 255)); textSize = 13f
+            setShadowLayer(2f, 1f, 1f, Color.BLACK); gravity = Gravity.END
+        }
+        root.addView(effectsText, lp(-2f, -2f, Gravity.TOP or Gravity.END, t = 96f, r = 16f))
+        // Today's play time left (see engine/PlayLimit).
+        timerText = TextView(this).apply {
+            setTextColor(Color.WHITE); textSize = 14f; typeface = android.graphics.Typeface.DEFAULT_BOLD
+            setBackgroundColor(Color.argb(140, 0, 0, 0)); setPadding(dpi(8f), dpi(3f), dpi(8f), dpi(3f))
+        }
+        root.addView(timerText, lp(-2f, -2f, Gravity.TOP or Gravity.END, t = 62f, r = 16f))
+
+        stats = TextView(this).apply {
+            setTextColor(Color.WHITE); textSize = 12f
+            setShadowLayer(2f, 1f, 1f, Color.BLACK)
+        }
+        root.addView(stats, lp(-2f, -2f, Gravity.TOP or Gravity.START, l = 12f, t = 8f))
+
+        toast = TextView(this).apply {
+            setTextColor(Color.WHITE); textSize = 16f
+            setShadowLayer(2f, 2f, 2f, Color.BLACK)
+            gravity = Gravity.CENTER
+            alpha = 0f
+        }
+        root.addView(toast, lp(-2f, -2f, Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL, b = 78f))
+
+        // The game's name: big in the middle when the world opens, then a small label at the top while playing.
+        val pixel = try { android.graphics.Typeface.createFromAsset(assets, "fonts/PressStart2P.ttf") }
+            catch (e: Exception) { android.graphics.Typeface.MONOSPACE }
+        val nameTag = TextView(this).apply {
+            text = "DhruvVishu"; textSize = 11f
+            typeface = pixel
+            setTextColor(Color.rgb(255, 255, 110)); setShadowLayer(2f, 2f, 2f, Color.BLACK)
+            alpha = 0f
+        }
+        root.addView(nameTag, lp(-2f, -2f, Gravity.TOP or Gravity.CENTER_HORIZONTAL, t = 8f))
+        val bigTitle = TextView(this).apply {
+            text = "DhruvVishu"; textSize = 34f
+            typeface = pixel
+            setTextColor(Color.rgb(255, 214, 70)); setShadowLayer(0.01f, 6f, 6f, Color.rgb(60, 40, 16))
+            gravity = Gravity.CENTER
+        }
+        root.addView(bigTitle, lp(-2f, -2f, Gravity.CENTER, b = 120f))
+        bigTitle.animate().setStartDelay(2500).setDuration(900).alpha(0f).withEndAction {
+            bigTitle.visibility = View.GONE
+            nameTag.animate().setDuration(500).alpha(0.85f)
+        }
+
+        status = StatusView(this)
+        root.addView(status, lp(9 * 42f, 36f, Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL, l = 0f, r = 50f, b = 50f))
+        if (!game.survival) status.visibility = View.GONE
+        hurtFlash = View(this).apply { setBackgroundColor(Color.argb(110, 220, 0, 0)); alpha = 0f }
+        root.addView(hurtFlash, 1, FrameLayout.LayoutParams(-1, -1))
+
+        // The held block or tool, bottom right, swings when you mine or place.
+        hand = ImageView(this).apply {
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            rotation = -18f
+            pivotX = dp(110f); pivotY = dp(110f)
+        }
+        root.addView(hand, 1, lp(110f, 110f, Gravity.BOTTOM or Gravity.END, r = 150f, b = 30f))
+        updateHand()
+
+        inventory = InventoryView(this) { id ->
+            if (id != null) {
+                val slot = hotbar.selected
+                glView.queueEvent {
+                    game.inventory.slots[slot] = ItemStack(id, 1)
+                    runOnUiThread { selectSlot(slot); hotbar.invalidate() }
+                }
+            }
+            showInventory(false)
+        }
+        inventory.visibility = View.GONE
+        root.addView(inventory, FrameLayout.LayoutParams(-1, -1))
+
+        screen = ContainerScreen(this, game, { action ->
+            glView.queueEvent { action(game); runOnUiThread { screen.invalidate(); hotbar.invalidate(); updateHand() } }
+        }) { updateHand() }
+        screen.visibility = View.GONE
+        root.addView(screen, FrameLayout.LayoutParams(-1, -1))
+
+        // The game menu scrolls, so every option can be reached on short phone and TV screens.
+        pauseList = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
+            setPadding(0, dpi(16f), 0, dpi(16f))
+        }
+        pauseMenu = android.widget.ScrollView(this).apply {
+            setBackgroundColor(Color.argb(160, 0, 0, 0))
+            isClickable = true
+            isFillViewport = true
+            visibility = View.GONE
+            addView(FrameLayout(this@GameActivity).apply {
+                addView(pauseList, FrameLayout.LayoutParams(-2, -2, Gravity.CENTER))
+            }, FrameLayout.LayoutParams(-1, -2))
+        }
+        val title = TextView(this).apply {
+            text = "Game menu"; setTextColor(Color.WHITE); textSize = 24f
+            setShadowLayer(2f, 3f, 3f, Color.DKGRAY); gravity = Gravity.CENTER
+        }
+        pauseList.addView(title, LinearLayout.LayoutParams(-2, -2).apply { bottomMargin = dpi(16f) })
+        fun addMenu(label: String, action: (TextView) -> Unit) {
+            lateinit var b: TextView
+            b = menuButton(this, label) { action(b) }
+            pauseList.addView(b, LinearLayout.LayoutParams(dpi(300f), -2).apply { bottomMargin = dpi(10f) })
+        }
+        addMenu("Back to game") { showPause(false) }
+        addMenu("Save game") {
+            if (game.isClient) { showToast("The host saves this world"); return@addMenu }
+            glView.queueEvent { game.save(); runOnUiThread { showToast("Game saved") } }
+        }
+        addMenu("Save and quit") { saveAndQuit() }
+        addMenu(modeLabel()) { b ->
+            if (game.isClient) { showToast("The host picks the game mode"); return@addMenu }
+            glView.queueEvent {
+                val msg = game.switchMode()
+                runOnUiThread { applyMode(); b.text = modeLabel(); showToast(msg); showPause(false) }
+            }
+        }
+        addMenu("Skip to next morning / night") {
+            glView.queueEvent { game.timeOfDay = if (game.daylight > 0.5f) 0.52f else 0.0f }
+            showPause(false)
+        }
+        addMenu("Mobs: Normal") { b ->
+            val hostile = !game.mobs.hostileEnabled
+            glView.queueEvent { game.mobs.hostileEnabled = hostile }
+            b.text = if (hostile) "Mobs: Normal" else "Mobs: Peaceful (no monsters)"
+        }
+        addMenu(if (settings.weather) "Weather: On" else "Weather: Off") { b ->
+            settings.weather = !settings.weather
+            applySettings()
+            b.text = if (settings.weather) "Weather: On" else "Weather: Off"
+        }
+        addMenu(if (game.isClient) "Wi-Fi: joined" else "Open to Wi-Fi") { b ->
+            if (game.net != null) { showToast(game.net!!.status); return@addMenu }
+            val name = settings.playerName
+            glView.queueEvent {
+                val result = try {
+                    game.net = com.vishucraft.game.net.HostSession(game, level.name, name)
+                    "Open! Friends on the same Wi-Fi can join from the title screen.\nYour address: ${com.vishucraft.game.net.Net.localAddress()}"
+                } catch (e: Exception) { "Could not open the game: ${e.message}" }
+                runOnUiThread { showToast(result); b.text = if (game.net != null) "Wi-Fi: open" else "Open to Wi-Fi" }
+            }
+        }
+        addMenu("Play online (room code)") { playOnline() }
+        addMenu("Other ways to play online") {
+            showToast("Checking your internet address…")
+            Thread {
+                val help = com.vishucraft.game.net.Net.internetHelp(com.vishucraft.game.net.Net.internetAddress())
+                runOnUiThread {
+                    android.app.AlertDialog.Builder(this).setTitle("Play over the internet").setMessage(help)
+                        .setPositiveButton("OK", null).show()
+                }
+            }.start()
+        }
+        addMenu("Achievements") { showAchievements() }
+        addMenu("Settings") { settingsDialog(this) { applySettings() } }
+        addMenu("Controls") { showControls() }
+        root.addView(pauseMenu, FrameLayout.LayoutParams(-1, -1))
+        if (!touch) handler.postDelayed({ showToast("Press MENU / Y for controls help in the pause menu (Back)") }, 800)
+        handler.postDelayed({ showToast("Play time left today: ${settings.playLimit().minutesLeft()} minutes") }, 3600)
+    }
+
+    /**
+     * Opens this world to friends anywhere: the game is opened like for Wi-Fi, then a room code is taken at
+     * the online relay. Friends choose "Join online game" and type the code.
+     */
+    private fun playOnline() {
+        if (game.isClient) { showToast("You joined someone else's game. Only the host can invite more friends"); return }
+        onlineRoom?.takeIf { it.open }?.let { showRoomCode(it.code); return }
+        showToast("Opening your game online…")
+        val name = settings.playerName
+        glView.queueEvent {
+            val opened = try {
+                if (game.net == null) game.net = com.vishucraft.game.net.HostSession(game, level.name, name)
+                null
+            } catch (e: Exception) { "Could not open the game: ${e.message}" }
+            if (opened != null) { runOnUiThread { showToast(opened) }; return@queueEvent }
+            Thread {
+                val result = try { com.vishucraft.game.net.HostTunnel.start() } catch (e: Exception) { runOnUiThread { showOnlineError(e.message) }; null }
+                if (result != null) { onlineRoom = result; runOnUiThread { showRoomCode(result.code) } }
+            }.start()
+        }
+    }
+
+    private fun showOnlineError(message: String?) {
+        android.app.AlertDialog.Builder(this).setTitle("Couldn't open online")
+            .setMessage(message ?: "Check your internet connection and try again.")
+            .setPositiveButton("OK", null).show()
+    }
+
+    private fun showRoomCode(code: String) {
+        val pretty = code.chunked(3).joinToString(" ")
+        android.app.AlertDialog.Builder(this).setTitle("Room code: $pretty")
+            .setMessage("Your game is open online.\n\nFriends anywhere (Wi-Fi or mobile data) tap \"Join online game\" on the DhruvVishu home screen and type:\n\n$pretty\n\nKeep the game open while they play.")
+            .setPositiveButton("OK", null)
+            .setNeutralButton("Share code") { _, _ ->
+                startActivity(android.content.Intent.createChooser(android.content.Intent(android.content.Intent.ACTION_SEND).setType("text/plain")
+                    .putExtra(android.content.Intent.EXTRA_TEXT, "Join my DhruvVishu game! Tap \"Join online game\" and type the room code $pretty"), "Share room code"))
+            }.show()
+    }
+
+    private fun updateHand() {
+        val id = game.heldId()
+        if (id == 0) { hand.setImageDrawable(null); return }
+        val bmp = BlockIcons.get(id)
+        hand.setImageDrawable(android.graphics.drawable.BitmapDrawable(resources, bmp).apply { paint.isFilterBitmap = false })
+    }
+
+    fun swing() {
+        hand.animate().cancel()
+        hand.rotation = -18f
+        hand.animate().rotation(-60f).setDuration(90).withEndAction {
+            hand.animate().rotation(-18f).setDuration(140).start()
+        }.start()
+    }
+
+    private val swingLoop = object : Runnable {
+        override fun run() {
+            if (!input.breakHeld) return
+            swing()
+            handler.postDelayed(this, 260)
+        }
+    }
+
+    private fun selectSlot(slot: Int) {
+        input.selectedSlot = slot
+        val id = game.inventory.slots[slot]?.id ?: 0
+        updateHand()
+        if (id == 0) { showToast("Empty hand"); return }
+        val ench = Items[id]?.enchantments
+        toast.text = if (ench != null) "${Items.displayName(id)}\n$ench" else Items.displayName(id)
+        toast.animate().cancel()
+        toast.alpha = 1f
+        toast.animate().alpha(0f).setStartDelay(1200).setDuration(500).start()
+    }
+
+    private fun showInventory(show: Boolean) {
+        if (show && game.survival) { releaseInputs(); screen.open(ContainerScreen.Mode.INVENTORY); return }
+        inventory.visibility = if (show) View.VISIBLE else View.GONE
+        if (show) releaseInputs()
+    }
+
+    private fun applySettings() {
+        game.lookScale = settings.sensitivity
+        game.fov = settings.fov.toFloat()
+        game.renderDistance = settings.renderDistance
+        game.weatherEnabled = settings.weather
+        game.fancyGraphics = settings.fancy
+        sounds.volume = settings.soundVolume / 100f
+        sounds.musicVolume = settings.musicVolume / 100f
+        if (::stats.isInitialized) stats.visibility = if (settings.showDebug) View.VISIBLE else View.GONE
+    }
+
+    private fun modeLabel() = "Game mode: " + if (game.survival) "Survival  →  switch to Creative" else "Creative  →  switch to Survival"
+
+    /** Shows the buttons and bars that belong to the current game mode. */
+    private fun applyMode() {
+        flyButton.visibility = if (game.survival) View.GONE else View.VISIBLE
+        status.visibility = if (game.survival) View.VISIBLE else View.GONE
+        hotbar.showCounts = game.survival
+    }
+
+    private fun showPause(show: Boolean) {
+        pauseMenu.visibility = if (show) View.VISIBLE else View.GONE
+        if (show) {
+            releaseInputs()
+            pauseMenu.scrollTo(0, 0)
+            pauseList.getChildAt(1)?.requestFocus()
+        }
+    }
+
+    private fun releaseInputs() {
+        keyFwd = false; keyBack = false; keyLeft = false; keyRight = false
+        keyTurnL = false; keyTurnR = false; keyLookU = false; keyLookD = false
+        input.lookStickX = 0f; input.lookStickY = 0f
+        input.moveForward = 0f; input.moveStrafe = 0f
+        input.jumpHeld = false; input.descendHeld = false; input.breakHeld = false
+    }
+
+    /** A villager's offers; tap one to trade (the list stays open for more). */
+    private fun showTrades(uid: Int) {
+        releaseInputs()
+        val job = com.vishucraft.game.world.Trades.jobFor(uid)
+        val inv = game.inventory
+        val labels = job.offers.map { t ->
+            val have = inv.count(t.give)
+            "${t.giveCount} ${Items.displayName(t.give)}  →  ${t.getCount} ${Items.displayName(t.get)}" +
+                if (game.survival) "   (you have $have)" else ""
+        }.toTypedArray()
+        android.app.AlertDialog.Builder(this).setTitle("${job.title} · trades")
+            .setItems(labels) { _, i ->
+                glView.queueEvent {
+                    val msg = game.trade(uid, i)
+                    runOnUiThread { showToast(msg); showTrades(uid) }
+                }
+            }
+            .setNegativeButton("Done", null).show()
+    }
+
+    private fun showAchievements() {
+        val got = level.achievements
+        val list = com.vishucraft.game.world.Achievements.all
+        val text = list.joinToString("\n") { a -> (if (a.key in got) "✓ " else "○ ") + a.title + "  —  " + a.hint }
+        android.app.AlertDialog.Builder(this).setTitle("Achievements ${list.count { it.key in got }} / ${list.size}")
+            .setMessage(text).setPositiveButton("OK", null).show()
+    }
+
+    /** Save and quit (the world is saved when the game screen closes). */
+    private fun saveAndQuit() = finish()
+
+    private fun showControls() {
+        android.app.AlertDialog.Builder(this)
+            .setTitle("Controls")
+            .setMessage(CONTROLS_HELP)
+            .setPositiveButton("OK", null)
+            .show()
+    }
+
+    /** Saves, switches dimension and reloads the game screen in the new world. */
+    private fun travel(target: com.vishucraft.game.world.Dimension) {
+        val name = when (target) {
+            com.vishucraft.game.world.Dimension.EMBER -> "the Ember Realm"
+            com.vishucraft.game.world.Dimension.SKY -> "the Sky Isles"
+            com.vishucraft.game.world.Dimension.OVERWORLD -> "the Overworld"
+        }
+        if (game.net != null) { showToast("Portals are closed during Wi-Fi games"); return }
+        showToast("Travelling to $name…")
+        glView.queueEvent {
+            game.save()
+            level.dimension = target
+            level.arriving = true
+            level.write(worldDirForDim)
+            runOnUiThread { recreate() }
+        }
+    }
+
+    private var lastLook: String? = null
+
+    private fun showToast(text: String) {
+        toast.text = com.vishucraft.game.world.Names.show(text)
+        toast.animate().cancel()
+        toast.alpha = 1f
+        toast.animate().alpha(0f).setStartDelay(1500).setDuration(500).start()
+    }
+
+    private fun onGameEvent(e: String) {
+        when {
+            e == "hurt" -> {
+                hurtFlash.animate().cancel()
+                hurtFlash.alpha = 1f
+                hurtFlash.animate().alpha(0f).setDuration(350).start()
+            }
+            e == "died" -> showToast("You died! Respawning…")
+            e == "sleep" -> {
+                // Fade to black and back while the night passes.
+                hurtFlash.animate().cancel()
+                hurtFlash.setBackgroundColor(Color.BLACK)
+                hurtFlash.alpha = 0f
+                hurtFlash.animate().alpha(1f).setDuration(700).withEndAction {
+                    hurtFlash.animate().alpha(0f).setStartDelay(500).setDuration(900).withEndAction {
+                        hurtFlash.setBackgroundColor(Color.argb(110, 220, 0, 0))
+                    }.start()
+                }.start()
+            }
+            e.startsWith("toast:") -> showToast(e.removePrefix("toast:"))
+            e == "open:craft" -> { releaseInputs(); screen.open(ContainerScreen.Mode.CRAFTING) }
+            e.startsWith("dimension:") -> travel(com.vishucraft.game.world.Dimension.valueOf(e.removePrefix("dimension:")))
+            e.startsWith("open:hopper:") -> {
+                val (x, y, z) = e.substringAfterLast(':').split(',').map { it.toInt() }
+                releaseInputs()
+                screen.open(ContainerScreen.Mode.CHEST, chestEntity = world.blockEntities.hopper(x, y, z))
+            }
+            e.startsWith("open:chest:") || e.startsWith("open:furnace:") -> {
+                val (x, y, z) = e.substringAfterLast(':').split(',').map { it.toInt() }
+                releaseInputs()
+                if (e.startsWith("open:chest:")) screen.open(ContainerScreen.Mode.CHEST, chestEntity = world.blockEntities.chest(x, y, z))
+                else screen.open(ContainerScreen.Mode.FURNACE, furnaceEntity = world.blockEntities.furnace(x, y, z))
+            }
+            e == "craft" -> { sounds.play("craft"); updateHand() }
+            e == "ending" -> {
+                releaseInputs()
+                android.app.AlertDialog.Builder(this).setTitle("The End")
+                    .setMessage("You defeated the Sky Warden and freed the Sky Isles!\n\n" +
+                "It dropped an Ember Star, Glider Wings, diamonds and a Totem of Life.\n\n" +
+                "Thank you for playing DhruvVishu.\n\n" +
+                "Made for Dhruv and Vishu.\n" +
+                "Every block, creature, sound and song in this game was made from code.\n\n" +
+                "The world is still yours: keep building, exploring and playing.")
+                    .setPositiveButton("Keep playing", null).show()
+            }
+            e == "open:ender" -> { releaseInputs(); screen.open(ContainerScreen.Mode.CHEST, chestEntity = level.enderChest) }
+            e.startsWith("signedit:") -> {
+                val (x, y, z) = e.removePrefix("signedit:").split(',').map { it.toInt() }
+                releaseInputs()
+                val input = android.widget.EditText(this).apply { hint = "Text on the sign"; setText(game.signText(x, y, z)) }
+                android.app.AlertDialog.Builder(this).setTitle("Sign").setView(input)
+                    .setPositiveButton("OK") { _, _ -> val txt = input.text.toString(); glView.queueEvent { game.setSignText(x, y, z, txt) } }
+                    .setNegativeButton("Cancel", null).show()
+                input.requestFocus()
+            }
+            e.startsWith("floors:") -> {
+                // Tapped an elevator: which floor?
+                releaseInputs()
+                val (lx, lz, cur, list) = e.removePrefix("floors:").split(',', limit = 4)
+                val names = list.split('|').mapIndexed { i, n -> if (i == cur.toInt()) "$n  (you are here)" else n }.toTypedArray()
+                android.app.AlertDialog.Builder(this).setTitle("Elevator")
+                    .setItems(names) { _, i -> glView.queueEvent { game.liftTo(lx.toInt(), lz.toInt(), i) } }
+                    .setNegativeButton("Cancel", null).show()
+            }
+            e.startsWith("flights:") -> {
+                // Got into an airplane: where to?
+                releaseInputs()
+                val names = e.removePrefix("flights:").split('|').toTypedArray()
+                android.app.AlertDialog.Builder(this).setTitle("Where do you want to fly?")
+                    .setItems(names) { _, i -> val n = names[i]; glView.queueEvent { game.flyTo(n) } }
+                    .setNegativeButton("Not now", null).show()
+            }
+            e.startsWith("metro:") -> {
+                // Got on a metro or bullet train: which station, non-stop?
+                releaseInputs()
+                val names = e.removePrefix("metro:").split('|')
+                val items = (names + "Stop at every station").toTypedArray()
+                android.app.AlertDialog.Builder(this).setTitle("Which station? (non-stop)")
+                    .setItems(items) { _, i -> val n = if (i < names.size) names[i] else ""; glView.queueEvent { game.metroTo(n) } }
+                    .setNegativeButton("Not now", null).show()
+            }
+            e.startsWith("achievement:") -> showToast("Achievement unlocked!\n" + e.removePrefix("achievement:"))
+            e.startsWith("trade:") -> e.removePrefix("trade:").toIntOrNull()?.let { showTrades(it) }
+            e.startsWith("name:") -> {
+                // Name tag: ask for the name.
+                val uid = e.removePrefix("name:").toIntOrNull() ?: return
+                releaseInputs()
+                val input = android.widget.EditText(this).apply { hint = "Name"; setSingleLine() }
+                android.app.AlertDialog.Builder(this).setTitle("Name this creature").setView(input)
+                    .setPositiveButton("OK") { _, _ -> val n = input.text.toString(); glView.queueEvent { game.nameMob(uid, n) } }
+                    .setNegativeButton("Cancel", null).show()
+                input.requestFocus()
+            }
+            e == "place" || e == "eat" || e == "pickup" || e == "break_tool" -> updateHand()
+        }
+        status.update(game.health, game.food, game.inventory.armorPoints())
+        status.updateExtra(game.air, game.xpLevel, game.xpProgress)
+    }
+
+    private fun onStats(text: String) {
+        val exposed = game.mobs.skyExposed(game.player.blockX(), game.player.blockY(), game.player.blockZ())
+        sounds.setRain(game.rain > 0.05f, game.rain * (if (exposed) 1f else 0.3f))
+        status.update(game.health, game.food, game.inventory.armorPoints())
+        status.updateExtra(game.air, game.xpLevel, game.xpProgress)
+        updateHand()
+        stats.text = text
+        // Potion effects with the time left, top right.
+        val fx = game.effects.toSortedMap().map { (key, left) ->
+            val name = com.vishucraft.game.world.Items.POTIONS.firstOrNull { it.second == key }?.first ?: key
+            "$name ${left.toInt() / 60}:${"%02d".format(left.toInt() % 60)}"
+        }
+        effectsText.text = (fx + (if (game.gliding) listOf("Gliding") else emptyList())).joinToString("\n")
+        val look = game.bossBar()?.let { (name, hp) ->
+            val n = (hp * 20).toInt()
+            "$name\n" + "▰".repeat(n) + "▱".repeat(20 - n)
+        } ?: game.lookedAtLabel() ?: ""
+        if (look != lastLook) { lastLook = look; lookLabel.text = com.vishucraft.game.world.Names.show(look) }
+        val flying = game.player.flying
+        flyButton.toggled = flying
+        // The down button also rides an elevator down.
+        downButton.visibility = if (flying || game.lift.standingOn) View.VISIBLE else View.GONE
+    }
+
+    /** Drag to look, tap to place, touch-and-hold to mine. */
+    private inner class LookTouchHandler : View.OnTouchListener {
+        private var pointer = -1
+        private var lastX = 0f; private var lastY = 0f
+        private var downTime = 0L
+        private var moved = 0f
+        private var mining = false
+        private val slop = dp(10f)
+        private val startMining = Runnable {
+            if (pointer != -1) { mining = true; input.breakHeld = true; handler.post(swingLoop) }
+        }
+
+        @SuppressLint("ClickableViewAccessibility")
+        override fun onTouch(v: View, e: MotionEvent): Boolean {
+            when (e.actionMasked) {
+                MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> if (pointer == -1) {
+                    val i = e.actionIndex
+                    pointer = e.getPointerId(i)
+                    lastX = e.getX(i); lastY = e.getY(i)
+                    downTime = SystemClock.uptimeMillis()
+                    moved = 0f; mining = false
+                    handler.postDelayed(startMining, 260)
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    val i = e.findPointerIndex(pointer)
+                    if (i >= 0) {
+                        val dx = e.getX(i) - lastX; val dy = e.getY(i) - lastY
+                        lastX = e.getX(i); lastY = e.getY(i)
+                        moved += abs(dx) + abs(dy)
+                        if (moved > slop && !mining) handler.removeCallbacks(startMining)
+                        val d = resources.displayMetrics.density
+                        input.addLook(dx / d, dy / d)
+                    }
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP, MotionEvent.ACTION_CANCEL -> {
+                    val lifted = e.actionMasked == MotionEvent.ACTION_CANCEL || e.getPointerId(e.actionIndex) == pointer
+                    if (lifted) {
+                        handler.removeCallbacks(startMining)
+                        val quick = SystemClock.uptimeMillis() - downTime < 260
+                        if (!mining && quick && moved < slop && e.actionMasked != MotionEvent.ACTION_CANCEL) {
+                            input.actions.add(GameInput.Action.PLACE)
+                            swing()
+                        }
+                        mining = false
+                        input.breakHeld = false
+                        pointer = -1
+                    }
+                }
+            }
+            return true
+        }
+    }
+
+    /**
+     * Prefers RGB888 with a 24-bit depth buffer (less z-fighting), then falls back step by step so that
+     * older TVs and boxes with OpenGL ES 2.0-only GPUs still get a working surface.
+     */
+    private class DepthConfigChooser : GLSurfaceView.EGLConfigChooser {
+        override fun chooseConfig(egl: EGL10, display: EGLDisplay): EGLConfig {
+            val es2 = 4 // EGL_OPENGL_ES2_BIT
+            val attempts = listOf(
+                intArrayOf(EGL10.EGL_RED_SIZE, 8, EGL10.EGL_GREEN_SIZE, 8, EGL10.EGL_BLUE_SIZE, 8, EGL10.EGL_DEPTH_SIZE, 24),
+                intArrayOf(EGL10.EGL_RED_SIZE, 8, EGL10.EGL_GREEN_SIZE, 8, EGL10.EGL_BLUE_SIZE, 8, EGL10.EGL_DEPTH_SIZE, 16),
+                intArrayOf(EGL10.EGL_RED_SIZE, 5, EGL10.EGL_GREEN_SIZE, 6, EGL10.EGL_BLUE_SIZE, 5, EGL10.EGL_DEPTH_SIZE, 16),
+                intArrayOf(EGL10.EGL_DEPTH_SIZE, 16),
+            )
+            for (a in attempts) {
+                val attribs = a + intArrayOf(EGL10.EGL_RENDERABLE_TYPE, es2, EGL10.EGL_NONE)
+                val configs = arrayOfNulls<EGLConfig>(1)
+                val num = IntArray(1)
+                if (egl.eglChooseConfig(display, attribs, configs, 1, num) && num[0] > 0) return configs[0]!!
+            }
+            throw IllegalStateException("This device has no OpenGL ES 2.0 display configuration")
+        }
+    }
+
+    // ---------------------------------------------------------------- TV remote, keyboard and gamepad
+
+    private var keyFwd = false; private var keyBack = false; private var keyLeft = false; private var keyRight = false
+    private var keyTurnL = false; private var keyTurnR = false; private var keyLookU = false; private var keyLookD = false
+    private var okMining = false
+    private var okDown = false
+    private var triggerPlace = false
+    private val okHold = Runnable { if (okDown) { okMining = true; input.breakHeld = true; handler.post(swingLoop) } }
+
+    private fun applyKeys() {
+        input.moveForward = (if (keyFwd) 1f else 0f) - (if (keyBack) 1f else 0f)
+        input.moveStrafe = (if (keyRight) 1f else 0f) - (if (keyLeft) 1f else 0f)
+        input.lookStickX = (if (keyTurnR) 1f else 0f) - (if (keyTurnL) 1f else 0f)
+        input.lookStickY = (if (keyLookU) 1f else 0f) - (if (keyLookD) 1f else 0f)
+    }
+
+    private fun cycleSlot(delta: Int) {
+        val slot = (hotbar.selected + delta + 9) % 9
+        hotbar.selected = slot
+        selectSlot(slot)
+    }
+
+    override fun dispatchKeyEvent(e: KeyEvent): Boolean {
+        if (screen.visibility == View.VISIBLE) {
+            if (screen.handleKey(e)) return true
+            return super.dispatchKeyEvent(e)
+        }
+        if (inventory.visibility == View.VISIBLE) {
+            if (inventory.handleKey(e)) return true
+            return super.dispatchKeyEvent(e)
+        }
+        if (pauseMenu.visibility == View.VISIBLE) {
+            if (e.keyCode == KeyEvent.KEYCODE_BUTTON_B || e.keyCode == KeyEvent.KEYCODE_BUTTON_START) {
+                if (e.action == KeyEvent.ACTION_UP) showPause(false)
+                return true
+            }
+            return super.dispatchKeyEvent(e)
+        }
+        val down = e.action == KeyEvent.ACTION_DOWN
+        val first = down && e.repeatCount == 0
+        when (e.keyCode) {
+            KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_W -> keyFwd = down
+            KeyEvent.KEYCODE_DPAD_DOWN, KeyEvent.KEYCODE_S -> keyBack = down
+            KeyEvent.KEYCODE_A -> keyLeft = down
+            KeyEvent.KEYCODE_D -> keyRight = down
+            KeyEvent.KEYCODE_DPAD_LEFT -> keyTurnL = down
+            KeyEvent.KEYCODE_DPAD_RIGHT -> keyTurnR = down
+            KeyEvent.KEYCODE_CHANNEL_UP, KeyEvent.KEYCODE_PAGE_UP, KeyEvent.KEYCODE_NUMPAD_8, KeyEvent.KEYCODE_R -> keyLookU = down
+            KeyEvent.KEYCODE_CHANNEL_DOWN, KeyEvent.KEYCODE_PAGE_DOWN, KeyEvent.KEYCODE_NUMPAD_2, KeyEvent.KEYCODE_V -> keyLookD = down
+            KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER, KeyEvent.KEYCODE_K -> {
+                // Short press: place / use / attack. Hold: mine.
+                if (first) { okDown = true; okMining = false; handler.postDelayed(okHold, 300) }
+                if (!down) {
+                    handler.removeCallbacks(okHold)
+                    if (okDown && !okMining) { input.actions.add(GameInput.Action.PLACE); swing() }
+                    okDown = false; okMining = false; input.breakHeld = false
+                }
+            }
+            KeyEvent.KEYCODE_J, KeyEvent.KEYCODE_BUTTON_R2 -> {
+                input.breakHeld = down
+                if (first) handler.post(swingLoop)
+            }
+            KeyEvent.KEYCODE_BUTTON_L2 -> if (first) { input.actions.add(GameInput.Action.PLACE); swing() }
+            KeyEvent.KEYCODE_SPACE, KeyEvent.KEYCODE_BUTTON_A -> input.jumpHeld = down
+            KeyEvent.KEYCODE_SHIFT_LEFT, KeyEvent.KEYCODE_BUTTON_THUMBL, KeyEvent.KEYCODE_C -> input.descendHeld = down
+            KeyEvent.KEYCODE_F, KeyEvent.KEYCODE_BUTTON_X -> if (first) input.actions.add(GameInput.Action.TOGGLE_FLY)
+            KeyEvent.KEYCODE_E, KeyEvent.KEYCODE_I, KeyEvent.KEYCODE_MENU, KeyEvent.KEYCODE_BUTTON_Y,
+            KeyEvent.KEYCODE_PROG_RED, KeyEvent.KEYCODE_TV_CONTENTS_MENU -> if (first) showInventory(true)
+            KeyEvent.KEYCODE_Q -> if (first) input.actions.add(if (e.isCtrlPressed) GameInput.Action.DROP_STACK else GameInput.Action.DROP)
+            KeyEvent.KEYCODE_CTRL_LEFT -> input.sprint = down || sprinting
+            KeyEvent.KEYCODE_BUTTON_L1, KeyEvent.KEYCODE_MEDIA_REWIND, KeyEvent.KEYCODE_MEDIA_PREVIOUS -> if (first) cycleSlot(-1)
+            KeyEvent.KEYCODE_TAB, KeyEvent.KEYCODE_BUTTON_R1, KeyEvent.KEYCODE_MEDIA_FAST_FORWARD, KeyEvent.KEYCODE_MEDIA_NEXT -> if (first) cycleSlot(1)
+            in KeyEvent.KEYCODE_1..KeyEvent.KEYCODE_9 -> if (first) { hotbar.selected = e.keyCode - KeyEvent.KEYCODE_1; selectSlot(hotbar.selected) }
+            KeyEvent.KEYCODE_BUTTON_B, KeyEvent.KEYCODE_BUTTON_START, KeyEvent.KEYCODE_ESCAPE, KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE ->
+                if (!down) showPause(true)
+            else -> return super.dispatchKeyEvent(e)
+        }
+        applyKeys()
+        return true
+    }
+
+    private fun axis(e: MotionEvent, a: Int): Float {
+        val v = e.getAxisValue(a)
+        return if (abs(v) < 0.18f) 0f else v
+    }
+
+    override fun dispatchGenericMotionEvent(e: MotionEvent): Boolean {
+        val isStick = e.source and InputDevice.SOURCE_JOYSTICK == InputDevice.SOURCE_JOYSTICK ||
+            e.source and InputDevice.SOURCE_GAMEPAD == InputDevice.SOURCE_GAMEPAD
+        if (!isStick || e.action != MotionEvent.ACTION_MOVE) return super.dispatchGenericMotionEvent(e)
+        if (inventory.visibility == View.VISIBLE || pauseMenu.visibility == View.VISIBLE) return true
+        val hatX = e.getAxisValue(MotionEvent.AXIS_HAT_X); val hatY = e.getAxisValue(MotionEvent.AXIS_HAT_Y)
+        input.moveStrafe = (axis(e, MotionEvent.AXIS_X) + hatX).coerceIn(-1f, 1f)
+        input.moveForward = (-axis(e, MotionEvent.AXIS_Y) - hatY).coerceIn(-1f, 1f)
+        input.lookStickX = axis(e, MotionEvent.AXIS_Z)
+        input.lookStickY = -axis(e, MotionEvent.AXIS_RZ)
+        val rt = maxOf(e.getAxisValue(MotionEvent.AXIS_RTRIGGER), e.getAxisValue(MotionEvent.AXIS_GAS))
+        val lt = maxOf(e.getAxisValue(MotionEvent.AXIS_LTRIGGER), e.getAxisValue(MotionEvent.AXIS_BRAKE))
+        val mining = rt > 0.5f
+        if (mining && !input.breakHeld) handler.post(swingLoop)
+        input.breakHeld = mining
+        if (lt > 0.5f && !triggerPlace) { input.actions.add(GameInput.Action.PLACE); swing() }
+        triggerPlace = lt > 0.5f
+        return true
+    }
+
+    @Deprecated("Deprecated in Java")
+    override fun onBackPressed() {
+        when {
+            screen.visibility == View.VISIBLE -> screen.close()
+            inventory.visibility == View.VISIBLE -> showInventory(false)
+            pauseMenu.visibility == View.VISIBLE -> showPause(false)
+            else -> showPause(true)
+        }
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) hideSystemUi()
+    }
+
+    @Suppress("DEPRECATION")
+    private fun hideSystemUi() {
+        window.decorView.systemUiVisibility = (View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+            or View.SYSTEM_UI_FLAG_FULLSCREEN or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+            or View.SYSTEM_UI_FLAG_LAYOUT_STABLE or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+            or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN)
+    }
+
+    /** Counts today's play time once a second; closes the world when the daily 30 minutes are used up. */
+    private val limitLoop = object : Runnable {
+        override fun run() {
+            val now = android.os.SystemClock.elapsedRealtime()
+            val warning = playLimit.tick(com.vishucraft.game.engine.PlayLimit.today(), (now - limitTick) / 1000f)
+            limitTick = now
+            settings.savePlayLimit(playLimit)
+            warning?.let { showToast(it) }
+            showTimer()
+            if (playLimit.over) {
+                // Time's up: save the world, then close it (the menu explains why).
+                releaseInputs(); showPause(false)
+                showToast("Daily limit is over. Saving your world…")
+                glView.queueEvent { game.save(); runOnUiThread { finish() } }
+                return
+            }
+            handler.postDelayed(this, 1000)
+        }
+    }
+    private lateinit var playLimit: com.vishucraft.game.engine.PlayLimit
+
+    private fun showTimer() {
+        timerText.text = "⏱ " + playLimit.clock()
+        timerText.setTextColor(if (playLimit.used > com.vishucraft.game.engine.PlayLimit.LIMIT - 5 * 60) Color.rgb(255, 110, 100) else Color.WHITE)
+    }
+    private var limitTick = 0L
+
+    override fun onResume() {
+        super.onResume()
+        playLimit = settings.playLimit()
+        limitTick = android.os.SystemClock.elapsedRealtime()
+        playLimit.newDay(com.vishucraft.game.engine.PlayLimit.today())
+        showTimer()
+        handler.postDelayed(limitLoop, 1000)
+        glView.onResume()
+        sounds.resume()
+        // New versions download in the background while playing; they install back on the menu.
+        Updater.attach(this)
+    }
+
+    override fun onPause() {
+        handler.removeCallbacks(limitLoop)
+        if (::playLimit.isInitialized) {
+            playLimit.tick(com.vishucraft.game.engine.PlayLimit.today(), (android.os.SystemClock.elapsedRealtime() - limitTick) / 1000f)
+            settings.savePlayLimit(playLimit)
+        }
+        Updater.detach(this)
+        sounds.pause()
+        releaseInputs()
+        glView.onPause() // blocks until the GL thread has paused, so saving below is safe
+        game.save()
+        super.onPause()
+    }
+
+    override fun onDestroy() {
+        val n = game.net
+        val room = onlineRoom
+        if (n != null || room != null) Thread { room?.close(); n?.close() }.start()
+        sounds.release()
+        world.shutdown()
+        super.onDestroy()
+    }
+}

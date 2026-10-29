@@ -1,14 +1,42 @@
-# Arduino AI – Privacy Policy
+# DhruvVishu – Privacy Policy
 
-Arduino AI does not collect, store or sell any personal data on its own servers. It has no accounts, ads or analytics.
+_Last updated: 28 September 2026_
 
-- **Your Claude API key** is stored only on your device (in the app's private storage).
-- **What you send to Claude**: when you press Write, Change, Fix or Explain, the app sends your request, the
-  chosen board, the code on screen and your explanation language to Anthropic's Claude API using your API key.
-  Anthropic handles that data under its own privacy policy: https://www.anthropic.com/legal/privacy
-- **Voice typing** uses your device's speech recognition service; the app only receives the recognised text.
-- **Saved sketches** stay on your device.
-- **Updates**: the download-link version checks
-  `https://github.com/samadhan84/Minecraft/releases/download/latest/` for a newer version. GitHub may log that request.
+DhruvVishu is a block-building game. This policy explains what the app does with information.
 
-Contact: open an issue at https://github.com/samadhan84/Minecraft/issues
+## What we collect
+
+**Nothing.** DhruvVishu has no accounts, no ads, no analytics and no tracking. The developer does not
+receive any information about you or your device.
+
+## What stays on your device
+
+- Your worlds, settings, achievements and player name are saved only on your device.
+- If the game crashes, a short crash report is saved on your device so the game can show it to you.
+  It is never sent anywhere automatically.
+
+## Network use
+
+- **Local Wi-Fi play:** when you host or join a game on your local network, your player name and your
+  moves in the world are shared with the other players in that game. Nothing is sent to the internet.
+- **Online play with a room code:** when you choose "Play online (room code)" or "Join online game", your
+  player name and your moves in the world travel between the players through a small relay server
+  (run on Cloudflare for DhruvVishu). The relay only passes the data along while you play; it does not
+  store it or keep any record of it.
+- **Internet play help:** only when you open the "play over the internet" help screen, the game asks
+  `api.ipify.org` for your public IP address so it can show it to you. The game does not store or send
+  this address anywhere else.
+- The Google Play version does not download updates itself; updates come from Google Play.
+
+## Children
+
+DhruvVishu is suitable for all ages. It does not collect personal information from anyone, including
+children.
+
+## Changes
+
+If this policy changes, the new version will be published at this same address.
+
+## Contact
+
+Questions: samadhan.pawar84@gmail.com

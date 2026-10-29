@@ -1,34 +1,33 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Talking to the Claude API. -->
+    <uses-feature android:glEsVersion="0x00020000" android:required="true" />
+    <!-- Wi-Fi games: hosting, joining and finding games on the local network. -->
     <uses-permission android:name="android.permission.INTERNET" />
-    <!-- Works on Android TV with the remote, and on phones and tablets. -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
+    <!-- Playable on Android TV with a remote or gamepad, as well as on phones and tablets. -->
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
     <uses-feature android:name="android.software.leanback" android:required="false" />
-    <uses-feature android:name="android.hardware.microphone" android:required="false" />
-
-    <queries>
-        <!-- Voice typing through the remote's microphone. -->
-        <intent>
-            <action android:name="android.speech.action.RECOGNIZE_SPEECH" />
-        </intent>
-    </queries>
+    <uses-feature android:name="android.hardware.gamepad" android:required="false" />
 
     <application
         android:allowBackup="true"
+        android:hasFragileUserData="true"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:banner="@drawable/tv_banner"
-        android:label="Arduino AI"
-        android:theme="@android:style/Theme.Black.NoTitleBar">
+        android:isGame="true"
+        android:appCategory="game"
+        android:label="DhruvVishu"
+        android:theme="@android:style/Theme.Black.NoTitleBar.Fullscreen">
 
-        <!-- Kept the name MenuActivity so launcher shortcuts made for the old app still open this one. -->
         <activity
             android:name=".MenuActivity"
             android:exported="true"
             android:launchMode="singleTop"
-            android:windowSoftInputMode="adjustResize"
+            android:screenOrientation="sensorLandscape"
             android:configChanges="orientation|screenSize|smallestScreenSize|keyboard|keyboardHidden|screenLayout|density|uiMode|navigation">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -36,5 +35,11 @@
                 <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <activity
+            android:name=".GameActivity"
+            android:exported="false"
+            android:screenOrientation="sensorLandscape"
+            android:configChanges="orientation|screenSize|smallestScreenSize|keyboard|keyboardHidden|screenLayout|density|uiMode|navigation" />
     </application>
 </manifest>

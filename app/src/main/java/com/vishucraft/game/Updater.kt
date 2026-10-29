@@ -16,10 +16,10 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 /**
- * Keeps the app up to date by itself. Every build is published at a fixed link together with its version
- * number. The app checks that link when it starts and every 30 minutes while it runs; a newer version is
- * downloaded in the background straight away and handed to Android's installer, which always asks to tap
- * Install once for apps from outside the Play Store. Saved sketches are kept.
+ * Keeps the game up to date by itself. Every build is published at a fixed link together with its version
+ * number. The game checks that link when it starts and every 30 minutes while it runs; a newer version is
+ * downloaded in the background straight away. On the menu it is then handed to Android's installer, which
+ * always asks the player to tap Install once for apps from outside the Play Store. Worlds are kept.
  */
 object Updater {
     private const val BASE = "https://github.com/samadhan84/Minecraft/releases/download/latest/"
@@ -57,7 +57,7 @@ object Updater {
         current = a
         main.removeCallbacks(tick)
         if (System.currentTimeMillis() - lastCheck >= EVERY_MS || lastCheck == 0L) check(a)
-        else if (readyVersion > 0) offerInstall(a)
+        else if (readyVersion > 0 && a is MenuActivity) offerInstall(a)
         main.postDelayed(tick, EVERY_MS)
     }
 
@@ -73,7 +73,7 @@ object Updater {
 
     private fun open(url: String): HttpURLConnection = (URL(url).openConnection() as HttpURLConnection).apply {
         connectTimeout = 8000; readTimeout = 30000; instanceFollowRedirects = true
-        setRequestProperty("User-Agent", "ArduinoAI")
+        setRequestProperty("User-Agent", "DhruvVishu")
     }
 
     private fun apkFile(a: Activity) = File(a.cacheDir, "update.apk")
@@ -94,9 +94,9 @@ object Updater {
                     latest == null -> message = if (manual) "Couldn't check for updates" else null
                     latest <= mine -> message = if (manual) "You have the newest version" else null
                     latest != readyVersion -> {
-                        main.post { toast(a, "Downloading a new version of Arduino AI…") }
+                        main.post { toast(a, "Downloading a new version of DhruvVishu…") }
                         val tmp = File(app.cacheDir, "update.part")
-                        open(BASE + "ArduinoAI.apk").inputStream.use { input -> tmp.outputStream().use { input.copyTo(it) } }
+                        open(BASE + "DhruvVishu.apk").inputStream.use { input -> tmp.outputStream().use { input.copyTo(it) } }
                         tmp.renameTo(apkFile(a))
                         readyVersion = latest
                         asked = false
@@ -110,7 +110,8 @@ object Updater {
                 message?.let { toast(a, it) }
                 val here = current ?: a
                 if (readyVersion > installedVersion(here)) {
-                    offerInstall(here)
+                    if (here is MenuActivity || manual) offerInstall(here)
+                    else if (!asked) toast(here, "Update downloaded. It installs when you go back to the menu.")
                 }
             }
         }.start()
@@ -127,14 +128,14 @@ object Updater {
         // Android needs permission once to install apps that don't come from the Play Store.
         if (Build.VERSION.SDK_INT >= 26 && !a.packageManager.canRequestPackageInstalls()) {
             AlertDialog.Builder(a).setTitle("A new version is ready")
-                .setMessage("To update by itself, Arduino AI needs permission to install updates. Turn on \"Allow from this source\", then come back.")
+                .setMessage("To update by itself, DhruvVishu needs permission to install updates. Turn on \"Allow from this source\", then come back.")
                 .setPositiveButton("Open settings") { _, _ ->
                     asked = false
                     try {
                         a.startActivity(Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:" + a.packageName)))
                     } catch (e: Exception) {
                         AlertDialog.Builder(a).setTitle("Settings not found")
-                            .setMessage("Open Settings → Apps → Special app access → Install unknown apps, and allow Arduino AI.")
+                            .setMessage("Open Settings → Apps → Special app access → Install unknown apps, and allow DhruvVishu.")
                             .setPositiveButton("OK", null).show()
                     }
                 }
@@ -154,7 +155,7 @@ object Updater {
         val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL)
         val id = installer.createSession(params)
         installer.openSession(id).use { session ->
-            session.openWrite("ArduinoAI", 0, apk.length()).use { out ->
+            session.openWrite("DhruvVishu", 0, apk.length()).use { out ->
                 apk.inputStream().use { it.copyTo(out) }
                 session.fsync(out)
             }

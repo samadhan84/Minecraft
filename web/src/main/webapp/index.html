@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-fullscreen">
+<meta name="apple-mobile-web-app-title" content="DhruvVishu">
+<meta name="theme-color" content="#1a1a1e">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-192.png">
+<link rel="manifest" href="manifest.webmanifest">
+<title>DhruvVishu</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #1a1a1e; overflow: hidden; touch-action: none;
+    -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; overscroll-behavior: none; }
+  #game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+  #text { position: fixed; left: -1000px; top: 0; width: 10px; height: 10px; opacity: 0; font-size: 16px; }
+  #loading { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; flex-direction: column;
+    color: #ffd65a; font: bold 28px -apple-system, "Helvetica Neue", Arial, sans-serif; text-align: center; padding: 20px; }
+  #loading small { color: #ccc; font-size: 15px; font-weight: normal; margin-top: 12px; }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<input id="text" type="text" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+<div id="loading">DhruvVishu<small>Loading…</small></div>
+<script src="version.js"></script>
+<script src="platform.js"></script>
+<script src="game.js"></script>
+<script>
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(function () {});
+  if (VC.init()) VC.openDb(function () {
+    try { main([]); document.getElementById('loading').style.display = 'none'; }
+    catch (e) { document.getElementById('loading').innerHTML = 'Sorry, the game could not start.<small>' + e + '</small>'; console.error(e); }
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,349 @@
+package com.vishucraft.game.world
+
+import java.io.DataInputStream
+import java.io.DataOutputStream
+import java.io.File
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
+import java.util.zip.GZIPInputStream
+import java.util.zip.GZIPOutputStream
+import kotlin.math.floor
+
+/**
+ * Chunk storage, background generation and persistence.
+ * Block edits happen on the game (GL) thread; generation runs on worker threads.
+ */
+enum class Dimension { OVERWORLD, EMBER, SKY }
+
+class World(val seed: Long, private val saveDir: File?, val dimension: Dimension = Dimension.OVERWORLD, val flat: Boolean = false) {
+    /** Villagers placed by structure generation, waiting to be spawned on the game thread. */
+    val pendingVillagers = java.util.concurrent.ConcurrentLinkedQueue<Triple<Int, Int, Int>>()
+
+    val chunks = ConcurrentHashMap<Long, Chunk>()
+    /** Keys of chunks that have just been loaded or generated, for the game to look at (long metro lines). */
+    val arrived = java.util.concurrent.ConcurrentLinkedQueue<Long>()
+    /** Positions (see [RedstoneIds.pack]) of every redstone component in loaded chunks. */
+    val components: MutableSet<Long> = java.util.Collections.newSetFromMap(ConcurrentHashMap())
+    val generator: WorldGenerator = when (dimension) {
+        Dimension.OVERWORLD -> if (flat) FlatGenerator() else TerrainGenerator(seed, this)
+        Dimension.EMBER -> EmberGenerator(seed)
+        Dimension.SKY -> SkyGenerator(seed)
+    }
+
+    private val pending: MutableSet<Long> = java.util.Collections.newSetFromMap(ConcurrentHashMap())
+    val workers: java.util.concurrent.Executor = makeWorkers?.invoke() ?: Executors.newFixedThreadPool(
+        (Runtime.getRuntime().availableProcessors() - 1).coerceIn(1, 3)
+    ) { r -> Thread(r, "world-worker").apply { isDaemon = true; priority = Thread.NORM_PRIORITY - 1 } }
+
+    private val chunkDir: File? = saveDir?.let { File(it, "chunks").apply { mkdirs() } }
+    /** Folder this dimension is saved in (null for Wi-Fi guests). */
+    val dataDir: File? get() = saveDir
+    val blockEntities = BlockEntities().also { be -> saveDir?.let { be.read(File(it, "blockentities.dat")) } }
+
+    fun getChunk(cx: Int, cz: Int): Chunk? = chunks[Chunk.key(cx, cz)]
+
+    fun getBlock(x: Int, y: Int, z: Int): Int {
+        if (y < 0) return Blocks.BEDROCK
+        if (y >= Chunk.HEIGHT) return Blocks.AIR
+        val c = getChunk(x shr 4, z shr 4) ?: return Blocks.AIR
+        return c.get(x and 15, y, z and 15)
+    }
+
+    fun getMeta(x: Int, y: Int, z: Int): Int {
+        if (y < 0 || y >= Chunk.HEIGHT) return 0
+        val c = getChunk(x shr 4, z shr 4) ?: return 0
+        return c.getMeta(x and 15, y, z and 15)
+    }
+
+    fun isLoaded(x: Int, z: Int) = getChunk(x shr 4, z shr 4) != null
+
+    /** Everything at this height and above in the column at (x, z) is air. */
+    fun columnHeight(x: Int, z: Int): Int = getChunk(x shr 4, z shr 4)?.height ?: Chunk.BASE
+
+    fun setBlock(x: Int, y: Int, z: Int, id: Int, meta: Int = 0): Boolean {
+        if (y < 0 || y >= Chunk.HEIGHT) return false
+        val cx = x shr 4; val cz = z shr 4
+        val c = getChunk(cx, cz) ?: return false
+        val lx = x and 15; val lz = z and 15
+        c.set(lx, y, lz, id, meta)
+        if (RedstoneIds.isComponent(id)) components.add(RedstoneIds.pack(x, y, z))
+        else components.remove(RedstoneIds.pack(x, y, z))
+        c.modified = true
+        c.version++
+        // Neighbouring meshes sample across borders (faces, AO, light), so refresh them too.
+        for (dz in -1..1) for (dx in -1..1) {
+            if (dx == 0 && dz == 0) continue
+            val touchesX = (dx == -1 && lx == 0) || (dx == 1 && lx == 15) || dx == 0
+            val touchesZ = (dz == -1 && lz == 0) || (dz == 1 && lz == 15) || dz == 0
+            if (touchesX && touchesZ) getChunk(cx + dx, cz + dz)?.let { it.version++ }
+        }
+        return true
+    }
+
+    /** When joined to a Wi-Fi game, chunks come from the host instead of being generated. */
+    @Volatile var remoteLoader: ((Int, Int) -> Unit)? = null
+
+    /** A chunk sent by the host. */
+    fun receiveChunk(c: Chunk) {
+        val key = Chunk.key(c.cx, c.cz)
+        registerComponents(c)
+        chunks[key] = c
+        arrived.add(key)
+        pending.remove(key)
+    }
+
+    /** Asynchronously load or generate a chunk. */
+    fun request(cx: Int, cz: Int) {
+        val key = Chunk.key(cx, cz)
+        if (chunks.containsKey(key) || !pending.add(key)) return
+        remoteLoader?.let { it(cx, cz); return }
+        workers.execute {
+            try {
+                val loaded = load(cx, cz)
+                val chunk = loaded ?: Chunk(cx, cz).also { generator.generate(it) }
+                if (loaded != null) registerComponents(chunk)
+                chunk.version = 1
+                chunks[key] = chunk
+                arrived.add(key)
+            } finally {
+                pending.remove(key)
+            }
+        }
+    }
+
+    fun pendingCount() = pending.size
+
+    /**
+     * Makes sure a chunk is in memory right now, loading or generating it on this thread (big buildings reach
+     * past what has been loaded). Returns false for Wi-Fi guests, whose chunks come from the host.
+     */
+    fun ensureLoaded(cx: Int, cz: Int): Boolean {
+        val key = Chunk.key(cx, cz)
+        if (chunks.containsKey(key)) return true
+        if (remoteLoader != null) return false
+        // A worker is already on it: wait for it to finish.
+        var waited = 0
+        while (pending.contains(key) && waited < 3000) { Thread.sleep(5); waited += 5 }
+        if (chunks.containsKey(key)) return true
+        val loaded = load(cx, cz)
+        val chunk = loaded ?: Chunk(cx, cz).also { generator.generate(it) }
+        if (loaded != null) registerComponents(chunk)
+        chunk.version = 1
+        chunks[key] = chunk
+        arrived.add(key)
+        return true
+    }
+
+    fun unload(chunk: Chunk) {
+        chunks.remove(Chunk.key(chunk.cx, chunk.cz))
+        components.removeIf { RedstoneIds.x(it) shr 4 == chunk.cx && RedstoneIds.z(it) shr 4 == chunk.cz }
+        if (chunk.modified) {
+            val data = chunk.toBytes()
+            workers.execute { writeChunk(chunk.cx, chunk.cz, data) }
+        }
+    }
+
+    private fun registerComponents(c: Chunk) {
+        for (i in c.blocks.indices) {
+            val id = c.blocks[i].toInt() and 0xFFFF
+            if (!RedstoneIds.isComponent(id)) continue
+            val x = i and 15; val z = (i shr 4) and 15; val y = i shr 8
+            components.add(RedstoneIds.pack(c.cx * 16 + x, y, c.cz * 16 + z))
+        }
+    }
+
+    // ---------------------------------------------------------------- persistence
+
+    private fun chunkFile(cx: Int, cz: Int) = chunkDir?.let { File(it, "c.$cx.$cz.bin") }
+
+    private fun load(cx: Int, cz: Int): Chunk? {
+        val f = chunkFile(cx, cz) ?: return null
+        if (!f.exists()) return null
+        return try {
+            val c = Chunk(cx, cz)
+            c.fromBytes(GZIPInputStream(f.inputStream().buffered()).use { it.readBytes() })
+            c
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    private fun writeChunk(cx: Int, cz: Int, data: ByteArray) {
+        val f = chunkFile(cx, cz) ?: return
+        try {
+            val tmp = File(f.parentFile, f.name + ".tmp")
+            GZIPOutputStream(tmp.outputStream().buffered()).use { it.write(data) }
+            tmp.renameTo(f)
+        } catch (_: Exception) {
+        }
+    }
+
+    /** Synchronously writes all modified chunks and the chest / furnace contents. */
+    fun saveChunks() {
+        saveDir?.let { try { blockEntities.write(File(it, "blockentities.dat")) } catch (_: Exception) {} }
+        for (c in chunks.values) {
+            if (c.modified) {
+                c.modified = false
+                writeChunk(c.cx, c.cz, c.toBytes())
+            }
+        }
+    }
+
+    fun shutdown() {
+        (workers as? ExecutorService)?.shutdown()
+    }
+
+    companion object {
+        /** The browser version has no threads: it runs chunk work between frames with its own executor. */
+        @JvmStatic var makeWorkers: (() -> java.util.concurrent.Executor)? = null
+    }
+
+    /** Finds a dry spawn point near the origin. */
+    fun findSpawn(): Triple<Float, Float, Float> {
+        for (r in 0..400 step 8) {
+            for (i in 0 until 16) {
+                val a = i * Math.PI * 2 / 16
+                val x = (Math.cos(a) * r).toInt()
+                val z = (Math.sin(a) * r).toInt()
+                val h = generator.surfaceHeight(x, z)
+                if (h > TerrainGenerator.SEA_LEVEL + 1 && h < 88) return Triple(x + 0.5f, h + 1f, z + 0.5f)
+            }
+        }
+        return Triple(0.5f, 100f, 0.5f)
+    }
+}
+
+enum class GameMode { CREATIVE, SURVIVAL }
+
+/** Player and world metadata stored in level.dat. */
+class LevelData(
+    var seed: Long,
+    var x: Float = 0f, var y: Float = 0f, var z: Float = 0f,
+    var yaw: Float = 0f, var pitch: Float = 0f,
+    var flying: Boolean = false,
+    var timeOfDay: Float = 0.3f,
+    var selectedSlot: Int = 0,
+    var hasPlayer: Boolean = false,
+    var mode: GameMode = GameMode.CREATIVE,
+    var name: String = "My World",
+    var health: Float = 20f,
+    var food: Float = 20f,
+    var saturation: Float = 5f,
+    val inventory: Inventory = Inventory(),
+    var dimension: Dimension = Dimension.OVERWORLD,
+    /** True right after travelling through a portal: find a safe spot and build a return portal. */
+    var arriving: Boolean = false,
+    /** Respawn point set by sleeping in a bed (Overworld only). */
+    var hasBedSpawn: Boolean = false,
+    var bedX: Int = 0, var bedY: Int = 0, var bedZ: Int = 0,
+    /** Experience points collected in total (the level is worked out from this). */
+    var xp: Int = 0,
+    /** Keys of the achievements already earned (see Achievements). */
+    val achievements: MutableSet<String> = LinkedHashSet(),
+    /** The ender chest: the same 27 slots behind every ender chest in the world. */
+    val enderChest: ChestEntity = ChestEntity(),
+    /** The Sky Warden has been beaten (it does not come back). */
+    var bossDefeated: Boolean = false,
+    /** A flat world: grass on top, no trees, plants or hills (new creative worlds). */
+    var flat: Boolean = false,
+) {
+    companion object {
+        private const val VERSION = 9
+
+        /** Creative worlds start with a useful hotbar; survival starts empty-handed. */
+        fun create(seed: Long, name: String, mode: GameMode): LevelData {
+            val l = LevelData(seed, mode = mode, name = name)
+            if (mode == GameMode.CREATIVE) {
+                l.flat = true
+                val start = intArrayOf(
+                    Items.find("Enchanted Diamond Pickaxe"), Items.find("Diamond Sword"), Blocks.GRASS, Blocks.STONE,
+                    Blocks.PLANKS, Blocks.GLASS, Blocks.TORCH, Blocks.REDSTONE_DUST, Blocks.PISTON,
+                )
+                for ((i, id) in start.withIndex()) l.inventory.slots[i] = ItemStack(id, 1)
+            }
+            return l
+        }
+
+        fun read(dir: File): LevelData? {
+            val f = File(dir, "level.dat")
+            if (!f.exists()) return null
+            return try {
+                DataInputStream(f.inputStream().buffered()).use { d ->
+                    val version = d.readInt()
+                    if (version !in 1..VERSION) return null
+                    val l = LevelData(d.readLong())
+                    l.x = d.readFloat(); l.y = d.readFloat(); l.z = d.readFloat()
+                    l.yaw = d.readFloat(); l.pitch = d.readFloat()
+                    l.flying = d.readBoolean()
+                    l.timeOfDay = d.readFloat()
+                    if (version == 1) {
+                        // Old creative-only saves: a 9-slot hotbar of ids.
+                        for (i in 0 until 9) d.readInt().let { v -> if (Items.isValidSlot(v)) l.inventory.slots[i] = ItemStack(v, 1) }
+                        l.selectedSlot = d.readInt().coerceIn(0, 8)
+                    } else {
+                        l.selectedSlot = d.readInt().coerceIn(0, 8)
+                        l.mode = GameMode.values()[d.readInt().coerceIn(0, 1)]
+                        l.name = d.readUTF()
+                        l.health = d.readFloat(); l.food = d.readFloat(); l.saturation = d.readFloat()
+                        l.inventory.read(d)
+                        if (version >= 3) {
+                            l.dimension = Dimension.values()[d.readInt().coerceIn(0, 2)]
+                            l.arriving = d.readBoolean()
+                        }
+                        if (version >= 4) {
+                            l.hasBedSpawn = d.readBoolean()
+                            l.bedX = d.readInt(); l.bedY = d.readInt(); l.bedZ = d.readInt()
+                        }
+                        // Worlds no longer have passwords: an old one is dropped so the world just opens.
+                        if (version >= 5) d.readUTF()
+                        if (version >= 6) {
+                            l.xp = d.readInt()
+                            repeat(d.readInt()) { l.achievements.add(d.readUTF()) }
+                        }
+                        if (version >= 7) for (i in l.enderChest.slots.indices) l.enderChest.slots[i] = Inventory.readStack(d)
+                        if (version >= 8) l.bossDefeated = d.readBoolean()
+                        if (version >= 9) l.flat = d.readBoolean()
+                    }
+                    l.hasPlayer = true
+                    l
+                }
+            } catch (e: Exception) {
+                null
+            }
+        }
+    }
+
+    fun write(dir: File) {
+        dir.mkdirs()
+        val f = File(dir, "level.dat")
+        val tmp = File(dir, "level.dat.tmp")
+        DataOutputStream(tmp.outputStream().buffered()).use { d ->
+            d.writeInt(VERSION)
+            d.writeLong(seed)
+            d.writeFloat(x); d.writeFloat(y); d.writeFloat(z)
+            d.writeFloat(yaw); d.writeFloat(pitch)
+            d.writeBoolean(flying)
+            d.writeFloat(timeOfDay)
+            d.writeInt(selectedSlot)
+            d.writeInt(mode.ordinal)
+            d.writeUTF(name)
+            d.writeFloat(health); d.writeFloat(food); d.writeFloat(saturation)
+            inventory.write(d)
+            d.writeInt(dimension.ordinal)
+            d.writeBoolean(arriving)
+            d.writeBoolean(hasBedSpawn)
+            d.writeInt(bedX); d.writeInt(bedY); d.writeInt(bedZ)
+            d.writeUTF("") // where versions 5..8 kept a world password (worlds no longer have one)
+            d.writeInt(xp)
+            d.writeInt(achievements.size)
+            for (a in achievements) d.writeUTF(a)
+            for (s in enderChest.slots) Inventory.writeStack(d, s)
+            d.writeBoolean(bossDefeated)
+            d.writeBoolean(flat)
+        }
+        tmp.renameTo(f)
+    }
+}
+
+fun floorInt(v: Float) = floor(v).toInt()
