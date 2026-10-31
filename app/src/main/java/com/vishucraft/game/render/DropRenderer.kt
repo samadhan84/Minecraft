@@ -13,7 +13,7 @@ class DropRenderer {
     private val mesh = GpuMesh(GL_DYNAMIC_DRAW)
     private val buf = FloatBuilder(4096)
 
-    fun invalidate() = mesh.invalidate()
+    fun invalidate() { mesh.invalidate(); coasterMesh.invalidate(); coasterVersion = -1 }
 
     /** Draws minecarts and flying arrows too (they share this batch). */
     private val arrowTile = Items[Items.find("Arrow")]!!.icon
@@ -27,8 +27,10 @@ class DropRenderer {
              carts: com.vishucraft.game.engine.Carts? = null, arrows: com.vishucraft.game.engine.Projectiles? = null,
              boats: com.vishucraft.game.engine.Boats? = null, aircraft: com.vishucraft.game.engine.Aircrafts? = null,
              vehicles: com.vishucraft.game.engine.Vehicles? = null, world: com.vishucraft.game.world.World? = null,
-             fireworks: com.vishucraft.game.engine.Fireworks? = null) {
+             fireworks: com.vishucraft.game.engine.Fireworks? = null, coasters: com.vishucraft.game.engine.Coasters? = null) {
+        if (coasters != null) drawCoasterTrack(shader, coasters)
         buf.size = 0
+        coasters?.list?.forEach { coasterTrain(it) }
         if (fireworks != null) fireworks(fireworks, camX, camZ, maxDist)
         if (world != null) billboards(world, camX, camZ, maxDist)
         carts?.list?.forEach { c ->
@@ -375,6 +377,104 @@ class DropRenderer {
                 val uv = ChunkMesher.UVS[k]
                 buf.put(cx + lx * c - lz * s, cy + ly, cz + lx * s + lz * c,
                     u0 + uv[0] * ChunkMesher.TILE_UV, v0 + uv[1] * ChunkMesher.TILE_UV, ChunkMesher.FACE_SHADE[f])
+            }
+        }
+    }
+
+    // ---------------------------------------------------------------- roller coasters
+
+    private val coasterMesh = GpuMesh(GL_STATIC_DRAW)
+    private var coasterVersion = -1
+    private val railTile by lazy { tile("coaster_rail") }
+    private val spineTile by lazy { tile("coaster_spine") }
+    private val supportTile by lazy { tile("coaster_support") }
+    private val carTile by lazy { tile("coaster_car") }
+
+    /** The coasters' track and supports never move, so they are built once into their own mesh. */
+    private fun drawCoasterTrack(shader: Shader, cs: com.vishucraft.game.engine.Coasters) {
+        if (cs.version != coasterVersion || (coasterMesh.quads == 0 && cs.list.isNotEmpty())) {
+            coasterVersion = cs.version
+            val b = FloatBuilder(65536)
+            for (c in cs.list) coasterTrack(b, c)
+            coasterMesh.upload(b.data, b.size)
+        }
+        if (cs.list.isEmpty()) return
+        glUniform3f(shader.u("uOffset"), 0f, 0f, 0f)
+        glDisable(GL_CULL_FACE)
+        coasterMesh.draw()
+        glEnable(GL_CULL_FACE)
+    }
+
+    /** One quad of the coaster mesh, lit by which way it faces. */
+    private fun cquad(b: FloatBuilder, tile: Int, q: Array<FloatArray>, nx: Float, ny: Float, nz: Float) {
+        val u0 = ChunkMesher.tileU(tile) + ChunkMesher.TILE_UV * 0.25f; val v0 = ChunkMesher.tileV(tile) + ChunkMesher.TILE_UV * 0.25f
+        val d = ChunkMesher.TILE_UV * 0.5f
+        val light = 0.62f + 0.38f * (ny * 0.6f + 0.4f + nx * 0.1f + nz * 0.05f).coerceIn(0f, 1f)
+        b.ensure(4 * FLOATS_PER_VERTEX)
+        val uv = arrayOf(floatArrayOf(0f, 0f), floatArrayOf(1f, 0f), floatArrayOf(1f, 1f), floatArrayOf(0f, 1f))
+        for (k in 0..3) b.put(q[k][0], q[k][1], q[k][2], u0 + uv[k][0] * d, v0 + uv[k][1] * d, light)
+    }
+
+    /** A square tube from point a to point b, [h] thick, with sides along (ua, ra) at a and (ub, rb) at b. */
+    private fun tube(bld: FloatBuilder, tile: Int, a: FloatArray, b: FloatArray, ua: FloatArray, ra: FloatArray, ub: FloatArray, rb: FloatArray, h: Float) {
+        val sides = arrayOf(1f to 1f, -1f to 1f, -1f to -1f, 1f to -1f)
+        fun corner(p: FloatArray, uu: FloatArray, rr: FloatArray, su: Float, sr: Float) = FloatArray(3) { p[it] + (uu[it] * su + rr[it] * sr) * h }
+        for (k in 0..3) {
+            val (su0, sr0) = sides[k]; val (su1, sr1) = sides[(k + 1) % 4]
+            val q = arrayOf(corner(a, ua, ra, su0, sr0), corner(a, ua, ra, su1, sr1), corner(b, ub, rb, su1, sr1), corner(b, ub, rb, su0, sr0))
+            val nu = (su0 + su1) * 0.5f; val nr = (sr0 + sr1) * 0.5f
+            cquad(bld, tile, q, ua[0] * nu + ra[0] * nr, ua[1] * nu + ra[1] * nr, ua[2] * nu + ra[2] * nr)
+        }
+    }
+
+    /** A box centred at [c] with half-sizes along forward, up and right. */
+    private fun obox(bld: FloatBuilder, tile: Int, c: FloatArray, f: FloatArray, u: FloatArray, r: FloatArray, hf: Float, hu: Float, hr: Float) {
+        val a = FloatArray(3) { c[it] - f[it] * hf }; val b = FloatArray(3) { c[it] + f[it] * hf }
+        val uu = FloatArray(3) { u[it] * hu }; val rr = FloatArray(3) { r[it] * hr }
+        tube(bld, tile, a, b, uu, rr, uu, rr, 1f)
+        // End caps.
+        for (e in arrayOf(a to -1f, b to 1f)) {
+            val p = e.first
+            val q = arrayOf(floatArrayOf(p[0] + uu[0] + rr[0], p[1] + uu[1] + rr[1], p[2] + uu[2] + rr[2]), floatArrayOf(p[0] + uu[0] - rr[0], p[1] + uu[1] - rr[1], p[2] + uu[2] - rr[2]),
+                floatArrayOf(p[0] - uu[0] - rr[0], p[1] - uu[1] - rr[1], p[2] - uu[2] - rr[2]), floatArrayOf(p[0] - uu[0] + rr[0], p[1] - uu[1] + rr[1], p[2] - uu[2] + rr[2]))
+            cquad(bld, tile, q, f[0] * e.second, f[1] * e.second, f[2] * e.second)
+        }
+    }
+
+    /** Two red running rails, a big grey spine under them, ties joining them, and white support columns. */
+    private fun coasterTrack(b: FloatBuilder, c: com.vishucraft.game.engine.CoasterTrack) {
+        val step = 2   // every half block
+        fun at(i: Int, side: Float, down: Float) = floatArrayOf(c.px[i] + c.r[i][0] * side - c.u[i][0] * down, c.py[i] + c.r[i][1] * side - c.u[i][1] * down, c.pz[i] + c.r[i][2] * side - c.u[i][2] * down)
+        var i = 0
+        while (i < c.n - 1) {
+            val j = minOf(i + step, c.n - 1)
+            for (side in floatArrayOf(-0.42f, 0.42f)) tube(b, railTile, at(i, side, 0f), at(j, side, 0f), c.u[i], c.r[i], c.u[j], c.r[j], 0.07f)
+            tube(b, spineTile, at(i, 0f, 0.36f), at(j, 0f, 0.36f), c.u[i], c.r[i], c.u[j], c.r[j], 0.14f)
+            if ((i / step) % 3 == 0) obox(b, spineTile, at(i, 0f, 0.2f), c.f[i], c.u[i], c.r[i], 0.06f, 0.05f, 0.44f)
+            i = j
+        }
+        val up = floatArrayOf(0f, 1f, 0f); val fx = floatArrayOf(1f, 0f, 0f); val fz = floatArrayOf(0f, 0f, 1f)
+        for (s in c.supports) {
+            val mid = (s[2] + s[3]) / 2f; val half = (s[2] - s[3]) / 2f
+            obox(b, supportTile, floatArrayOf(s[0], mid, s[1]), up, fx, fz, half, 0.22f, 0.22f)
+            obox(b, supportTile, floatArrayOf(s[0], s[3] + 0.1f, s[1]), up, fx, fz, 0.1f, 0.45f, 0.45f)   // foot
+        }
+    }
+
+    /** The train: three cars following each other along the track, each tilted with it (upside down in the loop). */
+    private fun coasterTrain(c: com.vishucraft.game.engine.CoasterTrack) {
+        for (car in 0..2) {
+            val at = c.s - car * 2.1f
+            val k = c.index(at); val p = c.pos(at)
+            val f = c.f[k]; val u = c.u[k]; val r = c.r[k]
+            fun off(df: Float, du: Float, dr: Float) = FloatArray(3) { p[it] + f[it] * df + u[it] * du + r[it] * dr }
+            val red = carTile; val black = tile("black_plastic"); val yellow = tile("concrete_yellow"); val steel = tile("steel")
+            obox(buf, steel, off(0f, 0.12f, 0f), f, u, r, 0.8f, 0.1f, 0.5f)            // chassis on the rails
+            obox(buf, red, off(0f, 0.45f, 0f), f, u, r, 0.85f, 0.25f, 0.6f)           // body
+            if (car == 0) obox(buf, yellow, off(0.95f, 0.45f, 0f), f, u, r, 0.15f, 0.28f, 0.55f)   // nose
+            for (row in floatArrayOf(-0.35f, 0.35f)) {
+                obox(buf, black, off(row - 0.25f, 0.95f, 0f), f, u, r, 0.06f, 0.3f, 0.5f)        // seat back
+                obox(buf, yellow, off(row + 0.2f, 0.78f, 0f), f, u, r, 0.04f, 0.04f, 0.45f)     // lap bar
             }
         }
     }

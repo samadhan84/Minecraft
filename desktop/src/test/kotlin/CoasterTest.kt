@@ -2,7 +2,7 @@ import com.vishucraft.game.engine.*
 import com.vishucraft.game.world.*
 import kotlin.test.*
 
-/** The roller coaster: it is built as one closed loop, the car rides all the way round and back, and you stay in till the station. */
+/** The steel roller coaster: one smooth closed track with a big drop and a loop; the train rides round and back. */
 class CoasterTest {
     private fun game(): Game {
         val dir = kotlin.io.path.createTempDirectory("coaster").toFile()
@@ -11,49 +11,60 @@ class CoasterTest {
         return Game(world, lvl, GameInput(), dir).also { it.mobs.hostileEnabled = false }
     }
 
-    @Test fun layoutIsAClosedLoop() {
-        val cells = coasterLayout()
-        for ((i, c) in cells.withIndex()) {
-            val n = cells[(i + 1) % cells.size]
-            assertEquals(1, kotlin.math.abs(n[0] - c[0]) + kotlin.math.abs(n[1] - c[1]), "step $i")
-            assertTrue(kotlin.math.abs(n[2] - c[2]) <= 1)
+    @Test fun trackIsSmoothClosedAndHasALoopAndADrop() {
+        val c = CoasterTrack(0f, 70f, 0f, 1, 0)
+        for (i in 0 until c.n - 1) {
+            val d = kotlin.math.sqrt((c.px[i + 1] - c.px[i]).let { it * it } + (c.py[i + 1] - c.py[i]).let { it * it } + (c.pz[i + 1] - c.pz[i]).let { it * it })
+            assertTrue(d < 0.6f, "gap of $d at point $i")
         }
-        assertEquals(cells.size, cells.map { it[0] to it[1] }.toSet().size)
-        assertEquals(11, cells.maxOf { it[2] })
+        assertEquals(c.px[0], c.px[c.n - 1], 0.01f); assertEquals(c.py[0], c.py[c.n - 1], 0.01f); assertEquals(c.pz[0], c.pz[c.n - 1], 0.01f)
+        assertTrue(c.py.max() >= 70f + 29f, "a 30-block lift hill")
+        assertTrue((0 until c.n).any { c.u[it][1] < -0.95f }, "upside down at the top of the loop")
+        assertTrue((0 until c.n).any { c.f[it][1] < -0.95f }, "a near-vertical drop")
+        assertTrue(c.length > 200f)
     }
 
-    @Test fun rideGoesAllTheWayRoundAndBack() {
+    @Test fun rideGoesRoundFastAndComesBack() {
         val g = game()
         g.world.ensureLoaded(0, 0)
-        val y = g.world.generator.surfaceHeight(0, 0) + 1
-        val car = g.buildCoaster(0, y, 0, 1, 0)
-        // Empty, it waits at the station.
-        repeat(60) { g.carts.update(0.05f, g) }
-        assertEquals(0f, car.speed)
-        g.player.x = car.x; g.player.y = car.y; g.player.z = car.z
-        g.carts.enter(car, 1f, 0f)
-        var top = 0f; var fastest = 0f; var left = false; var back = -1
-        for (step in 0 until 20 * 120) {
-            g.carts.update(0.05f, g)
-            top = maxOf(top, car.y); fastest = maxOf(fastest, car.speed)
-            assertTrue(car.y >= y - 0.01f, "on the track at step $step")
-            if (car.x > 10f) left = true
-            if (left && car.x < 4.5f && car.z < 1f) { back = step; break }
+        val y = g.world.generator.surfaceHeight(0, 0) + 1f
+        val c = g.buildCoaster(0.5f, y, 0.5f, 1, 0)
+        assertTrue(c.supports.isNotEmpty())
+        // Empty, it waits in the station.
+        repeat(100) { g.updateCoasters(0.05f) }
+        assertFalse(c.running)
+        g.coasters.riding = c
+        var fastest = 0f; var top = 0f; var upsideDown = false; var lapped = false
+        for (step in 0 until 20 * 200) {
+            g.updateCoasters(0.05f)
+            fastest = maxOf(fastest, c.speed); top = maxOf(top, g.player.y)
+            if (c.u[c.index(c.s)][1] < -0.9f) upsideDown = true
+            if (c.running && step > 100) {
+                // Safe: you can't get out while it is moving.
+                g.leaveCoaster(); assertSame(c, g.coasters.riding)
+            }
+            if (step > 200 && !c.running) { lapped = true; break }
         }
-        assertTrue(back > 0, "came back to the station")
-        assertTrue(top >= y + 10f, "went up the lift hill")
-        assertTrue(fastest > 12f, "raced down the drop: $fastest")
-        // Safe: you can't get out while it is moving.
-        if (car.speed > 1f) { g.carts.leave(g); assertSame(car, g.carts.riding) }
+        assertTrue(lapped, "came back to the station")
+        assertTrue(fastest > 25f, "fast: $fastest")
+        assertTrue(upsideDown, "went through the loop")
+        assertTrue(top > y + 28f, "went up the lift hill")
+        g.leaveCoaster(); assertNull(g.coasters.riding)
     }
 
-    @Test fun itemSetsUpTheRide() {
+    @Test fun itemSetsUpTheRideAndItIsSaved() {
         val g = game()
         g.world.ensureLoaded(0, 0)
         val y = g.world.generator.surfaceHeight(0, 0)
         g.player.yaw = 0f
         assertTrue(g.coasterUse(Items[Items.find("Roller Coaster")], RayHit(0, y, 0, 0, 1, 0, Blocks.GRASS)))
-        assertEquals(1, g.carts.list.count { it.kind == Cart.COASTER })
+        assertEquals(1, g.coasters.list.size)
+        val bytes = java.io.ByteArrayOutputStream()
+        java.io.DataOutputStream(bytes).use { g.coasters.write(it) }
+        val back = Coasters()
+        back.read(java.io.DataInputStream(java.io.ByteArrayInputStream(bytes.toByteArray())))
+        assertEquals(1, back.list.size)
+        assertEquals(g.coasters.list[0].supports.size, back.list[0].supports.size)
         assertTrue(Recipes.crafting.any { it.result == Items.find("Roller Coaster") })
     }
 }

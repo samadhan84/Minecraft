@@ -76,6 +76,8 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
     val metroNet = MetroNetwork()
     /** Diwali fireworks that are lit, and their sparks. */
     val fireworks = Fireworks()
+    /** Roller coasters (see engine/Coaster). */
+    val coasters = Coasters()
     private var cityCheck = 1f
     internal val travel = Travel()
     internal val robots = HashMap<Int, RobotBrain>()
@@ -431,7 +433,8 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
             val jumpPressed = input.jumpHeld && !lastJump
             val crouchPressed = input.descendHeld && !lastCrouch
             lastJump = input.jumpHeld; lastCrouch = input.descendHeld
-            if (liftInput(jumpPressed, crouchPressed)) {}
+            if (coasters.riding != null) { if (crouchPressed) leaveCoaster() }
+            else if (liftInput(jumpPressed, crouchPressed)) {}
             else if (vehicles.riding != null && crouchPressed) leaveVehicle()
             else if (boats.riding != null && crouchPressed) { boats.riding = null; player.y += 0.8f }
             else if (mount != null && crouchPressed) dismount()
@@ -444,7 +447,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
             lastVy = player.vy
             player.speedMul = (if (input.sprint && !player.flying) 1.3f else 1f) * (if (hasEffect("swiftness")) 1.4f else 1f)
             player.jumpMul = if (hasEffect("leaping")) 1.22f else 1f
-            if (carts.riding == null && mount == null && boats.riding == null && aircraft.riding == null && vehicles.riding == null && !sitting && !lift.riding &&
+            if (coasters.riding == null && carts.riding == null && mount == null && boats.riding == null && aircraft.riding == null && vehicles.riding == null && !sitting && !lift.riding &&
                 !rideEscalator(dt)) player.update(dt, world, input.moveForward, input.moveStrafe, input.jumpHeld, input.descendHeld)
             updateFlight(dt)
             // Fall damage when landing hard (not while flying or in water).
@@ -502,6 +505,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
         updatePassengers(dt)
         updateRobots(dt)
         fireworks.update(dt, this)
+        updateCoasters(dt)
         updateLift(dt)
         if (bowCooldown > 0f) bowCooldown -= dt
         // Standing in a portal for two seconds travels to the other world.
@@ -1348,6 +1352,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
         // Seeds, carrots and potatoes are planted on farmland.
         val crop = Farming.cropFor(item?.name)
         val tgt = target
+        if (coasterTap()) return
         if (fireworkUse(item, tgt)) return
         if (coasterUse(item, tgt)) return
         if (farmingUse(tgt, item)) return
@@ -1806,7 +1811,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
         try {
             dir.mkdirs()
             val tmp = File(dir, "entities.dat.tmp")
-            java.io.DataOutputStream(tmp.outputStream().buffered()).use { d -> mobs.write(d); carts.write(d); boats.write(d); carts.writeExtra(d); aircraft.write(d); vehicles.write(d); metroNet.write(d) }
+            java.io.DataOutputStream(tmp.outputStream().buffered()).use { d -> mobs.write(d); carts.write(d); boats.write(d); carts.writeExtra(d); aircraft.write(d); vehicles.write(d); metroNet.write(d); coasters.write(d) }
             tmp.renameTo(File(dir, "entities.dat"))
         } catch (_: Exception) {}
     }
@@ -1814,6 +1819,6 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
     private fun loadEntities() {
         val f = File(world.dataDir ?: return, "entities.dat")
         if (!f.exists()) return
-        try { java.io.DataInputStream(f.inputStream().buffered()).use { d -> mobs.read(d); carts.read(d); boats.read(d); carts.readExtra(d); aircraft.read(d); vehicles.read(d); metroNet.read(d) } } catch (_: Exception) {}
+        try { java.io.DataInputStream(f.inputStream().buffered()).use { d -> mobs.read(d); carts.read(d); boats.read(d); carts.readExtra(d); aircraft.read(d); vehicles.read(d); metroNet.read(d); coasters.read(d) } } catch (_: Exception) {}
     }
 }

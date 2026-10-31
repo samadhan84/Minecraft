@@ -53,7 +53,7 @@ internal fun Game.buildShowcaseIfNew() {
 
     val g = ground(0, 40) + 1
     // A roller coaster to ride, beside the row of houses.
-    buildCoaster(30, ground(30, 70) + 1, 70, 1, 0)
+    buildCoaster(30.5f, ground(30, 70) + 1f, 70.5f, 1, 0)
     // An escalator up to a little lookout, beside where you start.
     for (k in 0 until 5) setBlock(-14 - k, g + k, 44, Blocks.ESCALATOR, 4)
     for (x in -22..-19) for (z in 43..45) { for (y in g until g + 4) setBlock(x, y, z, Blocks.STONE_BRICKS); setBlock(x, g + 4, z, Blocks.OAK_FENCE) }

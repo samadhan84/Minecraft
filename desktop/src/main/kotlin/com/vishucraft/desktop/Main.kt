@@ -709,7 +709,26 @@ class App(demo: File?) : ClientApp(demo) {
                 g.player.yaw = kotlin.math.atan2(m.x - g.player.x, -(m.z - g.player.z)); g.player.pitch = -0.05f; g.player.flying = true
             }
             f == 1860 -> shot("14-metro-driver")
-            f == 1862 -> glfwSetWindowShouldClose(window, true)
+            f == 1862 -> session?.game?.let { g ->
+                // The roller coaster, from up high.
+                val c = g.coasters.list.first()
+                g.player.x = c.ox + 40f; g.player.y = c.oy + 38f; g.player.z = c.oz - 30f; g.player.flying = true
+                g.player.yaw = kotlin.math.PI.toFloat() - 0.1f; g.player.pitch = -0.55f
+            }
+            f == 1900 -> shot("15-roller-coaster")
+            f == 1902 || f == 1932 -> session?.game?.let { g ->
+                // Riding it: at the top of the big drop, then upside down at the top of the loop.
+                val c = g.coasters.list.first()
+                val k = if (f == 1902) (0 until c.n).first { c.f[it][1] < -0.5f } else (0 until c.n).first { c.u[it][1] < -0.97f }
+                g.coasters.riding = c; c.running = true; c.s = k * com.vishucraft.game.engine.CoasterTrack.DS - 1f; c.speed = 0f
+            }
+            f in 1903..1960 -> session?.game?.let { g ->
+                val c = g.coasters.list.first(); val k = c.index(c.s)
+                if (f < 1930 || f > 1932) { c.speed = 0.01f; g.player.yaw = kotlin.math.atan2(c.f[k][0], -c.f[k][2]); g.player.pitch = kotlin.math.asin(c.f[k][1].coerceIn(-0.99f, 0.99f)).coerceIn(-1.4f, 1.4f) }
+                if (f == 1928) shot("16-coaster-drop")
+                if (f == 1958) shot("17-coaster-loop")
+            }
+            f == 1962 -> glfwSetWindowShouldClose(window, true)
         }
     }
 }

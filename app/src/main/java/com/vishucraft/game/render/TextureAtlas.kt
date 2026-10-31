@@ -2012,6 +2012,10 @@ object TextureAtlas {
             "snake_tablet" -> { mask(t, arrayOf("..dddddd..", ".dmmmmmmd.", "dmmlmmmlmd", "dmmmmmmmmd", ".dmmmmmmd.", "..dddddd.."), rgb(40, 38, 36)); return true }
             "phuljhadi" -> { mask(t, arrayOf("..l.a.l.....", "...aaa......", "..aalaa.....", "...aaa......", "..l.ab.l....", "......b.....", ".......b....", "........b...", ".........b..", "..........d."), rgb(90, 90, 96), rgb(255, 220, 90), rgb(130, 130, 140)); return true }
             // A little roller coaster: track over a hill on red pillars, with a car on top.
+            // Roller coaster steel: glossy red rails and cars, grey spine, white supports.
+            "coaster_rail", "coaster_car" -> { t.fill { _, y -> scale(rgb(210, 30, 40), if (y < 5) 1.25f else 1f) }; return true }
+            "coaster_spine" -> { t.fill { _, y -> scale(rgb(90, 94, 104), if (y < 5) 1.2f else 1f) }; return true }
+            "coaster_support" -> { t.fill { x, _ -> scale(rgb(236, 238, 242), if (x < 5) 1.03f else 0.95f) }; return true }
             "roller_coaster_item" -> {
                 mask(t, arrayOf("......aa......", ".....abba.....", "....dd..dd....", "...d.m..m.d...", "..d..m..m..d..", ".d...m..m...d.", "d....m..m....d", "m....m..m....m", "m....m..m....m"),
                     rgb(220, 50, 50), rgb(250, 210, 60), rgb(60, 120, 230))
