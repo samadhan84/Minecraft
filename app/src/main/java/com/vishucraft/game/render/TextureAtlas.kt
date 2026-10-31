@@ -15,7 +15,7 @@ import kotlin.math.min
  */
 object TextureAtlas {
     const val TILE = 16
-    const val TILES_PER_ROW = 32
+    const val TILES_PER_ROW = 64
     const val SIZE = TILE * TILES_PER_ROW
 
     val pixels: IntArray by lazy { build() }
