@@ -1,7 +1,7 @@
 package com.vishucraft.game.engine
 
 /*
- * The daily play-time limit: 30 minutes a day on this device, counted while a world is open. Warnings come
+ * The daily play-time limit: 40 minutes a day on this device, counted while a world is open. Warnings come
  * 10, 5 and 1 minute before the end; then the game saves and closes the world, and no world opens again until
  * the next day (a new day starts fresh). The phone and PC versions keep [day] and [used] in their settings.
  */
@@ -31,12 +31,12 @@ class PlayLimit(var day: String, var used: Float) {
     }
 
     companion object {
-        /** Off: no daily limit and no countdown clock (the code stays here in case it is wanted again). */
-        const val ENABLED = false
-        const val LIMIT = 30 * 60f
+        /** On: 40 minutes a day, with the countdown clock on screen. */
+        const val ENABLED = true
+        const val LIMIT = 40 * 60f
         private val WARNINGS = intArrayOf(10 * 60, 5 * 60, 60)
         const val TITLE = "Daily limit is over"
-        const val MESSAGE = "You have played 30 minutes today, so the daily limit is over.\n\nYour world is saved. Come back tomorrow - a new day starts fresh!"
+        const val MESSAGE = "You have played 40 minutes today, so the daily limit is over.\n\nYour world is saved. Come back tomorrow - a new day starts fresh!"
 
         fun today(): String = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).format(java.util.Date())
     }
