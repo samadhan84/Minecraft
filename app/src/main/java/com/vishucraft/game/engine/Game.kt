@@ -1349,6 +1349,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
         val crop = Farming.cropFor(item?.name)
         val tgt = target
         if (fireworkUse(item, tgt)) return
+        if (coasterUse(item, tgt)) return
         if (farmingUse(tgt, item)) return
         if (crop > 0 && tgt != null && tgt.block == Blocks.FARMLAND && tgt.ny == 1 && world.getBlock(tgt.x, tgt.y + 1, tgt.z) == Blocks.AIR) {
             setBlock(tgt.x, tgt.y + 1, tgt.z, crop, 0)

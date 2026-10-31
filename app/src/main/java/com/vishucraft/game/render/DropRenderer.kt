@@ -37,7 +37,7 @@ class DropRenderer {
                 // A driving car at the back faces backwards; the one in front has the driver in it.
                 val back = cab && c.leader != null
                 train(c.x, c.y, c.z, if (back) c.yaw + Math.PI.toFloat() else c.yaw, c.kind, carts.power(c)?.kind ?: c.kind, driver = cab && !back)
-            } else cart(c.x, c.y, c.z, c.yaw)
+            } else if (c.kind == com.vishucraft.game.engine.Cart.COASTER) coasterCar(c.x, c.y, c.z, c.yaw) else cart(c.x, c.y, c.z, c.yaw)
         }
         boats?.list?.forEach { b -> boat(b.x, b.y, b.z, b.yaw) }
         aircraft?.list?.forEach { a -> if (a.isPlane) airplane(a.x, a.y, a.z, a.yaw) else helicopter(a.x, a.y, a.z, a.yaw, a.spin) }
@@ -292,6 +292,18 @@ class DropRenderer {
     }
 
     /** The glass car: the same shape as a car, but glass all over on a thin dark frame, with seats inside. */
+    /** A roller coaster car: low and red with a yellow nose, two rows of seats and padded lap bars. Local -Z is the front. */
+    private fun coasterCar(cx: Float, cy: Float, cz: Float, yaw: Float) {
+        val red = all6("concrete_red"); val yellow = all6("concrete_yellow"); val black = all6("black_plastic"); val steel = all6("steel")
+        part(cx, cy, cz, yaw, floatArrayOf(-0.5f, 0.1f, -0.75f, 0.5f, 0.3f, 0.75f), steel)          // chassis and wheels
+        part(cx, cy, cz, yaw, floatArrayOf(-0.55f, 0.3f, -0.7f, 0.55f, 0.75f, 0.7f), red)           // body
+        part(cx, cy, cz, yaw, floatArrayOf(-0.5f, 0.3f, -1f, 0.5f, 0.85f, -0.7f), yellow)           // nose
+        for (z0 in floatArrayOf(-0.55f, 0.1f)) {
+            part(cx, cy, cz, yaw, floatArrayOf(-0.45f, 0.75f, z0 + 0.4f, 0.45f, 1.25f, z0 + 0.55f), black)   // seat back
+            part(cx, cy, cz, yaw, floatArrayOf(-0.45f, 0.95f, z0, 0.45f, 1.05f, z0 + 0.08f), yellow)       // lap bar
+        }
+    }
+
     private fun glassCar(cx: Float, cy: Float, cz: Float, yaw: Float) {
         val glass = all6("glass_car"); val tyre = all6("tyre"); val black = all6("black_plastic"); val seat = all6("concrete_red")
         for (sx in floatArrayOf(-1f, 1f)) for (sz in floatArrayOf(-1f, 1f)) {

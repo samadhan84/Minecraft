@@ -348,6 +348,8 @@ object Items {
         add("Blueprint: Bullet Train Station", "blueprint", use = ItemUse.BLUEPRINT, maxStack = 16)
         // Diwali fireworks (see engine/Fireworks), lit until 13 November.
         for (k in com.vishucraft.game.engine.Cracker.values()) add(k.itemName, k.icon)
+        // Sets up a whole roller coaster ride (see engine/Coaster).
+        add("Roller Coaster", "roller_coaster_item", maxStack = 1)
 
         all = list
         for (i in all) { byId[i.id] = i; byName[i.name] = i.id }

@@ -116,11 +116,11 @@ class Cart(var x: Float, var y: Float, var z: Float, var kind: Int = MINECART) {
     /** Called to a station with its call button: it carries only the player, non-stop (not saved). */
     var private = false
 
-    val isTrain get() = kind != MINECART
+    val isTrain get() = kind != MINECART && kind != COASTER
     /** Half the length of the car body. */
     val half get() = when (kind) { ENGINE -> 1.35f; METRO -> 1.6f; BULLET -> 1.9f; COACH -> 1.4f; else -> 0.6f }
     val height get() = if (isTrain) 2.4f else 0.8f
-    val maxSpeed get() = when (kind) { ENGINE -> 16f; METRO -> 20f; BULLET -> 80f; else -> 12f }   // the bullet train is twice as fast as an airplane (42)
+    val maxSpeed get() = when (kind) { ENGINE -> 16f; METRO -> 20f; BULLET -> 80f; COASTER -> 24f; else -> 12f }   // the bullet train is twice as fast as an airplane (42)
     /** Metros and bullet trains chime and announce stations; engines blow the horn. */
     val isMetroLike get() = kind == METRO || kind == BULLET
 
@@ -131,6 +131,8 @@ class Cart(var x: Float, var y: Float, var z: Float, var kind: Int = MINECART) {
         const val COACH = 3
         /** Runs on metro tracks too (it can share them), much faster. */
         const val BULLET = 4
+        /** A roller coaster car (see engine/Coaster). */
+        const val COASTER = 5
 
         fun itemName(kind: Int) = when (kind) { ENGINE -> "Train Engine"; METRO -> "Metro Train"; COACH -> "Train Coach"; BULLET -> "Bullet Train"; else -> "Minecart" }
         fun kindOf(itemName: String?) = when (itemName) { "Train Engine" -> ENGINE; "Metro Train" -> METRO; "Train Coach" -> COACH; "Bullet Train" -> BULLET; else -> MINECART }
@@ -295,6 +297,8 @@ class Carts(private val world: World) {
     /** Gets the rider out: out of the side door of a train, or just up out of a minecart. */
     fun leave(game: Game) {
         val c = riding ?: return
+        // Safety first: you stay in a roller coaster car until it is back at the station.
+        if (c.kind == Cart.COASTER && c.speed > 1f) { game.uiEvents.add("toast:Hold on! You can get out when the car is back at the station"); return }
         riding = null
         // A private train goes back into service once its rider gets off.
         head(c).let { if (it.private) { it.private = false; it.dest = null; if (it.stopTimer > STOP_SECONDS) it.stopTimer = STOP_SECONDS } }
@@ -340,7 +344,7 @@ class Carts(private val world: World) {
     fun enter(c: Cart, lookX: Float, lookZ: Float) {
         riding = c
         // Trains keep their direction (coaches are pulled; engines are driven with forward and back).
-        if (c.speed < 0.5f && !c.isTrain) aim(c, lookX, lookZ)
+        if (c.speed < 0.5f && !c.isTrain && c.kind != Cart.COASTER) aim(c, lookX, lookZ)
     }
 
     /** The cart right in front of the player (within reach of a jump), if any. */
@@ -405,8 +409,8 @@ class Carts(private val world: World) {
                 if (power(h) == null && h === c && push > 0f) c.speed = minOf(4f, c.speed + 3f * push * dt)
                 return
             }
-            // Push the cart in the direction the player is looking along the track.
-            if (push != 0f) {
+            // Push the cart in the direction the player is looking along the track (a coaster car runs itself).
+            if (push != 0f && c.kind != Cart.COASTER) {
                 val lookX = kotlin.math.sin(p.yaw); val lookZ = -kotlin.math.cos(p.yaw)
                 val along = lookX * c.hx + lookZ * c.hz
                 val dir = if (along >= 0) 1f else -1f
@@ -612,11 +616,17 @@ class Carts(private val world: World) {
         val rise = com.vishucraft.game.world.Rails.rise(shape)
         if (rise != null && !(c.isTrain && power(c) != null)) {
             val uphill = rise[0] * c.hx + rise[1] * c.hz
-            c.speed -= uphill * 9f * dt
+            c.speed -= uphill * (if (c.kind == Cart.COASTER) CoasterRide.PULL else 9f) * dt
             if (c.speed < 0f) { c.hx = -c.hx; c.hz = -c.hz; c.speed = -c.speed }
         }
         checkStation(c, bx, by, bz, game)
-        if (rail == Blocks.POWERED_RAIL && !c.isTrain) {
+        if (c.kind == Cart.COASTER) {
+            if (rail == Blocks.POWERED_RAIL) {
+                // The station: off it goes with a rider; an empty car stops and waits.
+                if (riding === c) c.speed = maxOf(c.speed, CoasterRide.LAUNCH)
+                else { c.speed = maxOf(0f, c.speed - 30f * dt); if (c.speed < 0.5f) { c.speed = 0f; c.x += (bx + 0.5f - c.x) * minOf(1f, dt * 10f); c.z += (bz + 0.5f - c.z) * minOf(1f, dt * 10f) } }
+            } else c.speed = maxOf(c.speed, CoasterRide.CRAWL)
+        } else if (rail == Blocks.POWERED_RAIL && !c.isTrain) {
             // A cart standing on a powered rail next to a wall is pushed away from the wall;
             // otherwise it keeps going the way it was already heading.
             if (meta and 8 != 0 && c.speed < 0.5f) {

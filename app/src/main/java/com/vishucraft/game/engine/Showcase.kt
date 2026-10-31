@@ -7,7 +7,7 @@ import com.vishucraft.game.world.Items
  * The showcase world, opened from the home screen: a creative-only flat world that comes with everything already
  * built. Three cities joined by metro and railway lines, metro, railway and bullet train stations (the bullet
  * line runs under a lake) with call buttons, two airports with planes flying between them, the houses, mansion,
- * farm, tower and pool, cars (and a glass car), an escalator, the helper robot, villagers with their iron golem,
+ * farm, tower and pool, cars (and a glass car), a roller coaster, an escalator, the helper robot, villagers with their iron golem,
  * and animals.
  */
 
@@ -48,6 +48,8 @@ internal fun Game.buildShowcaseIfNew() {
         "Watch Tower" to 55, "Swimming Pool" to 75, "Small House" to 100)) build(name, x, 20)
 
     val g = ground(0, 40) + 1
+    // A roller coaster to ride, beside the row of houses.
+    buildCoaster(30, ground(30, 70) + 1, 70, 1, 0)
     // An escalator up to a little lookout, beside where you start.
     for (k in 0 until 5) setBlock(-14 - k, g + k, 44, Blocks.ESCALATOR, 4)
     for (x in -22..-19) for (z in 43..45) { for (y in g until g + 4) setBlock(x, y, z, Blocks.STONE_BRICKS); setBlock(x, g + 4, z, Blocks.OAK_FENCE) }

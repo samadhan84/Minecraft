@@ -2011,6 +2011,12 @@ object TextureAtlas {
             "colour_pencil" -> { mask(t, arrayOf("........l..", ".......aa..", "......mm...", ".....bb....", "....aa.....", "...mm......", "..bb.......", ".dd........", "dd........."), rgb(90, 200, 90), rgb(240, 80, 80), rgb(80, 140, 240)); return true }
             "snake_tablet" -> { mask(t, arrayOf("..dddddd..", ".dmmmmmmd.", "dmmlmmmlmd", "dmmmmmmmmd", ".dmmmmmmd.", "..dddddd.."), rgb(40, 38, 36)); return true }
             "phuljhadi" -> { mask(t, arrayOf("..l.a.l.....", "...aaa......", "..aalaa.....", "...aaa......", "..l.ab.l....", "......b.....", ".......b....", "........b...", ".........b..", "..........d."), rgb(90, 90, 96), rgb(255, 220, 90), rgb(130, 130, 140)); return true }
+            // A little roller coaster: track over a hill on red pillars, with a car on top.
+            "roller_coaster_item" -> {
+                mask(t, arrayOf("......aa......", ".....abba.....", "....dd..dd....", "...d.m..m.d...", "..d..m..m..d..", ".d...m..m...d.", "d....m..m....d", "m....m..m....m", "m....m..m....m"),
+                    rgb(220, 50, 50), rgb(250, 210, 60), rgb(60, 120, 230))
+                return true
+            }
             "glass_car_item" -> {
                 mask(t, arrayOf("....dddddd....", "...daaaaaad...", "..daaaaaaaad..", "dddaaaaaaaaddd", "daaaaaaaaaaaad", "laaaaaaaaaaaal", "daaaaaaaaaaaad", "ddbbdddddbbddd", "..bb.....bb..."),
                     rgb(200, 200, 210), rgb(170, 225, 250), rgb(30, 30, 30))
