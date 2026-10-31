@@ -66,6 +66,7 @@ class TrainsAndRobotTest {
         val row = s0[2] - 1   // the near track (row 4) runs one block in front of the island
         val bullet = Cart(s0[0] + 8.5f, s0[1].toFloat(), row + 0.5f, Cart.BULLET).apply { hx = 1f; hz = 0f }
         g.carts.list.add(bullet)
+        g.player.x = bullet.x; g.player.y = bullet.y; g.player.z = bullet.z
         g.carts.riding = bullet
         var stoppedMiddle = false
         repeat(60 * 40) {

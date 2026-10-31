@@ -9,6 +9,10 @@ import com.vishucraft.game.world.floorInt
  * way you were looking (the low end towards you). Step on and it carries you along smoothly, up or down, and you
  * step off onto the floor at the end. Tap one to switch the whole escalator between going up and going down.
  * Jump to hop off on the way.
+ *
+ * Or just place two escalator blocks, one higher up and one lower down, anywhere near each other: the steps in
+ * between fill in by themselves, with a flat walkway (and a little landing) where the two are not in a straight
+ * diagonal line.
  */
 
 private val FRONT = arrayOf(intArrayOf(0, 1), intArrayOf(0, -1), intArrayOf(1, 0), intArrayOf(-1, 0)) // faces 2..5
@@ -73,4 +77,64 @@ internal fun Game.escalatorTap(t: RayHit, sel: Int): Boolean {
     uiEvents.add("toast:Escalator: now going " + if (flip != 0) "down" else "up")
     sound("click", t.x + 0.5f, t.y + 0.5f, t.z + 0.5f)
     return true
+}
+
+/** The face index whose escalator rises towards (sx, sz). */
+private fun facingUp(sx: Int, sz: Int) = when { sx > 0 -> 5; sx < 0 -> 4; sz > 0 -> 3; else -> 2 }
+
+/** Whether the escalator at (x, y, z) already has another escalator step next to it (one up or down, one along). */
+private fun Game.inRun(x: Int, y: Int, z: Int): Boolean {
+    for ((dx, dz) in arrayOf(1 to 0, -1 to 0, 0 to 1, 0 to -1)) for (dy in intArrayOf(-1, 1))
+        if (world.getBlock(x + dx, y + dy, z + dz) == Blocks.ESCALATOR) return true
+    return false
+}
+
+/**
+ * Just placed an escalator block at (x, y, z) on its own: join it to the nearest other lone escalator block
+ * (within 48 blocks, at another height) with a full escalator, and a walkway where they aren't lined up.
+ */
+internal fun Game.joinEscalator(x: Int, y: Int, z: Int) {
+    if (isClient || inRun(x, y, z)) return
+    var other: IntArray? = null; var best = Int.MAX_VALUE
+    for (oy in y - 40..y + 40) {
+        if (oy == y || oy < 1 || oy >= com.vishucraft.game.world.Chunk.HEIGHT - 4) continue
+        for (oz in z - 48..z + 48) for (ox in x - 48..x + 48) {
+            if (world.getBlock(ox, oy, oz) != Blocks.ESCALATOR || inRun(ox, oy, oz)) continue
+            val d = (ox - x) * (ox - x) + (oz - z) * (oz - z) + (oy - y) * (oy - y)
+            if (d < best) { best = d; other = intArrayOf(ox, oy, oz) }
+        }
+    }
+    val o = other ?: return
+    val (lo, up) = if (o[1] < y) o to intArrayOf(x, y, z) else intArrayOf(x, y, z) to o
+    val rise = up[1] - lo[1]
+    // The steps run along whichever way the two are further apart, ending at the top block.
+    val dx = up[0] - lo[0]; val dz = up[2] - lo[2]
+    val alongX = if (dx == 0 && dz == 0) true else kotlin.math.abs(dx) >= kotlin.math.abs(dz)
+    val sx = if (alongX) (if (dx < 0) -1 else 1) else 0
+    val sz = if (alongX) 0 else (if (dz < 0) -1 else 1)
+    val face = facingUp(sx, sz)
+    // Steps from the bottom of the run (rise blocks back from the top) up to the top block, with headroom.
+    val bx = up[0] - sx * rise; val bz = up[2] - sz * rise
+    for (k in 0..rise) {
+        val ex = bx + sx * k; val ey = lo[1] + k; val ez = bz + sz * k
+        for (h in 1..3) if (world.getBlock(ex, ey + h, ez) != Blocks.AIR) setBlock(ex, ey + h, ez, Blocks.AIR)
+        setBlock(ex, ey, ez, Blocks.ESCALATOR, face)
+    }
+    // A walkway from the lower block to the foot of the escalator, if they aren't the same place.
+    if (lo[0] != bx || lo[2] != bz) {
+        setBlock(lo[0], lo[1], lo[2], Blocks.AIR)
+        val fx = bx - sx; val fz = bz - sz   // the floor just in front of the bottom step
+        var cx = lo[0]; var cz = lo[2]
+        fun floor(px: Int, pz: Int) {
+            setBlock(px, lo[1] - 1, pz, Blocks.POLISHED_ANDESITE)
+            for (h in 0..2) if (world.getBlock(px, lo[1] + h, pz) != Blocks.AIR && !(px == bx && pz == bz && h == 0)) setBlock(px, lo[1] + h, pz, Blocks.AIR)
+        }
+        floor(cx, cz)
+        while (cx != fx) { cx += Integer.signum(fx - cx); floor(cx, cz) }
+        while (cz != fz) { cz += Integer.signum(fz - cz); floor(cx, cz) }
+    }
+    // A landing at the top, so you step off onto something.
+    val tx = up[0] + sx; val tz = up[2] + sz
+    if (!Blocks.solid[world.getBlock(tx, up[1], tz)]) setBlock(tx, up[1], tz, Blocks.POLISHED_ANDESITE)
+    uiEvents.add("toast:Escalator joined: ${rise + 1} steps")
 }

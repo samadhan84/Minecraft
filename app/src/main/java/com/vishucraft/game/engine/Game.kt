@@ -1717,6 +1717,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
         }
         setBlock(x, y, z, id, meta)
         if (id == Blocks.SIGN) uiEvents.add("signedit:$x,$y,$z")
+        if (id == Blocks.ESCALATOR) joinEscalator(x, y, z)
         if (com.vishucraft.game.world.Rails.isRail(id)) {
             updateRail(x, y, z)
             for ((dx, dz) in arrayOf(1 to 0, -1 to 0, 0 to 1, 0 to -1)) for (dy in -1..1) updateRail(x + dx, y + dy, z + dz)
