@@ -69,10 +69,11 @@ class Fireworks {
             val f = it.next()
             if (f.held) { val p = game.player; f.x = p.x + sin(p.yaw) * 0.6f + cos(p.yaw) * 0.35f; f.y = p.y + 1.1f; f.z = p.z - cos(p.yaw) * 0.6f + sin(p.yaw) * 0.35f }
             f.age += dt
+            if (f.age < 0f) continue   // waiting its turn in a show
             if (f.age < f.kind.fuse) {
                 // The fuse fizzing.
                 if (rnd.nextFloat() < dt * 25f) sparks.add(Spark(f.x, f.y + 0.3f, f.z, rnd.nextFloat() - 0.5f, 1.5f, rnd.nextFloat() - 0.5f, 0.3f, c("spark_gold"), 3f))
-                if (f.age - dt < 0.01f) game.sound("fuse", f.x, f.y, f.z, 0.6f)
+                if (f.age - dt <= 0f) game.sound("fuse", f.x, f.y, f.z, 0.6f)
                 continue
             }
             val t = f.age - f.kind.fuse

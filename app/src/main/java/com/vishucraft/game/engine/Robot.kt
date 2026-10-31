@@ -151,9 +151,10 @@ fun Game.robotCommand(uid: Int, said: String) {
     b.target = null; b.done = 0
     when {
         text.isEmpty() || has("help", "what can") -> robotSay("I can: follow me, stay, come here, mine, chop trees, farm, light, guard, " +
-            "build a house (or any blueprint), give me 10 diamonds, take me to <station or airport>, make it day / night, stop the rain, call a train, dance")
+            "build a house (or any blueprint), give me 10 diamonds, fireworks (on Diwali), take me to <station or airport>, make it day / night, stop the rain, call a train, dance")
         has("give", "want", "need") -> giveItems(text, words)
         has("take me", "teleport", "go to") -> takeMeTo(text)
+        has("firework", "diwali", "cracker", "patak", "bomb", "phuljhadi", "anar", "chakri", "rocket", "sky shot", "ladi") -> robotFireworks(text)
         has("build", "make a", "make me") && !has("day", "night") -> robotBuild(text)
         has("day", "morning", "sun") -> { timeOfDay = 0.3f; robotSay("Good morning!") }
         has("night", "dark", "moon") -> { timeOfDay = 0.8f; robotSay("Good night!") }
@@ -241,4 +242,26 @@ private fun Game.robotCallTrain() {
     val d = sqrt((s[0] - player.x) * (s[0] - player.x) + (s[2] - player.z) * (s[2] - player.z))
     if (d > 40f) { robotSay("The nearest station is ${metroStationName(s)}, ${d.toInt()} blocks away. Say \"take me to ${metroStationName(s)}\""); return }
     callTrain(if (s[3] == TrackEnd.RAILWAY) "Railway Train" else "Metro", s[0], s[1], s[2])
+}
+
+/**
+ * "Fireworks!": the robot sets up a Diwali show a few blocks in front of you and lights it, one cracker after
+ * another (just the one you name, like "light a sutli bomb", or all of them). Only until 13 November.
+ */
+internal fun Game.robotFireworks(text: String) {
+    if (!diwaliTime()) { robotSay("Diwali is over: the fireworks were only until 13 November. See you next Diwali!"); return }
+    val named = Cracker.values().filter { k -> k.itemName.lowercase().split(" ", "(", ")").filter { it.length > 3 && it != "bomb" && it != "wala" && it != "diwali" }.any { text.contains(it) } }
+    val show = (named.ifEmpty { Cracker.values().filter { it != Cracker.PHULJHADI } }).filter { it != Cracker.PHULJHADI || named.size == 1 }
+    if (show == listOf(Cracker.PHULJHADI)) { fireworks.light(Cracker.PHULJHADI, player.x, player.y + 1.1f, player.z, held = true); robotSay("Here's a Phuljhadi for you. Happy Diwali!"); return }
+    val fx = sin(player.yaw); val fz = -kotlin.math.cos(player.yaw)
+    for ((k, kind) in show.withIndex()) {
+        // In a row across in front of you, 7 blocks away, each one lit 1.5 seconds after the last.
+        val side = (k - (show.size - 1) / 2f) * 2f
+        val x = floorInt(player.x + fx * 7f - fz * side); val z = floorInt(player.z + fz * 7f + fx * side)
+        var y = floorInt(player.y) + 6
+        while (y > floorInt(player.y) - 8 && !Blocks.solid[world.getBlock(x, y - 1, z)]) y--
+        fireworks.light(kind, x + 0.5f, y.toFloat(), z + 0.5f)
+        fireworks.lit.last().age = -k * 1.5f
+    }
+    robotSay(if (show.size == 1) "Lighting the ${show[0].itemName}! Stand back!" else "Diwali fireworks show! Stand back and watch. Happy Diwali!")
 }

@@ -42,4 +42,18 @@ class FireworksTest {
         val after = IntArray(9 * 9 * 9) { k -> g.world.getBlock(4 + k % 9, y - 4 + k / 81, 4 + (k / 9) % 9) }
         assertContentEquals(before, after)
     }
+
+    @Test fun robotPutsOnAFireworksShow() {
+        val g = game()
+        g.world.ensureLoaded(0, 0)
+        g.player.y = g.world.generator.surfaceHeight(0, 0) + 1f
+        val r = Mob(MobType.ROBOT, 1.5f, g.player.y + 1f, 0.5f); g.mobs.list.add(r)
+        g.robotCommand(r.uid, "light diwali fireworks")
+        assertEquals(Cracker.values().size - 1, g.fireworks.lit.size)
+        g.fireworks.lit.clear()
+        g.robotCommand(r.uid, "light a sutli bomb please")
+        assertEquals(listOf(Cracker.SUTLI), g.fireworks.lit.map { it.kind })
+        repeat(200) { g.fireworks.update(0.05f, g) }
+        assertTrue(g.fireworks.lit.isEmpty())
+    }
 }
