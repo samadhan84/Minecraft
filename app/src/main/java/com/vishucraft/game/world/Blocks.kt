@@ -428,7 +428,9 @@ object Blocks {
     const val ESCALATOR = 444
     /** On station platforms: press it to call a train of your own (see engine/TrainCall.kt). */
     const val CALL_BUTTON = 445
-    const val COUNT = 446
+    /** Bullet train track: only bullet trains run on it, and they run on nothing else (see Rails). */
+    const val BULLET_RAIL = 446
+    const val COUNT = 447
 
     /** The newer crops' texture names, in id order from RICE_CROP. */
     val NEW_CROPS = listOf("rice", "tomato", "lentil", "beetroot")
@@ -947,6 +949,9 @@ object Blocks {
             front = t("scarecrow_face"), movable = false))
         reg(BlockDef(STOP_RAIL, "Station Stop Rail", t("stop_rail"), render = RenderType.RAIL, opaque = false, solid = false,
             hardness = 0.4f, tool = P, category = Category.REDSTONE, needsSupport = true, movable = false))
+        reg(BlockDef(BULLET_RAIL, "Bullet Train Track", t("bullet_rail"), render = RenderType.RAIL, opaque = false, solid = false,
+            hardness = 0.4f, tool = P, category = Category.REDSTONE, needsSupport = true, movable = false))
+        t("bullet_rail_curve")
         // ---- Household pack
         reg(BlockDef(WARDROBE, "Wardrobe", t("dark_oak_planks"), t("wardrobe_side"), t("dark_oak_planks"), hardness = 1f, tool = A,
             category = H, facing = Facing.HORIZONTAL, front = t("wardrobe_front"), movable = false))
@@ -1091,6 +1096,7 @@ object Blocks {
             OBSERVER -> if (meta and 8 != 0 && face == ((meta and 7) xor 1)) return Tiles.id("observer_back_on")
             POWERED_RAIL -> return Tiles.id(if (meta and 8 != 0) "powered_rail_on" else "powered_rail")
             RAIL -> return Tiles.id(if ((meta and 15) >= 6) "rail_curve" else "rail")
+            BULLET_RAIL -> return Tiles.id(if ((meta and 15) >= 6) "bullet_rail_curve" else "bullet_rail")
             BERRY_BUSH -> return Tiles.id("berry_bush_${meta.coerceIn(0, 3)}")
             GAS_STOVE -> if (face == 0) return Tiles.id(if (meta and 8 != 0) "stove_top_on" else "stove_top")
             TAWA -> if (face == 0) return Tiles.id(if (meta and 8 != 0) "tawa_top_on" else "tawa_top")

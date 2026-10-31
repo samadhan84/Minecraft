@@ -107,6 +107,8 @@ abstract class ClientApp(protected val demo: File?) {
     protected val nameField = Ui.Field("", "World name")
     protected val seedField = Ui.Field("", "Seed (leave empty for random)")
     protected var survival = true
+    /** A new creative world on a flat world (false: normal land with hills, trees and water). */
+    protected var flatWorld = false
     protected var deleteTarget: File? = null
 
     // Join form
@@ -419,7 +421,10 @@ abstract class ClientApp(protected val demo: File?) {
         ui.text("Seed", cx - w / 2, y - 24, 16f, rgba(220, 220, 220))
         ui.field(seedField, cx - w / 2, y, w)
         y += 64
-        if (ui.button("Game mode: " + if (survival) "Survival" else "Creative (flat world)", cx - w / 2, y, w, 42f)) survival = !survival
+        if (ui.button("Game mode: " + when { survival -> "Survival"; flatWorld -> "Creative (flat world)"; else -> "Creative (normal world)" }, cx - w / 2, y, w, 42f)) {
+            // Survival, creative on normal land (hills, trees, water), or creative on a flat world.
+            if (survival) { survival = false; flatWorld = false } else if (!flatWorld) flatWorld = true else survival = true
+        }
         ui.text(if (survival) "Collect resources, craft tools, watch your health and hunger." else "Unlimited blocks, flying, no damage.",
             cx, y + 50, 16f, rgba(200, 200, 200), 1)
         y += 100
@@ -431,7 +436,7 @@ abstract class ClientApp(protected val demo: File?) {
             while (File(worldsDir, "world$n").exists()) n++
             val name = nameField.text.trim().ifEmpty { "World $n" }
             ui.focus = null
-            startSession(GameSession.create(File(worldsDir, "world$n"), name, seed, survival))
+            startSession(GameSession.create(File(worldsDir, "world$n"), name, seed, survival, flatWorld))
             menu = Menu.WORLDS
             return
         }

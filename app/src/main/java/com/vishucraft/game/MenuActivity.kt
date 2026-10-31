@@ -207,13 +207,14 @@ class MenuActivity : Activity() {
         return true
     }
 
-    private fun startGame(dirName: String, seed: Long? = null, name: String? = null, survival: Boolean = false) {
+    private fun startGame(dirName: String, seed: Long? = null, name: String? = null, survival: Boolean = false, flat: Boolean = true) {
         if (limitOver()) return
         val i = Intent(this, GameActivity::class.java)
         i.putExtra(GameActivity.EXTRA_WORLD, dirName)
         if (seed != null) i.putExtra(GameActivity.EXTRA_SEED, seed)
         if (name != null) i.putExtra(GameActivity.EXTRA_NAME, name)
         i.putExtra(GameActivity.EXTRA_MODE, survival)
+        i.putExtra(GameActivity.EXTRA_FLAT, flat)
         startActivity(i)
     }
 
@@ -355,11 +356,13 @@ class MenuActivity : Activity() {
             hint = "Seed (leave empty for random)"
             inputType = InputType.TYPE_CLASS_TEXT
         }
+        // Survival, creative on normal land (hills, trees, water), or creative on a flat world.
         var survival = true
+        var flat = false
         lateinit var modeButton: TextView
         modeButton = menuButton(this, "Game mode: Survival") {
-            survival = !survival
-            modeButton.text = if (survival) "Game mode: Survival" else "Game mode: Creative (flat world)"
+            if (survival) { survival = false; flat = false } else if (!flat) flat = true else survival = true
+            modeButton.text = when { survival -> "Game mode: Survival"; flat -> "Game mode: Creative (flat world)"; else -> "Game mode: Creative (normal world)" }
         }
         col.addView(nameInput); col.addView(seedInput)
         col.addView(modeButton, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dpi(8f) })
@@ -375,7 +378,7 @@ class MenuActivity : Activity() {
                 var n = 1
                 while (File(GameActivity.worldsRoot(this), "world$n").exists()) n++
                 val name = nameInput.text.toString().trim().ifEmpty { "World $n" }
-                startGame("world$n", seed, name, survival)
+                startGame("world$n", seed, name, survival, flat)
             }
             .setNegativeButton("Cancel", null)
             .show()

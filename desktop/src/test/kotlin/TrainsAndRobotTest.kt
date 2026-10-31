@@ -42,9 +42,9 @@ class TrainsAndRobotTest {
         assertTrue(Cart(0f, 0f, 0f, Cart.BULLET).maxSpeed >= 80f)
         val g = game()
         val y = g.ground(0, 0) + 1
-        for (x in -300..300) { g.world.ensureLoaded(x shr 4, -1); g.setBlock(x, y, -3, Blocks.RAIL, 1) }
-        // A slow metro in front, a bullet train behind it on the same track going the same way.
-        val metro = Cart(-150.5f, y.toFloat(), -2.5f, Cart.METRO).apply { hx = 1f; hz = 0f }
+        for (x in -300..300) { g.world.ensureLoaded(x shr 4, -1); g.setBlock(x, y, -3, Blocks.BULLET_RAIL, 1) }
+        // A car standing in the way on the bullet train's track: the bullet train goes straight through it.
+        val metro = Cart(-150.5f, y.toFloat(), -2.5f, Cart.COACH).apply { hx = 1f; hz = 0f }
         val bullet = Cart(-290.5f, y.toFloat(), -2.5f, Cart.BULLET).apply { hx = 1f; hz = 0f }
         g.carts.list.add(metro); g.carts.list.add(bullet)
         var top = 0f; var passed = false
@@ -56,25 +56,26 @@ class TrainsAndRobotTest {
 
     @Test fun bulletTrainsRunExpress() {
         val g = game()
-        assertTrue(g.build(0, 0, 0f, "Metro Station"))
-        assertTrue(g.build(200, 0, 0f, "Metro Station"))
-        assertTrue(g.build(400, 0, 0f, "Metro Station"))
+        assertTrue(g.build(0, 0, 0f, "Bullet Train Station"))
+        assertTrue(g.build(300, 0, 0f, "Bullet Train Station"))
+        assertTrue(g.build(600, 0, 0f, "Bullet Train Station"))
         g.loadLines()
         g.carts.list.clear()
-        // A bullet train leaving the first station towards the others.
+        // A bullet train leaving the first station towards the others, on its own track (row 4).
         val s0 = g.metroNet.stations[0]
-        val row = s0[2] - 1   // the near track (row 4) runs one block in front of the island
-        val bullet = Cart(s0[0] + 8.5f, s0[1].toFloat(), row + 0.5f, Cart.BULLET).apply { hx = 1f; hz = 0f }
+        val bullet = Cart(s0[0] + 8.5f, s0[1].toFloat(), s0[2] + 1.5f, Cart.BULLET).apply { hx = 1f; hz = 0f }
         g.carts.list.add(bullet)
         g.player.x = bullet.x; g.player.y = bullet.y; g.player.z = bullet.z
         g.carts.riding = bullet
-        var stoppedMiddle = false
+        var stoppedMiddle = false; var far = 0f
         repeat(60 * 40) {
             g.update(1 / 60f); g.dirtyChunks.clear()
-            if (bullet.stopTimer > 0f && kotlin.math.abs(bullet.x - 200f) < 20f) stoppedMiddle = true
+            val front = g.carts.head(bullet)
+            far = maxOf(far, front.x)
+            if (front.stopTimer > 0f && kotlin.math.abs(front.x - 300f) < 20f) stoppedMiddle = true
         }
-        println("bullet at ${bullet.x}, ${bullet.z}")
-        assertTrue(bullet.x > 300f || kotlin.math.abs(bullet.hx) > 0f && bullet.x != s0[0] + 8.5f, "it ran along the line")
+        println("express bullet got to x=$far")
+        assertTrue(far > 500f, "it ran along the line")
         assertFalse(stoppedMiddle, "an express bullet train doesn't stop at the stations in between")
     }
 
@@ -91,11 +92,11 @@ class TrainsAndRobotTest {
         val b = g.button(s0)!!
         g.player.x = b[0] + 0.5f; g.player.z = b[2] + 1.5f; g.player.y = b[1].toFloat()
         g.toasts()
-        assertTrue(g.callButtonTap(RayHit(b[0], b[1], b[2], 0, 1, 0, Blocks.CALL_BUTTON), 0))
-        assertTrue(g.toasts().any { it == "calltrain:${b[0]},${b[1]},${b[2]}" })
-        // Make the nearest metro one from the far station, to see it come all the way.
+        // Make the nearest metro one from the far station, to see it come all the way. The button calls the
+        // station's own kind of train straight away.
         g.carts.list.removeAll { kotlin.math.abs(it.x - s0[0]) < 100f }
-        g.callTrain("Metro", b[0], b[1], b[2])
+        assertTrue(g.callButtonTap(RayHit(b[0], b[1], b[2], 0, 1, 0, Blocks.CALL_BUTTON), 0))
+        assertEquals(Cart.METRO, g.carts.power(g.carts.riding!!)!!.kind)
         val riding = g.carts.riding
         assertNotNull(riding, "on board")
         val head = g.carts.head(riding)
@@ -112,14 +113,16 @@ class TrainsAndRobotTest {
             if (arrived) return@repeat
             g.update(1 / 60f); g.dirtyChunks.clear()
             if (g.mobs.list.any { it.ride != null && g.carts.chain(head).any { c -> c === it.ride } }) fail("someone else got on the private train")
-            if (head.stopTimer > 0.5f && kotlin.math.abs(head.x - 300f) < 20f) stoppedMiddle = true
-            if (head.stopTimer > 0.5f && kotlin.math.abs(head.x - 600f) < 20f) arrived = true
+            val front = g.carts.head(g.carts.riding!!)   // the front car changes when it turns round
+            if (front.stopTimer > 0.5f && kotlin.math.abs(front.x - 300f) < 20f) stoppedMiddle = true
+            if (front.stopTimer > 0.5f && kotlin.math.abs(front.x - 600f) < 20f) arrived = true
         }
         assertFalse(stoppedMiddle, "non-stop past the station in between")
         assertTrue(arrived, "arrived at the far station (train at ${head.x})")
         // Getting off puts it back into service.
+        val front = g.carts.head(g.carts.riding!!)
         g.carts.leave(g)
-        assertFalse(head.private)
+        assertFalse(front.private)
     }
 
     @Test fun olderStationsGetCallButtons() {

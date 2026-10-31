@@ -6,10 +6,11 @@ import com.vishucraft.game.world.Rails
 import com.vishucraft.game.world.RedstoneIds
 
 /*
- * Train call buttons stand on every station's platforms. Press one and pick a metro, a bullet train or a railway
- * train: the nearest train of that kind comes straight to the platform (a new one if there is none yet), just for
- * you. You are put on board and pick a station; it runs there non-stop, through any other train in the way and
- * through every station and city on the line. Once you get off, it goes back into service.
+ * Train call buttons stand on every station's platforms. Press one and the nearest train of the station's own kind
+ * (a metro at a metro station, a railway train at a railway station, a bullet train at a bullet train station)
+ * comes straight to the platform (a new one if there is none yet), just for you. You are put on board and pick a
+ * station; it runs there non-stop, through any other train in the way and through every station and city on the
+ * line. Once you get off, it goes back into service.
  */
 
 /** The kinds of train a call button offers, as shown to the player. */
@@ -19,7 +20,9 @@ val TRAIN_CHOICES = listOf("Metro", "Bullet Train", "Railway Train")
 internal fun Game.callButtonTap(t: RayHit, sel: Int): Boolean {
     if (t.block != Blocks.CALL_BUTTON || (sel > 0 && !Items.isItem(sel))) return false
     sound("click", t.x + 0.5f, t.y + 0.5f, t.z + 0.5f)
-    uiEvents.add("calltrain:${t.x},${t.y},${t.z}")
+    // Each station calls its own kind of train: a metro, a railway train or a bullet train.
+    val s = metroNet.stations.minByOrNull { (it[0] - t.x).toLong() * (it[0] - t.x) + (it[2] - t.z).toLong() * (it[2] - t.z) }
+    callTrain(when (s?.get(3)) { TrackEnd.BULLET -> "Bullet Train"; TrackEnd.RAILWAY -> "Railway Train"; else -> "Metro" }, t.x, t.y, t.z)
     return true
 }
 

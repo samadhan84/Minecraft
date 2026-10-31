@@ -236,8 +236,8 @@ class MetroNetwork {
     }
 
     companion object {
-        /** 3: railways; 4: every station has a train call button; 5: bullet train lines under the sea. */
-        const val VERSION = 5
+        /** 3: railways; 4: train call buttons; 5: bullet lines under the sea; 6: bullet train track of their own. */
+        const val VERSION = 6
     }
 }
 
@@ -281,33 +281,21 @@ private fun Game.addLine(line: MetroLine) {
 }
 
 /**
- * The route between two ends: a bullet line goes under the sea when there is water on the way; any line that would
- * cross a city goes up over it on a high viaduct instead of through its buildings.
+ * The route between two ends. Each kind of line has its own level: bullet lines go underground (in a glass tube
+ * where they pass through water), metro lines up high on a viaduct, clear of the ground, trees and hills along
+ * the way, and railways along the ground. Any line that would cross a city goes over it instead of through it.
  */
 private fun Game.planFor(a: TrackEnd, b: TrackEnd, kind: Int): MetroLine {
+    if (kind == TrackEnd.BULLET) return planDeep(a, b)
     val plain = planLine(a, b, 5)
-    if (kind == TrackEnd.BULLET && waterOnTheWay(plain)) return planDeep(a, b)
-    val city = citiesOnTheWay(plain)
-    if (city > 0) {
-        val t = maxOf(city, a.y, b.y)
-        return planLine(a, b, t - a.y + 5, t - b.y + 5).also { it.deep = t }
+    var t = citiesOnTheWay(plain)
+    if (kind == TrackEnd.METRO) {
+        var ground = 0
+        for (k in 0 until plain.size step 2) { val c = plain.cell(k); ground = maxOf(ground, world.generator.surfaceHeight(c[0], c[1])) }
+        t = maxOf(t, ground + 10)
     }
+    if (t > maxOf(a.y, b.y)) return planLine(a, b, t - a.y + 5, t - b.y + 5).also { it.deep = t }
     return plain
-}
-
-/** Whether there is sea, a lake or a river under the route (from the terrain, and from what is loaded). */
-private fun Game.waterOnTheWay(l: MetroLine): Boolean {
-    val sea = com.vishucraft.game.world.TerrainGenerator.SEA_LEVEL
-    for (k in 0 until l.size step 3) {
-        val c = l.cell(k)
-        if (world.generator.surfaceHeight(c[0], c[1]) < sea - 1) return true
-        if (world.isLoaded(c[0], c[1])) {
-            var y = world.columnHeight(c[0], c[1]) - 1
-            while (y > 1 && world.getBlock(c[0], y, c[1]) == Blocks.AIR) y--
-            if (world.getBlock(c[0], y, c[1]) == Blocks.WATER) return true
-        }
-    }
-    return false
 }
 
 /**
@@ -377,16 +365,18 @@ private fun Game.layLine(line: MetroLine, cx: Int, cz: Int): Boolean {
         val (x, z) = line.cell(k).let { it[0] to it[1] }
         val y = line.y(k)
         if (y < 2 || y >= Chunk.HEIGHT - 4) continue
-        if (line.deep > 0) { tube(line, k, x, y, z); continue }
-        // A tunnel through anything in the way (except the other track's rails), and a deck underneath.
-        for (h in 0..3) world.getBlock(x, y + h, z).let { if (it != Blocks.AIR && !com.vishucraft.game.world.Rails.isRail(it)) setBlock(x, y + h, z, Blocks.AIR) }
+        // Lines running below the stations go in a tube; lines running above them are ordinary viaducts.
+        if (line.deep > 0 && line.deep <= minOf(line.ya, line.yb)) { tube(line, k, x, y, z); continue }
+        // A tunnel through anything in the way (except the other track's rails; trees are chopped down whole),
+        // and a deck underneath.
+        for (h in 0..3) world.getBlock(x, y + h, z).let { if (it != Blocks.AIR && !com.vishucraft.game.world.Rails.isRail(it)) { setBlock(x, y + h, z, Blocks.AIR); chopTree(it, x, y + h, z) } }
         if (!Blocks.solid[world.getBlock(x, y - 1, z)] || world.getBlock(x, y - 1, z) == Blocks.WATER) setBlock(x, y - 1, z, deck)
         // Pillars down to the ground every 8 rails where the line is up in the air.
         if (k % 8 == 0) {
             var h = y - 2
             while (h > 1 && y - h < 64 && !Blocks.solid[world.getBlock(x, h, z)]) { setBlock(x, h, z, pillar); h-- }
         }
-        setBlock(x, y, z, Blocks.RAIL, 0)
+        setBlock(x, y, z, if (line.kind == TrackEnd.BULLET) Blocks.BULLET_RAIL else Blocks.RAIL, 0)
     }
     // Shape the rails into straights, curves and slopes, including the ones next to this chunk's stretch
     // (already laid in a neighbouring chunk, or a station's own track end).
@@ -419,7 +409,7 @@ private fun Game.tube(line: MetroLine, k: Int, x: Int, y: Int, z: Int) {
     // The rails before and after this one are part of the tube, not its walls.
     val prev = if (k > 0) line.cell(k - 1) else intArrayOf(line.ends[0], line.ends[2])
     val next = if (k < line.size - 1) line.cell(k + 1) else intArrayOf(line.ends[3], line.ends[5])
-    for (h in 0..2) world.getBlock(x, y + h, z).let { if (it != Blocks.AIR && !isRail(it)) setBlock(x, y + h, z, Blocks.AIR) }
+    for (h in 0..2) world.getBlock(x, y + h, z).let { if (it != Blocks.AIR && !isRail(it)) { setBlock(x, y + h, z, Blocks.AIR); chopTree(it, x, y + h, z) } }
     for ((dx, dz) in arrayOf(1 to 0, -1 to 0, 0 to 1, 0 to -1)) {
         val nx = x + dx; val nz = z + dz
         if ((nx == prev[0] && nz == prev[1]) || (nx == next[0] && nz == next[1])) continue
@@ -428,7 +418,24 @@ private fun Game.tube(line: MetroLine, k: Int, x: Int, y: Int, z: Int) {
     }
     seal(x, y - 1, z)
     seal(x, y + 3, z)
-    setBlock(x, y, z, Blocks.RAIL, 0)
+    setBlock(x, y, z, if (line.kind == TrackEnd.BULLET) Blocks.BULLET_RAIL else Blocks.RAIL, 0)
+}
+
+/** A log or leaves block was cleared out of a line's way: the rest of that tree comes down too. */
+private fun Game.chopTree(id: Int, x: Int, y: Int, z: Int) {
+    fun tree(b: Int) = Blocks[b].name.let { it.endsWith("Log") || it.endsWith("Leaves") || it == "Log" || it == "Leaves" }
+    if (!tree(id)) return
+    val q = ArrayDeque<IntArray>(); q.add(intArrayOf(x, y, z))
+    var n = 0
+    while (q.isNotEmpty() && n < 400) {
+        val (cx, cy, cz) = q.removeFirst()
+        for ((dx, dy, dz) in arrayOf(intArrayOf(1, 0, 0), intArrayOf(-1, 0, 0), intArrayOf(0, 1, 0), intArrayOf(0, -1, 0), intArrayOf(0, 0, 1), intArrayOf(0, 0, -1))) {
+            val nx = cx + dx; val ny = cy + dy; val nz = cz + dz
+            if (!tree(world.getBlock(nx, ny, nz))) continue
+            setBlock(nx, ny, nz, Blocks.AIR); n++
+            q.add(intArrayOf(nx, ny, nz))
+        }
+    }
 }
 
 /** Lays any metro track due in newly loaded chunks (and brings older saves' metro up to date first). */
@@ -441,6 +448,24 @@ internal fun Game.layMetro() {
     }
     val lines = metroNet.lines
     if (!metroNet.cabsChecked && !isClient) { metroNet.cabsChecked = true; addRearCabs() }
+    if (!isClient && metroNet.version < 6) {
+        // Bullet trains get their own track: bullet lines and stations are laid again with it, and bullet trains
+        // standing on ordinary track (in cities, from older versions) become metros.
+        metroNet.version = MetroNetwork.VERSION
+        for (l in metroNet.lines) if (l.kind == TrackEnd.BULLET) l.laid.clear()
+        for (s in metroNet.stations) if (s[3] == TrackEnd.BULLET) {
+            for (dz in -12..12) for (dx in -36..36) for (dy in -1..1) {
+                val x = s[0] + dx; val y = s[1] + dy; val z = s[2] + dz
+                world.ensureLoaded(x shr 4, z shr 4)
+                if (world.getBlock(x, y, z) == Blocks.RAIL) setBlock(x, y, z, Blocks.BULLET_RAIL, world.getMeta(x, y, z))
+            }
+        }
+        for (c in carts.list) if (c.kind == Cart.BULLET) {
+            val bx = com.vishucraft.game.world.floorInt(c.x); val by = com.vishucraft.game.world.floorInt(c.y + 0.1f); val bz = com.vishucraft.game.world.floorInt(c.z)
+            val under = (0 downTo -1).map { world.getBlock(bx, by + it, bz) }.firstOrNull { com.vishucraft.game.world.Rails.isRail(it) }
+            if (under != null && under != Blocks.BULLET_RAIL && under != Blocks.STOP_RAIL) c.kind = Cart.METRO
+        }
+    }
     while (true) {
         val key = world.arrived.poll() ?: break
         if (isClient) continue

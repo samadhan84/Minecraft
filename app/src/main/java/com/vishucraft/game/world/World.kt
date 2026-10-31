@@ -252,10 +252,14 @@ class LevelData(
         private const val VERSION = 9
 
         /** Creative worlds start with a useful hotbar; survival starts empty-handed. */
-        fun create(seed: Long, name: String, mode: GameMode): LevelData {
+        /**
+         * Creative worlds are flat unless [flat] is false (normal land with hills, trees and water, as in survival).
+         * The showcase world (engine/Showcase.kt) is always normal land.
+         */
+        fun create(seed: Long, name: String, mode: GameMode, flat: Boolean = true): LevelData {
             val l = LevelData(seed, mode = mode, name = name)
             if (mode == GameMode.CREATIVE) {
-                l.flat = true
+                l.flat = flat && name != "Showcase World"
                 val start = intArrayOf(
                     Items.find("Enchanted Diamond Pickaxe"), Items.find("Diamond Sword"), Blocks.GRASS, Blocks.STONE,
                     Blocks.PLANKS, Blocks.GLASS, Blocks.TORCH, Blocks.REDSTONE_DUST, Blocks.PISTON,

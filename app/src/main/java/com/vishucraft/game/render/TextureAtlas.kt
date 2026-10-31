@@ -2002,6 +2002,26 @@ object TextureAtlas {
                 return true
             }
             // ---- Household pack
+            // Bullet train track: grey concrete sleepers and bright blue steel rails (straight and curved).
+            "bullet_rail" -> {
+                sprite(t)
+                for (y in 0 until 16) if (y % 3 == 1) for (x in 1..14) t[x, y] = rgb(150, 152, 158)
+                for (y in 0 until 16) { t[3, y] = rgb(60, 150, 240); t[12, y] = rgb(60, 150, 240); t[4, y] = rgb(30, 100, 200); t[11, y] = rgb(30, 100, 200) }
+                return true
+            }
+            "bullet_rail_curve" -> {
+                // Drawn like the ordinary curved rail, in the bullet track's colours.
+                sprite(t)
+                val railC = rgb(60, 150, 240)
+                for (a in 0..40) {
+                    val ang = a / 40.0 * Math.PI / 2
+                    for ((r, c) in listOf(4.5 to railC, 13.0 to railC, 8.5 to rgb(150, 152, 158))) {
+                        val x = (16 - r * Math.cos(ang)).toInt(); val y = (16 - r * Math.sin(ang)).toInt()
+                        if (x in 0..15 && y in 0..15 && (c == railC || a % 6 < 3)) t[x, y] = c
+                    }
+                }
+                return true
+            }
             "stop_rail" -> {
                 sprite(t)
                 for (y in 0 until 16) if (y % 4 == 1) for (x in 1..14) t[x, y] = rgb(110, 76, 44)

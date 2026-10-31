@@ -371,7 +371,7 @@ class App(demo: File?) : ClientApp(demo) {
         val f = demoFrame
         when {
             f == 10 -> shot("01-title")
-            f == 12 -> { menu = Menu.CREATE; nameField.text = "Demo creative"; seedField.text = "12345"; survival = false }
+            f == 12 -> { menu = Menu.CREATE; nameField.text = "Demo creative"; seedField.text = "12345"; survival = false; flatWorld = true }
             f == 16 -> shot("02-create")
             f == 18 -> demoCreate = true
             f == 400 -> shot("03-creative-world")

@@ -330,7 +330,7 @@ private fun Game.bulletStation(p: Plan) {
     val name = towns[h.mod(towns.size)] + " Bullet Station"
     val white = Blocks.CONCRETE_FIRST; val blue = Blocks.CONCRETE_FIRST + 11
     p.site(-len, len, 0, 10, 8, Blocks.QUARTZ_BLOCK)
-    for (a in -len..len) for (d in intArrayOf(4, 6)) p.set(a, d, 0, if (a == 0) Blocks.STOP_RAIL else Blocks.RAIL, p.railAcross)
+    for (a in -len..len) for (d in intArrayOf(4, 6)) p.set(a, d, 0, if (a == 0) Blocks.STOP_RAIL else Blocks.BULLET_RAIL, p.railAcross)
     for (a in -16..16) {
         for (d in intArrayOf(1, 2, 3, 5, 7, 8, 9)) p.set(a, d, 0, if (d == 3 || d == 7 || d == 5) Blocks.STATION_PLATFORM else Blocks.QUARTZ_BLOCK)
         // White arches every 4 blocks holding up a glass roof with a blue stripe down the middle.
@@ -910,16 +910,6 @@ private fun Game.city(p: Plan, n: Int, title: String, metroName: String, railNam
         carts.list.add(metro)
         carts.list.add(Cart(p.x(sa + 2 * dir, d) + 0.5f, (p.oy + 11).toFloat(), p.z(sa + 2 * dir, d) + 0.5f, Cart.COACH).also { it.leader = metro; it.hx = metro.hx; it.hz = metro.hz; it.yaw = metro.yaw })
     }
-    // A bullet train shares the near track with the metro (trains on one track keep their distance).
-    val bullet = Cart(p.x(-16, mr - 1) + 0.5f, (p.oy + 11).toFloat(), p.z(-16, mr - 1) + 0.5f, Cart.BULLET)
-    bullet.hx = -p.rx.toFloat(); bullet.hz = -p.rz.toFloat(); bullet.yaw = kotlin.math.atan2(bullet.hx, -bullet.hz)
-    carts.list.add(bullet)
-    var lastCar = bullet
-    for (a in intArrayOf(-12)) {
-        val c = Cart(p.x(a, mr - 1) + 0.5f, (p.oy + 11).toFloat(), p.z(a, mr - 1) + 0.5f, Cart.COACH).also { it.leader = lastCar; it.hx = bullet.hx; it.hz = bullet.hz; it.yaw = bullet.yaw }
-        carts.list.add(c); lastCar = c
-    }
-
     // ---- The railway station behind the city, with a train.
     val rb = far + 3                                    // the railway's first row (104 in the smart city)
     for (a in -half - 4..half + 4) {

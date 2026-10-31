@@ -310,10 +310,24 @@ class Carts(private val world: World) {
         p.y = c.y + 2.5f
     }
 
-    private fun railAt(x: Int, y: Int, z: Int): Int = world.getBlock(x, y, z).let { if (com.vishucraft.game.world.Rails.isRail(it)) it else 0 }
+    /**
+     * Which track the cart being moved can run on: bullet trains only on bullet train track, other trains not on
+     * it (minecarts on anything). Set before each cart is moved.
+     */
+    private var family = 0
+    private fun familyOf(c: Cart) = when (power(c)?.kind) { null -> 0; Cart.BULLET -> 2; else -> 1 }
+    private fun railAt(x: Int, y: Int, z: Int): Int = world.getBlock(x, y, z).let {
+        when {
+            !com.vishucraft.game.world.Rails.isRail(it) -> 0
+            family == 1 && it == Blocks.BULLET_RAIL -> 0
+            family == 2 && (it == Blocks.RAIL || it == Blocks.POWERED_RAIL) -> 0
+            else -> it
+        }
+    }
 
     /** Points a cart along its track in the direction closest to (lookX, lookZ). */
     fun aim(c: Cart, lookX: Float, lookZ: Float) {
+        family = familyOf(c)
         val bx = floorInt(c.x); val bz = floorInt(c.z); var by = floorInt(c.y + 0.1f)
         if (railAt(bx, by, bz) == 0) by -= 1
         if (railAt(bx, by, bz) == 0) return
@@ -363,6 +377,7 @@ class Carts(private val world: World) {
         for (c in list) {
             if (c.leader != null || !world.isLoaded(floorInt(c.x), floorInt(c.z))) continue
             // Trains with an engine or a metro car drive themselves.
+            family = familyOf(c)
             if (power(c) != null && autoDrive(c, dt, game)) continue
             // Fast trains move in small steps so they never skip a curve.
             val n = kotlin.math.ceil(c.speed * dt / 0.3f).toInt().coerceIn(1, 14)
@@ -442,7 +457,8 @@ class Carts(private val world: World) {
     fun reverse(h: Cart, game: Game) {
         val cars = chain(h)
         val dest = h.dest
-        h.dest = null
+        val private = h.private
+        h.dest = null; h.private = false
         for (c in cars) { c.hx = -c.hx; c.hz = -c.hz; c.yaw = kotlin.math.atan2(c.hx, -c.hz); c.leader = null; c.trail.clear(); c.speed = 0f; c.atEnd = false }
         // On a two-track line, cross over to the other track: trains keep to the left.
         val lx = kotlin.math.round(h.hz).toInt() * 2; val lz = -kotlin.math.round(h.hx).toInt() * 2
@@ -461,6 +477,7 @@ class Carts(private val world: World) {
         }
         val nh = rev[0]
         nh.dest = dest
+        nh.private = private
         // A non-stop train only turns round; otherwise it waits like at a station.
         nh.stopTimer = if (dest != null) 2f else STOP_SECONDS
         nh.lastStation = Long.MIN_VALUE
@@ -591,9 +608,9 @@ class Carts(private val world: World) {
         // Stay centred on the track.
         if (c.hx != 0f) c.z += (bz + 0.5f - c.z) * minOf(1f, dt * 20f)
         if (c.hz != 0f) c.x += (bx + 0.5f - c.x) * minOf(1f, dt * 20f)
-        // Slopes pull the cart downhill.
+        // Slopes pull a cart downhill (trains with an engine or a driving car just climb them).
         val rise = com.vishucraft.game.world.Rails.rise(shape)
-        if (rise != null) {
+        if (rise != null && !(c.isTrain && power(c) != null)) {
             val uphill = rise[0] * c.hx + rise[1] * c.hz
             c.speed -= uphill * 9f * dt
             if (c.speed < 0f) { c.hx = -c.hx; c.hz = -c.hz; c.speed = -c.speed }

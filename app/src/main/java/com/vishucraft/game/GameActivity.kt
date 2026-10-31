@@ -57,6 +57,7 @@ class GameActivity : Activity() {
         const val EXTRA_WORLD = "world"
         const val EXTRA_NAME = "name"
         const val EXTRA_MODE = "mode"
+        const val EXTRA_FLAT = "flat"
         const val EXTRA_JOIN = "join"
 
         fun worldsRoot(activity: Activity) = File(activity.filesDir, "worlds").apply { mkdirs() }
@@ -124,6 +125,7 @@ class GameActivity : Activity() {
             intent.getLongExtra(EXTRA_SEED, System.currentTimeMillis()),
             intent.getStringExtra(EXTRA_NAME) ?: "My World",
             if (intent.getBooleanExtra(EXTRA_MODE, false)) GameMode.SURVIVAL else GameMode.CREATIVE,
+            intent.getBooleanExtra(EXTRA_FLAT, true),
         )
         // Each dimension keeps its own chunks in a sub-folder of the world.
         val dimDir = when (level.dimension) {

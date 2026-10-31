@@ -63,8 +63,8 @@ class GameSession(
     companion object {
         fun open(dir: File): GameSession = GameSession(dir, LevelData.read(dir) ?: LevelData.create(System.nanoTime(), dir.name, GameMode.CREATIVE))
 
-        fun create(dir: File, name: String, seed: Long, survival: Boolean): GameSession {
-            val level = LevelData.create(seed, name, if (survival) GameMode.SURVIVAL else GameMode.CREATIVE)
+        fun create(dir: File, name: String, seed: Long, survival: Boolean, flat: Boolean = true): GameSession {
+            val level = LevelData.create(seed, name, if (survival) GameMode.SURVIVAL else GameMode.CREATIVE, flat)
             level.write(dir)
             return GameSession(dir, level)
         }

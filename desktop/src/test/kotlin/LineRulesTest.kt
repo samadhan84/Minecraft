@@ -34,13 +34,17 @@ class LineRulesTest {
         assertEquals(listOf(Cart.METRO, Cart.COACH, Cart.METRO), g2.carts.chain(m).map { it.kind })
     }
 
-    @Test fun bulletLinesStayUpWithoutWaterAndGoOverCities() {
+    @Test fun bulletLinesRunUndergroundAndOtherLinesGoOverCities() {
         val g = game()
         assertTrue(g.build(-300, 0, "Bullet Train Station"))
         assertTrue(g.build(-300, 400, "Bullet Train Station"))
         val dry = g.metroNet.lines.first()
-        println("dry bullet line: deep=${dry.deep}")
-        assertEquals(0, dry.deep, "no water, no tunnel")
+        val gy = g.world.generator.surfaceHeight(-300, 0) + 1
+        println("bullet line: deep=${dry.deep} (stations at $gy)")
+        assertTrue(dry.deep in 1 until gy, "bullet lines always run underground")
+        val c = dry.cell(dry.size / 2)
+        g.world.ensureLoaded(c[0] shr 4, c[1] shr 4); g.layMetro()
+        assertEquals(Blocks.BULLET_RAIL, g.world.getBlock(c[0], dry.y(dry.size / 2), c[1]), "on bullet train track")
         // A city between two more bullet stations: the line goes high over it.
         g.metroNet.ends.filter { it.kind == TrackEnd.BULLET && !it.joined }.forEach { it.joined = true }
         assertTrue(g.build(300, -30, "Smart City"))
@@ -49,8 +53,16 @@ class LineRulesTest {
         assertTrue(g.build(300, -260, "Bullet Train Station"))
         val over = g.metroNet.lines[before]
         val oy = g.world.generator.surfaceHeight(300, -30) + 1
-        println("line past the city: deep=${over.deep} (city ground $oy), ${over.size} rails, ends ${over.ends.toList()}")
-        assertTrue(over.deep >= oy + 50, "high over the city")
+        println("bullet line past the city: deep=${over.deep} (city ground $oy)")
+        // (A bullet line goes under it; build metro stations either side to go over it.)
+        assertTrue(over.deep < oy, "the bullet line goes underneath")
+        g.metroNet.ends.filter { it.kind == TrackEnd.METRO && !it.joined && it.group > 0 }.forEach { it.joined = true }
+        assertTrue(g.build(700, 160, "Metro Station"))
+        val n = g.metroNet.lines.size
+        assertTrue(g.build(700, -300, "Metro Station"))
+        val metro = g.metroNet.lines[n]
+        println("metro line: deep=${metro.deep} (ground ${g.world.generator.surfaceHeight(700, 0)})")
+        assertTrue(metro.deep >= g.world.generator.surfaceHeight(700, 0) + 10, "metro lines run up high")
     }
 
     @Test fun railsCantBeJoinedOntoALine() {
@@ -61,5 +73,27 @@ class LineRulesTest {
         val y = s[1]
         assertTrue(g.wouldJoinLine(s[0] + 10, y, s[2] - 2), "beside the near track")
         assertFalse(g.wouldJoinLine(s[0] + 100, y, s[2] + 100))
+    }
+}
+
+class TrackSeparationTest {
+    @Test fun eachKindOfTrainStaysOnItsOwnTrack() {
+        val world = World(1L, null, Dimension.OVERWORLD, true)
+        for (cz in -2..2) for (cx in -20..20) { val c = Chunk(cx, cz); world.generator.generate(c); world.chunks[Chunk.key(cx, cz)] = c }
+        val g = Game(world, LevelData.create(1L, "T", GameMode.CREATIVE).apply { hasPlayer = true; y = 70f }, GameInput(), null)
+        val y = world.generator.surfaceHeight(0, 0) + 1
+        // Ordinary track from x -300 to 0, bullet train track from 0 to 300.
+        for (x in -300..0) g.setBlock(x, y, 0, Blocks.RAIL, 1)
+        for (x in 1..300) g.setBlock(x, y, 0, Blocks.BULLET_RAIL, 1)
+        val metro = Cart(-100.5f, y.toFloat(), 0.5f, Cart.METRO).apply { hx = 1f; hz = 0f }
+        val bullet = Cart(100.5f, y.toFloat(), 0.5f, Cart.BULLET).apply { hx = -1f; hz = 0f }
+        val coach = Cart(200.5f, y.toFloat(), 0.5f, Cart.COACH)
+        g.carts.list.addAll(listOf(metro, bullet, coach))
+        var metroMax = -999f; var bulletMin = 999f
+        repeat(60 * 20) { g.carts.update(1 / 60f, g); metroMax = maxOf(metroMax, metro.x); bulletMin = minOf(bulletMin, bullet.x) }
+        println("metro got as far as $metroMax, the bullet train as far as $bulletMin")
+        assertTrue(metroMax < 1.5f, "the metro doesn't go onto bullet train track")
+        assertTrue(bulletMin > -0.5f, "the bullet train doesn't go onto ordinary track")
+        assertTrue(bullet.x > 150f || bulletMin < 50f, "the bullet train runs on its own track")
     }
 }
