@@ -30,19 +30,11 @@ class TrainsAndRobotTest {
     }
     private fun Game.toasts(): List<String> { val out = ArrayList<String>(); while (true) { val e = uiEvents.poll() ?: break; out.add(e) }; return out }
 
-    @Test fun fortyMinutesADay() {
-        val l = PlayLimit("2026-10-29", 0f)
-        assertEquals(40, l.minutesLeft("2026-10-29"))
+    @Test fun noDailyTimer() {
+        val l = PlayLimit("2026-10-29", 99999f)
         assertFalse(l.over)
-        var warn: String? = null
-        repeat(31 * 60) { l.tick("2026-10-29", 1f)?.let { warn = it } }
-        assertEquals("10 minutes of play left today", warn)
-        repeat(9 * 60) { l.tick("2026-10-29", 1f) }
-        assertTrue(l.over)
-        assertEquals(0, l.minutesLeft("2026-10-29"))
-        // A new day starts fresh.
-        assertEquals(40, l.minutesLeft("2026-10-30"))
-        assertFalse(l.over)
+        assertNull(l.tick("2026-10-29", 5f))
+        assertTrue(l.minutesLeft("2026-10-29") > 100000)
     }
 
     @Test fun trainsStopForFiveSecondsAndBulletTrainsAreFast() {

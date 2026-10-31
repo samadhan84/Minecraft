@@ -31,8 +31,8 @@ class PlayLimit(var day: String, var used: Float) {
     }
 
     companion object {
-        /** On: 40 minutes a day, with the countdown clock on screen. */
-        const val ENABLED = true
+        /** Off: no daily limit and no countdown clock (the code stays here in case it is wanted again). */
+        const val ENABLED = false
         const val LIMIT = 40 * 60f
         private val WARNINGS = intArrayOf(10 * 60, 5 * 60, 60)
         const val TITLE = "Daily limit is over"
