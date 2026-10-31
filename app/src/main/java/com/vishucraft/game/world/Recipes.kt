@@ -389,6 +389,15 @@ object Recipes {
         r(i("Blueprint: Watch Tower"), 1, true, paper to 1, cobble to 48, planks to 8)
         r(i("Blueprint: Metro Station"), 1, true, paper to 1, iron to 16, smooth to 24, glass to 8)
         r(i("Blueprint: Bullet Train Station"), 1, true, paper to 1, iron to 24, glass to 16, Blocks.QUARTZ_BLOCK to 16)
+        // Diwali fireworks: paper and gunpowder (more gunpowder for the bigger bombs).
+        val gp = i("Gunpowder")
+        for ((k, n) in listOf(com.vishucraft.game.engine.Cracker.SUTLI to 2, com.vishucraft.game.engine.Cracker.LAKSHMI to 1, com.vishucraft.game.engine.Cracker.ATOM to 3,
+            com.vishucraft.game.engine.Cracker.LADI to 2, com.vishucraft.game.engine.Cracker.ROCKET to 1, com.vishucraft.game.engine.Cracker.SKY_SHOT to 3))
+            r(i(k.itemName), if (k == com.vishucraft.game.engine.Cracker.LADI) 1 else 2, false, paper to 1, gp to n)
+        for (k in listOf(com.vishucraft.game.engine.Cracker.BIJLI, com.vishucraft.game.engine.Cracker.CHAKRI, com.vishucraft.game.engine.Cracker.ANAR,
+            com.vishucraft.game.engine.Cracker.PENCIL, com.vishucraft.game.engine.Cracker.SNAKE))
+            r(i(k.itemName), 4, false, paper to 1, gp to 1, i(if (k == com.vishucraft.game.engine.Cracker.SNAKE) "Coal" else "Glowstone Dust") to 1)
+        r(i("Phuljhadi"), 4, false, iron to 1, gp to 1, stick to 1)
         r(i("Robot Spawn Egg"), 1, true, iron to 8, Blocks.REDSTONE_DUST to 4, Blocks.GLASS to 1)
         r(i("Blueprint: Railway Station"), 1, true, paper to 1, iron to 16, Blocks.BRICKS to 24, Blocks.GRAVEL to 16)
         r(i("Blueprint: Mansion"), 1, true, paper to 1, Blocks.QUARTZ_BLOCK to 48, glass to 32, i("Gold Ingot") to 8)

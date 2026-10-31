@@ -74,6 +74,8 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
     val vehicles = Vehicles(world)
     /** Metro track ends that new stations join up to (see MetroNetwork.kt). */
     val metroNet = MetroNetwork()
+    /** Diwali fireworks that are lit, and their sparks. */
+    val fireworks = Fireworks()
     private var cityCheck = 1f
     internal val travel = Travel()
     internal val robots = HashMap<Int, RobotBrain>()
@@ -499,6 +501,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
         vehicles.update(dt, this)
         updatePassengers(dt)
         updateRobots(dt)
+        fireworks.update(dt, this)
         updateLift(dt)
         if (bowCooldown > 0f) bowCooldown -= dt
         // Standing in a portal for two seconds travels to the other world.
@@ -1345,6 +1348,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
         // Seeds, carrots and potatoes are planted on farmland.
         val crop = Farming.cropFor(item?.name)
         val tgt = target
+        if (fireworkUse(item, tgt)) return
         if (farmingUse(tgt, item)) return
         if (crop > 0 && tgt != null && tgt.block == Blocks.FARMLAND && tgt.ny == 1 && world.getBlock(tgt.x, tgt.y + 1, tgt.z) == Blocks.AIR) {
             setBlock(tgt.x, tgt.y + 1, tgt.z, crop, 0)

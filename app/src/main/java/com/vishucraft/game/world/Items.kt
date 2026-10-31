@@ -346,6 +346,8 @@ object Items {
         add("Robot Spawn Egg", "spawn_egg_robot", use = ItemUse.SPAWN)
         add("Glass Car", "glass_car_item", maxStack = 1)
         add("Blueprint: Bullet Train Station", "blueprint", use = ItemUse.BLUEPRINT, maxStack = 16)
+        // Diwali fireworks (see engine/Fireworks), lit until 13 November.
+        for (k in com.vishucraft.game.engine.Cracker.values()) add(k.itemName, k.icon)
 
         all = list
         for (i in all) { byId[i.id] = i; byName[i.name] = i.id }

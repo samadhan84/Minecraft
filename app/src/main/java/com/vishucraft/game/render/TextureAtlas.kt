@@ -1989,6 +1989,28 @@ object TextureAtlas {
                     rgb(220, 40, 40), rgb(150, 200, 240), rgb(30, 30, 30))
                 return true
             }
+            // Diwali fireworks: sparks are round glowing dots; the crackers are little pictures of each one.
+            "spark_red", "spark_gold", "spark_green", "spark_blue", "spark_pink", "spark_white", "spark_smoke", "spark_ash" -> {
+                val c = when (name) {
+                    "spark_red" -> rgb(255, 70, 50); "spark_gold" -> rgb(255, 205, 70); "spark_green" -> rgb(90, 255, 110)
+                    "spark_blue" -> rgb(90, 160, 255); "spark_pink" -> rgb(255, 110, 220); "spark_white" -> rgb(255, 255, 240)
+                    "spark_smoke" -> rgb(150, 150, 150); else -> rgb(30, 28, 26)
+                }
+                t.fill { x, y -> val dx = x - 7.5f; val dy = y - 7.5f; if (dx * dx + dy * dy < 56f) (if (dx * dx + dy * dy < 16f && name != "spark_ash" && name != "spark_smoke") scale(c, 1.2f) else c) else 0 }
+                return true
+            }
+            "sutli_bomb" -> { mask(t, arrayOf("......l.......", ".....dl.......", "...dmmmmd.....", "..dmamamamd...", ".dmamamamamd..", ".dmmamamammd..", ".dmamamamamd..", "..dmamamamd...", "...dmmmmmd....", ".....ddd......"), rgb(200, 170, 110), rgb(140, 110, 60)); return true }
+            "lakshmi_bomb" -> { mask(t, arrayOf("......l.....", "......d.....", "..dddddddd..", "..dmmmmmmd..", "..dmaabmmd..", "..dmaabbmd..", "..dmmaammd..", "..dmmmmmmd..", "..dddddddd.."), rgb(220, 40, 50), rgb(255, 210, 60), rgb(255, 150, 190)); return true }
+            "atom_bomb" -> { mask(t, arrayOf(".......l......", "......dl......", "....dmmmmd....", "...dmaaaamd...", "..dmaabbaamd..", "..dmabbbbamd..", "..dmaabbaamd..", "...dmaaaamd...", "....dmmmmd....", "......dd......"), rgb(40, 120, 60), rgb(240, 220, 80), rgb(220, 50, 40)); return true }
+            "bijli_cracker" -> { mask(t, arrayOf(".l.......", ".d.......", ".dmd.....", ".dmmd....", "..dmmd...", "...dmmd..", "....dmmd.", ".....dmd.", "......d.."), rgb(240, 200, 60)); return true }
+            "ladi" -> { mask(t, arrayOf("l..........", "d..........", "mm.mm......", ".aa.aa.....", "..mm.mm....", "...aa.aa...", "....mm.mm..", ".....aa.aa.", "......mm.mm", ".......aa.a"), rgb(220, 40, 40), rgb(240, 200, 60)); return true }
+            "chakri" -> { mask(t, arrayOf("....dddd....", "..ddmaamdd..", ".dmaammaamd.", ".dammbbmmad.", "dmammbbmmamd", "dmammbbmmamd", ".dammmmmmad.", ".dmaammaamd.", "..ddmaamdd..", "....dddd...l"), rgb(60, 160, 70), rgb(240, 200, 60), rgb(200, 40, 40)); return true }
+            "anar" -> { mask(t, arrayOf(".....l.....", ".....d.....", "....dmd....", "...dmmmd...", "..dmaaamd..", ".dmaaaaamd.", ".dmmmmmmmd.", "dmmbbbbbmmd", "dmmmmmmmmmd", ".ddddddddd."), rgb(200, 120, 50), rgb(250, 210, 80), rgb(200, 40, 60)); return true }
+            "diwali_rocket" -> { mask(t, arrayOf("....l....", "...dmd...", "...mam...", "...mam...", "...mam...", "...dmd...", "....b....", "....b....", "....b....", "....b....", "....b....", "....l...."), rgb(220, 50, 50), rgb(250, 210, 80), rgb(150, 110, 60)); return true }
+            "sky_shot" -> { mask(t, arrayOf("..l..l..l...", "..d..d..d...", "dddddddddddd", "dmmmmmmmmmmd", "dmaammaammad", "dmaammaammad", "dmmmmmmmmmmd", "dbbbbbbbbbbd", "dmmmmmmmmmmd", "dddddddddddd"), rgb(60, 80, 200), rgb(250, 210, 80), rgb(220, 50, 50)); return true }
+            "colour_pencil" -> { mask(t, arrayOf("........l..", ".......aa..", "......mm...", ".....bb....", "....aa.....", "...mm......", "..bb.......", ".dd........", "dd........."), rgb(90, 200, 90), rgb(240, 80, 80), rgb(80, 140, 240)); return true }
+            "snake_tablet" -> { mask(t, arrayOf("..dddddd..", ".dmmmmmmd.", "dmmlmmmlmd", "dmmmmmmmmd", ".dmmmmmmd.", "..dddddd.."), rgb(40, 38, 36)); return true }
+            "phuljhadi" -> { mask(t, arrayOf("..l.a.l.....", "...aaa......", "..aalaa.....", "...aaa......", "..l.ab.l....", "......b.....", ".......b....", "........b...", ".........b..", "..........d."), rgb(90, 90, 96), rgb(255, 220, 90), rgb(130, 130, 140)); return true }
             "glass_car_item" -> {
                 mask(t, arrayOf("....dddddd....", "...daaaaaad...", "..daaaaaaaad..", "dddaaaaaaaaddd", "daaaaaaaaaaaad", "laaaaaaaaaaaal", "daaaaaaaaaaaad", "ddbbdddddbbddd", "..bb.....bb..."),
                     rgb(200, 200, 210), rgb(170, 225, 250), rgb(30, 30, 30))

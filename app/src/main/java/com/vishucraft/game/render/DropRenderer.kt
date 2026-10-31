@@ -26,8 +26,10 @@ class DropRenderer {
     fun draw(shader: Shader, drops: ItemEntities, camX: Float, camZ: Float, maxDist: Float, time: Float,
              carts: com.vishucraft.game.engine.Carts? = null, arrows: com.vishucraft.game.engine.Projectiles? = null,
              boats: com.vishucraft.game.engine.Boats? = null, aircraft: com.vishucraft.game.engine.Aircrafts? = null,
-             vehicles: com.vishucraft.game.engine.Vehicles? = null, world: com.vishucraft.game.world.World? = null) {
+             vehicles: com.vishucraft.game.engine.Vehicles? = null, world: com.vishucraft.game.world.World? = null,
+             fireworks: com.vishucraft.game.engine.Fireworks? = null) {
         buf.size = 0
+        if (fireworks != null) fireworks(fireworks, camX, camZ, maxDist)
         if (world != null) billboards(world, camX, camZ, maxDist)
         carts?.list?.forEach { c ->
             if (c.isTrain) {
@@ -361,6 +363,39 @@ class DropRenderer {
                 val uv = ChunkMesher.UVS[k]
                 buf.put(cx + lx * c - lz * s, cy + ly, cz + lx * s + lz * c,
                     u0 + uv[0] * ChunkMesher.TILE_UV, v0 + uv[1] * ChunkMesher.TILE_UV, ChunkMesher.FACE_SHADE[f])
+            }
+        }
+    }
+
+    private val smokeTiles by lazy { setOf(tile("spark_smoke"), tile("spark_ash")) }
+
+    /** Diwali fireworks: the lit crackers, and every spark as a tiny glowing cube (smoke and ash do not glow). */
+    private fun fireworks(fw: com.vishucraft.game.engine.Fireworks, camX: Float, camZ: Float, maxDist: Float) {
+        for (f in fw.lit) {
+            if (f.kind == com.vishucraft.game.engine.Cracker.ROCKET && f.age > f.kind.fuse) continue
+            val icon = Items[Items.find(f.kind.itemName)]?.icon ?: continue
+            sprite(f.x, f.y, f.z, if (f.held) 0.18f else 0.25f, 0.6f, icon)
+            sprite(f.x, f.y, f.z, if (f.held) 0.18f else 0.25f, 0.6f + 1.5708f, icon)
+        }
+        var n = 0
+        for (p in fw.sparks) {
+            val dx = p.x - camX; val dz = p.z - camZ
+            if (dx * dx + dz * dz > maxDist * maxDist) continue
+            if (++n > 3000) break
+            val smoke = p.tile in smokeTiles
+            val h = if (smoke) 0.09f + (2.5f - p.life).coerceIn(0f, 2.5f) * 0.05f else 0.035f
+            spark(p.x, p.y, p.z, h, p.tile, if (smoke) 1f else 2f)
+        }
+    }
+
+    private fun spark(cx: Float, cy: Float, cz: Float, h: Float, tile: Int, light: Float) {
+        val u0 = ChunkMesher.tileU(tile) + ChunkMesher.TILE_UV * 0.25f; val v0 = ChunkMesher.tileV(tile) + ChunkMesher.TILE_UV * 0.25f
+        val du = ChunkMesher.TILE_UV * 0.5f
+        for (f in 0 until 6) {
+            buf.ensure(4 * FLOATS_PER_VERTEX)
+            for ((k, cv) in ChunkMesher.CORNERS[f].withIndex()) {
+                val uv = ChunkMesher.UVS[k]
+                buf.put(cx + (cv[0] * 2 - 1) * h, cy + (cv[1] * 2 - 1) * h, cz + (cv[2] * 2 - 1) * h, u0 + uv[0] * du, v0 + uv[1] * du, light)
             }
         }
     }
