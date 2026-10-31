@@ -78,6 +78,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
     val fireworks = Fireworks()
     /** Roller coasters (see engine/Coaster). */
     val coasters = Coasters()
+    private var coastersUpgraded = false
     private var cityCheck = 1f
     internal val travel = Travel()
     internal val robots = HashMap<Int, RobotBrain>()
@@ -495,6 +496,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
         }
         projectiles.update(dt, this)
         if (spawned) buildShowcaseIfNew()
+        if (spawned && !coastersUpgraded) { coastersUpgraded = true; upgradeOldCoasters() }
         layMetro()
         cityCheck -= dt
         if (cityCheck <= 0f) { cityCheck = 2f; upgradeCities() }

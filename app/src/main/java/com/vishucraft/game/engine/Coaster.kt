@@ -279,7 +279,10 @@ internal fun Game.updateCoasters(dt: Float) {
             if (c.arriving) {
                 // Braking into the station.
                 c.speed = max(1.5f, min(c.speed, (CoasterTrack.STOP - c.s) * 3f + 1.5f))
-                if (c.s >= CoasterTrack.STOP) { c.s = CoasterTrack.STOP; c.speed = 0f; c.running = false; c.arriving = false; c.wait = 4f }
+                if (c.s >= CoasterTrack.STOP) {
+                    c.s = CoasterTrack.STOP; c.speed = 0f; c.running = false; c.arriving = false; c.wait = 6f
+                    if (rider) uiEvents.add("toast:Station! Tap or crouch to get off, or stay on for another ride")
+                }
             }
             c.s += c.speed * dt
             if (c.s >= c.length) { c.s -= c.length; c.arriving = true }
@@ -325,4 +328,91 @@ internal fun Game.leaveCoaster() {
     coasters.riding = null
     val k = c.index(c.s); val p = c.pos(c.s)
     player.x = p[0] - c.r[k][0] * 2.2f; player.y = p[1] + 0.1f; player.z = p[2] - c.r[k][2] * 2.2f
+}
+
+// ---------------------------------------------------------------- old coasters
+
+/** The old block-track coaster's pieces: steps forward (u), to the right (v), and height. */
+private fun oldCoasterLayout(): List<IntArray> {
+    fun leg(vararg parts: Pair<Char, Int>): List<Int> {
+        val out = ArrayList<Int>(); var y = 0
+        for ((what, n) in parts) repeat(n) { when (what) { 'u' -> y++; 'd' -> y-- }; out.add(y) }
+        return out
+    }
+    val first = leg('f' to 7, 'u' to 11, 'f' to 3, 'd' to 11, 'f' to 3)
+    val second = leg('f' to 2, 'u' to 5, 'f' to 2, 'd' to 5, 'f' to 2)
+    val third = leg('f' to 2, 'u' to 3, 'f' to 1, 'd' to 3, 'f' to 2, 'u' to 3, 'f' to 1, 'd' to 3, 'f' to 2, 'u' to 2, 'f' to 1, 'd' to 2, 'f' to first.size - 25)
+    val n1 = first.size; val n2 = second.size
+    val cells = ArrayList<IntArray>()
+    for (k in 0 until n1) cells.add(intArrayOf(k, 0, first[k]))
+    cells.add(intArrayOf(n1, 0, 0))
+    for (k in 0 until n2) cells.add(intArrayOf(n1, k + 1, second[k]))
+    cells.add(intArrayOf(n1, n2 + 1, 0))
+    for (k in 0 until n1) cells.add(intArrayOf(n1 - 1 - k, n2 + 1, third[k]))
+    cells.add(intArrayOf(-1, n2 + 1, 0))
+    for (k in 0 until n2) cells.add(intArrayOf(-1, n2 - k, 0))
+    cells.add(intArrayOf(-1, 0, 0))
+    return cells
+}
+
+/**
+ * Coasters from before the steel ones (block track with a little car) are replaced by the new steel coaster in
+ * the same place, facing the same way. Runs once when a world is opened.
+ */
+internal fun Game.upgradeOldCoasters() {
+    if (isClient) return
+    val old = carts.list.filter { it.kind == Cart.COASTER }
+    if (old.isEmpty()) return
+    var done = 0
+    for (car in old) {
+        val bx = floorInt(car.x); val bz = floorInt(car.z)
+        world.ensureLoaded(bx shr 4, bz shr 4)
+        val station = findOldStation(bx, floorInt(car.y + 0.1f), bz)
+        carts.list.remove(car)
+        if (carts.riding === car) carts.riding = null
+        val (o, h) = station ?: continue
+        removeOldCoaster(o[0], o[1], o[2], h[0], h[1])
+        buildCoaster(o[0] + 0.5f, o[1].toFloat(), o[2] + 0.5f, h[0], h[1])
+        done++
+    }
+    if (done > 0) uiEvents.add("toast:Your roller coaster" + (if (done > 1) "s have" else " has") + " been upgraded to the new steel coaster with a loop!")
+}
+
+/** The old coaster station near (x, y, z): its first cell (x, y, z) and the way it faces (fx, fz), or null. */
+private fun Game.findOldStation(x: Int, y: Int, z: Int): Pair<IntArray, IntArray>? {
+    val n1 = 35
+    for (r in 0..48) for (dy in -12..12) for (dz in -r..r) for (dx in -r..r) {
+        if (maxOf(kotlin.math.abs(dx), kotlin.math.abs(dz)) != r) continue
+        val px = x + dx; val py = y + dy; val pz = z + dz
+        if (world.getBlock(px, py, pz) != Blocks.POWERED_RAIL) continue
+        for ((hx, hz) in listOf(1 to 0, -1 to 0, 0 to 1, 0 to -1)) {
+            // The first of the three station rails, then two cells back is where the ride starts.
+            if (world.getBlock(px - hx, py, pz - hz) == Blocks.POWERED_RAIL) continue
+            if (world.getBlock(px + hx, py, pz + hz) != Blocks.POWERED_RAIL || world.getBlock(px + 2 * hx, py, pz + 2 * hz) != Blocks.POWERED_RAIL) continue
+            val ox = px - 2 * hx; val oz = pz - 2 * hz
+            // The first turn is at the end of the long side, straight ahead.
+            world.ensureLoaded((ox + hx * n1) shr 4, (oz + hz * n1) shr 4)
+            if (world.getBlock(ox + hx * n1, py, oz + hz * n1) != Blocks.RAIL) continue
+            return intArrayOf(ox, py, oz) to intArrayOf(hx, hz)
+        }
+    }
+    return null
+}
+
+/** Takes the old coaster's track, its coloured bed, pillars and platform fence away. */
+private fun Game.removeOldCoaster(x: Int, y: Int, z: Int, fx: Int, fz: Int) {
+    val rx = -fz; val rz = fx
+    for (c in oldCoasterLayout()) {
+        val px = x + fx * c[0] + rx * c[1]; val py = y + c[2]; val pz = z + fz * c[0] + rz * c[1]
+        world.ensureLoaded(px shr 4, pz shr 4)
+        if (com.vishucraft.game.world.Rails.isRail(world.getBlock(px, py, pz))) setBlock(px, py, pz, Blocks.AIR)
+        val bed = world.getBlock(px, py - 1, pz)
+        if (bed in Blocks.CONCRETE_FIRST until Blocks.CONCRETE_FIRST + 16) setBlock(px, py - 1, pz, if (c[2] == 0) Blocks.GRASS else Blocks.AIR)
+        var by = py - 2
+        while (by > 1 && world.getBlock(px, by, pz) == Blocks.IRON_BARS) { setBlock(px, by, pz, Blocks.AIR); by-- }
+    }
+    for (u in 0..6) {
+        val px = x + fx * u - rx * 2; val pz = z + fz * u - rz * 2
+        if (world.getBlock(px, y, pz) == Blocks.OAK_FENCE) setBlock(px, y, pz, Blocks.AIR)
+    }
 }

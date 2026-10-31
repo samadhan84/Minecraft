@@ -67,4 +67,20 @@ class CoasterTest {
         assertEquals(g.coasters.list[0].supports.size, back.list[0].supports.size)
         assertTrue(Recipes.crafting.any { it.result == Items.find("Roller Coaster") })
     }
+
+    @Test fun oldBlockCoastersAreUpgraded() {
+        val g = game()
+        g.world.ensureLoaded(0, 0)
+        val y = g.world.generator.surfaceHeight(0, 0) + 1
+        for (cx in 0..2) g.world.ensureLoaded(cx, 0)
+        // An old coaster's station (three powered rails) and its track along the first side, facing east.
+        for (u in 0..35) g.setBlock(u, y, 0, if (u in 2..4) Blocks.POWERED_RAIL else Blocks.RAIL, 1)
+        g.carts.list.add(Cart(3.5f, y.toFloat(), 0.5f, Cart.COASTER).also { it.hx = 1f; it.hz = 0f })
+        g.upgradeOldCoasters()
+        assertTrue(g.carts.list.none { it.kind == Cart.COASTER })
+        assertEquals(1, g.coasters.list.size)
+        val c = g.coasters.list[0]
+        assertEquals(0.5f, c.ox); assertEquals(1, c.fx); assertEquals(0, c.fz)
+        assertEquals(Blocks.AIR, g.world.getBlock(10, y, 0).let { if (Rails.isRail(it)) -1 else Blocks.AIR })
+    }
 }
