@@ -37,7 +37,8 @@ fun Game.callTrain(choice: String, x: Int, y: Int, z: Int) {
         head = Cart(rx + 0.5f, ry.toFloat(), rz + 0.5f, want)
         carts.list.add(head)
         var lead: Cart = head
-        repeat(2) { val c = Cart(rx + 0.5f, ry.toFloat(), rz + 0.5f, Cart.COACH).also { it.leader = lead }; carts.list.add(c); lead = c }
+        val c = Cart(rx + 0.5f, ry.toFloat(), rz + 0.5f, Cart.COACH).also { it.leader = lead }; carts.list.add(c); lead = c
+        addRearCabs()
     }
     val cars = carts.chain(head)
     // Anyone travelling in it gets off here first.
@@ -95,4 +96,23 @@ internal fun Game.placeCallButton(x: Int, y: Int, z: Int) {
         if (d < bestD) { bestD = d; best = intArrayOf(bx, by, bz) }
     }
     best?.let { setBlock(it[0], it[1], it[2], Blocks.CALL_BUTTON, 2) }
+}
+
+/**
+ * Metros and bullet trains have three parts: a driving car at the front, a passenger car (or more) in the middle,
+ * and a driving car at the back, which becomes the front when the train turns round. Adds the back driving car to
+ * any such train that is missing it (trains from older versions, or just built).
+ */
+internal fun Game.addRearCabs() {
+    for (h in carts.list.toList()) {
+        if (h.leader != null || (h.kind != Cart.METRO && h.kind != Cart.BULLET)) continue
+        val cars = carts.chain(h)
+        val tail = cars.last()
+        if (cars.size < 2 || tail.kind == h.kind || cars.none { it.kind == Cart.COACH }) continue
+        val gap = tail.half + 0.35f + (if (h.kind == Cart.BULLET) 1.9f else 1.6f)
+        val cab = Cart(tail.x - tail.hx * gap, tail.y, tail.z - tail.hz * gap, h.kind)
+        cab.hx = tail.hx; cab.hz = tail.hz; cab.yaw = tail.yaw; cab.leader = tail
+        for (s in 0..20) { val f = s / 20f; tail.trail.addLast(floatArrayOf(cab.x + (tail.x - cab.x) * f, tail.y, cab.z + (tail.z - cab.z) * f)) }
+        carts.list.add(cab)
+    }
 }

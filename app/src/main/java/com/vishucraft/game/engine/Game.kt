@@ -1715,6 +1715,11 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
                 meta = S.attachMeta(support)
             }
         }
+        if (com.vishucraft.game.world.Rails.isRail(id) && wouldJoinLine(x, y, z)) {
+            // Lines have just two tracks, one each way: a rail can't join onto them.
+            uiEvents.add("toast:Can't join a rail onto a metro, railway or bullet line: it keeps just its two tracks")
+            return
+        }
         setBlock(x, y, z, id, meta)
         if (id == Blocks.SIGN) uiEvents.add("signedit:$x,$y,$z")
         if (id == Blocks.ESCALATOR) joinEscalator(x, y, z)

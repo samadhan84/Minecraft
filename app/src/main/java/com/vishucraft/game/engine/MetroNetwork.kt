@@ -52,7 +52,10 @@ class MetroLine(val pts: IntArray, val ya: Int, val yb: Int, val ends: IntArray)
     var complete = false
     /** [TrackEnd.METRO] (on a concrete viaduct) or [TrackEnd.RAILWAY] (on ballast, with stone pillars). */
     var kind = TrackEnd.METRO
-    /** For a line that runs deep (bullet trains): the height of its tunnel, or 0 for a line at station height. */
+    /**
+     * For a line that leaves the stations' height: the height it runs at, or 0. Below the stations it is a tunnel
+     * (a bullet line under the sea); above them a high viaduct (a line going over a city).
+     */
     var deep = 0
     private val segs = pts.size / 2 - 1
     /** Index of the first rail of each straight run; the last entry is the number of rails. */
@@ -84,8 +87,9 @@ class MetroLine(val pts: IntArray, val ya: Int, val yb: Int, val ends: IntArray)
 
     /** The height of rail [k]: counting back from B, each rail is one block nearer A's height until level with it. */
     fun y(k: Int): Int {
-        // A deep line slopes down from A at one block per rail, runs level at its tunnel height, and climbs to B.
-        if (deep > 0) return maxOf(deep, ya - k, yb - (size - k))
+        // A deep line slopes down from A at one block per rail, runs level at its tunnel height, and climbs to B;
+        // a high one climbs, runs level up there and comes down again.
+        if (deep > 0) return if (deep <= minOf(ya, yb)) maxOf(deep, ya - k, yb - (size - k)) else minOf(deep, ya + k, yb + (size - k))
         val rise = yb - ya
         return yb - Integer.signum(rise) * minOf(size - k, abs(rise))
     }
@@ -180,6 +184,8 @@ class MetroNetwork {
     /** 2 once stations and lines have two tracks (older saves are brought up to date when loaded); 3 with railways. */
     var version = VERSION
     private var nextGroup = 1
+    /** Older trains have been given their back driving cars this session. */
+    var cabsChecked = false
 
     fun newGroup() = nextGroup++
 
@@ -259,11 +265,11 @@ internal fun Game.joinMetro(newEnds: List<TrackEnd>): Int {
         // tracks has b's other track on that same side as the trains arrive.
         val s = sideOf(a.ox, a.oz, a.dx, a.dz)
         val to = if (sideOf(b.ox, b.oz, -b.dx, -b.dz) == s) b else b.twin()
-        val main = if (kind == TrackEnd.BULLET) planDeep(a, to) else planLine(a, to, 5)
+        val main = planFor(a, to, kind)
         main.kind = kind
         new.add(main)
         main.twin(s)?.let { new.add(it) }
-    } else new.add(planLine(a, b, 5).also { it.kind = kind })
+    } else new.add(planFor(a, b, kind).also { it.kind = kind })
     for (l in new) addLine(l)
     return new[0].size
 }
@@ -272,6 +278,58 @@ internal fun Game.joinMetro(newEnds: List<TrackEnd>): Int {
 private fun Game.addLine(line: MetroLine) {
     metroNet.lines.add(line)
     for (key in world.chunks.keys.toList()) layLine(line, (key shr 32).toInt(), key.toInt())
+}
+
+/**
+ * The route between two ends: a bullet line goes under the sea when there is water on the way; any line that would
+ * cross a city goes up over it on a high viaduct instead of through its buildings.
+ */
+private fun Game.planFor(a: TrackEnd, b: TrackEnd, kind: Int): MetroLine {
+    val plain = planLine(a, b, 5)
+    if (kind == TrackEnd.BULLET && waterOnTheWay(plain)) return planDeep(a, b)
+    val city = citiesOnTheWay(plain)
+    if (city > 0) {
+        val t = maxOf(city, a.y, b.y)
+        return planLine(a, b, t - a.y + 5, t - b.y + 5).also { it.deep = t }
+    }
+    return plain
+}
+
+/** Whether there is sea, a lake or a river under the route (from the terrain, and from what is loaded). */
+private fun Game.waterOnTheWay(l: MetroLine): Boolean {
+    val sea = com.vishucraft.game.world.TerrainGenerator.SEA_LEVEL
+    for (k in 0 until l.size step 3) {
+        val c = l.cell(k)
+        if (world.generator.surfaceHeight(c[0], c[1]) < sea - 1) return true
+        if (world.isLoaded(c[0], c[1])) {
+            var y = world.columnHeight(c[0], c[1]) - 1
+            while (y > 1 && world.getBlock(c[0], y, c[1]) == Blocks.AIR) y--
+            if (world.getBlock(c[0], y, c[1]) == Blocks.WATER) return true
+        }
+    }
+    return false
+}
+
+/**
+ * If the route crosses a city, the height to fly over it at (above its tallest towers); otherwise 0. Cities are
+ * found from their metro lines' track ends (see [siteOf]).
+ */
+private fun Game.citiesOnTheWay(l: MetroLine): Int {
+    var high = 0
+    for ((_, ends) in metroNet.ends.filter { it.kind == TrackEnd.METRO }.groupBy { it.group }) {
+        val s = siteOf(ends) ?: continue
+        if (s.city == 0) continue
+        val half = s.city * 12
+        val far = 3 + s.city * 24 + 2 + 11
+        // The city's footprint, from its plan corners.
+        val xs = intArrayOf(s.x(-half - 1, 1), s.x(half + 1, far)); val zs = intArrayOf(s.z(-half - 1, 1), s.z(half + 1, far))
+        val x0 = xs.min(); val x1 = xs.max(); val z0 = zs.min(); val z1 = zs.max()
+        for (k in 0 until l.size) {
+            val c = l.cell(k)
+            if (c[0] in x0..x1 && c[1] in z0..z1) { high = maxOf(high, s.oy + 58); break }
+        }
+    }
+    return high
 }
 
 /**
@@ -382,6 +440,7 @@ internal fun Game.layMetro() {
         for (s in metroNet.stations) { world.ensureLoaded(s[0] shr 4, s[2] shr 4); placeCallButton(s[0], s[1], s[2]) }
     }
     val lines = metroNet.lines
+    if (!metroNet.cabsChecked && !isClient) { metroNet.cabsChecked = true; addRearCabs() }
     while (true) {
         val key = world.arrived.poll() ?: break
         if (isClient) continue
@@ -527,4 +586,22 @@ private fun Game.upgradeMetro() {
         if (sideOf(b.ox, b.oz, -b.dx, -b.dz) != sa) continue
         l.twin(sa)?.let { addLine(it) }
     }
+}
+
+/** Whether the rail at (x, y, z) is part of a metro, railway or bullet line, or of a station's tracks. */
+internal fun Game.isLineRail(x: Int, y: Int, z: Int): Boolean {
+    if (!com.vishucraft.game.world.Rails.isRail(world.getBlock(x, y, z))) return false
+    for (s in metroNet.stations) if (abs(s[0] - x) <= 36 && abs(s[2] - z) <= 36 && abs(s[1] - y) <= 2) return true
+    for (l in metroNet.lines) {
+        var hit = false
+        l.railsIn(x shr 4, z shr 4) { k -> if (!hit) { val c = l.cell(k); if (c[0] == x && c[1] == z && l.y(k) == y) hit = true } }
+        if (hit) return true
+    }
+    return false
+}
+
+/** Placing a rail next to a line's track would join onto it: metro lines keep just their two tracks. */
+internal fun Game.wouldJoinLine(x: Int, y: Int, z: Int): Boolean {
+    for ((dx, dz) in arrayOf(1 to 0, -1 to 0, 0 to 1, 0 to -1)) for (dy in -1..1) if (isLineRail(x + dx, y + dy, z + dz)) return true
+    return false
 }

@@ -76,6 +76,7 @@ internal fun Game.placeBuilding(t: RayHit, name: String): Boolean {
     if (!buildReady(p, name)) return false
     sound("ding", player.x, player.y, player.z)
     // Buildings that say something themselves (a city's welcome, a station joining the line) keep their message.
+    addRearCabs()
     if (uiEvents.count { it.startsWith("toast:") } == toastsBefore) uiEvents.add("toast:Built ${if (name[0].lowercaseChar() in "aeiou") "an" else "a"} ${name.lowercase()}!")
     return true
 }
@@ -357,11 +358,8 @@ private fun Game.bulletStation(p: Plan) {
         head.hx = (p.rx * dir).toFloat(); head.hz = (p.rz * dir).toFloat(); head.yaw = kotlin.math.atan2(head.hx, -head.hz)
         carts.list.add(head)
         var lead = head
-        for (k in 1..2) {
-            val a = 4 * dir - 4 * k * dir
-            val c = Cart(p.x(a, row) + 0.5f, p.oy.toFloat(), p.z(a, row) + 0.5f, Cart.COACH).also { it.leader = lead; it.hx = head.hx; it.hz = head.hz; it.yaw = head.yaw }
-            carts.list.add(c); lead = c
-        }
+        val c = Cart(p.x(0, row) + 0.5f, p.oy.toFloat(), p.z(0, row) + 0.5f, Cart.COACH).also { it.leader = lead; it.hx = head.hx; it.hz = head.hz; it.yaw = head.yaw }
+        carts.list.add(c)
     }
     stationPeople(p, intArrayOf(2, 5, 8))
 }
@@ -917,7 +915,7 @@ private fun Game.city(p: Plan, n: Int, title: String, metroName: String, railNam
     bullet.hx = -p.rx.toFloat(); bullet.hz = -p.rz.toFloat(); bullet.yaw = kotlin.math.atan2(bullet.hx, -bullet.hz)
     carts.list.add(bullet)
     var lastCar = bullet
-    for (a in intArrayOf(-12, -9)) {
+    for (a in intArrayOf(-12)) {
         val c = Cart(p.x(a, mr - 1) + 0.5f, (p.oy + 11).toFloat(), p.z(a, mr - 1) + 0.5f, Cart.COACH).also { it.leader = lastCar; it.hx = bullet.hx; it.hz = bullet.hz; it.yaw = bullet.yaw }
         carts.list.add(c); lastCar = c
     }

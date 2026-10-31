@@ -30,7 +30,12 @@ class DropRenderer {
         buf.size = 0
         if (world != null) billboards(world, camX, camZ, maxDist)
         carts?.list?.forEach { c ->
-            if (c.isTrain) train(c.x, c.y, c.z, c.yaw, c.kind, carts.power(c)?.kind ?: c.kind) else cart(c.x, c.y, c.z, c.yaw)
+            if (c.isTrain) {
+                val cab = c.kind == com.vishucraft.game.engine.Cart.METRO || c.kind == com.vishucraft.game.engine.Cart.BULLET || c.kind == com.vishucraft.game.engine.Cart.ENGINE
+                // A driving car at the back faces backwards; the one in front has the driver in it.
+                val back = cab && c.leader != null
+                train(c.x, c.y, c.z, if (back) c.yaw + Math.PI.toFloat() else c.yaw, c.kind, carts.power(c)?.kind ?: c.kind, driver = cab && !back)
+            } else cart(c.x, c.y, c.z, c.yaw)
         }
         boats?.list?.forEach { b -> boat(b.x, b.y, b.z, b.yaw) }
         aircraft?.list?.forEach { a -> if (a.isPlane) airplane(a.x, a.y, a.z, a.yaw) else helicopter(a.x, a.y, a.z, a.yaw, a.spin) }
@@ -174,7 +179,7 @@ class DropRenderer {
         }
     }
 
-    private fun train(cx: Float, cy: Float, cz: Float, yaw: Float, kind: Int, headKind: Int) {
+    private fun train(cx: Float, cy: Float, cz: Float, yaw: Float, kind: Int, headKind: Int, driver: Boolean = false) {
         val c = cos(yaw); val s = sin(yaw)
         val bullet = kind == com.vishucraft.game.engine.Cart.BULLET || headKind == com.vishucraft.game.engine.Cart.BULLET
         val metroStyle = bullet || kind == com.vishucraft.game.engine.Cart.METRO || headKind == com.vishucraft.game.engine.Cart.METRO
@@ -212,6 +217,15 @@ class DropRenderer {
         }
         val floor = body[0]
         box(floatArrayOf(-w + 0.02f, 0.3f, -half + 0.02f, w - 0.02f, 0.4f, half - 0.02f), IntArray(6) { floor })
+        if (driver) {
+            // The driver at the controls, looking ahead out of the cab window.
+            val shirt = IntArray(6) { tile("citizen_shirt") }.also { it[3] = tile("citizen_shirt_front") }
+            val head = IntArray(6) { tile("citizen_hair") }.also { it[3] = tile("citizen_face") }
+            box(floatArrayOf(-0.38f, 0.4f, -half + 0.35f, -0.02f, 0.9f, -half + 0.75f), IntArray(6) { tile("black_plastic") })   // seat
+            box(floatArrayOf(-0.34f, 0.9f, -half + 0.45f, -0.06f, 1.45f, -half + 0.65f), shirt)
+            box(floatArrayOf(-0.32f, 1.45f, -half + 0.42f, -0.08f, 1.7f, -half + 0.68f), head)
+            box(floatArrayOf(-0.4f, 0.95f, -half + 0.12f, 0.1f, 1.1f, -half + 0.3f), IntArray(6) { tile("black_plastic") })   // controls
+        }
         val wheels = IntArray(6) { wheelTile }
         for (zc in floatArrayOf(-half + 0.45f, half - 0.45f)) for (side in floatArrayOf(-1f, 1f)) {
             val x0 = if (side < 0) -w + 0.02f else w - 0.1f

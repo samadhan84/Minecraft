@@ -698,7 +698,18 @@ class App(demo: File?) : ClientApp(demo) {
                 g.player.yaw = 0.35f + kotlin.math.PI.toFloat(); g.player.pitch = 0.05f
             }
             f == 1830 -> shot("13-bullet-tube")
-            f == 1832 -> glfwSetWindowShouldClose(window, true)
+            f == 1832 -> session?.game?.let { g ->
+                // A metro standing at a station, from in front of its driving car, to see the driver.
+                val s = g.metroNet.stations.first { it[3] == com.vishucraft.game.engine.TrackEnd.METRO && it[0] < -350 }
+                val m = g.carts.list.filter { it.leader == null && it.kind == com.vishucraft.game.engine.Cart.METRO }
+                    .minByOrNull { (it.x - s[0]) * (it.x - s[0]) + (it.z - s[2]) * (it.z - s[2]) }!!
+                for (c in g.carts.chain(m)) c.speed = 0f
+                m.stopTimer = 60f
+                g.player.x = m.x + m.hx * 4.2f - m.hz * 1.6f; g.player.z = m.z + m.hz * 4.2f + m.hx * 1.6f; g.player.y = m.y + 0.3f
+                g.player.yaw = kotlin.math.atan2(m.x - g.player.x, -(m.z - g.player.z)); g.player.pitch = -0.05f; g.player.flying = true
+            }
+            f == 1860 -> shot("14-metro-driver")
+            f == 1862 -> glfwSetWindowShouldClose(window, true)
         }
     }
 }
