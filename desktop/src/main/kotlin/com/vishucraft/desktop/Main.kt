@@ -674,7 +674,23 @@ class App(demo: File?) : ClientApp(demo) {
             f == 1612 -> shot("08-crafting-table")
             f == 1614 -> { closeOverlay(); leaveWorld(); menu = Menu.WORLDS }
             f == 1618 -> shot("09-worlds")
-            f == 1620 -> glfwSetWindowShouldClose(window, true)
+            f == 1620 -> { menu = Menu.TITLE }
+            f == 1622 -> shot("10-home")
+            f == 1624 -> {
+                // The showcase world, from the home screen.
+                val dir = File(worldsDir, com.vishucraft.game.engine.SHOWCASE_DIR)
+                startSession(GameSession.create(dir, com.vishucraft.game.engine.SHOWCASE_NAME, 2026L, false))
+            }
+            f == 1700 -> session?.game?.let { g -> g.player.y += 18f; g.player.z += 10f; g.player.pitch = -0.3f; g.player.flying = true }
+            f == 1760 -> shot("11-showcase-world")
+            f == 1762 -> session?.game?.let { g ->
+                // Close up on the glass car, from beside it.
+                val car = g.vehicles.list.first { it.kind == com.vishucraft.game.engine.Vehicle.GLASS_CAR }
+                g.player.x = car.x + 3.2f; g.player.y = car.y + 1.2f; g.player.z = car.z + 2.5f
+                g.player.yaw = kotlin.math.atan2(car.x - g.player.x, -(car.z - g.player.z)); g.player.pitch = -0.35f
+            }
+            f == 1790 -> shot("12-glass-car")
+            f == 1792 -> glfwSetWindowShouldClose(window, true)
         }
     }
 }

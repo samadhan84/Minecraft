@@ -34,7 +34,11 @@ class DropRenderer {
         }
         boats?.list?.forEach { b -> boat(b.x, b.y, b.z, b.yaw) }
         aircraft?.list?.forEach { a -> if (a.isPlane) airplane(a.x, a.y, a.z, a.yaw) else helicopter(a.x, a.y, a.z, a.yaw, a.spin) }
-        vehicles?.list?.forEach { v -> if (v.isBus) bus(v.x, v.y, v.z, v.yaw) else car(v.x, v.y, v.z, v.yaw, v.color) }
+        vehicles?.list?.forEach { v -> when (v.kind) {
+            com.vishucraft.game.engine.Vehicle.BUS -> bus(v.x, v.y, v.z, v.yaw)
+            com.vishucraft.game.engine.Vehicle.GLASS_CAR -> glassCar(v.x, v.y, v.z, v.yaw)
+            else -> car(v.x, v.y, v.z, v.yaw, v.color)
+        } }
         arrows?.list?.forEach { a ->
             val tile = when (a.kind) {
                 com.vishucraft.game.engine.Projectile.SNOWBALL -> snowballTile
@@ -263,6 +267,27 @@ class DropRenderer {
         part(cx, cy, cz, yaw, floatArrayOf(-0.9f, 0.25f, -1.5f, 0.9f, 0.95f, 1.5f), paint)
         part(cx, cy, cz, yaw, floatArrayOf(-0.8f, 0.95f, -0.7f, 0.8f, 1.55f, 0.85f), glass)
         part(cx, cy, cz, yaw, floatArrayOf(-0.92f, 0.22f, -1.56f, 0.92f, 0.4f, -1.48f), black)             // bumpers
+        part(cx, cy, cz, yaw, floatArrayOf(-0.92f, 0.22f, 1.48f, 0.92f, 0.4f, 1.56f), black)
+        for (sx in floatArrayOf(-1f, 1f)) {
+            val x0 = if (sx < 0) -0.8f else 0.5f
+            part(cx, cy, cz, yaw, floatArrayOf(x0, 0.6f, -1.53f, x0 + 0.3f, 0.8f, -1.5f), all6("lamp_glow"))
+            part(cx, cy, cz, yaw, floatArrayOf(x0, 0.6f, 1.5f, x0 + 0.3f, 0.8f, 1.53f), all6("concrete_red"))
+        }
+    }
+
+    /** The glass car: the same shape as a car, but glass all over on a thin dark frame, with seats inside. */
+    private fun glassCar(cx: Float, cy: Float, cz: Float, yaw: Float) {
+        val glass = all6("glass_car"); val tyre = all6("tyre"); val black = all6("black_plastic"); val seat = all6("concrete_red")
+        for (sx in floatArrayOf(-1f, 1f)) for (sz in floatArrayOf(-1f, 1f)) {
+            val x0 = if (sx < 0) -0.95f else 0.75f; val z0 = sz * 1f - 0.25f
+            part(cx, cy, cz, yaw, floatArrayOf(x0, 0f, z0, x0 + 0.2f, 0.5f, z0 + 0.5f), tyre)
+        }
+        part(cx, cy, cz, yaw, floatArrayOf(-0.9f, 0.22f, -1.5f, 0.9f, 0.3f, 1.5f), black)                 // floor
+        part(cx, cy, cz, yaw, floatArrayOf(-0.9f, 0.25f, -1.5f, 0.9f, 0.95f, 1.5f), glass)
+        part(cx, cy, cz, yaw, floatArrayOf(-0.8f, 0.95f, -0.7f, 0.8f, 1.55f, 0.85f), glass)
+        for (sx in floatArrayOf(-0.55f, 0.1f)) part(cx, cy, cz, yaw, floatArrayOf(sx, 0.3f, 0.05f, sx + 0.45f, 0.75f, 0.5f), seat)
+        part(cx, cy, cz, yaw, floatArrayOf(-0.55f, 0.55f, -0.55f, -0.15f, 0.95f, -0.5f), black)        // steering wheel
+        part(cx, cy, cz, yaw, floatArrayOf(-0.92f, 0.22f, -1.56f, 0.92f, 0.4f, -1.48f), black)
         part(cx, cy, cz, yaw, floatArrayOf(-0.92f, 0.22f, 1.48f, 0.92f, 0.4f, 1.56f), black)
         for (sx in floatArrayOf(-1f, 1f)) {
             val x0 = if (sx < 0) -0.8f else 0.5f

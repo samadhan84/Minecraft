@@ -40,10 +40,12 @@ class Vehicle(var x: Float, var y: Float, var z: Float, val kind: Int, val color
     companion object {
         const val CAR = 0
         const val BUS = 1
+        /** A car made all of glass on a thin frame: you can see right through it, and see out all round. */
+        const val GLASS_CAR = 2
         const val NONE = 0
         const val STRAIGHT = 1
         const val RIGHT = 2
-        fun itemName(kind: Int) = if (kind == BUS) "Bus" else "Car"
+        fun itemName(kind: Int) = when (kind) { BUS -> "Bus"; GLASS_CAR -> "Glass Car"; else -> "Car" }
     }
 }
 
@@ -235,8 +237,8 @@ internal fun Game.vehicleUse(item: com.vishucraft.game.world.ItemDef?, t: RayHit
         uiEvents.add("toast:Driving the ${if (v.isBus) "bus" else "car"}: look to steer, forward to go, back to brake. Tap or crouch to get out")
         return true
     }
-    if ((item?.name == "Car" || item?.name == "Bus") && t != null) {
-        val kind = if (item.name == "Bus") Vehicle.BUS else Vehicle.CAR
+    if ((item?.name == "Car" || item?.name == "Bus" || item?.name == "Glass Car") && t != null) {
+        val kind = when (item.name) { "Bus" -> Vehicle.BUS; "Glass Car" -> Vehicle.GLASS_CAR; else -> Vehicle.CAR }
         val v = Vehicle(t.x + 0.5f, (if (t.ny == 1) t.y + 1 else t.y).toFloat(), t.z + 0.5f, kind, java.util.Random().nextInt(16))
         val fx = sin(player.yaw); val fz = -cos(player.yaw)
         if (abs(fx) > abs(fz)) v.hx = if (fx > 0) 1 else -1 else { v.hx = 0; v.hz = if (fz > 0) 1 else -1 }

@@ -331,6 +331,15 @@ abstract class ClientApp(protected val demo: File?) {
                 var y = ui.height * 0.42f
                 if (ui.button("Play", cx - bw / 2, y, bw, 44f)) menu = Menu.WORLDS
                 y += 54
+                // A creative world with everything already built (see engine/Showcase.kt).
+                if (ui.button("Showcase world (everything built)", cx - bw / 2, y, bw, 44f)) {
+                    val dir = File(worldsDir, com.vishucraft.game.engine.SHOWCASE_DIR)
+                    startSession(if (LevelData.read(dir) != null) GameSession.open(dir)
+                        else GameSession.create(dir, com.vishucraft.game.engine.SHOWCASE_NAME, 2026L, false))
+                    menu = Menu.WORLDS
+                    return
+                }
+                y += 54
                 if (net != null) {
                     if (ui.button("Join a game (online or Wi-Fi)", cx - bw / 2, y, bw, 44f)) { menu = Menu.JOIN; scan() }
                     y += 54

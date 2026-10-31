@@ -49,6 +49,7 @@ class MenuActivity : Activity() {
         }
 
         playButton = add("Play") { if (hasWorld()) showWorlds() else newWorld() }
+        add("Showcase world") { startGame(com.vishucraft.game.engine.SHOWCASE_DIR, 2026L, com.vishucraft.game.engine.SHOWCASE_NAME, false) }
         add("Join online game") { joinOnline() }
         add("Join Wi-Fi game") { joinGame() }
         add("Settings") { settingsDialog(this) }

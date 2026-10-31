@@ -998,7 +998,7 @@ object Blocks {
         for (n in listOf("glass", "black_plastic")) t(n)
         for (i in 0 until PixelFont.TILES) t("font_$i")
         for (n in listOf("bullet_side", "bullet_front", "bullet_roof")) t(n)
-        for (n in listOf("lamp_glow", "car_window", "bus_side", "bus_front", "bus_roof", "concrete_red")) t(n)
+        for (n in listOf("lamp_glow", "car_window", "bus_side", "bus_front", "bus_roof", "concrete_red", "glass_car")) t(n)
         for (n in listOf("plane_body", "plane_front", "plane_wing", "plane_tail", "heli_body", "heli_front", "rotor", "tyre")) t(n)
         for (n in listOf("mirror", "keyboard", "shower_water", "water_bottle_blue", "oak_leaves", "water")) t(n)
         for (n in listOf("steel", "black_plastic", "scarecrow", "train_side", "train_front", "train_roof",

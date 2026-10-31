@@ -106,6 +106,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
 
     /** Switches this world between creative and survival (from the game menu); returns the message to show. */
     fun switchMode(): String {
+        if (isShowcase) return "The showcase world is creative only"
         level.mode = if (survival) GameMode.CREATIVE else GameMode.SURVIVAL
         // A fresh start either way: full health and food, and no flying in survival.
         health = 20f; food = 20f; air = 10f
@@ -488,6 +489,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
             else { rain = maxOf(0f, rain - dt * 0.5f); raining = false; thunder = false }
         }
         projectiles.update(dt, this)
+        if (spawned) buildShowcaseIfNew()
         layMetro()
         cityCheck -= dt
         if (cityCheck <= 0f) { cityCheck = 2f; upgradeCities() }

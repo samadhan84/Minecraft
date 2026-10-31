@@ -1972,7 +1972,8 @@ object TextureAtlas {
                 t[8, 10] = rgb(250, 250, 250); t[7, 11] = rgb(250, 250, 250)
                 return true
             }
-            "car_window" -> { t.fill { x, y -> if (x < 1 || x > 14 || y < 1) rgb(40, 40, 44) else scale(rgb(120, 170, 210), if ((x + y) % 7 == 0) 1.3f else 1f) }; return true }
+            // Car windows: a dark frame with clear glass you can see through (a glint here and there).
+            "car_window" -> { t.fill { x, y -> if (x < 1 || x > 14 || y < 1) rgb(40, 40, 44) else if ((x + y) % 9 == 0 && y < 9) rgb(200, 225, 245) else 0 }; return true }
             "bus_side" -> {
                 t.fill { x, y -> when { y in 2..7 && x % 8 != 0 -> rgb(110, 160, 200); y == 10 -> rgb(40, 110, 60); else -> scale(rgb(250, 196, 30), t.jitter(0.02f)) } }
                 return true
@@ -1988,6 +1989,13 @@ object TextureAtlas {
                     rgb(220, 40, 40), rgb(150, 200, 240), rgb(30, 30, 30))
                 return true
             }
+            "glass_car_item" -> {
+                mask(t, arrayOf("....dddddd....", "...daaaaaad...", "..daaaaaaaad..", "dddaaaaaaaaddd", "daaaaaaaaaaaad", "laaaaaaaaaaaal", "daaaaaaaaaaaad", "ddbbdddddbbddd", "..bb.....bb..."),
+                    rgb(200, 200, 210), rgb(170, 225, 250), rgb(30, 30, 30))
+                return true
+            }
+            // Glass car panels: a thin frame round a clear middle (see-through).
+            "glass_car" -> { t.fill { x, y -> if (x == 0 || y == 0 || x == 15 || y == 15) rgb(60, 64, 72) else if ((x + y) % 11 == 0 && x in 3..12) rgb(230, 245, 255) else 0 }; return true }
             "bus_item" -> {
                 mask(t, arrayOf("dddddddddddddd", "daamaamaamaaad", "daamaamaamaaad", "dmmmmmmmmmmmmd", "dmmmmmmmmmmmml", "dmmmmmmmmmmmmd", "ddbbddddddbbdd", "..bb......bb.."),
                     rgb(250, 190, 30), rgb(120, 170, 220), rgb(30, 30, 30))
