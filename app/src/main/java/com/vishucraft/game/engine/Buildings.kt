@@ -92,6 +92,7 @@ private fun Game.buildReady(p: Plan, name: String): Boolean {
         "Mansion" -> mansion(p)
         "Airport" -> airport(p)
         "Railway Station" -> railwayStation(p)
+        "Bullet Train Station" -> bulletStation(p)
         "Smart City" -> {
             if (p.oy + 46 >= Chunk.HEIGHT) { uiEvents.add("toast:Too high up for the city's tallest tower: build lower down"); return false }
             city(p, 4, "the smart city", "DV Metro", "DV Central")
@@ -313,6 +314,56 @@ private fun Game.railwayStation(p: Plan) {
 private fun Game.registerStation(x: Int, y: Int, z: Int, kind: Int) {
     metroNet.stations.add(intArrayOf(x, y, z, kind))
     placeCallButton(x, y, z)
+}
+
+/**
+ * A bullet train station: sleek white and blue, two tracks (rows 4 and 6) with a stop rail each, a platform on
+ * both sides and an island platform between them under a long glass roof on white arches, the station's name on
+ * billboards, and a bullet train on each track. Its own line joins the nearest other bullet train station by
+ * itself: it dives down and runs in a glass tube deep under the sea (and through the rock under land).
+ */
+private fun Game.bulletStation(p: Plan) {
+    val len = 32
+    val towns = listOf("Sagar", "Neel", "Megh", "Surya", "Chandra", "Tara", "Akash", "Pavan")
+    val h = (p.x(0, 4) * 73856093) xor (p.z(0, 4) * 19349663)
+    val name = towns[h.mod(towns.size)] + " Bullet Station"
+    val white = Blocks.CONCRETE_FIRST; val blue = Blocks.CONCRETE_FIRST + 11
+    p.site(-len, len, 0, 10, 8, Blocks.QUARTZ_BLOCK)
+    for (a in -len..len) for (d in intArrayOf(4, 6)) p.set(a, d, 0, if (a == 0) Blocks.STOP_RAIL else Blocks.RAIL, p.railAcross)
+    for (a in -16..16) {
+        for (d in intArrayOf(1, 2, 3, 5, 7, 8, 9)) p.set(a, d, 0, if (d == 3 || d == 7 || d == 5) Blocks.STATION_PLATFORM else Blocks.QUARTZ_BLOCK)
+        // White arches every 4 blocks holding up a glass roof with a blue stripe down the middle.
+        if (a % 4 == 0) for (d in intArrayOf(1, 9)) for (hh in 1..5) p.set(a, d, hh, white)
+        for (d in 1..9) p.set(a, d, if (d in 3..7) 7 else 6, if (d == 5) blue else Blocks.GLASS)
+        if (a % 4 == 0) for (d in 2..8) p.set(a, d, if (d in 3..7) 7 else 6, white)
+        if (a % 4 == 2) { p.set(a, 2, 5, Blocks.SEA_LANTERN); p.set(a, 8, 5, Blocks.SEA_LANTERN) }
+        if (a % 8 == 5) { p.set(a, 2, 1, Blocks.SOFA, p.away); p.set(a, 8, 1, Blocks.SOFA, p.toward) }
+    }
+    p.set(0, 1, 1, Blocks.SIGN, p.toward)
+    world.blockEntities.sign(p.x(0, 1), p.oy + 1, p.z(0, 1))?.text = name
+    p.billboard(-4, 1, 3, 9, 2, p.away, true, name)
+    p.billboard(-4, 9, 3, 9, 2, p.toward, true, name)
+    val group = metroNet.newGroup()
+    val line = joinMetro(listOf(
+        TrackEnd(p.x(len, 4), p.oy, p.z(len, 4), p.rx, p.rz, group, ox = p.fx * 2, oz = p.fz * 2, kind = TrackEnd.BULLET),
+        TrackEnd(p.x(-len, 4), p.oy, p.z(-len, 4), -p.rx, -p.rz, group, ox = p.fx * 2, oz = p.fz * 2, kind = TrackEnd.BULLET),
+    ))
+    registerStation(p.x(0, 5), p.oy, p.z(0, 5), TrackEnd.BULLET)
+    uiEvents.add("toast:$name is open!" + if (line > 0) " Its line joins the nearest bullet train station, under the sea ($line blocks of new track)"
+        else " Build another bullet train station and the line joins them by itself, through a tunnel under the sea")
+    // A bullet train waiting at each platform, on its left-hand track.
+    for ((row, dir) in listOf(4 to -1, 6 to 1)) {
+        val head = Cart(p.x(4 * dir, row) + 0.5f, p.oy.toFloat(), p.z(4 * dir, row) + 0.5f, Cart.BULLET)
+        head.hx = (p.rx * dir).toFloat(); head.hz = (p.rz * dir).toFloat(); head.yaw = kotlin.math.atan2(head.hx, -head.hz)
+        carts.list.add(head)
+        var lead = head
+        for (k in 1..2) {
+            val a = 4 * dir - 4 * k * dir
+            val c = Cart(p.x(a, row) + 0.5f, p.oy.toFloat(), p.z(a, row) + 0.5f, Cart.COACH).also { it.leader = lead; it.hx = head.hx; it.hz = head.hz; it.yaw = head.yaw }
+            carts.list.add(c); lead = c
+        }
+    }
+    stationPeople(p, intArrayOf(2, 5, 8))
 }
 
 /** A few people waiting on a station's platforms (rows [rows]), ready to travel. */

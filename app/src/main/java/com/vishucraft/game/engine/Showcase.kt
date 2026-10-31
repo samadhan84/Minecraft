@@ -5,9 +5,10 @@ import com.vishucraft.game.world.Items
 
 /*
  * The showcase world, opened from the home screen: a creative-only flat world that comes with everything already
- * built. Three cities joined by metro and railway lines, metro and railway stations with call buttons, two
- * airports with planes flying between them, the houses, mansion, farm, tower and pool, cars (and a glass car),
- * an escalator, the helper robot, villagers with their iron golem, and animals.
+ * built. Three cities joined by metro and railway lines, metro, railway and bullet train stations (the bullet
+ * line runs under a lake) with call buttons, two airports with planes flying between them, the houses, mansion,
+ * farm, tower and pool, cars (and a glass car), an escalator, the helper robot, villagers with their iron golem,
+ * and animals.
  */
 
 /** The folder and name of the showcase world. */
@@ -34,6 +35,14 @@ internal fun Game.buildShowcaseIfNew() {
     build("Railway Station", 490, -181)
     build("Airport", -150, 160)
     build("Airport", 150, 160)
+    // Two bullet train stations with a lake between them: their line runs in a glass tube under the water.
+    build("Bullet Train Station", -150, 262)
+    val lakeTop = ground(0, 258)
+    for (x in -100..100) for (z in 240..275) {
+        world.ensureLoaded(x shr 4, z shr 4)
+        for (y in lakeTop - 14..lakeTop) setBlock(x, y, z, Blocks.WATER)
+    }
+    build("Bullet Train Station", 150, 262)
     // A row of buildings in front of the city.
     for ((name, x) in listOf("Small House" to -110, "Modern House" to -80, "Mansion" to -40, "Farm" to 30,
         "Watch Tower" to 55, "Swimming Pool" to 75, "Small House" to 100)) build(name, x, 20)

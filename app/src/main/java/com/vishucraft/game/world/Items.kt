@@ -68,7 +68,7 @@ object Items {
     val DISCS = listOf("Meadow", "Caves", "Stars")
 
     /** Ready-made buildings a blueprint can place (see engine/Buildings.kt). */
-    val BUILDINGS = listOf("Small House", "Modern House", "Farm", "Watch Tower", "Metro Station", "Swimming Pool", "Mansion", "Airport", "Smart City", "Big City", "Mega City", "Railway Station")
+    val BUILDINGS = listOf("Small House", "Modern House", "Farm", "Watch Tower", "Metro Station", "Swimming Pool", "Mansion", "Airport", "Smart City", "Big City", "Mega City", "Railway Station", "Bullet Train Station")
 
     val all: List<ItemDef>
     private val byId = HashMap<Int, ItemDef>()
@@ -345,6 +345,7 @@ object Items {
         add("Blueprint: Railway Station", "blueprint", use = ItemUse.BLUEPRINT, maxStack = 16)
         add("Robot Spawn Egg", "spawn_egg_robot", use = ItemUse.SPAWN)
         add("Glass Car", "glass_car_item", maxStack = 1)
+        add("Blueprint: Bullet Train Station", "blueprint", use = ItemUse.BLUEPRINT, maxStack = 16)
 
         all = list
         for (i in all) { byId[i.id] = i; byName[i.name] = i.id }

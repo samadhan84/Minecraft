@@ -690,7 +690,15 @@ class App(demo: File?) : ClientApp(demo) {
                 g.player.yaw = kotlin.math.atan2(car.x - g.player.x, -(car.z - g.player.z)); g.player.pitch = -0.35f
             }
             f == 1790 -> shot("12-glass-car")
-            f == 1792 -> glfwSetWindowShouldClose(window, true)
+            f == 1792 -> session?.game?.let { g ->
+                // Under the lake, beside the bullet train's glass tube.
+                val l = g.metroNet.lines.first { it.kind == com.vishucraft.game.engine.TrackEnd.BULLET }
+                val k = l.size / 2; val c = l.cell(k)
+                g.player.x = c[0] + 0.5f; g.player.y = l.y(k) + 0.5f; g.player.z = c[1] - 4.5f; g.player.flying = true
+                g.player.yaw = 0.35f + kotlin.math.PI.toFloat(); g.player.pitch = 0.05f
+            }
+            f == 1830 -> shot("13-bullet-tube")
+            f == 1832 -> glfwSetWindowShouldClose(window, true)
         }
     }
 }

@@ -32,6 +32,8 @@ class TrackEnd(val x: Int, val y: Int, val z: Int, val dx: Int, val dz: Int, val
     companion object {
         const val METRO = 0
         const val RAILWAY = 1
+        /** Bullet train lines: they dive deep and run in a glass tube under the sea (and through the rock under land). */
+        const val BULLET = 2
     }
 }
 
@@ -50,6 +52,8 @@ class MetroLine(val pts: IntArray, val ya: Int, val yb: Int, val ends: IntArray)
     var complete = false
     /** [TrackEnd.METRO] (on a concrete viaduct) or [TrackEnd.RAILWAY] (on ballast, with stone pillars). */
     var kind = TrackEnd.METRO
+    /** For a line that runs deep (bullet trains): the height of its tunnel, or 0 for a line at station height. */
+    var deep = 0
     private val segs = pts.size / 2 - 1
     /** Index of the first rail of each straight run; the last entry is the number of rails. */
     private val start = IntArray(segs + 1)
@@ -80,6 +84,8 @@ class MetroLine(val pts: IntArray, val ya: Int, val yb: Int, val ends: IntArray)
 
     /** The height of rail [k]: counting back from B, each rail is one block nearer A's height until level with it. */
     fun y(k: Int): Int {
+        // A deep line slopes down from A at one block per rail, runs level at its tunnel height, and climbs to B.
+        if (deep > 0) return maxOf(deep, ya - k, yb - (size - k))
         val rise = yb - ya
         return yb - Integer.signum(rise) * minOf(size - k, abs(rise))
     }
@@ -141,7 +147,7 @@ class MetroLine(val pts: IntArray, val ya: Int, val yb: Int, val ends: IntArray)
         }
         val e = ends
         val twinEnds = intArrayOf(e[0] + nx[0], e[1], e[2] + nz[0], e[3] + nx[n - 1], e[4], e[5] + nz[n - 1])
-        return MetroLine(out, ya, yb, twinEnds).also { it.kind = kind }
+        return MetroLine(out, ya, yb, twinEnds).also { it.kind = kind; it.deep = deep }
     }
 
     fun write(d: java.io.DataOutputStream) {
@@ -195,6 +201,8 @@ class MetroNetwork {
         for (e in ends) d.writeByte(e.kind)
         for (l in lines) d.writeByte(l.kind)
         for (s in stations) d.writeByte(s[3])
+        // Version 5: deep (bullet train) lines.
+        for (l in lines) d.writeInt(l.deep)
     }
 
     fun read(d: java.io.DataInputStream) {
@@ -217,12 +225,13 @@ class MetroNetwork {
                 for (l in lines) l.kind = d.readByte().toInt()
                 for (s in stations) s[3] = d.readByte().toInt()
             }
+            if (version >= 5) for (l in lines) l.deep = d.readInt()
         } catch (_: java.io.EOFException) {}
     }
 
     companion object {
-        /** 3: railways; 4: every station has a train call button. */
-        const val VERSION = 4
+        /** 3: railways; 4: every station has a train call button; 5: bullet train lines under the sea. */
+        const val VERSION = 5
     }
 }
 
@@ -250,7 +259,7 @@ internal fun Game.joinMetro(newEnds: List<TrackEnd>): Int {
         // tracks has b's other track on that same side as the trains arrive.
         val s = sideOf(a.ox, a.oz, a.dx, a.dz)
         val to = if (sideOf(b.ox, b.oz, -b.dx, -b.dz) == s) b else b.twin()
-        val main = planLine(a, to, 5)
+        val main = if (kind == TrackEnd.BULLET) planDeep(a, to) else planLine(a, to, 5)
         main.kind = kind
         new.add(main)
         main.twin(s)?.let { new.add(it) }
@@ -265,11 +274,20 @@ private fun Game.addLine(line: MetroLine) {
     for (key in world.chunks.keys.toList()) layLine(line, (key shr 32).toInt(), key.toInt())
 }
 
+/**
+ * A bullet train route: straight out of each station for long enough to slope down to its tunnel, deep under
+ * the sea, and level along the bottom.
+ */
+private fun planDeep(a: TrackEnd, b: TrackEnd): MetroLine {
+    val t = minOf(com.vishucraft.game.world.TerrainGenerator.SEA_LEVEL - 12, a.y - 4, b.y - 4).coerceAtLeast(6)
+    return planLine(a, b, a.y - t + 5, b.y - t + 5).also { it.deep = t }
+}
+
 /** Works out the route from end [a] to end [b], going straight out of [a] for [outA] blocks first. */
-private fun planLine(a: TrackEnd, b: TrackEnd, outA: Int): MetroLine {
+private fun planLine(a: TrackEnd, b: TrackEnd, outA: Int, outBDeep: Int = -1): MetroLine {
     // Out from each end in a straight line first (long enough at b for a ramp to b's height), then across.
     val rise = b.y - a.y
-    val outB = abs(rise) + 4
+    val outB = if (outBDeep > 0) outBDeep else abs(rise) + 4
     val ax = a.x + a.dx * outA; val az = a.z + a.dz * outA
     val bx = b.x + b.dx * outB; val bz = b.z + b.dz * outB
     val pts = ArrayList<Int>()
@@ -301,6 +319,7 @@ private fun Game.layLine(line: MetroLine, cx: Int, cz: Int): Boolean {
         val (x, z) = line.cell(k).let { it[0] to it[1] }
         val y = line.y(k)
         if (y < 2 || y >= Chunk.HEIGHT - 4) continue
+        if (line.deep > 0) { tube(line, k, x, y, z); continue }
         // A tunnel through anything in the way (except the other track's rails), and a deck underneath.
         for (h in 0..3) world.getBlock(x, y + h, z).let { if (it != Blocks.AIR && !com.vishucraft.game.world.Rails.isRail(it)) setBlock(x, y + h, z, Blocks.AIR) }
         if (!Blocks.solid[world.getBlock(x, y - 1, z)] || world.getBlock(x, y - 1, z) == Blocks.WATER) setBlock(x, y - 1, z, deck)
@@ -326,6 +345,32 @@ private fun Game.layLine(line: MetroLine, cx: Int, cz: Int): Boolean {
     for (k in shape) reshape(k)
     for (k in shape) reshape(k)
     return true
+}
+
+/**
+ * One rail of a deep line, in a glass tube: room for the train inside, and glass all round wherever there is
+ * water, air or anything loose (so the sea stays out and you can see it), rock left as it is.
+ */
+private fun Game.tube(line: MetroLine, k: Int, x: Int, y: Int, z: Int) {
+    val isRail = { id: Int -> com.vishucraft.game.world.Rails.isRail(id) }
+    fun seal(px: Int, py: Int, pz: Int) {
+        val id = world.getBlock(px, py, pz)
+        if (isRail(id) || id == Blocks.GLASS) return
+        if (!Blocks.solid[id] || id == Blocks.WATER || Blocks.isLiquid(id)) setBlock(px, py, pz, Blocks.GLASS)
+    }
+    // The rails before and after this one are part of the tube, not its walls.
+    val prev = if (k > 0) line.cell(k - 1) else intArrayOf(line.ends[0], line.ends[2])
+    val next = if (k < line.size - 1) line.cell(k + 1) else intArrayOf(line.ends[3], line.ends[5])
+    for (h in 0..2) world.getBlock(x, y + h, z).let { if (it != Blocks.AIR && !isRail(it)) setBlock(x, y + h, z, Blocks.AIR) }
+    for ((dx, dz) in arrayOf(1 to 0, -1 to 0, 0 to 1, 0 to -1)) {
+        val nx = x + dx; val nz = z + dz
+        if ((nx == prev[0] && nz == prev[1]) || (nx == next[0] && nz == next[1])) continue
+        // The other track's rail, two blocks over, is never next to this one; anything else beside it is wall.
+        for (h in -1..3) seal(nx, y + h, nz)
+    }
+    seal(x, y - 1, z)
+    seal(x, y + 3, z)
+    setBlock(x, y, z, Blocks.RAIL, 0)
 }
 
 /** Lays any metro track due in newly loaded chunks (and brings older saves' metro up to date first). */
@@ -358,7 +403,10 @@ internal fun Game.metroStationName(s: IntArray): String = world.blockEntities.na
 /** Getting on a metro or bullet train: offer the stations it can run to non-stop. */
 internal fun Game.offerMetroStations(c: Cart, line: Int? = null) {
     val power = carts.power(c) ?: return
-    val kind = line ?: if (power.isMetroLike) TrackEnd.METRO else TrackEnd.RAILWAY
+    // The line of the station the train is at (a bullet train can run on metro tracks or on its own line).
+    val near = metroNet.stations.minByOrNull { (it[0] - c.x) * (it[0] - c.x) + (it[2] - c.z) * (it[2] - c.z) }
+        ?.takeIf { (it[0] - c.x) * (it[0] - c.x) + (it[2] - c.z) * (it[2] - c.z) < 40f * 40f }
+    val kind = line ?: near?.get(3) ?: if (power.isMetroLike) TrackEnd.METRO else TrackEnd.RAILWAY
     val here = c.x to c.z
     val choices = metroNet.stations.filter { it[3] == kind }.filter { (it[0] - here.first) * (it[0] - here.first) + (it[2] - here.second) * (it[2] - here.second) > 30f * 30f }
     if (choices.isEmpty()) return

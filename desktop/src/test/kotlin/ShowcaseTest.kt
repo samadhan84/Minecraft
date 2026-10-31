@@ -21,6 +21,8 @@ class ShowcaseTest {
         assertEquals(2, g.aircraft.airports.size)
         assertTrue(net.stations.count { it[3] == TrackEnd.METRO } >= 10)
         assertTrue(net.stations.count { it[3] == TrackEnd.RAILWAY } >= 5)
+        assertEquals(2, net.stations.count { it[3] == TrackEnd.BULLET })
+        assertEquals(2, net.lines.count { it.kind == TrackEnd.BULLET })
         // Every city and station on one metro line and one railway line: only the two outermost ends are open.
         assertEquals(2, net.ends.count { !it.joined && it.kind == TrackEnd.METRO })
         assertEquals(2, net.ends.count { !it.joined && it.kind == TrackEnd.RAILWAY })
