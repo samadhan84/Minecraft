@@ -15,6 +15,10 @@ import com.vishucraft.game.world.Items
 const val SHOWCASE_DIR = "showcase"
 const val SHOWCASE_NAME = "Showcase World"
 
+/** How many worlds a player can have. */
+const val MAX_WORLDS = 5
+const val MAX_WORLDS_MESSAGE = "You can have up to 5 worlds. Delete one to make a new world."
+
 val Game.isShowcase get() = level.name == SHOWCASE_NAME
 
 /** Builds the showcase the first time the world is opened (it has no stations until then). */

@@ -1504,6 +1504,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
                     }
                 }
                 ItemUse.BLUEPRINT -> blueprintOf(item.name)?.let { if (placeBuilding(t, it)) consumeHeld() }
+                    ?: uiEvents.add("toast:This blueprint can't be used any more. Blueprints now: Smart City, Metro Station and Bullet Train Station")
                 ItemUse.CART -> if (com.vishucraft.game.world.Rails.isRail(t.block)) {
                     // The cart faces away from you, so it rolls off the way you are looking.
                     val cart = Cart(t.x + 0.5f, t.y.toFloat(), t.z + 0.5f, Cart.kindOf(item.name))

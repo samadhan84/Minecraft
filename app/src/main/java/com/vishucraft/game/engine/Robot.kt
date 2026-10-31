@@ -151,7 +151,7 @@ fun Game.robotCommand(uid: Int, said: String) {
     b.target = null; b.done = 0
     when {
         text.isEmpty() || has("help", "what can") -> robotSay("I can: follow me, stay, come here, mine, chop trees, farm, light, guard, " +
-            "build a house (or any blueprint), give me 10 diamonds, fireworks (on Diwali), take me to <station or airport>, make it day / night, stop the rain, call a train, dance")
+            "build a smart city, metro station or bullet train station, give me 10 diamonds, fireworks (on Diwali), take me to <station or airport>, make it day / night, stop the rain, call a train, dance")
         has("give", "want", "need") -> giveItems(text, words)
         has("take me", "teleport", "go to") -> takeMeTo(text)
         has("firework", "diwali", "cracker", "patak", "bomb", "phuljhadi", "anar", "chakri", "rocket", "sky shot", "ladi") -> robotFireworks(text)
@@ -181,7 +181,7 @@ private fun Game.giveItems(text: String, words: List<String>) {
     val wanted = words.filter { it.length > 2 && it.toIntOrNull() == null && it !in setOf("give", "want", "need", "please", "some", "the", "and") }
         .map { it.removeSuffix("es").removeSuffix("s") }
     if (wanted.isEmpty()) { robotSay("What should I give you? Say for example \"give me 10 diamonds\""); return }
-    val names = (1 until Blocks.COUNT).map { it to Blocks[it].name } + Items.all.map { it.id to it.name }
+    val names = (1 until Blocks.COUNT).map { it to Blocks[it].name } + Items.shown.map { it.id to it.name }
     val best = names.maxByOrNull { (_, name) ->
         val nm = name.lowercase()
         wanted.count { nm.contains(it) } * 10 - nm.length / 10 - (if (nm.endsWith(" spawn egg")) 5 else 0)
@@ -209,10 +209,10 @@ private fun Game.takeMeTo(text: String) {
 }
 
 private fun Game.robotBuild(text: String) {
-    val name = Items.BUILDINGS.firstOrNull { text.contains(it.lowercase()) }
-        ?: Items.BUILDINGS.firstOrNull { b -> b.lowercase().split(' ').any { it.length > 3 && text.contains(it) } }
-        ?: if (text.contains("house") || text.contains("home")) "Small House" else null
-    if (name == null) { robotSay("I can build: " + Items.BUILDINGS.joinToString(", ")); return }
+    val name = Items.ALLOWED_BUILDINGS.firstOrNull { text.contains(it.lowercase()) }
+        ?: Items.ALLOWED_BUILDINGS.firstOrNull { b -> b.lowercase().split(' ').any { it.length > 3 && it != "train" && it != "station" && text.contains(it) } }
+        ?: if (text.contains("city")) "Smart City" else if (text.contains("bullet")) "Bullet Train Station" else if (text.contains("metro")) "Metro Station" else null
+    if (name == null) { robotSay("I can build: " + Items.ALLOWED_BUILDINGS.joinToString(", ")); return }
     // On the ground a few steps in front of you.
     val fx = sin(player.yaw); val fz = -kotlin.math.cos(player.yaw)
     val x = floorInt(player.x + fx * 3f); val z = floorInt(player.z + fz * 3f)

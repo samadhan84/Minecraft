@@ -428,7 +428,7 @@ object Recipes {
         sh(Blocks.RUNWAY_LINE, 4, listOf("RWR"), 'R' to Blocks.RUNWAY, 'W' to i("White Dye"))
         sh(Blocks.HELIPAD, 4, listOf("RYR"), 'R' to Blocks.RUNWAY, 'Y' to i("Yellow Dye"))
         r(i("Blueprint: Swimming Pool"), 1, true, paper to 1, Blocks.SAND to 16, glass to 4, i("Water Bucket") to 1)
-        crafting = list
+        crafting = list.filter { !Items.hidden(Items[it.result]?.name) }
 
         smelting = mapOf(
             Blocks.COBBLESTONE to Blocks.STONE,

@@ -70,7 +70,15 @@ object Items {
     /** Ready-made buildings a blueprint can place (see engine/Buildings.kt). */
     val BUILDINGS = listOf("Small House", "Modern House", "Farm", "Watch Tower", "Metro Station", "Swimming Pool", "Mansion", "Airport", "Smart City", "Big City", "Mega City", "Railway Station", "Bullet Train Station")
 
+    /** The only blueprints that can be made and used now; the others stay in the list (item ids) but are hidden. */
+    val ALLOWED_BUILDINGS = listOf("Smart City", "Metro Station", "Bullet Train Station")
+    /** Items no longer offered: the other blueprints and the railway engine (no more normal railways). */
+    val HIDDEN: Set<String> = BUILDINGS.filter { it !in ALLOWED_BUILDINGS }.map { "Blueprint: $it" }.toSet() + "Train Engine"
+    fun hidden(name: String?) = name in HIDDEN
+
     val all: List<ItemDef>
+    /** The items players can get (everything but [HIDDEN]). */
+    val shown: List<ItemDef> by lazy { all.filter { !hidden(it.name) } }
     private val byId = HashMap<Int, ItemDef>()
     private val byName = HashMap<String, Int>()
 

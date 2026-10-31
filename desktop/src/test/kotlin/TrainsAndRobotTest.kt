@@ -197,8 +197,8 @@ class TrainsAndRobotTest {
         g.robotCommand(r.uid, "help"); assertTrue(g.toasts().any { it.contains("follow me") })
         g.robotCommand(r.uid, "fly to the moon and bake a cake"); assertTrue(g.toasts().any { it.contains("don't know") || it.contains("Good night") || it.contains("Sorry") })
         g.player.yaw = 0f; g.player.flying = false; g.player.y = g.ground(60, 0) + 1f
-        g.robotCommand(r.uid, "build a house")
-        assertTrue(g.toasts().any { it.contains("Built small house") }, "builds a house")
+        g.robotCommand(r.uid, "build a metro station")
+        assertTrue(g.toasts().any { it.contains("Built metro station") }, "builds a metro station")
     }
 
     @Test fun theRobotOnlyGivesThingsInCreative() {

@@ -49,7 +49,6 @@ class MenuActivity : Activity() {
         }
 
         playButton = add("Play") { if (hasWorld()) showWorlds() else newWorld() }
-        add("Showcase world") { startGame(com.vishucraft.game.engine.SHOWCASE_DIR, 2026L, com.vishucraft.game.engine.SHOWCASE_NAME, false) }
         add("Join online game") { joinOnline() }
         add("Join Wi-Fi game") { joinGame() }
         add("Settings") { settingsDialog(this) }
@@ -194,6 +193,7 @@ class MenuActivity : Activity() {
     private class WorldInfo(val dir: File, val level: com.vishucraft.game.world.LevelData)
 
     private fun worlds(): List<WorldInfo> = GameActivity.worldsRoot(this).listFiles().orEmpty()
+        .filter { it.name != com.vishucraft.game.engine.SHOWCASE_DIR }
         .mapNotNull { d -> com.vishucraft.game.world.LevelData.read(d)?.let { WorldInfo(d, it) } }
         .sortedByDescending { File(it.dir, "level.dat").lastModified() }
 
@@ -343,6 +343,10 @@ class MenuActivity : Activity() {
     }
 
     private fun newWorld() {
+        if (worlds().size >= com.vishucraft.game.engine.MAX_WORLDS) {
+            AlertDialog.Builder(this).setTitle("5 worlds only").setMessage(com.vishucraft.game.engine.MAX_WORLDS_MESSAGE).setPositiveButton("OK", null).show()
+            return
+        }
         val col = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dpi(20f), dpi(8f), dpi(20f), 0)

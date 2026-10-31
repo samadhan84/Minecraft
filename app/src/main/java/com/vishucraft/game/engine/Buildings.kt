@@ -109,7 +109,10 @@ private fun Game.buildReady(p: Plan, name: String): Boolean {
 }
 
 /** The name of the building on a blueprint item. */
-internal fun blueprintOf(itemName: String?) = itemName?.removePrefix("Blueprint: ")?.takeIf { it in Items.BUILDINGS }
+/** Cities no longer get a railway station behind them (normal railways are gone). */
+private const val CITY_RAILWAY = false
+
+internal fun blueprintOf(itemName: String?) = itemName?.removePrefix("Blueprint: ")?.takeIf { it in Items.ALLOWED_BUILDINGS }
 
 private fun Game.smallHouse(p: Plan) {
     p.site(-3, 3, 1, 7, 8, Blocks.COBBLESTONE)
@@ -910,7 +913,8 @@ private fun Game.city(p: Plan, n: Int, title: String, metroName: String, railNam
         carts.list.add(metro)
         carts.list.add(Cart(p.x(sa + 2 * dir, d) + 0.5f, (p.oy + 11).toFloat(), p.z(sa + 2 * dir, d) + 0.5f, Cart.COACH).also { it.leader = metro; it.hx = metro.hx; it.hz = metro.hz; it.yaw = metro.yaw })
     }
-    // ---- The railway station behind the city, with a train.
+    // ---- The railway station behind the city, with a train (no more normal railways: off).
+    if (CITY_RAILWAY) {
     val rb = far + 3                                    // the railway's first row (104 in the smart city)
     for (a in -half - 4..half + 4) {
         for (d in rb..rb + 6) p.set(a, d, -1, Blocks.RAILWAY_BALLAST)
@@ -940,6 +944,8 @@ private fun Game.city(p: Plan, n: Int, title: String, metroName: String, railNam
     for (k in 1..3) {
         val c = Cart(p.x(4 - 3 * k, rb + 3) + 0.5f, p.oy.toFloat(), p.z(4 - 3 * k, rb + 3) + 0.5f, Cart.COACH).also { it.leader = lead; it.hx = engine.hx; it.hz = engine.hz; it.yaw = engine.yaw }
         carts.list.add(c); lead = c
+    }
+
     }
 
     // ---- Traffic: cars and buses in the left lanes, plus parked ones.

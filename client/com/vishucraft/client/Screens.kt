@@ -178,7 +178,7 @@ class Hud(private val game: Game) {
 class CreativeScreen(private val game: Game) {
     private val tabs: List<Pair<String, List<Int>>> =
         Category.values().map { it.title to Blocks.inCategory(it) } +
-            ("Items" to Items.all.filter { com.vishucraft.game.engine.Cracker.of(it.name) == null }.map { it.id }) +
+            ("Items" to Items.shown.filter { com.vishucraft.game.engine.Cracker.of(it.name) == null }.map { it.id }) +
             (if (com.vishucraft.game.engine.diwaliTime()) listOf("Diwali" to com.vishucraft.game.engine.Cracker.values().map { Items.find(it.itemName) }) else emptyList())
     var tab = 0
     private var scroll = 0f
