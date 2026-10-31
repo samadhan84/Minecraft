@@ -631,9 +631,27 @@ class Mobs(private val world: World) {
         if (m.type == MobType.GLIDER && game.daylight > 0.7f) m.deathTime = 0.9f // fades away at sunrise
     }
 
-    /** Golems: the iron golem punches monsters, the snow golem throws snowballs at them. */
+    /**
+     * Golems: the iron golem punches monsters, the snow golem throws snowballs at them. A village's iron golem
+     * that you hit (or whose villagers you hit) comes after you instead, until you get far enough away.
+     */
     private fun golem(m: Mob, dt: Float, game: Game): Pair<Float, Float> {
         val iron = m.type == MobType.IRON_GOLEM
+        if (iron && m.angry && !m.tamed) {
+            val p = game.player
+            val dx = p.x - m.x; val dz = p.z - m.z
+            val d = sqrt(dx * dx + dz * dz).coerceAtLeast(0.01f)
+            if (!game.playerAlive || d > 40f) { m.angry = false; return 0f to 0f }
+            m.yaw = atan2(dx, -dz)
+            m.attackCooldown -= dt
+            if (d < 2f + m.halfWidth && abs(p.y - m.y) < 2.5f && m.attackCooldown <= 0f) {
+                m.attackCooldown = 1.5f
+                game.hurtPlayer(7f, m.x, m.z)
+                p.vy = maxOf(p.vy, 8f)   // the golem's punch throws you up in the air
+                game.sound("hit_stone", p.x, p.y + 1f, p.z)
+            }
+            return if (d > 1.5f) (dx / d) to (dz / d) else 0f to 0f
+        }
         val range = if (iron) 16f else 12f
         val prey = list.filter { it.type.hostile && !it.dead && !it.tamed && it.type != MobType.WARDEN }
             .minByOrNull { (it.x - m.x) * (it.x - m.x) + (it.z - m.z) * (it.z - m.z) }

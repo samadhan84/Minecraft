@@ -886,7 +886,12 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
         if (item?.name == "Mace" && player.vy < -6f) dmg += (-player.vy - 6f) * 1.5f
         val len = sqrt(dir[0] * dir[0] + dir[2] * dir[2]).coerceAtLeast(0.01f)
         if (isClient) net?.attack(mobHit.mob.uid, dmg, dir[0] / len, dir[2] / len)
-        else mobs.damage(mobHit.mob, dmg, dir[0] / len, dir[2] / len)
+        else {
+            mobs.damage(mobHit.mob, dmg, dir[0] / len, dir[2] / len)
+            // Hurting a villager makes the village's iron golems come after you.
+            if (mobHit.mob.type == MobType.VILLAGER || mobHit.mob.type.isCitizen) for (g in mobs.list)
+                if (g.type == MobType.IRON_GOLEM && !g.tamed && (g.x - mobHit.mob.x) * (g.x - mobHit.mob.x) + (g.z - mobHit.mob.z) * (g.z - mobHit.mob.z) < 32f * 32f) g.angry = true
+        }
         sound("hurt", mobHit.mob.x, mobHit.mob.y + 1f, mobHit.mob.z, 0.6f)
         damageHeld(if (item?.tool == ToolType.SWORD) 1 else 2)
         exhaust(0.1f)

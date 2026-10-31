@@ -134,8 +134,8 @@ class Structures(private val seed: Long, private val gen: TerrainGenerator, priv
 
     fun place(chunk: Chunk) {
         val p = Put(chunk)
-        // Surface structures on a 288-block grid, dungeons on a 64-block grid.
-        val region = 288
+        // Surface structures on a 144-block grid (a village about every 150 blocks), dungeons on a 64-block grid.
+        val region = 144
         for (rz in (p.z0 - 64).floorDiv(region)..(p.z0 + 80).floorDiv(region))
             for (rx in (p.x0 - 64).floorDiv(region)..(p.x0 + 80).floorDiv(region)) {
                 val rnd = Random(seed xor (rx * 341873128712L) xor (rz * 132897987541L) xor 0x5EED)
@@ -145,7 +145,7 @@ class Structures(private val seed: Long, private val gen: TerrainGenerator, priv
                 val h = gen.surfaceHeight(cx, cz)
                 if (h <= TerrainGenerator.SEA_LEVEL + 1 || h > 88) continue
                 when (gen.biomeAt(cx, cz)) {
-                    Biome.PLAINS, Biome.SAVANNA, Biome.FOREST, Biome.SNOW -> village(p, cx, cz, rnd)
+                    Biome.PLAINS, Biome.SAVANNA, Biome.FOREST, Biome.SNOW, Biome.CHERRY, Biome.JUNGLE, Biome.SWAMP -> village(p, cx, cz, rnd)
                     Biome.DESERT -> temple(p, cx, h, cz, rnd)
                     else -> {}
                 }
