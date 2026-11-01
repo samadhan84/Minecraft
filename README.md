@@ -1,4 +1,4 @@
-# DhruvVishu
+# Dhruvil Craft
 
 An open-world voxel sandbox game for Android (building and exploring with blocks), written from scratch in
 Kotlin and OpenGL ES 3.0. It has no third-party game engine and no image assets: every texture is generated

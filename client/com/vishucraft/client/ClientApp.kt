@@ -332,7 +332,7 @@ abstract class ClientApp(protected val demo: File?) {
                     if (ui.button("OK", cx - 100, ui.height * 0.62f, 200f)) limitNotice = false
                     return
                 }
-                ui.text("DhruvVishu", cx, ui.height * 0.16f, 72f, rgba(255, 220, 90), 1)
+                ui.text("Dhruvil Craft", cx, ui.height * 0.16f, 72f, rgba(255, 220, 90), 1)
                 ui.text("Build, explore and survive", cx, ui.height * 0.16f + 84, 20f, rgba(220, 220, 220), 1)
                 var y = ui.height * 0.42f
                 if (ui.button("Play", cx - bw / 2, y, bw, 44f)) menu = Menu.WORLDS
@@ -482,7 +482,7 @@ abstract class ClientApp(protected val demo: File?) {
     protected var internetTitle = "Play over the internet"
 
     protected fun roomText(code: String) = "Room code: ${code.chunked(3).joinToString(" ")}\n\n" +
-        "Friends anywhere (Wi-Fi or mobile data) choose \"Join online game\" on the DhruvVishu title screen and type this code.\n" +
+        "Friends anywhere (Wi-Fi or mobile data) choose \"Join online game\" on the Dhruvil Craft title screen and type this code.\n" +
         "Keep the game open while they play."
 
     protected fun internetScreen() {
@@ -508,7 +508,7 @@ abstract class ClientApp(protected val demo: File?) {
         var y = ui.height * 0.15f + 70
         val text = "You defeated the Sky Warden and freed the Sky Isles!\n\n" +
                 "It dropped an Ember Star, Glider Wings, diamonds and a Totem of Life.\n\n" +
-                "Thank you for playing DhruvVishu.\n\n" +
+                "Thank you for playing Dhruvil Craft.\n\n" +
                 "Made for Dhruv and Vishu.\n" +
                 "Every block, creature, sound and song in this game was made from code.\n\n" +
                 "The world is still yours: keep building, exploring and playing."

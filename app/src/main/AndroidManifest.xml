@@ -20,7 +20,7 @@
         android:banner="@drawable/tv_banner"
         android:isGame="true"
         android:appCategory="game"
-        android:label="DhruvVishu"
+        android:label="Dhruvil Craft"
         android:theme="@android:style/Theme.Black.NoTitleBar.Fullscreen">
 
         <activity

@@ -25,7 +25,7 @@ class MenuActivity : Activity() {
         super.onCreate(savedInstanceState)
 
         val root = FrameLayout(this)
-        // The DhruvVishu castle picture fills the screen; it already shows the game's name.
+        // The Dhruvil Craft title picture fills the screen; it already shows the game's name and logo.
         root.addView(android.widget.ImageView(this).apply {
             setImageResource(resources.getIdentifier("menu_background", "drawable", packageName))
             scaleType = android.widget.ImageView.ScaleType.CENTER_CROP

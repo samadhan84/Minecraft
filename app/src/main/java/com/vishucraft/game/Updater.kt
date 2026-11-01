@@ -96,7 +96,7 @@ object Updater {
                     latest == null -> message = if (manual) "Couldn't check for updates" else null
                     latest <= mine -> message = if (manual) "You have the newest version" else null
                     latest != readyVersion -> {
-                        main.post { toast(a, "Downloading a new version of DhruvVishu…") }
+                        main.post { toast(a, "Downloading a new version of Dhruvil Craft…") }
                         val tmp = File(app.cacheDir, "update.part")
                         open(BASE + "DhruvVishu.apk").inputStream.use { input -> tmp.outputStream().use { input.copyTo(it) } }
                         tmp.renameTo(apkFile(a))
@@ -134,14 +134,14 @@ object Updater {
         // Android needs permission once to install apps that don't come from the Play Store.
         if (Build.VERSION.SDK_INT >= 26 && !a.packageManager.canRequestPackageInstalls()) {
             AlertDialog.Builder(a).setTitle("A new version is ready")
-                .setMessage("To update by itself, DhruvVishu needs permission to install updates. Turn on \"Allow from this source\", then come back.")
+                .setMessage("To update by itself, Dhruvil Craft needs permission to install updates. Turn on \"Allow from this source\", then come back.")
                 .setPositiveButton("Open settings") { _, _ ->
                     asked = false
                     try {
                         a.startActivity(Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:" + a.packageName)))
                     } catch (e: Exception) {
                         AlertDialog.Builder(a).setTitle("Settings not found")
-                            .setMessage("Open Settings → Apps → Special app access → Install unknown apps, and allow DhruvVishu.")
+                            .setMessage("Open Settings → Apps → Special app access → Install unknown apps, and allow Dhruvil Craft.")
                             .setPositiveButton("OK", null).show()
                     }
                 }

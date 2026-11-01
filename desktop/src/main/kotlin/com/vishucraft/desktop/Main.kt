@@ -40,8 +40,8 @@ fun main(args: Array<String>) {
         try { File(Paths.home, "crash.txt").writeText(sw.toString()) } catch (_: Exception) {}
         System.err.println(sw)
         try {
-            javax.swing.JOptionPane.showMessageDialog(null, "DhruvVishu stopped because of an error:\n\n${e}\n\nDetails were saved to ${File(Paths.home, "crash.txt")}",
-                "DhruvVishu", javax.swing.JOptionPane.ERROR_MESSAGE)
+            javax.swing.JOptionPane.showMessageDialog(null, "Dhruvil Craft stopped because of an error:\n\n${e}\n\nDetails were saved to ${File(Paths.home, "crash.txt")}",
+                "Dhruvil Craft", javax.swing.JOptionPane.ERROR_MESSAGE)
         } catch (_: Throwable) {}
         kotlin.system.exitProcess(1)
     }
@@ -108,7 +108,7 @@ class App(demo: File?) : ClientApp(demo) {
         glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 1)
         glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE)
         glfwWindowHint(GLFW_DEPTH_BITS, 24)
-        window = glfwCreateWindow(1280, 720, "DhruvVishu", NULL, NULL)
+        window = glfwCreateWindow(1280, 720, "Dhruvil Craft", NULL, NULL)
         if (window == NULL) error("Could not open a window. Please update your graphics driver (OpenGL 2.1 is needed).")
         glfwMakeContextCurrent(window)
         GL.createCapabilities()

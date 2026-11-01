@@ -235,14 +235,14 @@ class GameActivity : Activity() {
         val pixel = try { android.graphics.Typeface.createFromAsset(assets, "fonts/PressStart2P.ttf") }
             catch (e: Exception) { android.graphics.Typeface.MONOSPACE }
         val nameTag = TextView(this).apply {
-            text = "DhruvVishu"; textSize = 11f
+            text = "Dhruvil Craft"; textSize = 11f
             typeface = pixel
             setTextColor(Color.rgb(255, 255, 110)); setShadowLayer(2f, 2f, 2f, Color.BLACK)
             alpha = 0f
         }
         root.addView(nameTag, lp(-2f, -2f, Gravity.TOP or Gravity.CENTER_HORIZONTAL, t = 8f))
         val bigTitle = TextView(this).apply {
-            text = "DhruvVishu"; textSize = 34f
+            text = "Dhruvil Craft"; textSize = 34f
             typeface = pixel
             setTextColor(Color.rgb(255, 214, 70)); setShadowLayer(0.01f, 6f, 6f, Color.rgb(60, 40, 16))
             gravity = Gravity.CENTER
@@ -400,11 +400,11 @@ class GameActivity : Activity() {
     private fun showRoomCode(code: String) {
         val pretty = code.chunked(3).joinToString(" ")
         android.app.AlertDialog.Builder(this).setTitle("Room code: $pretty")
-            .setMessage("Your game is open online.\n\nFriends anywhere (Wi-Fi or mobile data) tap \"Join online game\" on the DhruvVishu home screen and type:\n\n$pretty\n\nKeep the game open while they play.")
+            .setMessage("Your game is open online.\n\nFriends anywhere (Wi-Fi or mobile data) tap \"Join online game\" on the Dhruvil Craft home screen and type:\n\n$pretty\n\nKeep the game open while they play.")
             .setPositiveButton("OK", null)
             .setNeutralButton("Share code") { _, _ ->
                 startActivity(android.content.Intent.createChooser(android.content.Intent(android.content.Intent.ACTION_SEND).setType("text/plain")
-                    .putExtra(android.content.Intent.EXTRA_TEXT, "Join my DhruvVishu game! Tap \"Join online game\" and type the room code $pretty"), "Share room code"))
+                    .putExtra(android.content.Intent.EXTRA_TEXT, "Join my Dhruvil Craft game! Tap \"Join online game\" and type the room code $pretty"), "Share room code"))
             }.show()
     }
 
@@ -591,7 +591,7 @@ class GameActivity : Activity() {
                 android.app.AlertDialog.Builder(this).setTitle("The End")
                     .setMessage("You defeated the Sky Warden and freed the Sky Isles!\n\n" +
                 "It dropped an Ember Star, Glider Wings, diamonds and a Totem of Life.\n\n" +
-                "Thank you for playing DhruvVishu.\n\n" +
+                "Thank you for playing Dhruvil Craft.\n\n" +
                 "Made for Dhruv and Vishu.\n" +
                 "Every block, creature, sound and song in this game was made from code.\n\n" +
                 "The world is still yours: keep building, exploring and playing.")
@@ -907,7 +907,7 @@ class GameActivity : Activity() {
     fun offerUpdate() {
         if (isFinishing) return
         android.app.AlertDialog.Builder(this).setTitle("A new version is ready")
-            .setMessage("Update DhruvVishu now? Your world is saved first and nothing is lost.")
+            .setMessage("Update Dhruvil Craft now? Your world is saved first and nothing is lost.")
             .setPositiveButton("Update now") { _, _ ->
                 releaseInputs()
                 glView.queueEvent { game.save(); runOnUiThread { Updater.installNow(this) } }

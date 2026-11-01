@@ -1,4 +1,4 @@
-# Publishing DhruvVishu on Google Play
+# Publishing Dhruvil Craft on Google Play
 
 Every push to the game's branch builds two things (GitHub → Actions → **Android build**):
 
@@ -45,7 +45,7 @@ After the first upload, every new version can go to Google Play by itself:
 2. **Invite it in Play Console.**
    - Go to Users and permissions → Invite new users and enter the service account's email
      (…@….iam.gserviceaccount.com).
-   - Under App permissions, add DhruvVishu with **Release apps to testing tracks** and **Release to production**.
+   - Under App permissions, add Dhruvil Craft with **Release apps to testing tracks** and **Release to production**.
 3. **Add the GitHub secret** `PLAY_SERVICE_ACCOUNT_JSON`: paste the whole JSON file.
 4. **Choose where updates go (optional).**
    - Go to Settings → Secrets and variables → Actions → Variables and add `PLAY_TRACK`: `internal`

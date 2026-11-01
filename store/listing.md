@@ -1,13 +1,13 @@
-# Google Play listing – DhruvVishu
+# Google Play listing – Dhruvil Craft
 
-**App name (30 chars max):** DhruvVishu: Build & Explore
+**App name (30 chars max):** Dhruvil Craft: Build & Explore
 
 **Short description (80 chars max):**
 Build, explore, ride roller coasters and metros – alone or with friends.
 
 **Full description:**
 
-Welcome to DhruvVishu – a block world that is all yours!
+Welcome to Dhruvil Craft – a block world that is all yours!
 
 ⛏ MINE & CRAFT – Dig for coal, iron, gold and diamonds. Craft tools, armour, furniture and hundreds of blocks.
 🏰 BUILD ANYTHING – Houses, castles, farms and working Sparkstone machines with buttons, levers, lamps and doors. Flat worlds for building, with oceans.

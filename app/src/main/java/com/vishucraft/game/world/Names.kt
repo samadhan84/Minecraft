@@ -22,7 +22,7 @@ object Names {
         "Ghast" to "Wraith",
         "Blaze" to "Flame",
         "Prismarine" to "Sea Prism",
-        "Minecraft" to "DhruvVishu",
+        "Minecraft" to "Dhruvil Craft",
     ).map { (old, new) -> Regex("\\b" + Regex.escape(old), RegexOption.IGNORE_CASE) to new }
 
     /** Replaces the old names in any text shown to the player (keeps lower case for lower-case words). */

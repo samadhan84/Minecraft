@@ -1,12 +1,12 @@
-# DhruvVishu – Privacy Policy
+# Dhruvil Craft – Privacy Policy
 
 _Last updated: 28 September 2026_
 
-DhruvVishu is a block-building game. This policy explains what the app does with information.
+Dhruvil Craft is a block-building game. This policy explains what the app does with information.
 
 ## What we collect
 
-**Nothing.** DhruvVishu has no accounts, no ads, no analytics and no tracking. The developer does not
+**Nothing.** Dhruvil Craft has no accounts, no ads, no analytics and no tracking. The developer does not
 receive any information about you or your device.
 
 ## What stays on your device
@@ -21,7 +21,7 @@ receive any information about you or your device.
   moves in the world are shared with the other players in that game. Nothing is sent to the internet.
 - **Online play with a room code:** when you choose "Play online (room code)" or "Join online game", your
   player name and your moves in the world travel between the players through a small relay server
-  (run on Cloudflare for DhruvVishu). The relay only passes the data along while you play; it does not
+  (run on Cloudflare for Dhruvil Craft). The relay only passes the data along while you play; it does not
   store it or keep any record of it.
 - **Internet play help:** only when you open the "play over the internet" help screen, the game asks
   `api.ipify.org` for your public IP address so it can show it to you. The game does not store or send
@@ -30,7 +30,7 @@ receive any information about you or your device.
 
 ## Children
 
-DhruvVishu is suitable for all ages. It does not collect personal information from anyone, including
+Dhruvil Craft is suitable for all ages. It does not collect personal information from anyone, including
 children.
 
 ## Changes
