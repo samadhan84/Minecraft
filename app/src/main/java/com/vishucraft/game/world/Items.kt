@@ -73,7 +73,8 @@ object Items {
     /** The only blueprints that can be made and used now; the others stay in the list (item ids) but are hidden. */
     val ALLOWED_BUILDINGS = listOf("Smart City", "Metro Station", "Bullet Train Station")
     /** Items no longer offered: the other blueprints and the railway engine (no more normal railways). */
-    val HIDDEN: Set<String> = BUILDINGS.filter { it !in ALLOWED_BUILDINGS }.map { "Blueprint: $it" }.toSet() + "Train Engine"
+    val HIDDEN: Set<String> = BUILDINGS.filter { it !in ALLOWED_BUILDINGS }.map { "Blueprint: $it" }.toSet() + "Train Engine" +
+        listOf(com.vishucraft.game.engine.MobType.CITIZEN, com.vishucraft.game.engine.MobType.CITIZEN_WOMAN, com.vishucraft.game.engine.MobType.CITIZEN_KID).map { "${it.displayName} Spawn Egg" }
     fun hidden(name: String?) = name in HIDDEN
 
     val all: List<ItemDef>

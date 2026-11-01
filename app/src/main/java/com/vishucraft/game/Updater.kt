@@ -33,6 +33,8 @@ object Updater {
     @Volatile private var readyVersion = 0L
     private var lastCheck = 0L
     private var asked = false
+    /** The update was already offered while a world is open (once per downloaded version). */
+    private var askedInWorld = false
 
     private val tick = object : Runnable {
         override fun run() {
@@ -99,7 +101,7 @@ object Updater {
                         open(BASE + "DhruvVishu.apk").inputStream.use { input -> tmp.outputStream().use { input.copyTo(it) } }
                         tmp.renameTo(apkFile(a))
                         readyVersion = latest
-                        asked = false
+                        asked = false; askedInWorld = false
                     }
                 }
             } catch (e: Exception) {
@@ -111,6 +113,7 @@ object Updater {
                 val here = current ?: a
                 if (readyVersion > installedVersion(here)) {
                     if (here is MenuActivity || manual) offerInstall(here)
+                    else if (here is GameActivity && !askedInWorld) { askedInWorld = true; here.offerUpdate() }
                     else if (!asked) toast(here, "Update downloaded. It installs when you go back to the menu.")
                 }
             }
@@ -120,6 +123,9 @@ object Updater {
     private fun toast(a: Activity, text: String) {
         if (!a.isFinishing) Toast.makeText(a, text, Toast.LENGTH_LONG).show()
     }
+
+    /** Installs the downloaded update now, from inside a world that has just been saved. */
+    fun installNow(a: Activity) { asked = false; offerInstall(a) }
 
     /** Installs the downloaded update (Android shows its Install screen). */
     private fun offerInstall(a: Activity) {

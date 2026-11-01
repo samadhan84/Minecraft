@@ -109,6 +109,9 @@ private fun Game.buildReady(p: Plan, name: String): Boolean {
 }
 
 /** The name of the building on a blueprint item. */
+/** No more people (citizens) in cities, stations and airports. */
+internal const val PEOPLE = false
+
 /** Cities no longer get a railway station behind them (normal railways are gone). */
 private const val CITY_RAILWAY = false
 
@@ -369,6 +372,7 @@ private fun Game.bulletStation(p: Plan) {
 
 /** A few people waiting on a station's platforms (rows [rows]), ready to travel. */
 private fun Game.stationPeople(p: Plan, rows: IntArray, across: IntRange = -6..6) {
+    if (!PEOPLE) return
     val folk = listOf(MobType.CITIZEN, MobType.CITIZEN_WOMAN, MobType.CITIZEN_KID)
     val rnd = java.util.Random(p.ox * 31L + p.oz)
     var placed = 0
@@ -979,7 +983,7 @@ private fun Game.city(p: Plan, n: Int, title: String, metroName: String, railNam
     // ---- People walking on the pavements and in the parks.
     val rnd = java.util.Random(p.ox * 31L + p.oz)
     val folk = listOf(MobType.CITIZEN, MobType.CITIZEN_WOMAN, MobType.CITIZEN_KID)
-    repeat(n * n * 2) {
+    if (PEOPLE) repeat(n * n * 2) {
         val i = rnd.nextInt(n); val j = rnd.nextInt(n)
         val a0 = roads[i] + 3; val d0 = rows[j] + 3
         // On the pavement ring round a city block.

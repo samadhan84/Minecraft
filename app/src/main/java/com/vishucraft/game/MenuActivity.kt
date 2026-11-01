@@ -207,8 +207,34 @@ class MenuActivity : Activity() {
         return true
     }
 
+    /** Asks for the password (see engine/WorldLock), then runs [then]. */
+    private fun askPassword(then: () -> Unit) {
+        val input = EditText(this).apply {
+            hint = "Password"
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
+            setSingleLine()
+        }
+        val pad = dpi(20f)
+        val box = FrameLayout(this).apply { setPadding(pad, dpi(8f), pad, 0); addView(input) }
+        val dialog = AlertDialog.Builder(this).setTitle(com.vishucraft.game.engine.WorldLock.TITLE)
+            .setMessage(com.vishucraft.game.engine.WorldLock.MESSAGE).setView(box)
+            .setPositiveButton("OK", null).setNegativeButton("Cancel", null).create()
+        dialog.setOnShowListener {
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                if (com.vishucraft.game.engine.WorldLock.ok(input.text.toString())) { dialog.dismiss(); then() }
+                else { input.error = com.vishucraft.game.engine.WorldLock.WRONG; input.setText("") }
+            }
+            input.requestFocus()
+        }
+        dialog.show()
+    }
+
     private fun startGame(dirName: String, seed: Long? = null, name: String? = null, survival: Boolean = false, flat: Boolean = true) {
         if (limitOver()) return
+        askPassword { launchGame(dirName, seed, name, survival, flat) }
+    }
+
+    private fun launchGame(dirName: String, seed: Long?, name: String?, survival: Boolean, flat: Boolean) {
         val i = Intent(this, GameActivity::class.java)
         i.putExtra(GameActivity.EXTRA_WORLD, dirName)
         if (seed != null) i.putExtra(GameActivity.EXTRA_SEED, seed)

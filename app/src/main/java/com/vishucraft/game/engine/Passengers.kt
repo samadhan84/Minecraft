@@ -118,6 +118,7 @@ private fun getOffPlane(m: Mob, a: Aircraft) {
 
 /** A new traveller turns up at each station and airport near the player that has only a few people waiting. */
 private fun Game.newTravellers() {
+    if (!PEOPLE) return
     val folk = listOf(MobType.CITIZEN, MobType.CITIZEN_WOMAN, MobType.CITIZEN_KID)
     val near = mobs.list.count { it.type.isCitizen && (it.x - player.x) * (it.x - player.x) + (it.z - player.z) * (it.z - player.z) < 100f * 100f }
     if (near >= 80) return

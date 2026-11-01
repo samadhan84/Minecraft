@@ -79,6 +79,13 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
     /** Roller coasters (see engine/Coaster). */
     val coasters = Coasters()
     private var coastersUpgraded = false
+    private var peopleRemoved = false
+
+    /** Takes away every citizen (the people in cities, at stations and at airports) left in older worlds. */
+    private fun removePeople() {
+        mobs.list.removeAll { it.type.isCitizen }
+        mobs.parked.removeAll { it.type.isCitizen }
+    }
     /** Villages that have their theme park (see engine/ThemePark). */
     internal val villages by lazy { VillageRecord(world.dataDir?.let { java.io.File(it, "villages.txt") }) }
     internal var villageCheck = 0
@@ -511,6 +518,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
         updatePassengers(dt)
         updateRobots(dt)
         fireworks.update(dt, this)
+        if (!peopleRemoved && spawned) { peopleRemoved = true; if (!isClient) removePeople() }
         updateCoasters(dt)
         updateLift(dt)
         if (bowCooldown > 0f) bowCooldown -= dt

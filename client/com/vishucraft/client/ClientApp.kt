@@ -65,7 +65,7 @@ interface NetSupport {
  * platform adds its window, input and sound, and calls [frame] every frame.
  */
 abstract class ClientApp(protected val demo: File?) {
-    protected enum class Menu { TITLE, WORLDS, CREATE, JOIN, SETTINGS, CONTROLS, CONFIRM_DELETE }
+    protected enum class Menu { TITLE, WORLDS, CREATE, JOIN, SETTINGS, CONTROLS, CONFIRM_DELETE, PASSWORD }
     protected enum class Overlay { NONE, PAUSE, CREATIVE, CONTAINER, SETTINGS, CONTROLS, NAME_MOB, TRADE, ACHIEVEMENTS, SIGN, ENDING, INTERNET, FLIGHTS, FLOORS, METRO, CALL_TRAIN, ROBOT }
 
     // ---------------------------------------------------------------- platform parts
@@ -105,6 +105,10 @@ abstract class ClientApp(protected val demo: File?) {
 
     // Create-world form
     protected val nameField = Ui.Field("", "World name")
+    private val passwordField = Ui.Field("", "Password", 32, secret = true)
+    private var afterPassword: (() -> Unit)? = null
+    private var passwordBack = Menu.WORLDS
+    private var wrongPassword = false
     protected val seedField = Ui.Field("", "Seed (leave empty for random)")
     protected var survival = true
     /** A new creative world on a flat world (false: normal land with hills, trees and water). */
@@ -346,6 +350,7 @@ abstract class ClientApp(protected val demo: File?) {
                 ui.text(version, ui.width - ui.textWidth(version, 16f) - 14, 12f, 16f, rgba(230, 230, 230))
             }
             Menu.WORLDS -> worldsScreen()
+            Menu.PASSWORD -> passwordScreen()
             Menu.CREATE -> createScreen()
             Menu.JOIN -> joinScreen()
             Menu.SETTINGS -> settingsScreen { menu = Menu.TITLE }
@@ -375,6 +380,32 @@ abstract class ClientApp(protected val demo: File?) {
 
     protected var worldScroll = 0f
 
+    /** Asks for the password (see engine/WorldLock), then runs [then] (straight away in the demo run). */
+    protected fun needPassword(back: Menu, then: () -> Unit) {
+        if (demo != null) { then(); return }
+        afterPassword = then; passwordBack = back; wrongPassword = false
+        passwordField.text = ""; ui.focus = passwordField
+        menu = Menu.PASSWORD
+    }
+
+    private fun passwordScreen() {
+        val cx = ui.width / 2
+        title(com.vishucraft.game.engine.WorldLock.TITLE)
+        val w = 360f
+        ui.text(com.vishucraft.game.engine.WorldLock.MESSAGE, cx, ui.height * 0.34f, 20f, rgba(220, 220, 220), 1)
+        ui.field(passwordField, cx - w / 2, ui.height * 0.42f, w)
+        if (wrongPassword) ui.text(com.vishucraft.game.engine.WorldLock.WRONG, cx, ui.height * 0.42f + 56, 18f, rgba(255, 120, 120), 1)
+        val y = ui.height * 0.42f + 90
+        if (ui.button("OK", cx - w / 2, y, w / 2 - 5, 44f) || ui.takeSubmit()) {
+            if (com.vishucraft.game.engine.WorldLock.ok(passwordField.text)) {
+                val go = afterPassword; afterPassword = null; ui.focus = null; passwordField.text = ""
+                menu = passwordBack
+                go?.invoke()
+            } else { wrongPassword = true; passwordField.text = ""; ui.focus = passwordField }
+        }
+        if (ui.button("Cancel", cx + 5, y, w / 2 - 5, 44f)) { afterPassword = null; ui.focus = null; passwordField.text = ""; menu = passwordBack }
+    }
+
     protected fun worldsScreen() {
         val cx = ui.width / 2
         title("Select world")
@@ -390,7 +421,7 @@ abstract class ClientApp(protected val demo: File?) {
             val mode = if (wi.level.mode == GameMode.SURVIVAL) "Survival" else "Creative"
             if (ui.button("${wi.level.name}  ·  $mode", cx - w / 2, y, w - 110, 42f)) {
                 message = null
-                startSession(GameSession(wi.dir, wi.level))
+                needPassword(Menu.WORLDS) { startSession(GameSession(wi.dir, wi.level)) }
                 return
             }
             if (ui.button("Delete", cx + w / 2 - 100, y, 100f, 42f)) { deleteTarget = wi.dir; menu = Menu.CONFIRM_DELETE }
@@ -429,8 +460,8 @@ abstract class ClientApp(protected val demo: File?) {
             while (File(worldsDir, "world$n").exists()) n++
             val name = nameField.text.trim().ifEmpty { "World $n" }
             ui.focus = null
-            startSession(GameSession.create(File(worldsDir, "world$n"), name, seed, survival, flatWorld))
-            menu = Menu.WORLDS
+            val dir = File(worldsDir, "world$n"); val sv = survival; val fl = flatWorld
+            needPassword(Menu.WORLDS) { startSession(GameSession.create(dir, name, seed, sv, fl)); menu = Menu.WORLDS }
             return
         }
         if (ui.button("Cancel", cx + 5, y, w / 2 - 5, 44f)) { ui.focus = null; menu = Menu.WORLDS }

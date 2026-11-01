@@ -70,3 +70,15 @@ class CreativeBreakTest {
         assertEquals(Blocks.OBSIDIAN, g.world.getBlock(2, by, 0))
     }
 }
+
+/** The password asked for before a world opens. */
+class WorldLockTest {
+    @Test fun onlyThePasswordWorks() {
+        assertTrue(WorldLock.ok("dhruvil@123"))
+        assertTrue(WorldLock.ok("  dhruvil@123 "))
+        assertFalse(WorldLock.ok("Dhruvil@123"))
+        assertFalse(WorldLock.ok(""))
+        assertFalse(WorldLock.ok(null))
+        assertTrue(Items.shown.none { it.name.endsWith("Spawn Egg") && (it.name.startsWith("Man") || it.name.startsWith("Woman") || it.name.startsWith("Child")) })
+    }
+}

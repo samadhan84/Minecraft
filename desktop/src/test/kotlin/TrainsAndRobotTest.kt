@@ -137,7 +137,7 @@ class TrainsAndRobotTest {
         assertEquals(MetroNetwork.VERSION, g.metroNet.version)
     }
 
-    @Test fun moreTravellersArrive() {
+    @Test fun noPeopleAtStationsAnyMore() {
         val g = game()
         assertTrue(g.build(0, 0, 0f, "Metro Station"))
         g.carts.list.clear()
@@ -146,8 +146,13 @@ class TrainsAndRobotTest {
         g.player.x = s[0] + 0.5f; g.player.z = s[2] + 12f; g.player.flying = true
         repeat(60 * 70) { g.update(1 / 60f); g.dirtyChunks.clear() }
         val people = g.mobs.list.count { it.type.isCitizen && kotlin.math.abs(it.x - s[0]) < 16f && kotlin.math.abs(it.z - s[2]) < 16f }
-        println("$people people turned up at the station")
-        assertTrue(people in 3..8)
+        assertEquals(0, people, "no people turn up")
+        // People from older worlds are taken away when the world opens.
+        g.mobs.list.add(Mob(MobType.CITIZEN, s[0] + 1f, s[1].toFloat(), s[2] + 1f))
+        val h = game()
+        h.mobs.list.add(Mob(MobType.CITIZEN_KID, 3f, 70f, 3f))
+        repeat(5) { h.update(1 / 60f) }
+        assertTrue(h.mobs.list.none { it.type.isCitizen })
     }
 
     private fun Game.robot(): Mob {

@@ -903,6 +903,18 @@ class GameActivity : Activity() {
             or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN)
     }
 
+    /** A new version finished downloading while you play: offers to save the world and update right now. */
+    fun offerUpdate() {
+        if (isFinishing) return
+        android.app.AlertDialog.Builder(this).setTitle("A new version is ready")
+            .setMessage("Update DhruvVishu now? Your world is saved first and nothing is lost.")
+            .setPositiveButton("Update now") { _, _ ->
+                releaseInputs()
+                glView.queueEvent { game.save(); runOnUiThread { Updater.installNow(this) } }
+            }
+            .setNegativeButton("Later", null).show()
+    }
+
     /** Counts today's play time once a second; closes the world when the daily 40 minutes are used up. */
     private val limitLoop = object : Runnable {
         override fun run() {
