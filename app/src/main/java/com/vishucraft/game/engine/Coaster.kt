@@ -44,6 +44,7 @@ class CoasterTrack(val ox: Float, val oy: Float, val oz: Float, val fx: Int, val
     var s = STOP; var speed = 0f; var running = false; var arriving = false; var wait = 3f
     internal var clack = 0f
     internal var screamed = false
+    internal var loopScreamed = false
 
     init {
         val pts = layout()
@@ -262,7 +263,7 @@ internal fun Game.updateCoasters(dt: Float) {
         val rider = coasters.riding === c
         if (!c.running) {
             c.speed = 0f
-            if (rider) { c.wait -= dt; if (c.wait <= 0f) { c.running = true; c.speed = 4f; c.screamed = false; sound("click", c.px[0], c.py[0], c.pz[0]) } }
+            if (rider) { c.wait -= dt; if (c.wait <= 0f) { c.running = true; c.speed = 4f; c.screamed = false; c.loopScreamed = false; sound("click", c.px[0], c.py[0], c.pz[0]) } }
             else c.wait = 3f
         } else {
             val i = c.index(c.s)
@@ -274,7 +275,17 @@ internal fun Game.updateCoasters(dt: Float) {
             } else {
                 c.speed += (-CoasterTrack.G * c.f[i][1] - 0.3f - 0.002f * c.speed * c.speed) * dt
                 c.speed = max(c.speed, 4f)
-                if (rider && !c.screamed && c.f[i][1] < -0.8f) { c.screamed = true; uiEvents.add("toast:AAAAAAAHHHH!!!") }
+                // Everyone screams going down the big drop and upside down in the loop.
+                if (!c.screamed && c.f[i][1] < -0.8f) {
+                    c.screamed = true
+                    sound("scream", c.px[i], c.py[i], c.pz[i], 1f)
+                    if (rider) uiEvents.add("toast:AAAAAAAHHHH!!!")
+                }
+                if (!c.loopScreamed && c.u[i][1] < -0.3f) {
+                    c.loopScreamed = true
+                    sound("scream", c.px[i], c.py[i], c.pz[i], 1f)
+                    if (rider) uiEvents.add("toast:AAAAAHHH!!! UPSIDE DOWN!!!")
+                }
             }
             if (c.arriving) {
                 // Braking into the station.

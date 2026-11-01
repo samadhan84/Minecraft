@@ -34,6 +34,8 @@ class CoasterTest {
         repeat(100) { g.updateCoasters(0.05f) }
         assertFalse(c.running)
         g.coasters.riding = c
+        val sounds = ArrayList<String>()
+        g.soundSink = { name, _, _, _, _ -> sounds.add(name) }
         var fastest = 0f; var top = 0f; var upsideDown = false; var lapped = false
         for (step in 0 until 20 * 200) {
             g.updateCoasters(0.05f)
@@ -46,6 +48,7 @@ class CoasterTest {
             if (step > 200 && !c.running) { lapped = true; break }
         }
         assertTrue(lapped, "came back to the station")
+        assertEquals(2, sounds.count { it == "scream" }, "a scream on the drop and one in the loop")
         assertTrue(fastest > 25f, "fast: $fastest")
         assertTrue(upsideDown, "went through the loop")
         assertTrue(top > y + 28f, "went up the lift hill")

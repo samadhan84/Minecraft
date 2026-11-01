@@ -143,6 +143,15 @@ object Synth {
         make("tv", 0.8f) { for ((k, f) in listOf(523f, 659f, 784f, 1047f).withIndex()) tone(it, k * 3500, 5000, { f }, 0.35f, 0.25f, 0.003f, floatArrayOf(1f, 0.4f)) }
         make("train_horn", 1.8f) { tone(it, 0, it.size, { 311f }, 0.35f, 2.5f, 0.05f, floatArrayOf(1f, 0.7f, 0.5f)); tone(it, 0, it.size, { 370f }, 0.35f, 2.5f, 0.05f, floatArrayOf(1f, 0.7f, 0.5f)) }
         make("metro_chime", 1.6f) { for ((k, f) in listOf(784f, 659f, 523f).withIndex()) tone(it, k * 7000, 12000, { f }, 0.4f, 0.5f, 0.003f, floatArrayOf(1f, 0.35f, 0.1f)) }
+        // Riders screaming on the roller coaster: several voices sliding up and wailing, with breathy noise.
+        make("scream", 2.4f) {
+            for ((k, base) in listOf(980f, 1180f, 1420f, 860f).withIndex()) {
+                val vib = 5.5f + k * 0.9f
+                tone(it, k * 700, it.size - k * 700, { t -> base * (1f + 0.35f * minOf(1f, t * 3f) - 0.25f * maxOf(0f, t - 1.4f)) + 40f * sin(t * vib * 6.283f) },
+                    0.28f, 1.6f, 0.06f, floatArrayOf(1f, 0.55f, 0.35f, 0.2f, 0.12f))
+            }
+            noiseBurst(it, 0, it.size, 0.25f, 1.4f, 0.6f)
+        }
         make("rails", 0.35f) { for (k in 0..1) noiseBurst(it, k * 5000, 2500, 0.6f, 0.03f, 0.35f) }
 
         // Loops.

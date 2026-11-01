@@ -620,10 +620,13 @@ class Carts(private val world: World) {
         if (rise != null && !(c.isTrain && power(c) != null)) {
             val uphill = rise[0] * c.hx + rise[1] * c.hz
             c.speed -= uphill * (if (c.kind == Cart.COASTER) CoasterRide.PULL else 9f) * dt
+            // A coaster cart racing downhill with someone in it: they scream.
+            if (c.kind == Cart.COASTER && riding === c && uphill < 0f && c.speed > 9f && c.stopTimer <= 0f) { game.sound("scream", c.x, c.y, c.z, 1f); c.stopTimer = 4f }
             if (c.speed < 0f) { c.hx = -c.hx; c.hz = -c.hz; c.speed = -c.speed }
         }
         checkStation(c, bx, by, bz, game)
         if (c.kind == Cart.COASTER) {
+            if (c.stopTimer > 0f) c.stopTimer -= dt   // (the coaster cart uses it to space out the screams)
             if (rail == Blocks.POWERED_RAIL || rail == Blocks.STOP_RAIL) {
                 // The station: off it goes with a rider; an empty car stops and waits.
                 if (riding === c) c.speed = maxOf(c.speed, CoasterRide.LAUNCH)
