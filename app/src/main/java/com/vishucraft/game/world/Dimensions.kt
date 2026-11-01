@@ -109,6 +109,21 @@ class SkyGenerator(private val seed: Long) : WorldGenerator {
     }
 }
 
+/** Where villages are: the village plaza (x, y, z) in region (rx, rz) of the 144-block grid, or null if none. */
+fun villageIn(seed: Long, generator: WorldGenerator, rx: Int, rz: Int): IntArray? {
+    val gen = generator as? TerrainGenerator ?: return null   // flat worlds have no villages
+    val region = 144
+    val rnd = Random(seed xor (rx * 341873128712L) xor (rz * 132897987541L) xor 0x5EED)
+    val cx = rx * region + 48 + rnd.nextInt(region - 96)
+    val cz = rz * region + 48 + rnd.nextInt(region - 96)
+    val h = gen.surfaceHeight(cx, cz)
+    if (h <= TerrainGenerator.SEA_LEVEL + 1 || h > 88) return null
+    return when (gen.biomeAt(cx, cz)) {
+        Biome.PLAINS, Biome.SAVANNA, Biome.FOREST, Biome.SNOW, Biome.CHERRY, Biome.JUNGLE, Biome.SWAMP -> intArrayOf(cx, h, cz)
+        else -> null
+    }
+}
+
 /** Villages, desert temples and dungeons, generated chunk by chunk from a deterministic layout. */
 class Structures(private val seed: Long, private val gen: TerrainGenerator, private val world: World) {
     private class Put(val chunk: Chunk) {

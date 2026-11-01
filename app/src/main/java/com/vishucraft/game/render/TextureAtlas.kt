@@ -2016,6 +2016,11 @@ object TextureAtlas {
             "coaster_rail", "coaster_car" -> { t.fill { _, y -> scale(rgb(210, 30, 40), if (y < 5) 1.25f else 1f) }; return true }
             "coaster_spine" -> { t.fill { _, y -> scale(rgb(90, 94, 104), if (y < 5) 1.2f else 1f) }; return true }
             "coaster_support" -> { t.fill { x, _ -> scale(rgb(236, 238, 242), if (x < 5) 1.03f else 0.95f) }; return true }
+            "coaster_cart_item" -> {
+                mask(t, arrayOf("..b....b......", "..b....b......", ".dmmmmmmmmmmd.", "dmmmmmmmmmmmma", "dmmmmmmmmmmmma", ".ddddddddddd..", "..dd.....dd..."),
+                    rgb(215, 35, 45), rgb(250, 210, 60), rgb(40, 40, 40))
+                return true
+            }
             "roller_coaster_item" -> {
                 mask(t, arrayOf("......aa......", ".....abba.....", "....dd..dd....", "...d.m..m.d...", "..d..m..m..d..", ".d...m..m...d.", "d....m..m....d", "m....m..m....m", "m....m..m....m"),
                     rgb(220, 50, 50), rgb(250, 210, 60), rgb(60, 120, 230))
@@ -2039,6 +2044,26 @@ object TextureAtlas {
                 sprite(t)
                 for (y in 0 until 16) if (y % 3 == 1) for (x in 1..14) t[x, y] = rgb(150, 152, 158)
                 for (y in 0 until 16) { t[3, y] = rgb(60, 150, 240); t[12, y] = rgb(60, 150, 240); t[4, y] = rgb(30, 100, 200); t[11, y] = rgb(30, 100, 200) }
+                return true
+            }
+            // Roller coaster track: dark steel ties with two bright red tube rails (straight and curved).
+            "coaster_track" -> {
+                sprite(t)
+                for (y in 0 until 16) if (y % 4 == 1) for (x in 2..13) t[x, y] = rgb(70, 72, 80)
+                for (x in 6..9) for (y in 0 until 16) t[x, y] = rgb(90, 94, 104)
+                for (y in 0 until 16) { t[2, y] = rgb(240, 60, 60); t[3, y] = rgb(200, 30, 40); t[12, y] = rgb(240, 60, 60); t[13, y] = rgb(200, 30, 40) }
+                return true
+            }
+            "coaster_track_curve" -> {
+                sprite(t)
+                val railC = rgb(225, 40, 50)
+                for (a in 0..40) {
+                    val ang = a / 40.0 * Math.PI / 2
+                    for ((r, c) in listOf(3.0 to railC, 3.8 to railC, 12.5 to railC, 13.3 to railC, 8.0 to rgb(90, 94, 104))) {
+                        val x = (16 - r * Math.cos(ang)).toInt(); val y = (16 - r * Math.sin(ang)).toInt()
+                        if (x in 0..15 && y in 0..15) t[x, y] = c
+                    }
+                }
                 return true
             }
             "bullet_rail_curve" -> {

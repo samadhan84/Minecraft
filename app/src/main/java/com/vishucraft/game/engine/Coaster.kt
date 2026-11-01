@@ -367,10 +367,12 @@ internal fun Game.upgradeOldCoasters() {
     for (car in old) {
         val bx = floorInt(car.x); val bz = floorInt(car.z)
         world.ensureLoaded(bx shr 4, bz shr 4)
-        val station = findOldStation(bx, floorInt(car.y + 0.1f), bz)
+        val by = floorInt(car.y + 0.1f)
+        // Coaster carts on the new coaster track are the player's own: leave them be.
+        if ((-1..0).any { world.getBlock(bx, by + it, bz).let { b -> b == Blocks.COASTER_RAIL || b == Blocks.STOP_RAIL } }) continue
+        val (o, h) = findOldStation(bx, by, bz) ?: continue
         carts.list.remove(car)
         if (carts.riding === car) carts.riding = null
-        val (o, h) = station ?: continue
         removeOldCoaster(o[0], o[1], o[2], h[0], h[1])
         buildCoaster(o[0] + 0.5f, o[1].toFloat(), o[2] + 0.5f, h[0], h[1])
         done++

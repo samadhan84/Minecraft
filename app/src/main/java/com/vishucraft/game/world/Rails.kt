@@ -2,7 +2,7 @@ package com.vishucraft.game.world
 
 /** Rail shapes: 0 N-S, 1 E-W, 2..5 ascending towards +X, -X, -Z, +Z, 6..9 curves SE, SW, NW, NE. */
 object Rails {
-    fun isRail(id: Int) = id == Blocks.RAIL || id == Blocks.POWERED_RAIL || id == Blocks.STOP_RAIL || id == Blocks.BULLET_RAIL
+    fun isRail(id: Int) = id == Blocks.RAIL || id == Blocks.POWERED_RAIL || id == Blocks.STOP_RAIL || id == Blocks.BULLET_RAIL || id == Blocks.COASTER_RAIL
 
     /**
      * Bullet train track and ordinary track never join up: a bullet rail only links to bullet rails (and stop
@@ -11,8 +11,9 @@ object Rails {
     fun joins(id: Int, neighbour: Int): Boolean = when {
         !isRail(neighbour) -> false
         id == Blocks.BULLET_RAIL -> neighbour == Blocks.BULLET_RAIL || neighbour == Blocks.STOP_RAIL
+        id == Blocks.COASTER_RAIL -> neighbour == Blocks.COASTER_RAIL || neighbour == Blocks.STOP_RAIL
         id == Blocks.STOP_RAIL -> true
-        else -> neighbour != Blocks.BULLET_RAIL
+        else -> neighbour != Blocks.BULLET_RAIL && neighbour != Blocks.COASTER_RAIL
     }
 
     /**

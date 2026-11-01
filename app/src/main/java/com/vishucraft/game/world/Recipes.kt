@@ -398,6 +398,8 @@ object Recipes {
             com.vishucraft.game.engine.Cracker.PENCIL, com.vishucraft.game.engine.Cracker.SNAKE))
             r(i(k.itemName), 4, false, paper to 1, gp to 1, i(if (k == com.vishucraft.game.engine.Cracker.SNAKE) "Coal" else "Glowstone Dust") to 1)
         r(i("Phuljhadi"), 4, false, iron to 1, gp to 1, stick to 1)
+        r(Blocks.COASTER_RAIL, 16, true, iron to 6, stick to 1, Blocks.REDSTONE_DUST to 1)
+        r(i("Coaster Cart"), 1, true, i("Minecart") to 1, Blocks.CONCRETE_FIRST + 14 to 2, iron to 2)
         r(i("Roller Coaster"), 1, true, Blocks.RAIL to 64, Blocks.POWERED_RAIL to 3, i("Minecart") to 1, iron to 16)
         r(i("Robot Spawn Egg"), 1, true, iron to 8, Blocks.REDSTONE_DUST to 4, Blocks.GLASS to 1)
         r(i("Blueprint: Railway Station"), 1, true, paper to 1, iron to 16, Blocks.BRICKS to 24, Blocks.GRAVEL to 16)

@@ -759,7 +759,23 @@ class App(demo: File?) : ClientApp(demo) {
                 g.player.yaw = kotlin.math.atan2(-9f, 9f); g.player.pitch = -0.3f
             }
             f == 2110 -> shot("19-futuristic-village")
-            f == 2112 -> glfwSetWindowShouldClose(window, true)
+            f == 2112 -> session?.game?.let { g ->
+                // Roller coaster track laid by hand (like rails), with a coaster cart on it.
+                val x0 = kotlin.math.floor(g.player.x).toInt() + 4; val z0 = kotlin.math.floor(g.player.z).toInt()
+                val y = g.world.generator.surfaceHeight(x0, z0) + 1
+                for (x in x0 - 2..x0 + 12) for (z in z0 - 3..z0 + 3) for (h in 0..6) g.setBlock(x, y + h, z, com.vishucraft.game.world.Blocks.AIR)
+                for (x in x0 - 2..x0 + 12) for (z in z0 - 3..z0 + 3) g.setBlock(x, y - 1, z, com.vishucraft.game.world.Blocks.SMOOTH_STONE)
+                g.setBlock(x0, y, z0, com.vishucraft.game.world.Blocks.STOP_RAIL, 1)
+                for (x in x0 + 1..x0 + 3) g.setBlock(x, y, z0, com.vishucraft.game.world.Blocks.COASTER_RAIL, 1)
+                for (k in 0..2) { g.setBlock(x0 + 4 + k, y + k, z0, com.vishucraft.game.world.Blocks.COASTER_RAIL, 2); g.setBlock(x0 + 4 + k, y + k - 1, z0, com.vishucraft.game.world.Blocks.IRON_BARS) }
+                for (x in x0 + 7..x0 + 9) { g.setBlock(x, y + 3, z0, com.vishucraft.game.world.Blocks.COASTER_RAIL, if (x == x0 + 9) 6 else 1); g.setBlock(x, y + 2, z0, com.vishucraft.game.world.Blocks.IRON_BARS) }
+                g.setBlock(x0 + 9, y + 3, z0 + 1, com.vishucraft.game.world.Blocks.COASTER_RAIL, 0); g.setBlock(x0 + 9, y + 2, z0 + 1, com.vishucraft.game.world.Blocks.IRON_BARS)
+                g.carts.list.add(com.vishucraft.game.engine.Cart(x0 + 1.5f, y.toFloat(), z0 + 0.5f, com.vishucraft.game.engine.Cart.COASTER).also { it.hx = 1f; it.hz = 0f })
+                g.player.x = x0 + 2.5f; g.player.y = y + 3.5f; g.player.z = z0 - 5f; g.player.flying = true
+                g.player.yaw = kotlin.math.atan2(2.5f, -5f); g.player.pitch = -0.45f
+            }
+            f == 2150 -> shot("20-coaster-track")
+            f == 2152 -> glfwSetWindowShouldClose(window, true)
         }
     }
 }

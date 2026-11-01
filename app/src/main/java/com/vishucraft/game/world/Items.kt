@@ -358,6 +358,8 @@ object Items {
         for (k in com.vishucraft.game.engine.Cracker.values()) add(k.itemName, k.icon)
         // Sets up a whole roller coaster ride (see engine/Coaster).
         add("Roller Coaster", "roller_coaster_item", maxStack = 1)
+        // A roller coaster car for your own coaster track (see engine/Projectiles, Cart.COASTER).
+        add("Coaster Cart", "coaster_cart_item", use = ItemUse.CART, maxStack = 1)
 
         all = list
         for (i in all) { byId[i.id] = i; byName[i.name] = i.id }

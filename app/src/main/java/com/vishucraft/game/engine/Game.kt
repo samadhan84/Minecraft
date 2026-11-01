@@ -79,6 +79,9 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
     /** Roller coasters (see engine/Coaster). */
     val coasters = Coasters()
     private var coastersUpgraded = false
+    /** Villages that have their theme park (see engine/ThemePark). */
+    internal val villages by lazy { VillageRecord(world.dataDir?.let { java.io.File(it, "villages.txt") }) }
+    internal var villageCheck = 0
     private var cityCheck = 1f
     internal val travel = Travel()
     internal val robots = HashMap<Int, RobotBrain>()

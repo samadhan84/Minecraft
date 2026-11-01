@@ -134,8 +134,8 @@ class Cart(var x: Float, var y: Float, var z: Float, var kind: Int = MINECART) {
         /** A roller coaster car (see engine/Coaster). */
         const val COASTER = 5
 
-        fun itemName(kind: Int) = when (kind) { ENGINE -> "Train Engine"; METRO -> "Metro Train"; COACH -> "Train Coach"; BULLET -> "Bullet Train"; else -> "Minecart" }
-        fun kindOf(itemName: String?) = when (itemName) { "Train Engine" -> ENGINE; "Metro Train" -> METRO; "Train Coach" -> COACH; "Bullet Train" -> BULLET; else -> MINECART }
+        fun itemName(kind: Int) = when (kind) { ENGINE -> "Train Engine"; METRO -> "Metro Train"; COACH -> "Train Coach"; BULLET -> "Bullet Train"; COASTER -> "Coaster Cart"; else -> "Minecart" }
+        fun kindOf(itemName: String?) = when (itemName) { "Train Engine" -> ENGINE; "Metro Train" -> METRO; "Train Coach" -> COACH; "Bullet Train" -> BULLET; "Coaster Cart" -> COASTER; else -> MINECART }
     }
 }
 
@@ -319,10 +319,13 @@ class Carts(private val world: World) {
      * it (minecarts on anything). Set before each cart is moved.
      */
     private var family = 0
-    private fun familyOf(c: Cart) = when (power(c)?.kind) { null -> 0; Cart.BULLET -> 2; else -> 1 }
+    private fun familyOf(c: Cart) = if (c.kind == Cart.COASTER) 3 else when (power(c)?.kind) { null -> 0; Cart.BULLET -> 2; else -> 1 }
     private fun railAt(x: Int, y: Int, z: Int): Int = world.getBlock(x, y, z).let {
         when {
             !com.vishucraft.game.world.Rails.isRail(it) -> 0
+            // Coaster carts keep to coaster track (and the old coasters' rails); nothing else runs on coaster track.
+            family == 3 -> if (it == Blocks.BULLET_RAIL) 0 else it
+            it == Blocks.COASTER_RAIL -> 0
             family == 1 && it == Blocks.BULLET_RAIL -> 0
             family == 2 && (it == Blocks.RAIL || it == Blocks.POWERED_RAIL) -> 0
             else -> it
@@ -621,11 +624,13 @@ class Carts(private val world: World) {
         }
         checkStation(c, bx, by, bz, game)
         if (c.kind == Cart.COASTER) {
-            if (rail == Blocks.POWERED_RAIL) {
+            if (rail == Blocks.POWERED_RAIL || rail == Blocks.STOP_RAIL) {
                 // The station: off it goes with a rider; an empty car stops and waits.
                 if (riding === c) c.speed = maxOf(c.speed, CoasterRide.LAUNCH)
                 else { c.speed = maxOf(0f, c.speed - 30f * dt); if (c.speed < 0.5f) { c.speed = 0f; c.x += (bx + 0.5f - c.x) * minOf(1f, dt * 10f); c.z += (bz + 0.5f - c.z) * minOf(1f, dt * 10f) } }
-            } else c.speed = maxOf(c.speed, CoasterRide.CRAWL)
+            } else if (riding !== c) c.speed = maxOf(0f, c.speed - 3f * dt)   // nobody on: it rolls to a stop
+            else if (game.input.moveForward < 0f) c.speed = maxOf(0f, c.speed - 12f * dt)   // holding back brakes
+            else c.speed = maxOf(c.speed, CoasterRide.CRAWL)
         } else if (rail == Blocks.POWERED_RAIL && !c.isTrain) {
             // A cart standing on a powered rail next to a wall is pushed away from the wall;
             // otherwise it keeps going the way it was already heading.
