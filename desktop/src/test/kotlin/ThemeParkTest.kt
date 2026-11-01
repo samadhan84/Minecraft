@@ -26,7 +26,7 @@ class ThemeParkTest {
         assertTrue(world.pendingParks.any { it.first == cx && it.third == cz })
     }
 
-    @Test fun survivalVillagesGetAThemePark() {
+    @Test fun villagesGetAThemePark() {
         val dir = kotlin.io.path.createTempDirectory("park").toFile()
         val world = World(12345L, dir, Dimension.OVERWORLD, false)
         val (cx, cz) = villageCentre(world)
@@ -34,7 +34,7 @@ class ThemeParkTest {
         val g = Game(world, lvl, GameInput(), dir).also { it.mobs.hostileEnabled = false }
         world.ensureLoaded(cx shr 4, cz shr 4)
         g.openThemeParks()
-        assertEquals(1, g.coasters.list.size, "roller coaster")
+        assertTrue(g.coasters.list.isEmpty(), "no roller coaster any more")
         val gy = world.generator.surfaceHeight(cx, cz + 32)
         assertEquals(Blocks.IRON_BLOCK, world.getBlock(cx - 16, gy + 12, cz + 34), "Ferris wheel hub")
     }
@@ -47,10 +47,12 @@ class ThemeParkTest {
         val g = Game(world, lvl, GameInput(), dir)
         world.ensureLoaded(cx shr 4, cz shr 4)
         g.openThemeParks()
-        assertEquals(1, g.coasters.list.size)
+        val gy = world.generator.surfaceHeight(cx, cz + 32)
+        assertEquals(Blocks.IRON_BLOCK, world.getBlock(cx - 16, gy + 12, cz + 34), "Ferris wheel")
+        assertTrue(g.coasters.list.isEmpty())
         // Only once, even after looking round again.
         repeat(300) { g.openThemeParks() }
-        assertEquals(1, g.coasters.list.size)
+        assertEquals(1, (cx - 20..cx - 12).sumOf { x -> (gy + 12..gy + 12).count { y -> world.getBlock(x, y, cz + 34) == Blocks.IRON_BLOCK } })
     }
 
     @Test fun oldVillagesAreMadeOver() {
@@ -71,7 +73,7 @@ class ThemeParkTest {
         assertNotEquals(Blocks.LOG, world.getBlock(hx + 1, hy + 1, cz), "log corner became a coloured corner")
         assertEquals(Blocks.SMOOTH_STONE, world.getBlock(hx - 1, hy, cz))
         assertEquals(Blocks.QUARTZ_BLOCK, world.getBlock(cx + 2, h, cz + 2), "new plaza")
-        assertEquals(1, g.coasters.list.size, "and a theme park")
+        assertTrue(g.coasters.list.isEmpty(), "and a theme park without a roller coaster")
     }
 
     @Test fun coasterTrackAndCart() {

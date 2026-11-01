@@ -10,9 +10,9 @@ Build, explore, ride roller coasters and metros – alone or with friends.
 Welcome to DhruvVishu – a block world that is all yours!
 
 ⛏ MINE & CRAFT – Dig for coal, iron, gold and diamonds. Craft tools, armour, furniture and hundreds of blocks.
-🏰 BUILD ANYTHING – Houses, castles, farms and working Sparkstone machines with buttons, levers, lamps and doors. Flat worlds for building, with oceans and villages.
+🏰 BUILD ANYTHING – Houses, castles, farms and working Sparkstone machines with buttons, levers, lamps and doors. Flat worlds for building, with oceans.
 🎢 ROLLER COASTERS – Ride a real steel roller coaster: a 30-block chain lift, a near-vertical drop, a full loop and banked turns (everyone screams!). Or lay your own coaster track like rails and ride a coaster cart.
-🎡 THEME PARKS & FUTURISTIC VILLAGES – Villages with glass-walled pod houses, glowing plazas and lit streets, each with a theme park: a Ferris wheel and a roller coaster.
+🎡 FUTURISTIC VILLAGES & THEME PARKS – Villages with glass-walled pod houses, glowing plazas and lit streets, each with a theme park and a big Ferris wheel.
 🏙️ SMART CITY – One blueprint builds a whole city: roads with traffic lights, people, cars and buses you can drive, skyscrapers with elevators, a hospital, a school and an elevated metro.
 🚇 METRO & BULLET TRAIN – Metro lines run high above the ground; bullet trains race underground and through glass tubes under the sea. Press a station's call button and your own train comes to take you anywhere, non-stop.
 🤖 HELPER ROBOT – Type what you want: "mine", "chop trees", "build a metro station", "give me 10 diamonds", "guard me"… and it does it.

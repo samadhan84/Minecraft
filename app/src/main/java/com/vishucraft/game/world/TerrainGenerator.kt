@@ -16,8 +16,8 @@ interface WorldGenerator {
 
 /**
  * A flat world for building: bedrock, stone, three layers of dirt and grass on top. Nothing grows on it.
- * With [sea] (new flat worlds) it also has oceans with sandy beaches here and there (never right by the start),
- * and villages (with their theme parks) on the flat land.
+ * With [sea] (new flat worlds) it also has oceans with sandy beaches here and there (never right by the start).
+ * Flat worlds have no villages or theme parks.
  */
 class FlatGenerator(private val seed: Long = 0L, val sea: Boolean = false, private val world: World? = null) : WorldGenerator {
     companion object { const val TOP = 64 }
@@ -52,7 +52,6 @@ class FlatGenerator(private val seed: Long = 0L, val sea: Boolean = false, priva
             for (y in TOP - 3 until TOP) chunk.set(x, y, z, if (beach) Blocks.SAND else Blocks.DIRT)
             chunk.set(x, TOP, z, if (beach) Blocks.SAND else Blocks.GRASS)
         }
-        if (sea) world?.let { Structures(seed, this, it).place(chunk) }
     }
 
     override fun surfaceHeight(x: Int, z: Int): Int { val o = ocean(x, z); return if (o > 0) TOP - 1 - depth(o) else TOP }

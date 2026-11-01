@@ -112,16 +112,8 @@ class SkyGenerator(private val seed: Long) : WorldGenerator {
 /** Where villages are: the village plaza (x, y, z) in region (rx, rz) of the 144-block grid, or null if none. */
 fun villageIn(seed: Long, generator: WorldGenerator, rx: Int, rz: Int): IntArray? {
     val region = 144
-    if (generator is FlatGenerator) {
-        // Flat worlds with seas have villages on the land (not too near the water).
-        if (!generator.sea) return null
-        val rnd = Random(seed xor (rx * 341873128712L) xor (rz * 132897987541L) xor 0x5EED)
-        val cx = rx * region + 48 + rnd.nextInt(region - 96)
-        val cz = rz * region + 48 + rnd.nextInt(region - 96)
-        for (dz in -30..30 step 10) for (dx in -30..30 step 10) if (generator.ocean(cx + dx, cz + dz) > -0.04) return null
-        return intArrayOf(cx, FlatGenerator.TOP, cz)
-    }
-    val gen = generator as? TerrainGenerator ?: return null
+    if (generator !is TerrainGenerator) return null   // flat worlds (with or without sea) have no villages
+    val gen = generator
     val rnd = Random(seed xor (rx * 341873128712L) xor (rz * 132897987541L) xor 0x5EED)
     val cx = rx * region + 48 + rnd.nextInt(region - 96)
     val cz = rz * region + 48 + rnd.nextInt(region - 96)
@@ -166,7 +158,7 @@ class Structures(private val seed: Long, private val gen: WorldGenerator, privat
                 val cx = rx * region + 48 + rnd.nextInt(region - 96)
                 val cz = rz * region + 48 + rnd.nextInt(region - 96)
                 if (abs(cx - p.x0 - 8) > 64 || abs(cz - p.z0 - 8) > 64) continue
-                if (gen is FlatGenerator) { if (villageIn(seed, gen, rx, rz) != null) village(p, cx, cz, rnd); continue }
+                if (gen is FlatGenerator) continue   // no villages in flat worlds
                 val h = gen.surfaceHeight(cx, cz)
                 if (h <= TerrainGenerator.SEA_LEVEL + 1 || h > 88) continue
                 when (gen.biomeAt(cx, cz)) {

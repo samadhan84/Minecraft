@@ -9,8 +9,9 @@ import com.vishucraft.game.world.floorInt
 import com.vishucraft.game.world.villageIn
 
 /*
- * Every village gets a theme park beside it: a steel roller coaster with a loop (see Coaster), a big Ferris wheel
- * with coloured cabins, an entrance arch with lights, and a plaza with lamps. Villages from before the futuristic
+ * Every village gets a theme park beside it: a big Ferris wheel with coloured cabins, an entrance arch with lights,
+ * and a plaza with lamps (no roller coaster any more; ones built in earlier versions stay).
+ * Villages from before the futuristic
  * look are made over when you come near them: white walls, coloured corners, glass windows, glowing roof trim,
  * solar panels, smooth lit streets and a glowing plaza instead of the old well.
  */
@@ -53,8 +54,13 @@ internal fun Game.openThemeParks() {
     }
 }
 
-/** Whether a theme park's roller coaster already stands beside the village at (cx, cz). */
-private fun Game.hasPark(cx: Int, cz: Int) = coasters.list.any { kotlin.math.abs(it.ox - (cx + 8.5f)) < 3f && kotlin.math.abs(it.oz - (cz + 32.5f)) < 3f }
+/** Whether a theme park already stands beside the village at (cx, cz): its Ferris wheel hub, or a coaster from earlier versions. */
+private fun Game.hasPark(cx: Int, cz: Int): Boolean {
+    if (coasters.list.any { kotlin.math.abs(it.ox - (cx + 8.5f)) < 3f && kotlin.math.abs(it.oz - (cz + 32.5f)) < 3f }) return true
+    world.ensureLoaded((cx - 16) shr 4, (cz + 34) shr 4)
+    val gy = world.generator.surfaceHeight(cx, cz + 32)
+    return world.getBlock(cx - 16, gy + 12, cz + 34) == Blocks.IRON_BLOCK
+}
 
 /** The old village well: water ringed by cobblestone. */
 private fun Game.isOldVillage(cx: Int, cy: Int, cz: Int) =
@@ -134,9 +140,7 @@ fun Game.buildThemePark(cx: Int, y: Int, cz: Int) {
     for (x in px - 3..px + 3) setBlock(x, gy + 6, pz - 4, if (x % 2 == 0) Blocks.SEA_LANTERN else Blocks.CONCRETE_FIRST + 14)
     for (h in 1..4) setBlock(px, gy + h, pz - 4, Blocks.AIR)
     ferrisWheel(px - 16, gy, pz + 2)
-    // The roller coaster, its station at the east end of the plaza.
-    buildCoaster(px + 8.5f, gy + 1f, pz + 0.5f, 1, 0)
-    uiEvents.add("toast:A theme park has opened next to the village! Ride the roller coaster")
+    uiEvents.add("toast:A theme park has opened next to the village! Take a ride on the Ferris wheel")
 }
 
 /** A Ferris wheel 20 blocks across, facing north-south, centred over (x, z), with A-frame legs and eight cabins. */
