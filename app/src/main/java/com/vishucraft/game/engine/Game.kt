@@ -497,6 +497,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
         projectiles.update(dt, this)
         if (spawned) buildShowcaseIfNew()
         if (spawned && !coastersUpgraded) { coastersUpgraded = true; upgradeOldCoasters() }
+        if (spawned) openThemeParks()
         layMetro()
         cityCheck -= dt
         if (cityCheck <= 0f) { cityCheck = 2f; upgradeCities() }

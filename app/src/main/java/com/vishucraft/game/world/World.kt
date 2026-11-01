@@ -19,6 +19,8 @@ enum class Dimension { OVERWORLD, EMBER, SKY }
 class World(val seed: Long, private val saveDir: File?, val dimension: Dimension = Dimension.OVERWORLD, val flat: Boolean = false) {
     /** Villagers placed by structure generation, waiting to be spawned on the game thread. */
     val pendingVillagers = java.util.concurrent.ConcurrentLinkedQueue<Triple<Int, Int, Int>>()
+    /** Village plazas (x, y, z) from world generation, where survival worlds open a theme park. */
+    val pendingParks = java.util.concurrent.ConcurrentLinkedQueue<Triple<Int, Int, Int>>()
 
     val chunks = ConcurrentHashMap<Long, Chunk>()
     /** Keys of chunks that have just been loaded or generated, for the game to look at (long metro lines). */

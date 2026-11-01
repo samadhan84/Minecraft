@@ -224,17 +224,34 @@ class Structures(private val seed: Long, private val gen: TerrainGenerator, priv
 
     // ---------------------------------------------------------------- village
 
+    /*
+     * Villages are futuristic: a glowing plaza with a fountain and a light tower in the middle, smooth lit streets,
+     * white pod houses with big glass walls, glowing roof trim and solar panels, and hydroponic farms. In survival
+     * worlds a theme park opens beside each new village (built by the game: see engine/ThemePark).
+     */
     private fun village(p: Put, cx: Int, cz: Int, rnd: Random) {
         val wh = gen.surfaceHeight(cx, cz)
-        // Well.
-        for (dx in -2..2) for (dz in -2..2) {
-            val ring = abs(dx) == 2 || abs(dz) == 2
-            for (y in wh - 3..wh) set(p, cx + dx, y, cz + dz, if (ring) Blocks.COBBLESTONE else if (y == wh) Blocks.WATER else Blocks.WATER)
-            for (y in wh + 1..wh + 4) set(p, cx + dx, y, cz + dz, Blocks.AIR)
-            if (abs(dx) == 2 && abs(dz) == 2) for (y in wh + 1..wh + 3) set(p, cx + dx, y, cz + dz, Blocks.OAK_FENCE)
-            set(p, cx + dx, wh + 4, cz + dz, Blocks.OAK_SLAB)
+        val white = Blocks.CONCRETE_FIRST; val cyan = Blocks.CONCRETE_FIRST + 9; val lightBlue = Blocks.CONCRETE_FIRST + 3
+        // The plaza: white with a light blue ring, a fountain and a glowing tower in the middle.
+        for (dx in -5..5) for (dz in -5..5) {
+            val ring = abs(dx) == 5 || abs(dz) == 5
+            for (y in wh - 3 until wh) set(p, cx + dx, y, cz + dz, Blocks.STONE)
+            set(p, cx + dx, wh, cz + dz, if (ring) lightBlue else white)
+            for (y in wh + 1..wh + 8) set(p, cx + dx, y, cz + dz, Blocks.AIR)
         }
-        if (p.inside(cx, cz)) repeat(3 + rnd.nextInt(3)) { world.pendingVillagers.add(Triple(cx + 3, wh + 1, cz + 3)) }
+        for (dx in -2..2) for (dz in -2..2) {
+            val rim = abs(dx) == 2 || abs(dz) == 2
+            set(p, cx + dx, wh, cz + dz, if (rim) Blocks.QUARTZ_BLOCK else Blocks.WATER)
+            if (rim) set(p, cx + dx, wh + 1, cz + dz, if ((dx + dz) % 2 == 0) Blocks.QUARTZ_BLOCK else Blocks.GLASS_PANE)
+        }
+        for (y in wh - 2 until wh) for (dx in -1..1) for (dz in -1..1) set(p, cx + dx, y, cz + dz, Blocks.WATER)
+        for (y in wh + 1..wh + 5) set(p, cx, y, cz, if (y % 2 == 0) Blocks.SEA_LANTERN else Blocks.GLASS)
+        set(p, cx, wh + 6, cz, Blocks.QUARTZ_BLOCK)
+        for ((dx, dz) in listOf(4 to 4, -4 to 4, 4 to -4, -4 to -4)) lamp(p, cx + dx, wh + 1, cz + dz)
+        if (p.inside(cx, cz)) {
+            repeat(3 + rnd.nextInt(3)) { world.pendingVillagers.add(Triple(cx + 3, wh + 1, cz + 3)) }
+            world.pendingParks.add(Triple(cx, wh, cz))
+        }
 
         val houses = 4 + rnd.nextInt(4)
         for (i in 0 until houses) {
@@ -246,49 +263,66 @@ class Structures(private val seed: Long, private val gen: TerrainGenerator, priv
         }
     }
 
+    /** A street lamp: a pole two blocks high with the lamp on top. */
+    private fun lamp(p: Put, x: Int, y: Int, z: Int) {
+        set(p, x, y, z, Blocks.STREET_LAMP, 2 or 8); set(p, x, y + 1, z, Blocks.STREET_LAMP, 2 or 8); set(p, x, y + 2, z, Blocks.STREET_LAMP, 2)
+    }
+
+    /** A smooth grey street, two blocks wide, with a street lamp every 8 blocks. */
     private fun path(p: Put, x0: Int, z0: Int, x1: Int, z1: Int) {
         val steps = max(abs(x1 - x0), abs(z1 - z0))
+        val alongX = abs(x1 - x0) >= abs(z1 - z0)
         for (i in 0..steps) {
             val x = x0 + (x1 - x0) * i / max(1, steps); val z = z0 + (z1 - z0) * i / max(1, steps)
-            if (!p.inside(x, z)) continue
-            val y = gen.surfaceHeight(x, z)
-            val cur = p.chunk.get(x - p.x0, y, z - p.z0)
-            if (cur == Blocks.GRASS || cur == Blocks.SNOW_GRASS || cur == Blocks.DIRT || cur == Blocks.SAND) set(p, x, y, z, Blocks.DIRT_PATH)
-            if (Blocks[p.chunk.get(x - p.x0, y + 1, z - p.z0)].render == RenderType.CROSS) set(p, x, y + 1, z, Blocks.AIR)
+            for (w in 0..1) {
+                val px = if (alongX) x else x + w; val pz = if (alongX) z + w else z
+                if (!p.inside(px, pz) || (abs(px - x0) <= 5 && abs(pz - z0) <= 5)) continue
+                val y = gen.surfaceHeight(px, pz)
+                val cur = p.chunk.get(px - p.x0, y, pz - p.z0)
+                if (cur == Blocks.GRASS || cur == Blocks.SNOW_GRASS || cur == Blocks.DIRT || cur == Blocks.SAND) set(p, px, y, pz, Blocks.SMOOTH_STONE)
+                if (Blocks[p.chunk.get(px - p.x0, y + 1, pz - p.z0)].render == RenderType.CROSS) set(p, px, y + 1, pz, Blocks.AIR)
+            }
+            if (i % 8 == 4 && i < steps - 4) {
+                val lx = if (alongX) x else x - 1; val lz = if (alongX) z - 1 else z
+                if (p.inside(lx, lz)) lamp(p, lx, gen.surfaceHeight(lx, lz) + 1, lz)
+            }
         }
     }
 
+    /** A futuristic pod house: white walls with big glass windows, glowing trim, a flat roof with solar panels. */
     private fun house(p: Put, hx: Int, hz: Int, rnd: Random, cx: Int, cz: Int) {
         val y0 = gen.surfaceHeight(hx, hz)
         val w = 2 + rnd.nextInt(2) // half width -> 5x5 or 7x7
-        val wall = if (rnd.nextBoolean()) Blocks.PLANKS else Blocks.COBBLESTONE
-        // Door faces the well.
+        val white = Blocks.CONCRETE_FIRST
+        val accent = Blocks.CONCRETE_FIRST + listOf(9, 3, 11, 10)[rnd.nextInt(4)]   // cyan, light blue, blue or purple
+        // Door faces the plaza.
         val dx = cx - hx; val dz = cz - hz
         val doorSide = if (abs(dx) > abs(dz)) (if (dx > 0) 4 else 5) else (if (dz > 0) 2 else 3)
         for (x in -w..w) for (z in -w..w) {
             val edge = abs(x) == w || abs(z) == w
             val corner = abs(x) == w && abs(z) == w
-            for (y in y0 - 4 until y0) set(p, hx + x, y, hz + z, Blocks.COBBLESTONE)
-            set(p, hx + x, y0, hz + z, if (edge) Blocks.COBBLESTONE else Blocks.PLANKS)
+            for (y in y0 - 4 until y0) set(p, hx + x, y, hz + z, Blocks.QUARTZ_BLOCK)
+            set(p, hx + x, y0, hz + z, if (edge) Blocks.QUARTZ_BLOCK else Blocks.SMOOTH_STONE)
             for (y in y0 + 1..y0 + 3) {
                 val id = when {
-                    corner -> Blocks.LOG
-                    edge && y == y0 + 2 && (x == 0 || z == 0) -> Blocks.GLASS_PANE
-                    edge -> wall
+                    corner -> accent
+                    edge && y >= y0 + 2 -> Blocks.GLASS        // big panoramic windows all round
+                    edge -> white
                     else -> Blocks.AIR
                 }
                 set(p, hx + x, y, hz + z, id)
             }
-            // Roof: a slab cap one block wider.
-            set(p, hx + x, y0 + 4, hz + z, Blocks.PLANKS)
+            // Flat white roof with a glowing rim.
+            set(p, hx + x, y0 + 4, hz + z, if (edge) Blocks.SEA_LANTERN else white)
         }
-        for (x in -w - 1..w + 1) for (z in -w - 1..w + 1) if (abs(x) == w + 1 || abs(z) == w + 1) set(p, hx + x, y0 + 4, hz + z, Blocks.OAK_SLAB)
-        for (x in -w + 1..w - 1) for (z in -w + 1..w - 1) set(p, hx + x, y0 + 5, hz + z, Blocks.OAK_SLAB)
+        // Solar panels on the roof, and a light in the ceiling.
+        for (x in -w + 1..w - 1 step 2) set(p, hx + x, y0 + 5, hz, Blocks.SOLAR_PANEL, 2)
+        set(p, hx, y0 + 4, hz, Blocks.SEA_LANTERN)
         // Door.
         val (ddx, ddz) = when (doorSide) { 2 -> 0 to w; 3 -> 0 to -w; 4 -> w to 0; else -> -w to 0 }
         set(p, hx + ddx, y0 + 1, hz + ddz, Blocks.OAK_DOOR, doorSide)
         set(p, hx + ddx, y0 + 2, hz + ddz, Blocks.OAK_DOOR, doorSide or Shapes.UPPER)
-        set(p, hx, y0 + 3, hz, Blocks.TORCH)
+        set(p, hx + ddx, y0 + 3, hz + ddz, accent)
         // Bigger houses get a red bed in a corner, clear of every possible doorway.
         if (w == 3) {
             set(p, hx - 2, y0 + 1, hz + 2, Blocks.BED_FIRST + 14, 4)
@@ -308,7 +342,7 @@ class Structures(private val seed: Long, private val gen: TerrainGenerator, priv
         for (x in -3..3) for (z in -2..2) {
             val border = abs(x) == 3 || abs(z) == 2
             for (yy in y - 2 until y) set(p, fx + x, yy, fz + z, Blocks.DIRT)
-            set(p, fx + x, y, fz + z, if (border) Blocks.LOG else if (x == 0) Blocks.WATER else Blocks.FARMLAND)
+            set(p, fx + x, y, fz + z, if (border) (if (abs(x) == 3 && abs(z) == 2) Blocks.SEA_LANTERN else Blocks.QUARTZ_BLOCK) else if (x == 0) Blocks.WATER else Blocks.FARMLAND)
             set(p, fx + x, y + 1, fz + z, if (!border && x != 0) crop else Blocks.AIR, if (!border && x != 0) rnd.nextInt(8) else 0)
             set(p, fx + x, y + 2, fz + z, Blocks.AIR)
         }

@@ -1,5 +1,6 @@
 package com.vishucraft.desktop
 
+import com.vishucraft.game.engine.buildThemePark
 import com.vishucraft.game.engine.placeBuilding
 import com.vishucraft.game.engine.flyTo
 import com.vishucraft.game.engine.liftTo
@@ -359,6 +360,7 @@ class App(demo: File?) : ClientApp(demo) {
         }
     }
     private var demoWorld = 0
+    private var demoCx = 0; private var demoCz = 0
 
     /**
      * `--demo <folder>` walks through the menus and a creative and a survival world by itself,
@@ -728,7 +730,36 @@ class App(demo: File?) : ClientApp(demo) {
                 if (f == 1928) shot("16-coaster-drop")
                 if (f == 1958) shot("17-coaster-loop")
             }
-            f == 1962 -> glfwSetWindowShouldClose(window, true)
+            f == 1962 -> session?.game?.let { g ->
+                // A futuristic village with its theme park.
+                g.coasters.riding = null
+                val gen = g.world.generator
+                var best: Pair<Int, Int>? = null
+                for (rz in -4..3) for (rx in -4..3) {
+                    if (best != null) break
+                    val rnd = java.util.Random(g.world.seed xor (rx * 341873128712L) xor (rz * 132897987541L) xor 0x5EED)
+                    val cx = rx * 144 + 48 + rnd.nextInt(144 - 96); val cz = rz * 144 + 48 + rnd.nextInt(144 - 96)
+                    val h = gen.surfaceHeight(cx, cz)
+                    if (h <= com.vishucraft.game.world.TerrainGenerator.SEA_LEVEL + 1 || h > 88) continue
+                    if (gen.biomeAt(cx, cz) in setOf(com.vishucraft.game.world.Biome.PLAINS, com.vishucraft.game.world.Biome.SAVANNA, com.vishucraft.game.world.Biome.FOREST,
+                            com.vishucraft.game.world.Biome.SNOW, com.vishucraft.game.world.Biome.CHERRY, com.vishucraft.game.world.Biome.JUNGLE, com.vishucraft.game.world.Biome.SWAMP)) best = cx to cz
+                }
+                val (cx, cz) = best!!
+                for (dz in -3..4) for (dx in -3..3) g.world.ensureLoaded((cx shr 4) + dx, (cz shr 4) + dz)
+                g.buildThemePark(cx, gen.surfaceHeight(cx, cz), cz)
+                g.player.x = cx + 30f; g.player.y = gen.surfaceHeight(cx, cz) + 30f; g.player.z = cz - 30f; g.player.flying = true
+                g.player.yaw = kotlin.math.atan2(-(30f), -(60f)); g.player.pitch = -0.5f
+                demoCx = cx; demoCz = cz
+            }
+            f == 2060 -> shot("18-village-and-theme-park")
+            f == 2062 -> session?.game?.let { g ->
+                // Close up on a village street.
+                val y = g.world.generator.surfaceHeight(demoCx, demoCz)
+                g.player.x = demoCx + 9f; g.player.y = y + 6f; g.player.z = demoCz + 9f
+                g.player.yaw = kotlin.math.atan2(-9f, 9f); g.player.pitch = -0.3f
+            }
+            f == 2110 -> shot("19-futuristic-village")
+            f == 2112 -> glfwSetWindowShouldClose(window, true)
         }
     }
 }
