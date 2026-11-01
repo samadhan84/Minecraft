@@ -828,6 +828,34 @@ private fun Game.city(p: Plan, n: Int, title: String, metroName: String, railNam
         for (a in ca - 5..ca + 5) { p.set(a, cd + 8, 0, Blocks.STONE_BRICK_STAIRS, p.toward); p.set(a, cd + 8, 1, Blocks.AIR) }
         sign(ca, cd - 8, 0, "Cricket Stadium")
     }
+    /** Cars parked at the pumps and chargers, made once the traffic code below is ready: (a, d, kind, colour). */
+    val parkedAtPumps = ArrayList<IntArray>()
+    /** A petrol station: a canopy over three petrol pumps and two EV chargers, a shop at the back, and parked cars. */
+    fun petrolStation(ca: Int, cd: Int) {
+        for (a in ca - 8..ca + 8) for (d in cd - 8..cd + 6) p.set(a, d, -1, if (d in cd - 7..cd - 1 && (a + d) % 5 == 0) concrete(0) else Blocks.POLISHED_ANDESITE)
+        // The canopy: red with a white stripe, on four pillars, lit from below.
+        for (a in ca - 8..ca + 8) for (d in cd - 7..cd - 1) {
+            p.set(a, d, 5, if (d == cd - 4) concrete(0) else concrete(14))
+            if (a % 4 == 0 && d == cd - 4) p.set(a, d, 4, Blocks.SEA_LANTERN)
+        }
+        for ((a, d) in listOf(ca - 7 to cd - 6, ca + 7 to cd - 6, ca - 7 to cd - 2, ca + 7 to cd - 2)) for (h in 0..4) p.set(a, d, h, Blocks.QUARTZ_BLOCK)
+        for (a in intArrayOf(ca - 5, ca - 1, ca + 3)) p.set(a, cd - 4, 0, Blocks.PETROL_PUMP, p.toward)
+        for (a in intArrayOf(ca + 6, ca + 7)) p.set(a, cd - 4, 0, Blocks.EV_CHARGER, p.toward)
+        // The shop at the back.
+        for (a in ca - 6..ca + 6) for (d in cd + 1..cd + 5) {
+            p.set(a, d, 4, Blocks.SMOOTH_STONE)
+            val edge = a == ca - 6 || a == ca + 6 || d == cd + 1 || d == cd + 5
+            if (edge) for (h in 0..3) p.set(a, d, h, if (d == cd + 1 && h in 1..2 && abs(a - ca) in 1..5) Blocks.GLASS else white)
+        }
+        p.door(ca, cd + 1)
+        sign(ca + 2, cd + 0, 1, "Petrol Pump & EV Charging")
+        p.set(ca, cd + 3, 3, Blocks.CEILING_LIGHT, 8)
+        for (a in ca - 4..ca - 1) { p.set(a, cd + 4, 0, Blocks.BARREL); p.set(a, cd + 4, 1, Blocks.BARREL) }
+        p.set(ca + 4, cd + 4, 0, Blocks.FRIDGE, p.toward); p.set(ca + 4, cd + 4, 1, Blocks.FRIDGE, p.toward or Shapes.UPPER)
+        for ((a, d) in listOf(ca - 8 to cd - 8, ca + 8 to cd - 8)) { for (h in 0..6) p.set(a, d, h, Blocks.STREET_LAMP, 8); p.set(a, d, 7, Blocks.SEA_LANTERN) }
+        // A petrol car and an electric car filling up.
+        parkedAtPumps.add(intArrayOf(ca - 5, cd - 6, Vehicle.CAR, 12)); parkedAtPumps.add(intArrayOf(ca + 6, cd - 6, Vehicle.EV_CAR, 9))
+    }
     fun solarFarm(ca: Int, cd: Int) {
         for (a in ca - 8..ca + 8) for (d in cd - 8..cd - 1) p.set(a, d, -1, if (d == cd - 5 && a % 3 != 0) concrete(0) else Blocks.POLISHED_ANDESITE)
         for (a in ca - 7..ca + 7 step 3) p.set(a, cd - 1, 0, Blocks.EV_CHARGER, p.toward)
@@ -843,10 +871,10 @@ private fun Game.city(p: Plan, n: Int, title: String, metroName: String, railNam
         park(-36, 15); police(-12, 15); shops(12, 15); hospital(36, 15)
         school(-36, 39); skyscraper(-12, 39, 8, concrete(11), "Tech Park"); skyscraper(12, 39, 10, concrete(9), "Sky Towers"); houses(36, 39)
         houses(-36, 63); skyscraper(-12, 63, 9, concrete(7), "City Centre"); cricket(12, 63); solarFarm(36, 63)
-        villa(-36, 87); skyscraper(-12, 87, 11, concrete(15), "DV Tower"); villa(12, 87); park(36, 87)
+        villa(-36, 87); skyscraper(-12, 87, 11, concrete(15), "DV Tower"); villa(12, 87); petrolStation(36, 87)
     } else {
         // Bigger cities: a mix of everything, with more towers towards the middle.
-        val kinds = listOf("sky", "houses", "shops", "park", "villa", "sky", "school", "houses", "solar", "sky", "cricket", "police", "hospital", "villa", "shops", "sky")
+        val kinds = listOf("sky", "houses", "shops", "park", "villa", "sky", "school", "houses", "solar", "sky", "cricket", "police", "hospital", "villa", "petrol", "sky")
         val towers = listOf("Tech Park", "Sky Towers", "City Centre", "DV Tower", "Lotus Tower", "Ocean View", "Galaxy Heights", "Royal Plaza",
             "Sun Tower", "Silver Oak", "Diamond Point", "Pearl Tower", "Orchid Heights", "Metro Plaza", "Unity Tower", "Rainbow Tower")
         val frames = intArrayOf(11, 9, 7, 15, 3, 14, 13, 1)
@@ -864,6 +892,7 @@ private fun Game.city(p: Plan, n: Int, title: String, metroName: String, railNam
                 "villa" -> villa(ca, cd)
                 "school" -> school(ca, cd)
                 "solar" -> solarFarm(ca, cd)
+                "petrol" -> petrolStation(ca, cd)
                 "cricket" -> cricket(ca, cd)
                 "police" -> police(ca, cd)
                 else -> hospital(ca, cd)
@@ -959,22 +988,24 @@ private fun Game.city(p: Plan, n: Int, title: String, metroName: String, railNam
         v.yaw = kotlin.math.atan2(v.hx.toFloat(), -v.hz.toFloat())
         vehicles.list.add(v)
     }
-    val car = Vehicle.CAR; val bus = Vehicle.BUS
+    val car = Vehicle.CAR; val bus = Vehicle.BUS; val ev = Vehicle.EV_CAR
+    for (c in parkedAtPumps) vehicle(c[0], c[1], 0, 1, c[2], c[3])
     if (n == 4) {
-        vehicle(-1, 15, 0, 1, car, 14); vehicle(1, 40, 0, -1, car, 11); vehicle(-25, 63, 0, 1, car, 0); vehicle(23, 87, 0, 1, car, 15)
-        vehicle(-12, 28, 1, 0, car, 4); vehicle(12, 26, -1, 0, car, 5); vehicle(36, 76, 1, 0, car, 1); vehicle(-36, 98, -1, 0, car, 8)
+        vehicle(-1, 15, 0, 1, car, 14); vehicle(1, 40, 0, -1, ev, 9); vehicle(-25, 63, 0, 1, car, 0); vehicle(23, 87, 0, 1, car, 15)
+        vehicle(-12, 28, 1, 0, ev, 0); vehicle(12, 26, -1, 0, car, 5); vehicle(36, 76, 1, 0, car, 1); vehicle(-36, 98, -1, 0, car, 8)
         vehicle(49, 30, 0, -1, car, 10); vehicle(-49, 70, 0, 1, car, 3)
         vehicle(-1, 63, 0, 1, bus, 0); vehicle(-30, 52, 1, 0, bus, 0); vehicle(8, 2, -1, 0, bus, 0)
         // Parked: the police cars, an ambulance and cars at the EV chargers.
         vehicle(-16, 21, 0, 1, car, 11); vehicle(-8, 21, 0, 1, car, 0)
         vehicle(42, 7, 1, 0, car, 0)
-        vehicle(32, 59, 0, 1, car, 13); vehicle(38, 59, 0, 1, car, 6)
+        vehicle(32, 59, 0, 1, ev, 13); vehicle(38, 59, 0, 1, ev, 6)
     } else {
         // Traffic in the middle of every other stretch of road, both ways, and buses on the main avenue.
         var color = 0
         for (i in 0..n) for (j in 0 until n) if ((i + j) % 2 == 0) {
             val dMid = rows[j] + 12
-            if ((i + j) % 4 == 0) vehicle(roads[i] - 1, dMid, 0, 1, car, color++ % 16) else vehicle(roads[i] + 1, dMid, 0, -1, car, color++ % 16)
+            val kind = if ((i * 3 + j) % 3 == 0) ev else car   // every third car is electric
+            if ((i + j) % 4 == 0) vehicle(roads[i] - 1, dMid, 0, 1, kind, color++ % 16) else vehicle(roads[i] + 1, dMid, 0, -1, kind, color++ % 16)
         }
         for (j in 0 until n) if (j % 2 == 1) vehicle(roads[j] + 12, rows[j] + 1, 1, 0, car, color++ % 16)
         for (j in 0 until n step 2) vehicle(-1, rows[j] + 8, 0, 1, bus, 0)

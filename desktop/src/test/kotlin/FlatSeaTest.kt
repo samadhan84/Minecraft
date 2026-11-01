@@ -19,6 +19,12 @@ class FlatSeaTest {
         // Out in the open sea it is as deep as the world allows: the floor is just above bedrock.
         val deepest = (-1500..1500 step 25).flatMap { x -> (-1500..1500 step 25).map { z -> gen.surfaceHeight(x, z) } }.min()
         assertTrue(deepest <= 8, "deep sea, floor at $deepest")
+        // A sheer drop: the very first water block next to the shore is already the full depth.
+        var shores = 0
+        for (z in -1500..1500 step 37) for (x in -1500 until 1500) {
+            if (gen.ocean(x, z) <= 0 && gen.ocean(x + 1, z) > 0) { shores++; assertTrue(gen.surfaceHeight(x + 1, z) <= 8, "sheer drop at $x,$z"); break }
+        }
+        assertTrue(shores > 5, "found shores: $shores")
         // The sea is real water over a sandy floor.
         val (ox, oz) = (-1500..1500 step 25).flatMap { x -> (-1500..1500 step 25).map { z -> x to z } }.first { gen.ocean(it.first, it.second) > 0.1 }
         world.ensureLoaded(ox shr 4, oz shr 4)

@@ -219,6 +219,12 @@ object HomeShapes {
                 b(11.5f, 6f, 11f, 12.5f, 11f, 13f, "black_plastic"),   // cable holder
                 b(3.5f, 5f, 11f, 4.5f, 9f, 12f, "black_plastic"),
             )
+            Blocks.PETROL_PUMP -> listOf(
+                b(3f, 0f, 3f, 13f, 2f, 13f, "steel"),                  // base
+                b(4f, 2f, 5f, 12f, 16f, 11f),                          // the pump
+                b(12f, 6f, 6f, 13f, 12f, 8f, "black_plastic"),         // nozzle holder
+                b(13f, 8f, 6.5f, 15f, 9.5f, 7.5f, "black_plastic"),    // nozzle
+            )
             else -> return null
         }
         val f = (meta and 7).let { if (it < 2 || it > 5) 2 else it }

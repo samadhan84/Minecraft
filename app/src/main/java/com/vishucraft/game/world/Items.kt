@@ -361,6 +361,8 @@ object Items {
         add("Roller Coaster", "roller_coaster_item", maxStack = 1)
         // A roller coaster car for your own coaster track (see engine/Projectiles, Cart.COASTER).
         add("Coaster Cart", "coaster_cart_item", use = ItemUse.CART, maxStack = 1)
+        // An electric car (see engine/Vehicles): charges at the EV chargers in the cities.
+        add("EV Car", "ev_car_item", maxStack = 1)
 
         all = list
         for (i in all) { byId[i.id] = i; byName[i.name] = i.id }

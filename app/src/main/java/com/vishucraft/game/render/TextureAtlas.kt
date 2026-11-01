@@ -1964,6 +1964,23 @@ object TextureAtlas {
                 t.fill { x, y -> if (x % 4 == 0 || y % 8 == 0) rgb(190, 196, 206) else scale(rgb(30, 50, 110), (if ((x + y) % 5 == 0) 1.25f else 1f) * t.jitter(0.03f)) }
                 return true
             }
+            // Petrol pump: red body, a display, a hose and a "P" sign; and its plain red sides.
+            "pump_red" -> { t.fill { x, y -> if (x == 0 || y == 0 || x == 15 || y == 15) rgb(150, 24, 28) else scale(rgb(214, 40, 44), t.jitter(0.015f)) }; return true }
+            "petrol_pump" -> {
+                t.fill { x, y -> if (x == 0 || y == 0 || x == 15 || y == 15) rgb(150, 24, 28) else scale(rgb(214, 40, 44), t.jitter(0.015f)) }
+                for (y in 2..5) for (x in 4..11) t[x, y] = rgb(20, 40, 50)
+                for (x in 5..10) t[x, 3] = rgb(250, 200, 40)
+                for (y in 7..11) for (x in 5..10) t[x, y] = rgb(236, 236, 232)
+                for (y in 7..11) { t[5, y] = rgb(30, 30, 30); t[6, y] = rgb(30, 30, 30) }
+                t[8, 8] = rgb(214, 40, 44); t[9, 9] = rgb(214, 40, 44); t[8, 10] = rgb(214, 40, 44)
+                for (x in 4..11) t[x, 13] = rgb(60, 60, 64)
+                return true
+            }
+            "ev_car_item" -> {
+                mask(t, arrayOf("....dddddd....", "...daaaaaad...", "..daaaaaaaad..", "dddmmmmmmmmddd", "dbbbbbbbbbbbbd", "lmmmmmmmmmmmml", "dmmmmmmmmmmmmd", "ddbbdddddbbddd", "..bb.....bb..."),
+                    rgb(235, 240, 245), rgb(150, 205, 245), rgb(60, 210, 110))
+                return true
+            }
             "ev_charger" -> {
                 t.fill { _, _ -> scale(rgb(236, 238, 240), t.jitter(0.01f)) }
                 for (y in 2..6) for (x in 5..10) t[x, y] = rgb(20, 40, 50)

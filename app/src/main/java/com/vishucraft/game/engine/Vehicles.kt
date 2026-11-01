@@ -42,10 +42,12 @@ class Vehicle(var x: Float, var y: Float, var z: Float, val kind: Int, val color
         const val BUS = 1
         /** A car made all of glass on a thin frame: you can see right through it, and see out all round. */
         const val GLASS_CAR = 2
+        /** An electric car: low and sleek with a green stripe; charges at the EV chargers. */
+        const val EV_CAR = 3
         const val NONE = 0
         const val STRAIGHT = 1
         const val RIGHT = 2
-        fun itemName(kind: Int) = when (kind) { BUS -> "Bus"; GLASS_CAR -> "Glass Car"; else -> "Car" }
+        fun itemName(kind: Int) = when (kind) { BUS -> "Bus"; GLASS_CAR -> "Glass Car"; EV_CAR -> "EV Car"; else -> "Car" }
     }
 }
 
@@ -234,11 +236,11 @@ internal fun Game.vehicleUse(item: com.vishucraft.game.world.ItemDef?, t: RayHit
         vehicles.riding = v
         carts.riding = null; boats.riding = null; aircraft.riding = null
         player.yaw = v.yaw
-        uiEvents.add("toast:Driving the ${if (v.isBus) "bus" else "car"}: look to steer, forward to go, back to brake. Tap or crouch to get out")
+        uiEvents.add("toast:Driving the ${if (v.isBus) "bus" else if (v.kind == Vehicle.EV_CAR) "electric car" else "car"}: look to steer, forward to go, back to brake. Tap or crouch to get out")
         return true
     }
-    if ((item?.name == "Car" || item?.name == "Bus" || item?.name == "Glass Car") && t != null) {
-        val kind = when (item.name) { "Bus" -> Vehicle.BUS; "Glass Car" -> Vehicle.GLASS_CAR; else -> Vehicle.CAR }
+    if ((item?.name == "Car" || item?.name == "Bus" || item?.name == "Glass Car" || item?.name == "EV Car") && t != null) {
+        val kind = when (item.name) { "Bus" -> Vehicle.BUS; "Glass Car" -> Vehicle.GLASS_CAR; "EV Car" -> Vehicle.EV_CAR; else -> Vehicle.CAR }
         val v = Vehicle(t.x + 0.5f, (if (t.ny == 1) t.y + 1 else t.y).toFloat(), t.z + 0.5f, kind, java.util.Random().nextInt(16))
         val fx = sin(player.yaw); val fz = -cos(player.yaw)
         if (abs(fx) > abs(fz)) v.hx = if (fx > 0) 1 else -1 else { v.hx = 0; v.hz = if (fz > 0) 1 else -1 }

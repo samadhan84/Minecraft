@@ -80,7 +80,8 @@ class Player {
             vz = approach(vz, wz * speed, 20f * dt)
             vy -= GRAVITY * 0.25f * dt
             if (jump) vy = approach(vy, 4f, 30f * dt)
-            vy = vy.coerceIn(-3f, 5f)
+            // You sink slowly (a gentle drift down), and swim up when you jump.
+            vy = vy.coerceIn(-1.6f, 5f)
         } else {
             val speed = WALK_SPEED * speedMul
             val accel = if (onGround) 50f else 12f

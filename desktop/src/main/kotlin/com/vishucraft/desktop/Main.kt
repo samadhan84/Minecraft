@@ -786,7 +786,21 @@ class App(demo: File?) : ClientApp(demo) {
                 g.player.yaw = kotlin.math.PI.toFloat() - 0.785f; g.player.pitch = -0.4f
             }
             f == 2320 -> shot("21-flat-world-sea")
-            f == 2322 -> glfwSetWindowShouldClose(window, true)
+            f == 2322 -> session?.game?.let { g ->
+                // A smart city with its petrol station, from above.
+                for (dz in -10..2) for (dx in -6..6) g.world.ensureLoaded(dx, dz)
+                g.player.yaw = 0f
+                g.placeBuilding(com.vishucraft.game.engine.RayHit(0, g.world.generator.surfaceHeight(0, 0), 0, 0, 1, 0, com.vishucraft.game.world.Blocks.GRASS), "Smart City")
+                g.player.x = 24f; g.player.y = 64f + 12f; g.player.z = -70f; g.player.flying = true
+                g.player.yaw = kotlin.math.atan2(12f, 17f); g.player.pitch = -0.4f
+            }
+            f == 2420 -> shot("22-petrol-station")
+            f == 2422 -> session?.game?.let { g ->
+                g.player.x = 28f; g.player.y = 64f + 4f; g.player.z = -76f
+                g.player.yaw = kotlin.math.atan2(8f, 8f); g.player.pitch = -0.1f
+            }
+            f == 2470 -> shot("23-petrol-pumps-and-ev-car")
+            f == 2472 -> glfwSetWindowShouldClose(window, true)
         }
     }
 }

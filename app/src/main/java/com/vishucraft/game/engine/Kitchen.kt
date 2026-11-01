@@ -182,10 +182,23 @@ internal fun Game.kitchenBlock(t: RayHit, item: ItemDef?, sel: Int): Boolean {
             sound("splash", cx, cy + 0.5f, cz, 0.4f)
             return true
         }
+        Blocks.PETROL_PUMP -> {
+            if (holdingBlock) return false
+            val car = vehicles.list.firstOrNull { !it.isBus && kotlin.math.abs(it.x - cx) < 5f && kotlin.math.abs(it.z - cz) < 5f && kotlin.math.abs(it.y - y) < 2f }
+            say(when {
+                car == null -> "Petrol pump: park a car next to it and tap to fill the tank"
+                car.kind == Vehicle.EV_CAR -> "That's an electric car: it needs the EV charger, not petrol"
+                else -> "Filling the tank... ⛽ Full!"
+            })
+            sound("beep", cx, cy, cz, 0.5f)
+            return true
+        }
         Blocks.EV_CHARGER -> {
             if (holdingBlock) return false
             val car = vehicles.list.firstOrNull { !it.isBus && kotlin.math.abs(it.x - cx) < 4f && kotlin.math.abs(it.z - cz) < 4f && kotlin.math.abs(it.y - y) < 2f }
-            say(if (car != null) "Charging the car... ⚡ 100%, fully charged!" else "EV charger: park a car next to it and tap to charge")
+            say(if (car != null && car.kind == Vehicle.EV_CAR) "Charging the electric car... ⚡ 100%, fully charged!"
+                else if (car != null) "That car runs on petrol: use the petrol pump (the EV charger is for electric cars)"
+                else "EV charger: park an electric car next to it and tap to charge")
             sound("beep", cx, cy, cz, 0.5f)
             return true
         }

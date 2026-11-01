@@ -46,6 +46,7 @@ class DropRenderer {
         vehicles?.list?.forEach { v -> when (v.kind) {
             com.vishucraft.game.engine.Vehicle.BUS -> bus(v.x, v.y, v.z, v.yaw)
             com.vishucraft.game.engine.Vehicle.GLASS_CAR -> glassCar(v.x, v.y, v.z, v.yaw)
+            com.vishucraft.game.engine.Vehicle.EV_CAR -> evCar(v.x, v.y, v.z, v.yaw, v.color)
             else -> car(v.x, v.y, v.z, v.yaw, v.color)
         } }
         arrows?.list?.forEach { a ->
@@ -304,6 +305,24 @@ class DropRenderer {
             part(cx, cy, cz, yaw, floatArrayOf(-0.45f, 0.75f, z0 + 0.4f, 0.45f, 1.25f, z0 + 0.55f), black)   // seat back
             part(cx, cy, cz, yaw, floatArrayOf(-0.45f, 0.95f, z0, 0.45f, 1.05f, z0 + 0.08f), yellow)       // lap bar
         }
+    }
+
+    /** An electric car: the car's shape but lower and sleeker, with a lime stripe, a light bar and a charging flap. */
+    private fun evCar(cx: Float, cy: Float, cz: Float, yaw: Float, color: Int) {
+        val paint = all6("concrete_" + com.vishucraft.game.world.Blocks.DYES[color and 15])
+        val glass = all6("car_window").also { it[0] = paint[0] }
+        val tyre = all6("tyre"); val black = all6("black_plastic"); val lime = all6("concrete_lime"); val light = all6("sea_lantern")
+        for (sx in floatArrayOf(-1f, 1f)) for (sz in floatArrayOf(-1f, 1f)) {
+            val x0 = if (sx < 0) -0.95f else 0.75f; val z0 = sz * 1f - 0.25f
+            part(cx, cy, cz, yaw, floatArrayOf(x0, 0f, z0, x0 + 0.2f, 0.5f, z0 + 0.5f), tyre)
+        }
+        part(cx, cy, cz, yaw, floatArrayOf(-0.9f, 0.22f, -1.5f, 0.9f, 0.85f, 1.5f), paint)
+        part(cx, cy, cz, yaw, floatArrayOf(-0.8f, 0.85f, -0.5f, 0.8f, 1.35f, 0.95f), glass)
+        part(cx, cy, cz, yaw, floatArrayOf(-0.93f, 0.4f, -1.5f, 0.93f, 0.52f, 1.5f), lime)              // the green stripe
+        part(cx, cy, cz, yaw, floatArrayOf(-0.7f, 0.55f, -1.54f, 0.7f, 0.68f, -1.5f), light)            // front light bar
+        part(cx, cy, cz, yaw, floatArrayOf(-0.92f, 0.22f, -1.56f, 0.92f, 0.34f, -1.48f), black)
+        part(cx, cy, cz, yaw, floatArrayOf(-0.92f, 0.22f, 1.48f, 0.92f, 0.34f, 1.56f), black)
+        part(cx, cy, cz, yaw, floatArrayOf(0.9f, 0.6f, 0.9f, 0.95f, 0.78f, 1.15f), lime)                // the charging flap
     }
 
     private fun glassCar(cx: Float, cy: Float, cz: Float, yaw: Float) {
