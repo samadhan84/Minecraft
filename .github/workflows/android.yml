@@ -68,6 +68,36 @@ jobs:
         with:
           name: DhruvVishu-google-play-aab
           path: app/build/outputs/bundle/playRelease/*.aab
+      # Every new version goes to Google Play by itself once the PLAY_SERVICE_ACCOUNT_JSON secret is set (the key of a
+      # Google Cloud service account invited in Play Console -> Users and permissions, with "Release apps" rights).
+      # The track is the repository variable PLAY_TRACK (internal, alpha = closed testing, beta, or production);
+      # it is "internal" if unset. The very first bundle must be uploaded by hand in Play Console.
+      - name: Check for the Google Play key
+        id: play
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/claude/minecraft-android-clone-2fqpdz'
+        env:
+          PLAY_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          HAS_UPLOAD_KEY: ${{ secrets.PLAY_UPLOAD_KEYSTORE_BASE64 != '' }}
+        run: |
+          if [ -n "$PLAY_JSON" ] && [ "$HAS_UPLOAD_KEY" = "true" ]; then
+            echo "upload=true" >> "$GITHUB_OUTPUT"
+            mkdir -p whatsnew
+            # What's new: this build's change, in one line (Play allows 500 characters).
+            git log -1 --pretty=%s | cut -c1-480 > whatsnew/whatsnew-en-US
+          else
+            echo "::notice::Not uploading to Google Play (add the PLAY_SERVICE_ACCOUNT_JSON and upload key secrets to turn it on)."
+          fi
+      - name: Upload the new version to Google Play
+        if: steps.play.outputs.upload == 'true'
+        continue-on-error: true
+        uses: r0adkll/upload-google-play@v1.1.3
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: com.vishucraft.game
+          releaseFiles: app/build/outputs/bundle/playRelease/*.aab
+          track: ${{ vars.PLAY_TRACK || 'internal' }}
+          status: completed
+          whatsNewDirectory: whatsnew
       # A fixed download link for TVs and phones (no login, no zip):
       # https://github.com/samadhan84/Minecraft/releases/download/latest/DhruvVishu.apk
       - name: Publish the APK to the "latest" release

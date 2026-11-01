@@ -3,27 +3,29 @@
 **App name (30 chars max):** DhruvVishu: Build & Explore
 
 **Short description (80 chars max):**
-Build, mine, craft and explore a blocky world – alone or with friends on Wi-Fi.
+Build, explore, ride roller coasters and metros – alone or with friends.
 
 **Full description:**
 
 Welcome to DhruvVishu – a block world that is all yours!
 
 ⛏ MINE & CRAFT – Dig for coal, iron, gold and diamonds. Craft tools, armour, furniture and hundreds of blocks.
-🏰 BUILD ANYTHING – Houses, castles, farms, railways and working Sparkstone machines with buttons, levers, lamps and doors.
-🌍 EXPLORE – Plains, forests, deserts, snowy peaks, swamps, badlands, cherry groves and mushroom islands, caves, villages and the Ember Realm.
+🏰 BUILD ANYTHING – Houses, castles, farms and working Sparkstone machines with buttons, levers, lamps and doors. Flat worlds for building, with oceans and villages.
+🎢 ROLLER COASTERS – Ride a real steel roller coaster: a 30-block chain lift, a near-vertical drop, a full loop and banked turns (everyone screams!). Or lay your own coaster track like rails and ride a coaster cart.
+🎡 THEME PARKS & FUTURISTIC VILLAGES – Villages with glass-walled pod houses, glowing plazas and lit streets, each with a theme park: a Ferris wheel and a roller coaster.
+🏙️ SMART CITY – One blueprint builds a whole city: roads with traffic lights, people, cars and buses you can drive, skyscrapers with elevators, a hospital, a school and an elevated metro.
+🚇 METRO & BULLET TRAIN – Metro lines run high above the ground; bullet trains race underground and through glass tubes under the sea. Press a station's call button and your own train comes to take you anywhere, non-stop.
+🤖 HELPER ROBOT – Type what you want: "mine", "chop trees", "build a metro station", "give me 10 diamonds", "guard me"… and it does it.
+🚗 CARS & MORE – Drive cars, buses and a see-through glass car, ride escalators, horses and boats.
+🌍 EXPLORE – Plains, forests, deserts, snowy peaks, swamps, badlands, cherry groves and mushroom islands, caves, temples and the Ember Realm.
 🍛 REAL KITCHEN – Gas stove, pressure cooker, tawa, fridge, microwave and mixer: cook rice, dal, roti, dosa, chai and pizza.
-🌾 FARMING – Grow wheat, rice, tomatoes, lentils, beetroot, carrots and potatoes. Water them, harvest with a sickle, and they replant themselves.
-🏠 READY-MADE BUILDINGS – Place a house, modern home, farm, watch tower, metro station or swimming pool in one tap.
-✈️ AIRPORTS – Build airports, fly airplanes between them, and take a helicopter anywhere.
-🏙️ SMART CITIES – One blueprint builds a whole city (smart, big or mega): roads with traffic lights, people, cars and buses you can drive, a metro and bullet train, a railway station, skyscrapers with elevators, a hospital, school and more. Metro stations have two tracks and join up by themselves, however far apart; pick a station and ride non-stop.
-🚆 TRAINS & METRO – Drive a train engine with coaches, or ride the metro from station to station.
-🐺 ANIMALS & MONSTERS – Tame wolves, cats and parrots, ride horses, trade with villagers and defend yourself at night.
+🌾 FARMING – Grow wheat, rice, tomatoes, lentils, beetroot, carrots and potatoes. They replant themselves when harvested with a sickle.
+🐺 ANIMALS & MONSTERS – Tame wolves, cats and parrots, trade with villagers, and defend yourself at night (iron golems fight back if you hit them!).
 ⚔ SURVIVAL & CREATIVE – Play survival with health, hunger and experience, or build freely in creative mode.
-👨‍👩‍👧 PLAY TOGETHER – Host a world and play with family and friends on the same Wi-Fi.
+👨‍👩‍👧 PLAY TOGETHER – Play with family and friends on the same Wi-Fi, or online with a room code.
 📺 PHONE, TABLET & ANDROID TV – Touch controls, game controller and TV remote support.
 
-No ads. No accounts. No data collected.
+No ads. No accounts. No in-app purchases. No data collected.
 
 **Category:** Game → Simulation (or Adventure)
 **Tags:** Sandbox, Building, Survival
@@ -53,5 +55,5 @@ not the home screen.
 
 - Category: Game
 - Violence: fantasy violence against monsters, no blood → answer "Yes, cartoon/fantasy violence"
-- Users can interact: **Yes, local Wi-Fi only**, no chat with strangers over the internet
+- Users can interact: **Yes** – they can play together on the same Wi-Fi or online with a room code they share; there is **no chat**, and only the nickname they pick is shown to the other players
 - No gambling, no purchases, no ads
