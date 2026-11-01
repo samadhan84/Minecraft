@@ -15,6 +15,7 @@ Welcome to DhruvVishu – a block world that is all yours!
 🎡 FUTURISTIC VILLAGES & THEME PARKS – Villages with glass-walled pod houses, glowing plazas and lit streets, each with a theme park and a big Ferris wheel.
 🏙️ SMART CITY – One blueprint builds a whole city: roads with traffic lights, people, cars and buses you can drive, skyscrapers with elevators, a hospital, a school and an elevated metro.
 🚇 METRO & BULLET TRAIN – Metro lines run high above the ground; bullet trains race underground and through glass tubes under the sea. Press a station's call button and your own train comes to take you anywhere, non-stop.
+🪔 FESTIVALS – The game follows the Indian calendar: 5 days before Holi, Diwali, Gudi Padwa, Ganesh Chaturthi, Navratri, Eid, Onam, Baisakhi, Republic Day, Independence Day, Christmas and more, that festival's update switches on with colours, sweets, fireworks, flags, rangolis and decorations. It goes away a day after the festival ends.
 🤖 HELPER ROBOT – Type what you want: "mine", "chop trees", "build a metro station", "give me 10 diamonds", "guard me"… and it does it.
 🚗 CARS & MORE – Drive cars, buses and a see-through glass car, ride escalators, horses and boats.
 🌍 EXPLORE – Plains, forests, deserts, snowy peaks, swamps, badlands, cherry groves and mushroom islands, caves, temples and the Ember Realm.

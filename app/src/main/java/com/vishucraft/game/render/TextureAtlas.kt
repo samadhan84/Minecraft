@@ -2007,8 +2007,9 @@ object TextureAtlas {
                 return true
             }
             // Diwali fireworks: sparks are round glowing dots; the crackers are little pictures of each one.
-            "spark_red", "spark_gold", "spark_green", "spark_blue", "spark_pink", "spark_white", "spark_smoke", "spark_ash" -> {
+            "spark_red", "spark_gold", "spark_green", "spark_blue", "spark_pink", "spark_white", "spark_smoke", "spark_ash", "spark_orange", "spark_purple", "spark_cyan" -> {
                 val c = when (name) {
+                    "spark_orange" -> rgb(255, 140, 30); "spark_purple" -> rgb(170, 90, 255); "spark_cyan" -> rgb(80, 230, 255)
                     "spark_red" -> rgb(255, 70, 50); "spark_gold" -> rgb(255, 205, 70); "spark_green" -> rgb(90, 255, 110)
                     "spark_blue" -> rgb(90, 160, 255); "spark_pink" -> rgb(255, 110, 220); "spark_white" -> rgb(255, 255, 240)
                     "spark_smoke" -> rgb(150, 150, 150); else -> rgb(30, 28, 26)
@@ -2321,7 +2322,44 @@ object TextureAtlas {
         return true
     }
 
+    /** Festival items (see engine/Festivals): a small picture of a [shape] in one colour, named fest_<shape>_<rrggbb>. */
+    private val FEST = mapOf(
+        "ball" to arrayOf("..dddd..", ".dmllmd.", "dmlmmmmd", "dmmmmmmd", "dmmmmmmd", ".dmmmmd.", "..dddd.."),
+        "slice" to arrayOf("dddddddd", "dmllmmmd", "dmmmmmd.", "dmammd..", "dmmmd...", "dmmd....", "dd......"),
+        "pot" to arrayOf(".aaaaaa.", "dmllmmmd", "dmmmmmmd", "dmmmmmmd", ".dmmmmd.", "..dddd.."),
+        "lamp" to arrayOf("....b...", "...bab..", "....a...", ".dddddd.", "dmllmmmd", ".dmmmmd.", "..dddd.."),
+        "flag" to arrayOf("dmmmmmm.", "dmmmmmm.", "daaaaaa.", "daaaaaa.", "dbbbbbb.", "dbbbbbb.", "d.......", "d......."),
+        "kite" to arrayOf("...m...", "..mlm..", ".mlllm.", "..mlm..", "...m...", "...d...", "..d....", "..a...."),
+        "stick" to arrayOf("aa....aa", ".md..dm.", ".md..dm.", ".md..dm.", ".md..dm.", ".md..dm.", ".dd..dd."),
+        "drum" to arrayOf(".dmmmmd.", "dmlllmmd", "dmmmmmmd", "dmaaaamd", "dmmmmmmd", ".dmmmmd."),
+        "flute" to arrayOf("......md", ".....md.", "....mld.", "...ml...", "..ml....", ".md.....", "md......"),
+        "gift" to arrayOf("..a..a..", "...aa...", "dddaaddd", "dmmaammd", "dmmaammd", "dmmaammd", "dddddddd"),
+        "tree" to arrayOf("....b...", "...mmm..", "..mlmmm.", "...mmm..", "..mmlmm.", ".mmmmmmm", "....d..."),
+        "lantern" to arrayOf("..dd..", "..dm..", ".dmmd.", "dmllmd", "dmllmd", "dmmmmd", ".dddd."),
+        "bottle" to arrayOf("..dd..", "..dm..", ".dmmd.", "dmllmd", "dmmmmd", "dmmmmd", ".dddd."),
+        "powder" to arrayOf("..mm..", ".mlmm.", "mmmlmm", "mmmmmm", "dddddd"),
+        "idol" to arrayOf("..aaaa..", "..dmmd..", ".dmmmmd.", "dmmlmmmd", ".dmmmmd.", "dmmmmmmd", "dd.dd.dd"),
+        "rakhi" to arrayOf("..mmmm..", ".m....m.", "m..aa..m", "m..aa..m", ".m....m.", "..mmmm.."),
+        "cane" to arrayOf("..mmm...", ".m...m..", ".a...m..", ".m......", ".a......", ".m......", ".a......"),
+        "snowman" to arrayOf("..mmm...", ".mmmmm..", ".mmaam..", "..mmm...", ".mmmmm..", "mmmmmmm.", "mmmmmmm.", ".mmmmm.."),
+        "effigy" to arrayOf("a.a.a.a.", "mmmmmmm.", ".mmmmm..", "..mmm...", "..mmm...", "..mmm...", "d.d.d.d."),
+        "gudi" to arrayOf("..bbb...", "...b....", "...d....", "..dm....", ".dmm....", "dmmm....", "d.d....."),
+        "mandala" to arrayOf("..aaaa..", ".abbbba.", "abmmmmba", "abmmmmba", ".abbbba.", "..aaaa.."),
+        "rocket" to arrayOf("....l....", "...dmd...", "...mam...", "...mam...", "...dmd...", "....b....", "....b....", "....b...."),
+    )
+
+    private fun festivalIcon(name: String, t: Tile) {
+        val parts = name.split("_")
+        val rows = FEST[parts.getOrNull(1)] ?: FEST.getValue("ball")
+        val c = (parts.getOrNull(2) ?: "ff8800").toInt(16)
+        val main = rgb(c shr 16 and 255, c shr 8 and 255, c and 255)
+        // Flags and rockets are tricolour (saffron, white, green); everything else gets bright accents.
+        val tri = parts.getOrNull(1) == "flag" || parts.getOrNull(1) == "rocket"
+        mask(t, rows, main, if (tri) rgb(250, 250, 250) else rgb(255, 213, 79), if (tri) rgb(19, 136, 8) else rgb(255, 255, 255))
+    }
+
     private fun paint(name: String, t: Tile) {
+        if (name.startsWith("fest_")) { festivalIcon(name, t); return }
         if (kitchenTile(name, t)) return
         if (pack3Tile(name, t)) return
         if (mobSkin(name, t)) return

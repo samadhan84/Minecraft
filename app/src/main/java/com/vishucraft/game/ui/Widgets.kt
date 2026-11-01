@@ -196,8 +196,8 @@ class HotbarView(
 class InventoryView(ctx: Context, private val onPick: (Int?) -> Unit) : View(ctx) {
     private val tabs: List<Pair<String, List<Int>>> =
         com.vishucraft.game.world.Category.values().map { it.title to com.vishucraft.game.world.Blocks.inCategory(it) } +
-            ("Items" to com.vishucraft.game.world.Items.shown.filter { com.vishucraft.game.engine.Cracker.of(it.name) == null }.map { it.id }) +
-            (if (com.vishucraft.game.engine.diwaliTime()) listOf("Diwali" to com.vishucraft.game.engine.Cracker.values().map { com.vishucraft.game.world.Items.find(it.itemName) }) else emptyList())
+            ("Items" to com.vishucraft.game.world.Items.shown.filter { com.vishucraft.game.engine.Cracker.of(it.name) == null && !com.vishucraft.game.engine.Festivals.isFestivalItem(it.name) }.map { it.id }) +
+            (com.vishucraft.game.engine.Festivals.active()?.let { listOf("Festival" to it.festival.items.map { fi -> com.vishucraft.game.world.Items.find(fi.name) }) } ?: emptyList())
     private var tab = 0
     private var scroll = 0f
     private val dim = Paint().apply { color = Color.argb(150, 0, 0, 0) }

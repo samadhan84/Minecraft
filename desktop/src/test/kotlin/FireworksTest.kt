@@ -19,19 +19,12 @@ class FireworksTest {
         }
     }
 
-    @Test fun onlyUntilThirteenthNovember() {
-        assertTrue(diwaliTime("2026-10-31"))
-        assertTrue(diwaliTime("2026-11-13"))
-        assertFalse(diwaliTime("2026-11-14"))
-        assertFalse(diwaliTime("2027-01-01"))
-    }
-
     @Test fun everyCrackerGoesOffWithoutBreakingBlocks() {
         val g = game()
         g.world.ensureLoaded(0, 0)
         val y = g.world.generator.surfaceHeight(8, 8)
         val before = IntArray(9 * 9 * 9) { k -> g.world.getBlock(4 + k % 9, y - 4 + k / 81, 4 + (k / 9) % 9) }
-        for ((n, k) in Cracker.values().withIndex()) {
+        for ((n, k) in (Cracker.ORIGINAL + Cracker.TIRANGA).withIndex()) {
             if (k == Cracker.PHULJHADI) g.fireworks.light(k, g.player.x, g.player.y + 1f, g.player.z, held = true)
             else g.fireworks.light(k, 8.5f, y + 1f, 8.5f)
             var most = 0
@@ -49,7 +42,7 @@ class FireworksTest {
         g.player.y = g.world.generator.surfaceHeight(0, 0) + 1f
         val r = Mob(MobType.ROBOT, 1.5f, g.player.y + 1f, 0.5f); g.mobs.list.add(r)
         g.robotCommand(r.uid, "light diwali fireworks")
-        assertEquals(Cracker.values().size - 1, g.fireworks.lit.size)
+        assertEquals(Cracker.ORIGINAL.size - 1, g.fireworks.lit.size)
         g.fireworks.lit.clear()
         g.robotCommand(r.uid, "light a sutli bomb please")
         assertEquals(listOf(Cracker.SUTLI), g.fireworks.lit.map { it.kind })

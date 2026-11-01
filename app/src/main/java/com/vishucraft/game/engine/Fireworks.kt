@@ -7,7 +7,7 @@ import kotlin.math.cos
 import kotlin.math.sin
 
 /*
- * Diwali fireworks, until 13 November: the crackers Indian families light on Diwali. Tap the ground with one to put
+ * Diwali fireworks (while the Diwali update is on, see Festivals): the crackers Indian families light on Diwali. Tap the ground with one to put
  * it down and light it; after a short fuse it goes off. Bombs (Sutli, Lakshmi, Atom and the little Bijli) bang and
  * flash without breaking anything, the Ladi crackles away a long string of bangs, the Chakri spins sparks round on
  * the ground, the Anar throws up a fountain of sparks, rockets and sky shots burst in colours high in the air,
@@ -28,18 +28,18 @@ enum class Cracker(val itemName: String, val icon: String, val fuse: Float, val 
     SKY_SHOT("Sky Shot", "sky_shot", 2f, 8f),
     PENCIL("Colour Pencil", "colour_pencil", 1f, 6f),
     SNAKE("Snake Tablet", "snake_tablet", 1f, 6f),
-    PHULJHADI("Phuljhadi", "phuljhadi", 0f, 12f);
+    PHULJHADI("Phuljhadi", "phuljhadi", 0f, 12f),
+    /** A lit clay lamp that burns for two minutes (Diwali, Ram Navami, Shivratri, Ganesh Chaturthi...). */
+    DIYA("Diya", "", 0f, 120f),
+    /** A rocket that bursts saffron, white and green (Republic Day, Independence Day, Diwali). */
+    TIRANGA("Tiranga Rocket", "", 1.5f, 2.2f);
 
     companion object {
+        /** The twelve fireworks that were the first items; the others come with the festival items (see Items). */
+        val ORIGINAL: List<Cracker> by lazy { values().take(12) }
         fun of(itemName: String?) = values().firstOrNull { it.itemName == itemName }
     }
 }
-
-/** Until when the Diwali fireworks can be lit (inclusive), as yyyy-mm-dd. */
-const val DIWALI_UNTIL = "2026-11-13"
-
-/** Whether it is still Diwali time on this device. */
-fun diwaliTime(today: String = PlayLimit.today()) = today <= DIWALI_UNTIL
 
 /** A firework that has been lit: it waits for its fuse, then goes off for [Cracker.runs] seconds. */
 class LitCracker(val kind: Cracker, var x: Float, var y: Float, var z: Float) {
@@ -58,6 +58,18 @@ class Fireworks {
     private val rnd = java.util.Random()
     /** A white flash on the screen after a big bang (fades out). */
     var flash = 0f
+
+    companion object {
+        private fun tiles(vararg names: String) = names.map { com.vishucraft.game.world.Tiles.id(it) }
+        /** Holi colours, and sets of colours for the other festival effects. */
+        val HOLI by lazy { tiles("spark_pink", "spark_gold", "spark_green", "spark_blue", "spark_orange", "spark_purple", "spark_red") }
+        val BLUES by lazy { tiles("spark_blue", "spark_cyan", "spark_white") }
+        val PINKS by lazy { tiles("spark_pink", "spark_red", "spark_white") }
+        val TIRANGA by lazy { tiles("spark_orange", "spark_white", "spark_green") }
+    }
+
+    /** A burst of coloured sparks from a point (festival items). */
+    fun colourBurst(x: Float, y: Float, z: Float, n: Int, speed: Float, tiles: List<Int>, life: Float, gravity: Float) = burst(x, y, z, n, speed, tiles, life, gravity)
 
     private val colours by lazy { listOf("spark_red", "spark_gold", "spark_green", "spark_blue", "spark_pink", "spark_white").map { com.vishucraft.game.world.Tiles.id(it) } }
     private fun c(name: String) = com.vishucraft.game.world.Tiles.id(name)
@@ -186,6 +198,22 @@ class Fireworks {
                 if (rnd.nextFloat() < dt * 30f) sparks.add(Spark(f.x + sin(t * 5f) * 0.15f, f.y + h, f.z + cos(t * 5f) * 0.15f, 0f, 0f, 0f, f.kind.runs - t + 2f, c("spark_ash"), 0f))
                 if (rnd.nextFloat() < dt * 8f) sparks.add(Spark(f.x, f.y + h + 0.2f, f.z, 0f, 0.6f, 0f, 1.5f, c("spark_smoke"), -0.2f))
             }
+            Cracker.DIYA -> {
+                // A small steady flame with a flicker of gold.
+                if (rnd.nextFloat() < dt * 14f) sparks.add(Spark(f.x + (rnd.nextFloat() - 0.5f) * 0.1f, f.y + 0.25f, f.z + (rnd.nextFloat() - 0.5f) * 0.1f, 0f, 0.8f + rnd.nextFloat() * 0.5f, 0f, 0.5f, c("spark_gold"), -1f))
+                if (rnd.nextFloat() < dt * 3f) sparks.add(Spark(f.x, f.y + 0.35f, f.z, 0f, 0.4f, 0f, 0.35f, c("spark_orange"), 0f))
+            }
+            Cracker.TIRANGA -> {
+                if (t < f.kind.runs) {
+                    f.y += 18f * dt
+                    sparks.add(Spark(f.x, f.y, f.z, 0f, -1f, 0f, 0.6f, TIRANGA[(f.age * 20).toInt() % 3], 0f))
+                    if (f.shots == 0) { f.shots = 1; game.sound("fuse", f.x, f.y, f.z, 0.8f) }
+                } else {
+                    burst(f.x, f.y, f.z, 180, 9f, TIRANGA, 2.2f, 3f)
+                    game.sound("explode", f.x, f.y, f.z, 0.8f)
+                    return true
+                }
+            }
             Cracker.PHULJHADI -> {
                 repeat(8) {
                     val a = rnd.nextFloat() * 6.2832f; val u = rnd.nextFloat() * 2f - 1f
@@ -212,7 +240,7 @@ class Fireworks {
 /** Using a Diwali firework: put it down on the tapped block and light it. Returns true when handled. */
 internal fun Game.fireworkUse(item: com.vishucraft.game.world.ItemDef?, t: RayHit?): Boolean {
     val kind = Cracker.of(item?.name) ?: return false
-    if (!diwaliTime()) { uiEvents.add("toast:Diwali fireworks were only until 13 November. Happy Diwali!"); return true }
+    if (!Festivals.usable(kind.itemName)) { uiEvents.add("toast:${kind.itemName} is for a festival that is over. It comes back with ${Festivals.whenAgain(kind.itemName)}"); return true }
     if (kind == Cracker.PHULJHADI) {
         if (fireworks.lit.any { it.held }) return true
         fireworks.light(kind, player.x, player.y + 1.1f, player.z, held = true)

@@ -178,8 +178,8 @@ class Hud(private val game: Game) {
 class CreativeScreen(private val game: Game) {
     private val tabs: List<Pair<String, List<Int>>> =
         Category.values().map { it.title to Blocks.inCategory(it) } +
-            ("Items" to Items.shown.filter { com.vishucraft.game.engine.Cracker.of(it.name) == null }.map { it.id }) +
-            (if (com.vishucraft.game.engine.diwaliTime()) listOf("Diwali" to com.vishucraft.game.engine.Cracker.values().map { Items.find(it.itemName) }) else emptyList())
+            ("Items" to Items.shown.filter { com.vishucraft.game.engine.Cracker.of(it.name) == null && !com.vishucraft.game.engine.Festivals.isFestivalItem(it.name) }.map { it.id }) +
+            (com.vishucraft.game.engine.Festivals.active()?.let { listOf("Festival" to it.festival.items.map { fi -> Items.find(fi.name) }) } ?: emptyList())
     var tab = 0
     private var scroll = 0f
     private val search = Ui.Field("", "Search…", 24)

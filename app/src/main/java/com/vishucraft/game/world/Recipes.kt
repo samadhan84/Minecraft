@@ -402,6 +402,11 @@ object Recipes {
         r(i("Coaster Cart"), 1, true, i("Minecart") to 1, Blocks.CONCRETE_FIRST + 14 to 2, iron to 2)
         sh(Blocks.PETROL_PUMP, 1, listOf("RRR", "RGR", "IBI"), 'R' to Blocks.CONCRETE_FIRST + 14, 'G' to Blocks.GLASS, 'I' to iron, 'B' to i("Bucket"))
         r(i("EV Car"), 1, true, i("Car") to 1, Blocks.REDSTONE_BLOCK to 1, i("Copper Ingot") to 2)
+        // Festival items (see engine/Festivals): sweets from wheat and sugar, everything else from paper, dye-like redstone and gunpowder.
+        for (fi in com.vishucraft.game.engine.Festivals.newItems) {
+            val id = i(fi.name)
+            if (fi.food > 0) r(id, 2, false, i("Wheat") to 1, i("Sugar") to 1) else r(id, 1, false, paper to 2, i("Sugar") to 1)
+        }
         r(i("Roller Coaster"), 1, true, Blocks.RAIL to 64, Blocks.POWERED_RAIL to 3, i("Minecart") to 1, iron to 16)
         r(i("Robot Spawn Egg"), 1, true, iron to 8, Blocks.REDSTONE_DUST to 4, Blocks.GLASS to 1)
         r(i("Blueprint: Railway Station"), 1, true, paper to 1, iron to 16, Blocks.BRICKS to 24, Blocks.GRAVEL to 16)

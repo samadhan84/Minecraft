@@ -356,13 +356,16 @@ object Items {
         add("Glass Car", "glass_car_item", maxStack = 1)
         add("Blueprint: Bullet Train Station", "blueprint", use = ItemUse.BLUEPRINT, maxStack = 16)
         // Diwali fireworks (see engine/Fireworks), lit until 13 November.
-        for (k in com.vishucraft.game.engine.Cracker.values()) add(k.itemName, k.icon)
+        for (k in com.vishucraft.game.engine.Cracker.ORIGINAL) add(k.itemName, k.icon)
         // Sets up a whole roller coaster ride (see engine/Coaster).
         add("Roller Coaster", "roller_coaster_item", maxStack = 1)
         // A roller coaster car for your own coaster track (see engine/Projectiles, Cart.COASTER).
         add("Coaster Cart", "coaster_cart_item", use = ItemUse.CART, maxStack = 1)
         // An electric car (see engine/Vehicles): charges at the EV chargers in the cities.
         add("EV Car", "ev_car_item", maxStack = 1)
+        // Festival items (see engine/Festivals), always added at the end so older worlds keep their item numbers.
+        for (fi in com.vishucraft.game.engine.Festivals.newItems) if (list.none { it.name == fi.name })
+            add(fi.name, "fest_${fi.shape}_${"%06x".format(fi.rgb)}", food = fi.food)
 
         all = list
         for (i in all) { byId[i.id] = i; byName[i.name] = i.id }

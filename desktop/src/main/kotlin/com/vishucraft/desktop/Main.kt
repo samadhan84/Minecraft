@@ -1,5 +1,6 @@
 package com.vishucraft.desktop
 
+import com.vishucraft.game.engine.buildFestival
 import com.vishucraft.game.engine.buildThemePark
 import com.vishucraft.game.engine.placeBuilding
 import com.vishucraft.game.engine.flyTo
@@ -800,7 +801,17 @@ class App(demo: File?) : ClientApp(demo) {
                 g.player.yaw = kotlin.math.atan2(8f, 8f); g.player.pitch = -0.1f
             }
             f == 2470 -> shot("23-petrol-pumps-and-ev-car")
-            f == 2472 -> glfwSetWindowShouldClose(window, true)
+            f == 2472 -> session?.game?.let { g ->
+                // The festival decorations in a row.
+                for (cz in -3..1) for (cx in -4..6) g.world.ensureLoaded(cx, cz)
+                val y = 64
+                val kinds = listOf("flag", "tree", "gudi", "ganesh", "snowman", "rangoli", "effigy", "lantern")
+                for ((k, kind) in kinds.withIndex()) g.buildFestival(kind, k * 11 - 40, y, 0, 0f, -1f)
+                g.player.x = 0f; g.player.y = y + 8f; g.player.z = 30f; g.player.flying = true
+                g.player.yaw = 0f; g.player.pitch = -0.25f
+            }
+            f == 2530 -> shot("24-festival-decorations")
+            f == 2532 -> glfwSetWindowShouldClose(window, true)
         }
     }
 }

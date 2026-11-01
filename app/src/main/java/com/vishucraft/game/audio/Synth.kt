@@ -152,6 +152,10 @@ object Synth {
             }
             noiseBurst(it, 0, it.size, 0.25f, 1.4f, 0.6f)
         }
+        // A dhol: two deep beats and a rattle.
+        make("dhol", 0.9f) {
+            for (k in 0..3) { tone(it, k * 3600, 7000, { t -> 120f - t * 90f }, 0.7f, 0.12f, 0.002f, floatArrayOf(1f, 0.5f, 0.2f)); noiseBurst(it, k * 3600, 1500, 0.4f, 0.03f, 0.4f) }
+        }
         make("rails", 0.35f) { for (k in 0..1) noiseBurst(it, k * 5000, 2500, 0.6f, 0.03f, 0.35f) }
 
         // Loops.

@@ -249,9 +249,9 @@ private fun Game.robotCallTrain() {
  * another (just the one you name, like "light a sutli bomb", or all of them). Only until 13 November.
  */
 internal fun Game.robotFireworks(text: String) {
-    if (!diwaliTime()) { robotSay("Diwali is over: the fireworks were only until 13 November. See you next Diwali!"); return }
+    if (!Festivals.usable("Sutli Bomb")) { robotSay("The Diwali update is off right now. The fireworks come back with ${Festivals.whenAgain("Sutli Bomb")}"); return }
     val named = Cracker.values().filter { k -> k.itemName.lowercase().split(" ", "(", ")").filter { it.length > 3 && it != "bomb" && it != "wala" && it != "diwali" }.any { text.contains(it) } }
-    val show = (named.ifEmpty { Cracker.values().filter { it != Cracker.PHULJHADI } }).filter { it != Cracker.PHULJHADI || named.size == 1 }
+    val show = (named.ifEmpty { Cracker.ORIGINAL.filter { it != Cracker.PHULJHADI } }).filter { it != Cracker.PHULJHADI || named.size == 1 }
     if (show == listOf(Cracker.PHULJHADI)) { fireworks.light(Cracker.PHULJHADI, player.x, player.y + 1.1f, player.z, held = true); robotSay("Here's a Phuljhadi for you. Happy Diwali!"); return }
     val fx = sin(player.yaw); val fz = -kotlin.math.cos(player.yaw)
     for ((k, kind) in show.withIndex()) {

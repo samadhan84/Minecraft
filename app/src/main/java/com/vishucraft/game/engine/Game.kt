@@ -80,6 +80,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
     val coasters = Coasters()
     private var coastersUpgraded = false
     private var peopleRemoved = false
+    private var festivalAnnounced = false
 
     /** Takes away every citizen (the people in cities, at stations and at airports) left in older worlds. */
     private fun removePeople() {
@@ -132,6 +133,8 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
     /** Player health in half-hearts (20 = ten hearts). */
     var health = level.health.coerceIn(1f, 20f)
         private set
+    /** Gives back [amount] half-hearts of health (the Rakhi). */
+    internal fun heal(amount: Float) { health = minOf(20f, health + amount) }
     /** Hunger (20 = full) and hidden saturation, as in the usual survival rules. */
     var food = level.food.coerceIn(0f, 20f)
         internal set
@@ -518,6 +521,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
         updatePassengers(dt)
         updateRobots(dt)
         fireworks.update(dt, this)
+        if (!festivalAnnounced && spawned) { festivalAnnounced = true; Festivals.announcement()?.let { uiEvents.add("toast:$it") } }
         if (!peopleRemoved && spawned) { peopleRemoved = true; if (!isClient) removePeople() }
         updateCoasters(dt)
         updateLift(dt)
@@ -1383,6 +1387,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
         val tgt = target
         if (coasterTap()) return
         if (fireworkUse(item, tgt)) return
+        if (festivalUse(item, tgt)) return
         if (coasterUse(item, tgt)) return
         if (farmingUse(tgt, item)) return
         if (crop > 0 && tgt != null && tgt.block == Blocks.FARMLAND && tgt.ny == 1 && world.getBlock(tgt.x, tgt.y + 1, tgt.z) == Blocks.AIR) {
