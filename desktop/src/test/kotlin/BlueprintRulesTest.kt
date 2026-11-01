@@ -28,3 +28,45 @@ class BlueprintRulesTest {
         assertTrue(g.carts.list.any { it.kind == Cart.METRO })
     }
 }
+
+/** In creative one tap breaks anything; in survival blocks still take time. */
+class CreativeBreakTest {
+    private fun game(creative: Boolean): Game {
+        val dir = kotlin.io.path.createTempDirectory("brk").toFile()
+        val world = World(42L, dir, Dimension.OVERWORLD, true)
+        val lvl = LevelData.create(42L, "B", if (creative) GameMode.CREATIVE else GameMode.SURVIVAL).apply { hasPlayer = true; x = 0.5f; y = 90f; z = 0.5f }
+        return Game(world, lvl, GameInput(), dir).also { it.mobs.hostileEnabled = false }
+    }
+
+    @Test fun creativeBreaksAnythingInOneFrame() {
+        val g = game(true)
+        g.world.ensureLoaded(0, 0)
+        val y = g.world.generator.surfaceHeight(0, 0) + 1
+        g.player.x = 0.5f; g.player.y = y.toFloat(); g.player.z = 0.5f; g.player.flying = true
+        g.player.yaw = (Math.PI / 2).toFloat(); g.player.pitch = 0f      // looking along +x at eye height
+        val by = kotlin.math.floor(g.player.eyeY).toInt()
+        for (id in listOf(Blocks.OBSIDIAN, Blocks.IRON_BLOCK, Blocks.STONE, Blocks.GRASS)) {
+            g.setBlock(2, by, 0, id)
+            g.input.breakHeld = false
+            g.update(1 / 60f)
+            g.input.breakHeld = true
+            g.update(1 / 60f)
+            assertEquals(Blocks.AIR, g.world.getBlock(2, by, 0), "block $id broke in one tap")
+            g.input.breakHeld = false
+            g.update(1 / 60f)
+        }
+    }
+
+    @Test fun survivalStillTakesTime() {
+        val g = game(false)
+        g.world.ensureLoaded(0, 0)
+        val y = g.world.generator.surfaceHeight(0, 0) + 1
+        g.player.x = 0.5f; g.player.y = y.toFloat(); g.player.z = 0.5f
+        g.player.yaw = (Math.PI / 2).toFloat(); g.player.pitch = 0f
+        val by = kotlin.math.floor(g.player.eyeY).toInt()
+        g.setBlock(2, by, 0, Blocks.OBSIDIAN)
+        g.input.breakHeld = true
+        g.update(1 / 60f)
+        assertEquals(Blocks.OBSIDIAN, g.world.getBlock(2, by, 0))
+    }
+}

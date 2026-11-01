@@ -790,9 +790,24 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
         return max(time, 0.05f)
     }
 
+    private var creativeBreakWait = 0f
+
     private fun updateBreaking(dt: Float) {
         val t = target
-        if (!input.breakHeld || t == null || !Blocks[t.block].breakable) {
+        creativeBreakWait -= dt
+        // In creative anything breaks with one tap (even bedrock, except the very bottom layer of the world).
+        val breakable = t != null && (Blocks[t.block].breakable || (!survival && t.block == Blocks.BEDROCK && t.y > 0))
+        if (!input.breakHeld || t == null || !breakable) {
+            breakProgress = 0f; breakKey = Long.MIN_VALUE
+            if (!input.breakHeld) creativeBreakWait = 0f
+            return
+        }
+        if (!survival) {
+            // Holding the button keeps breaking, five blocks a second.
+            if (creativeBreakWait > 0f) return
+            creativeBreakWait = 0.2f
+            blockSound(t.block, t.x, t.y, t.z, 0.6f)
+            breakBlock(t.x, t.y, t.z)
             breakProgress = 0f; breakKey = Long.MIN_VALUE
             return
         }
