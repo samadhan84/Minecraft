@@ -775,7 +775,19 @@ class App(demo: File?) : ClientApp(demo) {
                 g.player.yaw = kotlin.math.atan2(2.5f, -5f); g.player.pitch = -0.45f
             }
             f == 2150 -> shot("20-coaster-track")
-            f == 2152 -> glfwSetWindowShouldClose(window, true)
+            f == 2152 -> startSession(GameSession.create(File(worldsDir, "flatsea"), "Flat Sea", 777L, false, true))
+            f == 2200 -> session?.game?.let { g ->
+                // A flat world with the sea and a village (and its theme park) by the shore, from up high.
+                val gen = g.world.generator as com.vishucraft.game.world.FlatGenerator
+                val v = (-6..6).flatMap { rz -> (-6..6).mapNotNull { rx -> com.vishucraft.game.world.villageIn(777L, gen, rx, rz) } }
+                    .filter { vv -> (-80..80 step 20).any { d -> gen.ocean(vv[0] + d, vv[2] + 80) > 0 || gen.ocean(vv[0] + 80, vv[2] + d) > 0 } }.firstOrNull()
+                    ?: (-6..6).flatMap { rz -> (-6..6).mapNotNull { rx -> com.vishucraft.game.world.villageIn(777L, gen, rx, rz) } }.first()
+                for (dz in -4..6) for (dx in -4..6) g.world.ensureLoaded((v[0] shr 4) + dx, (v[2] shr 4) + dz)
+                g.player.x = v[0] - 40f; g.player.y = 64f + 45f; g.player.z = v[2] - 40f; g.player.flying = true
+                g.player.yaw = kotlin.math.atan2(1f, -1f).let { kotlin.math.PI.toFloat() - 0.785f }; g.player.pitch = -0.55f
+            }
+            f == 2320 -> shot("21-flat-world-sea-village")
+            f == 2322 -> glfwSetWindowShouldClose(window, true)
         }
     }
 }

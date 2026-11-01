@@ -14,20 +14,48 @@ interface WorldGenerator {
     fun biomeAt(x: Int, z: Int): Biome
 }
 
-/** A flat world for building: bedrock, stone, three layers of dirt and grass on top. Nothing grows on it. */
-class FlatGenerator : WorldGenerator {
+/**
+ * A flat world for building: bedrock, stone, three layers of dirt and grass on top. Nothing grows on it.
+ * With [sea] (new flat worlds) it also has oceans with sandy beaches here and there (never right by the start),
+ * and villages (with their theme parks) on the flat land.
+ */
+class FlatGenerator(private val seed: Long = 0L, val sea: Boolean = false, private val world: World? = null) : WorldGenerator {
     companion object { const val TOP = 64 }
+
+    private val oceanNoise = Noise(seed xor 0x0CEA)
+
+    /** How much ocean is at (x, z): above 0 is water (its depth grows with it), just below 0 is beach. */
+    fun ocean(x: Int, z: Int): Double {
+        if (!sea) return -1.0
+        val n = oceanNoise.fbm2(x / 260.0, z / 260.0, 3) - 0.08
+        // Always land around where the world starts.
+        val d = kotlin.math.sqrt(x.toDouble() * x + z.toDouble() * z)
+        return if (d < 120) minOf(n, -0.2) else if (d < 220) n - (220 - d) / 500.0 else n
+    }
+
+    private fun depth(o: Double) = (o * 60).toInt().coerceIn(2, 14)
 
     override fun generate(chunk: Chunk) {
         for (z in 0 until Chunk.SIZE) for (x in 0 until Chunk.SIZE) {
+            val o = ocean(chunk.cx * 16 + x, chunk.cz * 16 + z)
             chunk.set(x, 0, z, Blocks.BEDROCK)
+            if (o > 0) {
+                // The sea: a sandy floor, water up to just below the land.
+                val floor = TOP - 1 - depth(o)
+                for (y in 1 until floor - 2) chunk.set(x, y, z, Blocks.STONE)
+                for (y in floor - 2..floor) chunk.set(x, y, z, Blocks.SAND)
+                for (y in floor + 1 until TOP) chunk.set(x, y, z, Blocks.WATER)
+                continue
+            }
             for (y in 1 until TOP - 3) chunk.set(x, y, z, Blocks.STONE)
-            for (y in TOP - 3 until TOP) chunk.set(x, y, z, Blocks.DIRT)
-            chunk.set(x, TOP, z, Blocks.GRASS)
+            val beach = o > -0.04
+            for (y in TOP - 3 until TOP) chunk.set(x, y, z, if (beach) Blocks.SAND else Blocks.DIRT)
+            chunk.set(x, TOP, z, if (beach) Blocks.SAND else Blocks.GRASS)
         }
+        if (sea) world?.let { Structures(seed, this, it).place(chunk) }
     }
 
-    override fun surfaceHeight(x: Int, z: Int) = TOP
+    override fun surfaceHeight(x: Int, z: Int): Int { val o = ocean(x, z); return if (o > 0) TOP - 1 - depth(o) else TOP }
     override fun biomeAt(x: Int, z: Int) = Biome.PLAINS
 }
 
