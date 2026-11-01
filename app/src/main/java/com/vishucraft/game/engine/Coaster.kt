@@ -80,7 +80,7 @@ class CoasterTrack(val ox: Float, val oy: Float, val oz: Float, val fx: Int, val
         const val STOP = 6f
         const val STATION = 10f
         /** Gravity along the track and the chain lift's speed. */
-        const val G = 18f
+        const val G = 50f
         const val CHAIN = 6f
 
         private class Pt(val pos: DoubleArray, val f: DoubleArray, val u: DoubleArray, val r: DoubleArray, val lift: Boolean)
@@ -273,8 +273,9 @@ internal fun Game.updateCoasters(dt: Float) {
                 c.clack -= dt
                 if (c.clack <= 0f) { c.clack = 0.22f; sound("click", c.px[i], c.py[i], c.pz[i], 0.6f) }
             } else {
-                c.speed += (-CoasterTrack.G * c.f[i][1] - 0.3f - 0.002f * c.speed * c.speed) * dt
-                c.speed = max(c.speed, 4f)
+                c.speed += (-CoasterTrack.G * c.f[i][1] - 0.3f - 0.0006f * c.speed * c.speed) * dt
+                // Never slow down in the loop (it would hang upside down), and never faster than 90 blocks a second.
+                c.speed = min(90f, max(c.speed, if (c.u[i][1] < 0.6f && c.f[i][1] > -0.8f) 28f else 4f))
                 // Everyone screams going down the big drop and upside down in the loop.
                 if (!c.screamed && c.f[i][1] < -0.8f) {
                     c.screamed = true

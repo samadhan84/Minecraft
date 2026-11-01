@@ -36,11 +36,11 @@ class CoasterTest {
         g.coasters.riding = c
         val sounds = ArrayList<String>()
         g.soundSink = { name, _, _, _, _ -> sounds.add(name) }
-        var fastest = 0f; var top = 0f; var upsideDown = false; var lapped = false
+        var fastest = 0f; var top = 0f; var upsideDown = false; var lapped = false; var slowestUpsideDown = 999f
         for (step in 0 until 20 * 200) {
             g.updateCoasters(0.05f)
             fastest = maxOf(fastest, c.speed); top = maxOf(top, g.player.y)
-            if (c.u[c.index(c.s)][1] < -0.9f) upsideDown = true
+            if (c.u[c.index(c.s)][1] < -0.9f) { upsideDown = true; slowestUpsideDown = minOf(slowestUpsideDown, c.speed) }
             if (c.running && step > 100) {
                 // Safe: you can't get out while it is moving.
                 g.leaveCoaster(); assertSame(c, g.coasters.riding)
@@ -49,8 +49,9 @@ class CoasterTest {
         }
         assertTrue(lapped, "came back to the station")
         assertEquals(2, sounds.count { it == "scream" }, "a scream on the drop and one in the loop")
-        assertTrue(fastest > 25f, "fast: $fastest")
+        assertTrue(fastest > 50f, "very fast down the drop: $fastest")
         assertTrue(upsideDown, "went through the loop")
+        assertTrue(slowestUpsideDown >= 25f, "fast even upside down: $slowestUpsideDown")
         assertTrue(top > y + 28f, "went up the lift hill")
         g.leaveCoaster(); assertNull(g.coasters.riding)
     }
