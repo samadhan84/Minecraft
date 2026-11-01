@@ -33,7 +33,8 @@ class FlatGenerator(private val seed: Long = 0L, val sea: Boolean = false, priva
         return if (d < 120) minOf(n, -0.2) else if (d < 220) n - (220 - d) / 500.0 else n
     }
 
-    private fun depth(o: Double) = (o * 60).toInt().coerceIn(2, 14)
+    /** The sea gets as deep as the world allows (the floor is just above bedrock) within a short way from the beach. */
+    private fun depth(o: Double) = (o * 300).toInt().coerceIn(2, 58)
 
     override fun generate(chunk: Chunk) {
         for (z in 0 until Chunk.SIZE) for (x in 0 until Chunk.SIZE) {

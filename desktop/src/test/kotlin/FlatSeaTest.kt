@@ -16,6 +16,9 @@ class FlatSeaTest {
         for (rz in -8..8) for (rx in -8..8) assertNull(villageIn(777L, gen, rx, rz))
         for (cz in -6..6) for (cx in -6..6) world.ensureLoaded(cx, cz)
         assertTrue(world.pendingParks.isEmpty())
+        // Out in the open sea it is as deep as the world allows: the floor is just above bedrock.
+        val deepest = (-1500..1500 step 25).flatMap { x -> (-1500..1500 step 25).map { z -> gen.surfaceHeight(x, z) } }.min()
+        assertTrue(deepest <= 8, "deep sea, floor at $deepest")
         // The sea is real water over a sandy floor.
         val (ox, oz) = (-1500..1500 step 25).flatMap { x -> (-1500..1500 step 25).map { z -> x to z } }.first { gen.ocean(it.first, it.second) > 0.1 }
         world.ensureLoaded(ox shr 4, oz shr 4)
