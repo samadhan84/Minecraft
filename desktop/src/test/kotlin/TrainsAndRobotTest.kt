@@ -68,7 +68,10 @@ class TrainsAndRobotTest {
         g.player.x = bullet.x; g.player.y = bullet.y; g.player.z = bullet.z
         g.carts.riding = bullet
         var stoppedMiddle = false; var far = 0f
-        repeat(60 * 40) {
+        // The train waits whenever the ground ahead is still being made in the background, so give it plenty of
+        // time (up to 4 minutes of game time) instead of a fixed 40 seconds that a busy computer can run out of.
+        var frames = 0
+        while (frames++ < 60 * 240 && far <= 500f) {
             g.update(1 / 60f); g.dirtyChunks.clear()
             val front = g.carts.head(bullet)
             far = maxOf(far, front.x)

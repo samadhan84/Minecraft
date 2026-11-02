@@ -79,6 +79,9 @@ class WorldLockTest {
         assertFalse(WorldLock.ok("Dhruvil@123"))
         assertFalse(WorldLock.ok(""))
         assertFalse(WorldLock.ok(null))
+        // The secret code turns the lock off, and is not the password (and the password is not the secret code).
+        assertTrue(WorldLock.secretOk("dhu@123")); assertFalse(WorldLock.secretOk("dhruvil@123")); assertFalse(WorldLock.secretOk(null))
+        assertFalse(WorldLock.ok("dhu@123"))
         assertTrue(Items.shown.none { it.name.endsWith("Spawn Egg") && (it.name.startsWith("Man") || it.name.startsWith("Woman") || it.name.startsWith("Child")) })
     }
 }

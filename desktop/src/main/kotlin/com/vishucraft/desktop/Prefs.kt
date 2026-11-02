@@ -40,6 +40,7 @@ class Prefs : com.vishucraft.client.ClientPrefs {
     /** Rain, snow and thunderstorms. Off by default. */
     override var weather: Boolean get() = b("weather", false); set(v) { p.setProperty("weather", v.toString()); save() }
     override var fancy: Boolean get() = b("fancy", true); set(v) { p.setProperty("fancy", v.toString()); save() }
+    override var passwordLock: Boolean get() = b("passwordLock", true); set(v) { p.setProperty("passwordLock", v.toString()); save() }
     var fullscreen: Boolean get() = b("fullscreen", false); set(v) { p.setProperty("fullscreen", v.toString()); save() }
     /** Today's play time (see engine/PlayLimit). */
     override fun playLimit() = com.vishucraft.game.engine.PlayLimit(p.getProperty("playDay") ?: "", f("playUsed", 0f))

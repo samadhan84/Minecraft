@@ -209,6 +209,7 @@ class MenuActivity : Activity() {
 
     /** Asks for the password (see engine/WorldLock), then runs [then]. */
     private fun askPassword(then: () -> Unit) {
+        if (!com.vishucraft.game.ui.Settings(this).passwordLock) { then(); return }   // switched off with the secret code (Settings)
         val input = EditText(this).apply {
             hint = "Password"
             inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD

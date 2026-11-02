@@ -26,6 +26,8 @@ interface ClientPrefs {
     var weather: Boolean
     var fancy: Boolean
     var playerName: String
+    /** Whether a world asks for the password (see engine/WorldLock); turning it off needs the secret code. */
+    var passwordLock: Boolean
     /** Label + "change" action for each option, shown as buttons on the settings screen. */
     fun rows(): List<Pair<() -> String, () -> Unit>>
     fun playLimit(): com.vishucraft.game.engine.PlayLimit
@@ -109,6 +111,9 @@ abstract class ClientApp(protected val demo: File?) {
     private var afterPassword: (() -> Unit)? = null
     private var passwordBack = Menu.WORLDS
     private var wrongPassword = false
+    private val secretField = Ui.Field("", "Secret code", 32, secret = true)
+    private var askingSecret = false
+    private var wrongSecret = false
     protected val seedField = Ui.Field("", "Seed (leave empty for random)")
     protected var survival = true
     /** A new creative world on a flat world (false: normal land with hills, trees and water). */
@@ -382,7 +387,7 @@ abstract class ClientApp(protected val demo: File?) {
 
     /** Asks for the password (see engine/WorldLock), then runs [then] (straight away in the demo run). */
     protected fun needPassword(back: Menu, then: () -> Unit) {
-        if (demo != null) { then(); return }
+        if (demo != null || !prefs.passwordLock) { then(); return }
         afterPassword = then; passwordBack = back; wrongPassword = false
         passwordField.text = ""; ui.focus = passwordField
         menu = Menu.PASSWORD
@@ -759,7 +764,25 @@ abstract class ClientApp(protected val demo: File?) {
             }
             y += 48
         }
-        if (ui.button("Done", cx - 220, y + 16, 440f, 44f)) back()
+        // The password lock: turning it off needs the secret code; turning it on again does not.
+        val lockLabel = "Password lock: " + if (prefs.passwordLock) "On (turning it off needs the secret code)" else "Off (tap to turn on)"
+        if (ui.button(lockLabel, cx - 220, y, 440f, 40f)) {
+            if (prefs.passwordLock) { askingSecret = true; wrongSecret = false; secretField.text = ""; ui.focus = secretField }
+            else { prefs.passwordLock = true; askingSecret = false }
+        }
+        y += 48
+        if (askingSecret && prefs.passwordLock) {
+            ui.field(secretField, cx - 220, y, 300f)
+            if (ui.button("OK", cx + 90, y, 130f, 40f) || ui.takeSubmit()) {
+                if (com.vishucraft.game.engine.WorldLock.secretOk(secretField.text)) { prefs.passwordLock = false; askingSecret = false; ui.focus = null }
+                else { wrongSecret = true; secretField.text = ""; ui.focus = secretField }
+            }
+            y += 48
+            ui.text(if (wrongSecret) com.vishucraft.game.engine.WorldLock.SECRET_WRONG else com.vishucraft.game.engine.WorldLock.SECRET_MESSAGE, cx, y - 6, 16f,
+                if (wrongSecret) rgba(255, 120, 120) else rgba(210, 210, 210), 1)
+            y += 28
+        }
+        if (ui.button("Done", cx - 220, y + 16, 440f, 44f)) { askingSecret = false; ui.focus = null; back() }
     }
 
     protected fun controlsScreen(back: () -> Unit) {
