@@ -33,7 +33,6 @@ sourceSets {
                 "com/vishucraft/game/ui/**",
                 "com/vishucraft/game/GameActivity.kt",
                 "com/vishucraft/game/MenuActivity.kt",
-                "com/vishucraft/game/IdeActivity.kt",
                 "com/vishucraft/game/Updater.kt",
                 "com/vishucraft/game/CrashReporter.kt",
                 "com/vishucraft/game/audio/Sounds.kt",

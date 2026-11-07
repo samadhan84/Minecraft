@@ -364,7 +364,6 @@ class GameActivity : Activity() {
             }.start()
         }
         addMenu("Achievements") { showAchievements() }
-        addMenu("Arduino IDE") { startActivity(android.content.Intent(this, IdeActivity::class.java)) }
         addMenu("Settings") { settingsDialog(this) { applySettings() } }
         addMenu("Controls") { showControls() }
         root.addView(pauseMenu, FrameLayout.LayoutParams(-1, -1))
@@ -456,7 +455,6 @@ class GameActivity : Activity() {
         game.lookScale = settings.sensitivity
         game.fov = settings.fov.toFloat()
         game.renderDistance = settings.renderDistance
-        game.uploadedSketch = settings.uploadedSketch
         game.weatherEnabled = settings.weather
         game.fancyGraphics = settings.fancy
         sounds.volume = settings.soundVolume / 100f
@@ -1016,7 +1014,6 @@ class GameActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
-        if (::game.isInitialized) game.uploadedSketch = settings.uploadedSketch
         playLimit = settings.playLimit()
         limitTick = android.os.SystemClock.elapsedRealtime()
         playLimit.newDay(com.vishucraft.game.engine.PlayLimit.today())

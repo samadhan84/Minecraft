@@ -51,7 +51,6 @@ class MenuActivity : Activity() {
         playButton = add("Play") { if (hasWorld()) showWorlds() else newWorld() }
         add("Join online game") { joinOnline() }
         add("Join Wi-Fi game") { joinGame() }
-        add("Arduino IDE (code + Claude)") { startActivity(Intent(this, IdeActivity::class.java)) }
         add("Settings") { settingsDialog(this) }
         add("Back up / restore") { backupMenu() }
         if (Updater.enabled(this)) add("Check for updates") { Updater.check(this, manual = true) }

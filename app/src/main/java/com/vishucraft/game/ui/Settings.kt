@@ -17,18 +17,6 @@ class Settings(context: Context) {
     var renderDistance: Int
         get() = prefs.getInt("renderDistance", if (lowMemory) 3 else 5)
         set(v) = prefs.edit().putInt("renderDistance", v).apply()
-    /** The player's own Anthropic API key for the Arduino IDE's Ask Claude button (kept on this device only). */
-    var claudeKey: String
-        get() = prefs.getString("claudeKey", "") ?: ""
-        set(v) = prefs.edit().putString("claudeKey", v).apply()
-    /** The sketch last written in the home screen's Arduino IDE. */
-    var ideSketch: String
-        get() = prefs.getString("ideSketch", "") ?: ""
-        set(v) = prefs.edit().putString("ideSketch", v).apply()
-    /** The sketch last uploaded from the Arduino IDE: tap a board in the world to put it on that board. */
-    var uploadedSketch: String
-        get() = prefs.getString("uploadedSketch", "") ?: ""
-        set(v) = prefs.edit().putString("uploadedSketch", v).apply()
     var showDebug: Boolean
         get() = prefs.getBoolean("showDebug", true)
         set(v) = prefs.edit().putBoolean("showDebug", v).apply()

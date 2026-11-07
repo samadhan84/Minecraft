@@ -66,7 +66,7 @@ interface NetSupport {
  */
 abstract class ClientApp(protected val demo: File?) {
     protected enum class Menu { TITLE, WORLDS, CREATE, JOIN, SETTINGS, CONTROLS, CONFIRM_DELETE, PASSWORD }
-    protected enum class Overlay { NONE, PAUSE, CREATIVE, CONTAINER, SETTINGS, CONTROLS, NAME_MOB, TRADE, ACHIEVEMENTS, SIGN, IDE, ENDING, INTERNET, FLIGHTS, FLOORS, METRO, CALL_TRAIN, ROBOT, PASSWORD_ASK, PASSWORD_SET, PASSWORD_REMOVE }
+    protected enum class Overlay { NONE, PAUSE, CREATIVE, CONTAINER, SETTINGS, CONTROLS, NAME_MOB, TRADE, ACHIEVEMENTS, SIGN, ENDING, INTERNET, FLIGHTS, FLOORS, METRO, CALL_TRAIN, ROBOT, PASSWORD_ASK, PASSWORD_SET, PASSWORD_REMOVE }
 
     // ---------------------------------------------------------------- platform parts
     protected abstract val prefs: ClientPrefs
@@ -179,7 +179,6 @@ abstract class ClientApp(protected val demo: File?) {
             Overlay.TRADE -> tradeScreen(s)
             Overlay.ACHIEVEMENTS -> achievementsScreen(s)
             Overlay.SIGN -> signScreen(s)
-            Overlay.IDE -> ideScreen(s)
             Overlay.FLIGHTS -> flightsScreen(s)
             Overlay.METRO -> metroScreen(s)
             Overlay.CALL_TRAIN -> callTrainScreen(s)
@@ -214,11 +213,6 @@ abstract class ClientApp(protected val demo: File?) {
             e == "craft" -> audio.play("craft")
             e == "ending" -> overlay = Overlay.ENDING
             e == "open:ender" -> openContainer(ContainerScreen.Mode.CHEST, chest = s.level.enderChest)
-            e.startsWith("ide:") -> {
-                signPos = e.removePrefix("ide:").split(',').map { it.toInt() }
-                ideField.text = com.vishucraft.game.world.Sketches.flatten(s.game.sketchText(signPos[0], signPos[1], signPos[2]))
-                ideMessage = ""; ui.focus = ideField; overlay = Overlay.IDE
-            }
             e.startsWith("signedit:") -> {
                 signPos = e.removePrefix("signedit:").split(',').map { it.toInt() }
                 signField.text = s.game.signText(signPos[0], signPos[1], signPos[2]); ui.focus = signField; overlay = Overlay.SIGN
@@ -700,36 +694,6 @@ abstract class ClientApp(protected val demo: File?) {
             y += 52
         }
         if (ui.button("Not now", cx - w / 2, y + 10, w, 44f)) overlay = Overlay.NONE
-    }
-
-    protected val ideField = Ui.Field("", "Arduino code", com.vishucraft.game.world.Sketches.MAX_LENGTH)
-    protected var ideMessage = ""
-    private var ideExample = 0
-    private var idePreset = 0
-
-    /** The Arduino IDE: the code is on one line here (use ; and { }). Upload runs it on the board; the examples and ready-made programs cycle with their buttons. */
-    protected fun ideScreen(s: GameSession) {
-        val cx = ui.width / 2; val w = 760f
-        val id = s.game.world.getBlock(signPos[0], signPos[1], signPos[2])
-        ui.rect(0f, 0f, ui.width, ui.height, rgba(0, 0, 0, 170))
-        title("Arduino IDE: ${com.vishucraft.game.world.Blocks[id].name}", ui.height * 0.18f)
-        ui.field(ideField, cx - w / 2, ui.height * 0.32f, w)
-        if (ideMessage.isNotEmpty()) ui.text(ideMessage, cx - w / 2, ui.height * 0.32f + 52, 16f, 0xFFFFC857.toInt())
-        val y = ui.height * 0.32f + 90; val bw = (w - 15) / 4
-        if (ui.button("Upload", cx - w / 2, y, bw, 44f) || ui.takeSubmit()) {
-            val err = s.game.uploadSketch(signPos[0], signPos[1], signPos[2], ideField.text)
-            if (err == null) { ui.focus = null; overlay = Overlay.NONE } else ideMessage = err
-        }
-        if (ui.button("Next example", cx - w / 2 + bw + 5, y, bw, 44f)) {
-            val ex = com.vishucraft.game.world.Sketches.examples
-            ideField.text = com.vishucraft.game.world.Sketches.flatten(ex[ideExample % ex.size].code); ideExample++; ideMessage = ""
-        }
-        if (ui.button("Ready-made", cx - w / 2 + 2 * (bw + 5), y, bw, 44f)) {
-            val n = com.vishucraft.game.world.Boards.programs(id).size
-            s.game.setBoardPreset(signPos[0], signPos[1], signPos[2], idePreset % n); idePreset++
-            ui.focus = null; overlay = Overlay.NONE
-        }
-        if (ui.button("Close", cx - w / 2 + 3 * (bw + 5), y, bw, 44f)) { ui.focus = null; overlay = Overlay.NONE }
     }
 
     protected fun signScreen(s: GameSession) {

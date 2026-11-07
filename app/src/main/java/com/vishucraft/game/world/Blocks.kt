@@ -434,10 +434,7 @@ object Blocks {
     const val COASTER_RAIL = 447
     /** A petrol pump (see engine/Kitchen: tap it next to a car to fill the tank). */
     const val PETROL_PUMP = 448
-    /** Programmable boards (see Boards): tap to choose what they do; they give power on the OUT side. */
-    const val ARDUINO = 449
-    const val ESP32 = 450
-    const val COUNT = 451
+    const val COUNT = 449
 
     /** The newer crops' texture names, in id order from RICE_CROP. */
     val NEW_CROPS = listOf("rice", "tomato", "lentil", "beetroot")
@@ -764,11 +761,6 @@ object Blocks {
         reg(BlockDef(OBSERVER, "Observer", t("observer_top"), t("observer_side"), t("observer_top"), hardness = 1f, tool = P,
             category = R2, facing = Facing.ALL, front = t("observer_front"), back = t("observer_back")))
         t("observer_back_on")
-        reg(BlockDef(ARDUINO, "Arduino Board", t("board_arduino_top"), t("board_side"), t("board_side"), hardness = 0.5f, tool = P,
-            category = R2, facing = Facing.HORIZONTAL, front = t("board_out")))
-        reg(BlockDef(ESP32, "ESP32 Board (Wi-Fi)", t("board_esp_top"), t("board_side"), t("board_side"), hardness = 0.5f, tool = P,
-            category = R2, facing = Facing.HORIZONTAL, front = t("board_out")))
-        t("board_arduino_top_on"); t("board_esp_top_on")
         shape(DAYLIGHT_SENSOR, "Daylight Sensor", "daylight_sensor", "daylight_sensor_side", "oak_planks", hardness = 0.3f,
             tool = A, cat = R2, facing = Facing.NONE)
         shape(PRESSURE_PLATE, "Stone Pressure Plate", "stone", hardness = 0.4f, tool = P, cat = R2, facing = Facing.NONE, solid = false)
@@ -1111,8 +1103,6 @@ object Blocks {
                 return Tiles.id(if (meta and Shapes.UPPER != 0) "${w}_door_top" else "${w}_door_bottom")
             }
             REPEATER -> if (face == 0) return Tiles.id(if (meta and Shapes.POWERED != 0) "repeater_on" else "repeater")
-            ARDUINO -> if (face == 0 && meta and 8 != 0) return Tiles.id("board_arduino_top_on")
-            ESP32 -> if (face == 0 && meta and 8 != 0) return Tiles.id("board_esp_top_on")
             OBSERVER -> if (meta and 8 != 0 && face == ((meta and 7) xor 1)) return Tiles.id("observer_back_on")
             POWERED_RAIL -> return Tiles.id(if (meta and 8 != 0) "powered_rail_on" else "powered_rail")
             RAIL -> return Tiles.id(if ((meta and 15) >= 6) "rail_curve" else "rail")

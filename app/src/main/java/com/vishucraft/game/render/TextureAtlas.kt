@@ -2358,45 +2358,7 @@ object TextureAtlas {
         mask(t, rows, main, if (tri) rgb(250, 250, 250) else rgb(255, 213, 79), if (tri) rgb(19, 136, 8) else rgb(255, 255, 255))
     }
 
-    /** Arduino (teal) and ESP32 (black) circuit boards, seen from above, their sides and the OUT face. */
-    private fun boardTile(name: String, t: Tile): Boolean {
-        val gold = rgb(222, 178, 60); val silver = rgb(196, 200, 208); val chip = rgb(24, 24, 28)
-        when (name) {
-            "board_arduino_top", "board_arduino_top_on" -> {
-                val on = name.endsWith("on")
-                t.fill { x, y -> if (x == 0 || y == 0 || x == 15 || y == 15) rgb(0, 80, 92) else scale(rgb(0, 134, 150), t.jitter(0.04f)) }
-                for (y in 5..10) for (x in 5..10) t[x, y] = chip                                  // the chip
-                for (i in 2..13 step 2) { t[i, 1] = gold; t[i, 14] = gold }                       // header pins
-                for (y in 1..4) for (x in 11..14) if (y == 1 || x == 11) t[x, y] = silver         // the USB socket
-                t[2, 12] = if (on) rgb(255, 150, 30) else rgb(110, 70, 20)                        // the LED
-                t[3, 12] = if (on) rgb(60, 255, 90) else rgb(20, 70, 30)
-                return true
-            }
-            "board_esp_top", "board_esp_top_on" -> {
-                val on = name.endsWith("on")
-                t.fill { x, y -> if (x == 0 || y == 0 || x == 15 || y == 15) rgb(14, 14, 18) else scale(rgb(34, 34, 40), t.jitter(0.04f)) }
-                for (y in 6..13) for (x in 3..12) t[x, y] = if (x == 3 || x == 12 || y == 6 || y == 13) rgb(150, 154, 162) else silver   // the metal Wi-Fi module
-                for (x in 3..12 step 2) { t[x, 2] = rgb(190, 150, 50); t[x + 1, 3] = rgb(190, 150, 50) }                                  // the antenna trace
-                t[13, 14] = if (on) rgb(80, 170, 255) else rgb(20, 40, 80)                       // the LED
-                return true
-            }
-            "board_side" -> {
-                t.fill { x, y -> if (y < 3 || y > 12) rgb(222, 178, 60) else scale(rgb(24, 48, 52), t.jitter(0.05f)) }
-                return true
-            }
-            "board_out" -> {
-                t.fill { x, y -> scale(rgb(24, 48, 52), t.jitter(0.05f)) }
-                for (i in 0..15) { t[i, 0] = rgb(222, 178, 60); t[i, 15] = rgb(222, 178, 60) }
-                for (y in 3..12) t[7, y] = rgb(255, 210, 60)                                      // an arrow: power comes out here
-                for (i in 0..3) { t[7 - i, 3 + i] = rgb(255, 210, 60); t[8 + i, 3 + i] = rgb(255, 210, 60) }
-                return true
-            }
-        }
-        return false
-    }
-
     private fun paint(name: String, t: Tile) {
-        if (name.startsWith("board_") && boardTile(name, t)) return
         if (name.startsWith("fest_")) { festivalIcon(name, t); return }
         if (kitchenTile(name, t)) return
         if (pack3Tile(name, t)) return

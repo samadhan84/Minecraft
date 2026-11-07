@@ -1144,39 +1144,6 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
             }
     }
 
-    /** The sketch uploaded in the Arduino IDE app (null where there is no such app: the board opens its own editor). */
-    var uploadedSketch: String? = null
-
-    /** The code on a board, or the Blink example when it has none yet (for the Arduino IDE screen). */
-    fun sketchText(x: Int, y: Int, z: Int): String =
-        signText(x, y, z).ifBlank { com.vishucraft.game.world.Sketches.examples[0].code }
-
-    /** Upload from the Arduino IDE: null when the board now runs the code, else what to fix. Empty code puts the board back on its ready-made program. */
-    fun uploadSketch(x: Int, y: Int, z: Int, code: String): String? {
-        val b = world.getBlock(x, y, z)
-        if (!com.vishucraft.game.world.Boards.isBoard(b)) return "That board is gone"
-        val text = code.take(com.vishucraft.game.world.Sketches.MAX_LENGTH)
-        if (text.isNotBlank()) {
-            try { com.vishucraft.game.world.Sketches.compile(text, b == Blocks.ESP32) }
-            catch (e: com.vishucraft.game.world.SketchError) { return "Line ${e.line}: ${e.message}" }
-        }
-        world.blockEntities.sign(x, y, z)?.text = if (text.isBlank()) "" else text
-        sound("ding", x + 0.5f, y + 0.5f, z + 0.5f, 0.7f)
-        uiEvents.add("toast:${if (text.isBlank()) "Back to the ready-made program" else "Uploaded! The board is running your sketch"}")
-        return null
-    }
-
-    /** Puts a ready-made program on a board (and takes any sketch off it). */
-    fun setBoardPreset(x: Int, y: Int, z: Int, index: Int) {
-        val b = world.getBlock(x, y, z)
-        if (!com.vishucraft.game.world.Boards.isBoard(b)) return
-        val n = com.vishucraft.game.world.Boards.programs(b).size
-        val m = world.getMeta(x, y, z)
-        setBlock(x, y, z, b, (m and 15) or ((index.coerceIn(0, n - 1)) shl 4))
-        world.blockEntities.sign(x, y, z)?.text = ""
-        uiEvents.add("toast:${com.vishucraft.game.world.Boards.program(b, world.getMeta(x, y, z)).title}")
-    }
-
     fun signText(x: Int, y: Int, z: Int): String = (world.blockEntities.get(x, y, z) as? com.vishucraft.game.world.SignEntity)?.text ?: ""
 
     /** Item frame: put the held item in, or take the item out with an empty hand. */
@@ -1255,7 +1222,6 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
             Blocks.ITEM_FRAME -> (world.blockEntities.get(t.x, t.y, t.z) as? com.vishucraft.game.world.ItemHolderEntity)?.stack?.let { Items.displayName(it.id) }
             Blocks.JUKEBOX -> (world.blockEntities.get(t.x, t.y, t.z) as? com.vishucraft.game.world.ItemHolderEntity)?.stack?.let { "Playing: " + Items.displayName(it.id) }
             Blocks.COMPOSTER -> "Composter ${world.getMeta(t.x, t.y, t.z).coerceAtMost(7)}/7"
-            Blocks.ARDUINO, Blocks.ESP32 -> if (signText(t.x, t.y, t.z).isNotBlank()) "${Blocks[t.block].name}: running your sketch" else world.getMeta(t.x, t.y, t.z).let { m -> "${Blocks[t.block].name}: ${com.vishucraft.game.world.Boards.program(t.block, m).title}${if (com.vishucraft.game.world.Boards.isOn(m)) " (on)" else ""}" }
             else -> null
         }
     }
@@ -1558,16 +1524,6 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
             Blocks.JUKEBOX -> { useJukebox(t.x, t.y, t.z); return }
             Blocks.CAMPFIRE -> if (item != null && campfireCooks(item.name) != null) { cookOnCampfire(t.x, t.y, t.z, item); return }
             Blocks.NOTE_BLOCK -> if (item == null) return
-            // Tap an Arduino or ESP32 board to choose the next program it runs.
-            Blocks.ARDUINO, Blocks.ESP32 -> {
-                sound("click", t.x + 0.5f, t.y + 0.5f, t.z + 0.5f)
-                val uploaded = uploadedSketch
-                // With the separate Arduino IDE (Android), a tap puts the sketch uploaded there on the board; without it, the board's own editor opens.
-                if (uploaded == null) uiEvents.add("ide:${t.x},${t.y},${t.z}")
-                else if (uploaded.isBlank()) uiEvents.add("toast:Open the Arduino IDE (home screen or pause menu), write a sketch and press Upload. Then tap the board.")
-                else uploadSketch(t.x, t.y, t.z, uploaded)?.let { uiEvents.add("toast:$it") }
-                return
-            }
         }
 
         if (item != null) {
@@ -1793,7 +1749,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
                 meta = if (t.nz == 1) 2 else if (t.nz == -1) 3 else if (t.nx == 1) 4 else 5
                 if (id == Blocks.PAINTING) meta = meta or (java.util.Random().nextInt(4) shl 3)
             }
-            Blocks.REPEATER, Blocks.OBSERVER, Blocks.ARDUINO, Blocks.ESP32 -> meta = meta xor 1
+            Blocks.REPEATER, Blocks.OBSERVER -> meta = meta xor 1
             Blocks.LEVER, in Blocks.WOOD_BUTTON_FIRST until Blocks.WOOD_BUTTON_FIRST + 6, Blocks.STONE_BUTTON -> {
                 // Stick it to the face that was tapped: floor, ceiling or a wall (a replaced plant: the floor).
                 val support = if (replace) 1 else when {
