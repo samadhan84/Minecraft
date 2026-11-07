@@ -83,7 +83,9 @@ enum class MobType(
     BOT_RED("Red Bot", 0.3f, 1.85f, 20, false, 1.1f),
     BOT_BLUE("Blue Bot", 0.3f, 1.85f, 20, false, 1.1f),
     BOT_GREEN("Green Bot", 0.3f, 1.85f, 20, false, 1.1f),
-    BOT_YELLOW("Yellow Bot", 0.3f, 1.85f, 20, false, 1.1f);
+    BOT_YELLOW("Yellow Bot", 0.3f, 1.85f, 20, false, 1.1f),
+    /** The Bedwars Ender Dragon: bought at the shop, flown by the game (not by the ordinary mob AI). */
+    ENDER_DRAGON("Ender Dragon", 1.4f, 1.6f, 400, false, 1f);
 
     val isBot get() = this == BOT_RED || this == BOT_BLUE || this == BOT_GREEN || this == BOT_YELLOW
     val isCitizen get() = this == CITIZEN || this == CITIZEN_WOMAN || this == CITIZEN_KID
@@ -225,7 +227,7 @@ class Mobs(private val world: World) {
             if (m.dead && m.deathTime > 0.8f) { it.remove(); continue }
             // Travellers go wherever their train or plane goes (moved by Passengers.kt), near or far;
             // robots fly where they are told (Robot.kt).
-            if (m.ride != null || m.type == MobType.ROBOT || m.type.isBot) continue
+            if (m.ride != null || m.type == MobType.ROBOT || m.type.isBot || m.type == MobType.ENDER_DRAGON) continue
             if (far || !world.isLoaded(floorInt(m.x), floorInt(m.z)) || (!hostileEnabled && m.type.hostile && !m.tamed)) {
                 if (persistent(m) && !m.dead && (far || !world.isLoaded(floorInt(m.x), floorInt(m.z)))) parked.add(m)
                 it.remove(); continue
@@ -811,7 +813,7 @@ class Mobs(private val world: World) {
     fun voice(t: MobType) = when (t) {
         MobType.WARDEN -> "enderman"
         MobType.DROWNED -> "zombie"; MobType.RABBIT, MobType.SQUID, MobType.COD -> "none"
-        MobType.IRON_GOLEM, MobType.SNOW_GOLEM, MobType.TURTLE, MobType.AXOLOTL, MobType.ROBOT, MobType.BOT_RED, MobType.BOT_BLUE, MobType.BOT_GREEN, MobType.BOT_YELLOW -> "none"
+        MobType.IRON_GOLEM, MobType.SNOW_GOLEM, MobType.TURTLE, MobType.AXOLOTL, MobType.ROBOT, MobType.BOT_RED, MobType.BOT_BLUE, MobType.BOT_GREEN, MobType.BOT_YELLOW, MobType.ENDER_DRAGON -> "none"
         MobType.MOOSHROOM -> "cow"; MobType.POLAR_BEAR, MobType.PANDA -> "bear"
         else -> t.name.lowercase()
     }

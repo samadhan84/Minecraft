@@ -326,6 +326,13 @@ object MobModels {
         // Bedwars players: a person in a team-coloured shirt, hat and trousers.
         MobType.BOT_RED to botModel("bw_red"), MobType.BOT_BLUE to botModel("bw_blue"),
         MobType.BOT_GREEN to botModel("bw_green"), MobType.BOT_YELLOW to botModel("bw_yellow"),
+        MobType.ENDER_DRAGON to listOf(
+            box(-0.7f, 0.2f, -1.6f, 0.7f, 1.5f, 1.6f, tiles("bw_dragon")),                                   // the body
+            box(-0.5f, 0.6f, -2.8f, 0.5f, 1.6f, -1.6f, tiles("bw_dragon", front = "bw_eye")),                 // the head
+            box(-0.3f, 0.7f, 1.6f, 0.3f, 1.2f, 3.4f, tiles("bw_dragon")),                                    // the tail
+            box(-4.2f, 1.2f, -0.9f, -0.7f, 1.35f, 1.0f, tiles("bw_wing"), 2, pivotY = 1.3f),                   // wings
+            box(0.7f, 1.2f, -0.9f, 4.2f, 1.35f, 1.0f, tiles("bw_wing"), 2, pivotY = 1.3f),
+        ),
         // The helper robot: a boxy body with a screen, a visor face with glowing eyes, an antenna and a jet.
         MobType.ROBOT to listOf(
             box(-0.14f, 0.02f, -0.1f, 0.14f, 0.2f, 0.1f, tiles("steel", top = "robot_light")),

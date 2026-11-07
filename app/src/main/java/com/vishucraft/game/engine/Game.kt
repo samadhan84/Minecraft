@@ -461,7 +461,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
                 carts.nearby(player.x, player.y, player.z, dir[0] / len, dir[2] / len)?.let { carts.enter(it, dir[0], dir[2]); offerMetroStations(it) }
             }
             lastVy = player.vy
-            player.speedMul = (if (input.sprint && !player.flying) 1.3f else 1f) * (if (hasEffect("swiftness")) 1.4f else 1f)
+            player.speedMul = (if (input.sprint && !player.flying) (if (level.bedwars > 0) 1.7f else 1.3f) else 1f) * (if (hasEffect("swiftness")) 1.4f else 1f)
             player.jumpMul = if (hasEffect("leaping")) 1.22f else 1f
             if (coasters.riding == null && carts.riding == null && mount == null && boats.riding == null && aircraft.riding == null && vehicles.riding == null && !sitting && !lift.riding &&
                 !rideEscalator(dt)) player.update(dt, world, input.moveForward, input.moveStrafe, input.jumpHeld, input.descendHeld)

@@ -1,5 +1,6 @@
 package com.vishucraft.desktop
 
+import com.vishucraft.game.engine.bedwarsShopTap
 import com.vishucraft.game.engine.buildFestival
 import com.vishucraft.game.engine.buildThemePark
 import com.vishucraft.game.engine.placeBuilding
@@ -828,6 +829,14 @@ class App(demo: File?) : ClientApp(demo) {
                 g.player.x = 40f; g.player.y = 67f; g.player.z = 12f; g.player.yaw = kotlin.math.PI.toFloat(); g.player.pitch = -0.2f
             }
             f == 2700 -> shot("26-bedwars-shop")
+            f == 2704 -> session?.game?.let { g ->
+                // Buy the Ender Dragon (10 emeralds) and look at it.
+                val red = com.vishucraft.game.engine.BwTeam.RED
+                g.inventory.add(com.vishucraft.game.world.Items.find("Emerald"), 10)
+                g.bedwarsShopTap(com.vishucraft.game.engine.RayHit(red.shopX(17), 64, red.shopZ(17), 0, 1, 0, com.vishucraft.game.world.Blocks.BW_SHOP))
+                g.player.x = 40f; g.player.y = 70f; g.player.z = 0f; g.player.yaw = kotlin.math.PI.toFloat(); g.player.pitch = 0.1f
+            }
+            f == 2708 -> shot("28-ender-dragon")
             f == 5600 -> session?.game?.let { g ->
                 // From high above the middle: the bots' wool bridges across the sky.
                 g.player.x = 0f; g.player.y = 140f; g.player.z = 0f; g.player.yaw = 0f; g.player.pitch = -1.5f

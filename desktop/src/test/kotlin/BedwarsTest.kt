@@ -24,7 +24,7 @@ class BedwarsTest {
         for (t in BwTeam.values()) {
             assertTrue(Blocks.isBed(g.world.getBlock(t.bedX, 64, t.bedZ)), "${t.label} bed")
             assertEquals(Blocks.GRASS, g.world.getBlock(t.cx + 3, 63, t.cz + 3), "${t.label} island")
-            assertEquals((0..8).toList(), (0..8).filter { k -> g.world.getBlock(t.shopX(k), 64, t.shopZ(k)) == Blocks.BW_SHOP })
+            assertEquals((0..17).toList(), (0..17).filter { k -> g.world.getBlock(t.shopX(k), 64, t.shopZ(k)) == Blocks.BW_SHOP })
         }
         assertEquals(Blocks.EMERALD_BLOCK, g.world.getBlock(0, 64, 0))
         assertEquals(7, g.bedwars!!.bots.size, "you and a team-mate, and three teams of two")
@@ -44,10 +44,45 @@ class BedwarsTest {
         g.inventory.add(Items.find("Iron Ingot"), 10)
         assertTrue(g.bedwarsShopTap(shop))
         assertEquals(woolBefore + 16, g.inventory.count(red.wool)); assertEquals(6, g.inventory.count(Items.find("Iron Ingot")))
-        // Stone sword for 10 iron (the third block).
+        // Stone sword for 10 iron (block 9, in the second row).
         g.inventory.add(Items.find("Iron Ingot"), 4)
-        g.bedwarsShopTap(RayHit(red.shopX(2), 64, red.shopZ(2), 0, 1, 0, Blocks.BW_SHOP))
+        g.bedwarsShopTap(RayHit(red.shopX(9), 64, red.shopZ(9), 0, 1, 0, Blocks.BW_SHOP))
         assertTrue(g.inventory.count(Items.find("Stone Sword")) == 1)
+        // Pickaxe, shears and cobblestone are on sale too.
+        fun buy(k: Int) = g.bedwarsShopTap(RayHit(red.shopX(k), 64, red.shopZ(k), 0, 1, 0, Blocks.BW_SHOP))
+        g.inventory.add(Items.find("Iron Ingot"), 60); g.inventory.add(Items.find("Gold Ingot"), 10)
+        buy(1); buy(5); buy(7); buy(6)
+        assertEquals(16, g.inventory.count(Blocks.COBBLESTONE)); assertEquals(1, g.inventory.count(Items.find("Wooden Pickaxe")))
+        assertEquals(1, g.inventory.count(Items.find("Shears"))); assertEquals(1, g.inventory.count(Items.find("Iron Pickaxe")))
+        // Every sign names the price.
+        for (k in 0..17) assertTrue(g.world.blockEntities.sign(red.shopX(k), 65, red.shopZ(k))?.text?.contains("-") == true, "sign $k")
+    }
+
+    @Test fun theEnderDragonCostsTenEmeraldsAndBreaksBeds() {
+        val g = game(2)
+        g.update(1 / 20f)
+        val red = BwTeam.RED; val em = Items.find("Emerald")
+        val dragon = RayHit(red.shopX(17), 64, red.shopZ(17), 0, 1, 0, Blocks.BW_SHOP)
+        g.inventory.add(em, 9)
+        g.bedwarsShopTap(dragon)
+        assertEquals(9, g.inventory.count(em), "9 emeralds is not enough")
+        assertTrue(g.mobs.list.none { it.type == MobType.ENDER_DRAGON })
+        g.inventory.add(em, 1)
+        g.bedwarsShopTap(dragon)
+        assertEquals(0, g.inventory.count(em))
+        assertTrue(g.mobs.list.any { it.type == MobType.ENDER_DRAGON }, "the dragon rises")
+        // It flies to the other beds and breaks them all.
+        var t = 0f
+        while (t < 80f && BwTeam.values().any { it != red && g.bedwars!!.bedAlive[it.ordinal] }) { g.update(1 / 20f); t += 1 / 20f }
+        assertTrue(BwTeam.values().none { it != red && g.bedwars!!.bedAlive[it.ordinal] }, "all the other beds are gone")
+        assertTrue(g.bedwars!!.bedAlive[red.ordinal], "your own bed stays")
+    }
+
+    @Test fun runningIsFasterInBedwars() {
+        val g = game(1)
+        g.input.sprint = true
+        g.update(1 / 20f)
+        assertTrue(g.player.speedMul >= 1.6f)
     }
 
     @Test fun whatYouMayBreak() {
@@ -57,6 +92,7 @@ class BedwarsTest {
         assertFalse(g.bedwarsMayBreak(red.bedX, 64, red.bedZ, g.world.getBlock(red.bedX, 64, red.bedZ)), "your own bed")
         assertTrue(g.bedwarsMayBreak(blue.bedX, 64, blue.bedZ, g.world.getBlock(blue.bedX, 64, blue.bedZ)), "another team's bed")
         assertTrue(g.bedwarsMayBreak(0, 64, 0, Blocks.WOOL_RED)); assertTrue(g.bedwarsMayBreak(0, 64, 0, Blocks.PLANKS))
+        for (b in listOf(Blocks.COBBLESTONE, Blocks.END_STONE, Blocks.OBSIDIAN)) assertTrue(g.bedwarsMayBreak(0, 64, 0, b), "placed blocks can be broken")
         assertFalse(g.bedwarsMayBreak(0, 63, 0, Blocks.GRASS)); assertFalse(g.bedwarsMayBreak(0, 64, 0, Blocks.BW_SHOP))
         // The generator drops iron on your island.
         run(g, 4f)

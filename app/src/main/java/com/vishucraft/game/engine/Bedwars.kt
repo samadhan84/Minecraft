@@ -44,11 +44,11 @@ enum class BwTeam(val label: String, val dye: Int, val wool: Int, val mob: MobTy
     val bedX get() = cx + ox * 5
     val bedZ get() = cz + oz * 5
     val bedFacing get() = if (ox != 0) 2 else 4
-    /** Shop block number [k] (0 to 8): a row along the side of the island, out of the way of anyone crossing it. */
-    fun shopX(k: Int) = cx - oz * 5 + ox * (k - 4)
-    fun shopZ(k: Int) = cz + ox * 5 + oz * (k - 4)
-    /** Which way the signs on the shop row face (towards the middle of the island's side). */
-    val shopFace get() = if (ox > 0) 3 else if (ox < 0) 2 else if (oz > 0) 4 else 5
+    /** Shop block number [k] (0 to 17): two rows of nine along opposite sides of the island, out of the way of anyone crossing it. */
+    fun shopX(k: Int) = cx - oz * (if (k < 9) 5 else -5) + ox * (k % 9 - 4)
+    fun shopZ(k: Int) = cz + ox * (if (k < 9) 5 else -5) + oz * (k % 9 - 4)
+    /** Which way the signs on shop block [k] face (towards the middle of the island). */
+    fun shopFace(k: Int): Int { val a = if (ox > 0) 3 else if (ox < 0) 2 else if (oz > 0) 4 else 5; return if (k < 9) a else a xor 1 }
     val bedHeadX get() = bedX + ChunkMesher.NORMALS[bedFacing][0]
     val bedHeadZ get() = bedZ + ChunkMesher.NORMALS[bedFacing][2]
 }
@@ -96,6 +96,7 @@ class Bedwars(val difficulty: Int) {
     internal var ironTimer = 0f; internal var goldTimer = 0f; internal var diamondTimer = 0f; internal var emeraldTimer = 0f
     internal var checkTimer = 0f; internal var celebrate = 0f; internal var timeFix = 0f
     internal var warnTimer = 0f
+    internal var dragon: Mob? = null; internal var dragonLife = 0f; internal var dragonHit = 0f
     val level: BwLevel get() = LEVELS[(difficulty - 1).coerceIn(0, 2)]
 }
 
@@ -133,8 +134,6 @@ private fun Game.buildBedwarsMap() {
     island(0, 0, 8.5)                                                      // the middle island (emeralds)
     setBlock(0, SURF, 0, Blocks.EMERALD_BLOCK)
     for ((x, z) in DIAMOND_ISLANDS) { island(x, z, 4.0, topId = Blocks.SAND); setBlock(x, SURF, z, Blocks.DIAMOND_BLOCK) }
-    val shop = listOf("Wool x16 - 4 Iron", "Planks x8 - 4 Gold", "Stone Sword - 10 Iron", "Iron Sword - 7 Gold", "Diamond Sword - 4 Diamonds",
-        "Iron Armour - 24 Iron", "Bow + 8 Arrows - 12 Gold", "Golden Apple - 3 Gold", "Ender Pearl - 4 Emeralds")
     for (t in BwTeam.values()) {
         island(t.cx, t.cz, 7.5)
         // A pad of the team's wool where you stand, and the generator in the middle.
@@ -149,12 +148,12 @@ private fun Game.buildBedwarsMap() {
         }
         setBlock(t.bedX, SURF, t.bedZ, Blocks.BED_FIRST + t.dye, t.bedFacing)
         setBlock(t.bedHeadX, SURF, t.bedHeadZ, Blocks.BED_FIRST + t.dye, t.bedFacing or Shapes.UPPER)
-        // Nine shop blocks in a row along the side of the island, each with a sign saying what it sells.
-        for (k in 0..8) {
+        // Two rows of nine shop blocks along opposite sides of the island, each with a sign saying what it sells.
+        for (k in 0 until SHOP_COUNT) {
             val x = t.shopX(k); val z = t.shopZ(k)
             setBlock(x, SURF, z, Blocks.BW_SHOP, k)
-            setBlock(x, SURF + 1, z, Blocks.SIGN, t.shopFace)
-            world.blockEntities.sign(x, SURF + 1, z)?.text = shop[k]
+            setBlock(x, SURF + 1, z, Blocks.SIGN, t.shopFace(k))
+            world.blockEntities.sign(x, SURF + 1, z)?.text = shopEntries[k].label
         }
         // Light posts at the corners of the island.
         for ((dx, dz) in listOf(5 to 5, -5 to 5, 5 to -5, -5 to -5)) { setBlock(t.cx + dx, SURF, t.cz + dz, Blocks.OAK_FENCE); setBlock(t.cx + dx, SURF + 1, t.cz + dz, Blocks.SEA_LANTERN) }
@@ -216,6 +215,7 @@ internal fun Game.updateBedwars(dt: Float) {
         return
     }
     generators(bw, dt)
+    updateDragons(bw, dt)
     for (b in bw.bots) updateBot(b, bw, dt)
     bw.checkTimer -= dt
     if (bw.checkTimer <= 0f) { bw.checkTimer = 0.5f; checkMatch(bw) }
@@ -251,7 +251,7 @@ private fun Game.generators(bw: Bedwars, dt: Float) {
         bw.diamondTimer = 0f
         for ((x, z) in DIAMOND_ISLANDS) { credit(x, z, 7f, 2, 1f); drop(Items.find("Diamond"), x, z) }
     }
-    if (bw.emeraldTimer >= 40f) { bw.emeraldTimer = 0f; drop(Items.find("Emerald"), 0, 0) }
+    if (bw.emeraldTimer >= 20f) { bw.emeraldTimer = 0f; drop(Items.find("Emerald"), 0, 0) }
 }
 
 private fun Game.checkMatch(bw: Bedwars) {
@@ -301,6 +301,8 @@ internal fun Game.bedwarsBedBroken(x: Int, z: Int) {
 }
 
 /** What the player may break in a match: beds of other teams, and the blocks players put down. Returns false (with a message) if not. */
+private val PLACED = setOf(Blocks.PLANKS, Blocks.GLASS, Blocks.COBBLESTONE, Blocks.END_STONE, Blocks.OBSIDIAN)
+
 internal fun Game.bedwarsMayBreak(x: Int, y: Int, z: Int, id: Int): Boolean {
     val bw = bedwars ?: return true
     if (Blocks.isBed(id)) {
@@ -308,7 +310,7 @@ internal fun Game.bedwarsMayBreak(x: Int, y: Int, z: Int, id: Int): Boolean {
         if ((x == own.bedX && z == own.bedZ) || (x == own.bedHeadX && z == own.bedHeadZ)) { notice("You can't break your own bed!"); return false }
         return true
     }
-    if (Blocks[id].name.endsWith("Wool") || id == Blocks.PLANKS || id == Blocks.GLASS) return true
+    if (Blocks[id].name.endsWith("Wool") || id in PLACED) return true
     notice("Only beds and the blocks players put down can be broken")
     return false
 }
@@ -322,31 +324,52 @@ private fun Game.notice(text: String) {
 
 // ---------------------------------------------------------------- the shop
 
-private class ShopEntry(val resource: String, val price: Int, val item: Int, val count: Int, val extra: Pair<Int, Int>? = null)
+private const val DRAGON = -1
+internal const val SHOP_COUNT = 18
 
-private fun shopEntries(): List<ShopEntry> = listOf(
-    ShopEntry("Iron Ingot", 4, BwTeam.RED.wool, 16),
-    ShopEntry("Gold Ingot", 4, Blocks.PLANKS, 8),
-    ShopEntry("Iron Ingot", 10, Items.find("Stone Sword"), 1),
-    ShopEntry("Gold Ingot", 7, Items.find("Iron Sword"), 1),
-    ShopEntry("Diamond", 4, Items.find("Diamond Sword"), 1),
-    ShopEntry("Iron Ingot", 24, Items.find("Iron Chestplate"), 1, Items.find("Iron Leggings") to 1),
-    ShopEntry("Gold Ingot", 12, Items.find("Bow"), 1, Items.find("Arrow") to 8),
-    ShopEntry("Gold Ingot", 3, Items.find("Golden Apple"), 1),
-    ShopEntry("Emerald", 4, Items.find("Ender Pearl"), 1),
-)
+private class ShopEntry(val label: String, val resource: String, val price: Int, val item: Int, val count: Int, val extra: Pair<Int, Int>? = null)
+
+/** What the shop blocks sell (block number = place in this list). Iron buys the basics, gold the good things, diamonds the best weapons, emeralds the rare ones. */
+private val shopEntries: List<ShopEntry> by lazy { listOf(
+    ShopEntry("Wool x16 - 4 Iron", "Iron Ingot", 4, BwTeam.RED.wool, 16),
+    ShopEntry("Cobblestone x16 - 12 Iron", "Iron Ingot", 12, Blocks.COBBLESTONE, 16),
+    ShopEntry("Planks x16 - 4 Gold", "Gold Ingot", 4, Blocks.PLANKS, 16),
+    ShopEntry("End Stone x12 - 24 Iron", "Iron Ingot", 24, Blocks.END_STONE, 12),
+    ShopEntry("Obsidian x4 - 4 Emeralds", "Emerald", 4, Blocks.OBSIDIAN, 4),
+    ShopEntry("Wooden Pickaxe - 10 Iron", "Iron Ingot", 10, Items.find("Wooden Pickaxe"), 1),
+    ShopEntry("Iron Pickaxe - 3 Gold", "Gold Ingot", 3, Items.find("Iron Pickaxe"), 1),
+    ShopEntry("Shears - 20 Iron", "Iron Ingot", 20, Items.find("Shears"), 1),
+    ShopEntry("Iron Axe - 6 Gold", "Gold Ingot", 6, Items.find("Iron Axe"), 1),
+    ShopEntry("Stone Sword - 10 Iron", "Iron Ingot", 10, Items.find("Stone Sword"), 1),
+    ShopEntry("Iron Sword - 7 Gold", "Gold Ingot", 7, Items.find("Iron Sword"), 1),
+    ShopEntry("Diamond Sword - 4 Diamonds", "Diamond", 4, Items.find("Diamond Sword"), 1),
+    ShopEntry("Iron Armour - 24 Iron", "Iron Ingot", 24, Items.find("Iron Chestplate"), 1, Items.find("Iron Leggings") to 1),
+    ShopEntry("Diamond Armour - 8 Diamonds", "Diamond", 8, Items.find("Diamond Chestplate"), 1, Items.find("Diamond Leggings") to 1),
+    ShopEntry("Bow + 8 Arrows - 12 Gold", "Gold Ingot", 12, Items.find("Bow"), 1, Items.find("Arrow") to 8),
+    ShopEntry("Golden Apple - 3 Gold", "Gold Ingot", 3, Items.find("Golden Apple"), 1),
+    ShopEntry("Ender Pearl - 4 Emeralds", "Emerald", 4, Items.find("Ender Pearl"), 1),
+    ShopEntry("ENDER DRAGON - 10 Emeralds", "Emerald", 10, DRAGON, 1),
+) }
 
 /** Tapping a shop block buys what the block sells, paying with iron, gold, diamonds or emeralds from your bag. */
-internal fun Game.bedwarsShopTap(t: RayHit?): Boolean {
+fun Game.bedwarsShopTap(t: RayHit?): Boolean {
     if (t == null || t.block != Blocks.BW_SHOP) return false
-    val e = shopEntries().getOrNull(world.getMeta(t.x, t.y, t.z)) ?: return true
+    val e = shopEntries.getOrNull(world.getMeta(t.x, t.y, t.z)) ?: return true
     val pay = Items.find(e.resource)
     if (inventory.count(pay) < e.price) {
         uiEvents.add("toast:Not enough ${Items.displayName(pay)}: you need ${e.price}")
         sound("hit_stone", t.x + 0.5f, t.y + 0.5f, t.z + 0.5f, 0.5f)
         return true
     }
+    if (e.item == DRAGON) {
+        if (!summonDragon()) { uiEvents.add("toast:Your Ender Dragon is still flying: wait until it is gone"); return true }
+    }
     inventory.remove(pay, e.price)
+    if (e.item == DRAGON) {
+        sound("ding", t.x + 0.5f, t.y + 0.5f, t.z + 0.5f, 0.8f)
+        uiEvents.add("toast:The ENDER DRAGON rises for your team! It hunts the other teams' beds and players")
+        return true
+    }
     for ((id, n) in listOfNotNull(e.item to e.count, e.extra)) {
         val left = inventory.add(id, n)
         if (left > 0) drops.spawn(ItemStack(id, left), player.x, player.y + 1f, player.z)
@@ -559,5 +582,62 @@ private fun Game.botShop(b: BwBot, m: Mob) {
         b.sword < 3 && b.diamond >= 3f -> { b.diamond -= 3f; b.sword = 3 }
         b.armor < 2 && b.diamond >= 6f -> { b.diamond -= 6f; b.armor = 2; m.health += 6f }
         else -> {}
+    }
+}
+
+// ---------------------------------------------------------------- the Ender Dragon
+
+/** Your team's dragon: it flies to the nearest other bed and smashes it and the blocks round it, then hunts the players of the other teams. */
+private fun Game.summonDragon(): Boolean {
+    val bw = bedwars ?: return false
+    if (bw.dragon != null) return false
+    val m = Mob(MobType.ENDER_DRAGON, player.x, SURF + 10f, player.z)
+    m.customName = "Your Ender Dragon"
+    mobs.list.add(m)
+    bw.dragon = m; bw.dragonLife = 90f; bw.dragonHit = 0f
+    sound("explode", player.x, player.y + 4f, player.z, 1f)
+    return true
+}
+
+private fun Game.updateDragons(bw: Bedwars, dt: Float) {
+    val m = bw.dragon ?: return
+    bw.dragonLife -= dt
+    if (bw.dragonLife <= 0f || m.dead || bw.finished) { mobs.list.remove(m); bw.dragon = null; return }
+    // Where to: the nearest bed of another team, else the nearest player of another team.
+    var tx = m.x; var tz = m.z; var best = Float.MAX_VALUE; var bedTeam: BwTeam? = null
+    for (t in BwTeam.values()) if (t != BwTeam.RED && bw.bedAlive[t.ordinal]) {
+        val d = hypot(t.bedX - m.x, t.bedZ - m.z)
+        if (d < best) { best = d; tx = t.bedX + 0.5f; tz = t.bedZ + 0.5f; bedTeam = t }
+    }
+    if (bedTeam == null) for (b in bw.bots) {
+        val bm = b.mob ?: continue
+        if (b.team == BwTeam.RED || bm.dead || b.out) continue
+        val d = hypot(bm.x - m.x, bm.z - m.z)
+        if (d < best) { best = d; tx = bm.x; tz = bm.z }
+    }
+    val dx = tx - m.x; val dz = tz - m.z; val d = hypot(dx, dz)
+    val speed = 9f
+    if (d > 2.5f) { m.x += dx / d * speed * dt; m.z += dz / d * speed * dt }
+    m.y += ((SURF + 4f + (if (d < 12f) 0f else 6f)) - m.y) * min(1f, 2f * dt)
+    m.yaw = atan2(-dx, dz)
+    m.moving = true; m.walkPhase += dt * 6f
+    // At the bed: it is destroyed, and everything players built round it.
+    if (bedTeam != null && d < 6f) {
+        for (ddx in -4..4) for (ddz in -4..4) for (y in SURF - 1..SURF + 3) {
+            val x = bedTeam.bedX + ddx; val z = bedTeam.bedZ + ddz
+            val id = world.getBlock(x, y, z)
+            if (id != Blocks.AIR && (Blocks[id].name.endsWith("Wool") || id in PLACED)) setBlock(x, y, z, Blocks.AIR)
+        }
+        destroyBed(bedTeam, "the Ender Dragon")
+    }
+    // Anyone of another team close to the dragon is hit hard.
+    bw.dragonHit -= dt
+    if (bw.dragonHit <= 0f) {
+        bw.dragonHit = 0.5f
+        for (b in bw.bots) {
+            val bm = b.mob ?: continue
+            if (b.team == BwTeam.RED || bm.dead || b.out) continue
+            if (hypot(bm.x - m.x, bm.z - m.z) < 5f && abs(bm.y - m.y) < 8f) { mobs.damage(bm, 14f, (bm.x - m.x) / 5f, (bm.z - m.z) / 5f); sound("hurt", bm.x, bm.y + 1f, bm.z, 0.6f) }
+        }
     }
 }

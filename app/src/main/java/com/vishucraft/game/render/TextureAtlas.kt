@@ -2363,6 +2363,7 @@ object TextureAtlas {
         val c = when (name) {
             "bw_red" -> rgb(214, 48, 49); "bw_blue" -> rgb(52, 112, 230); "bw_green" -> rgb(52, 178, 76); "bw_yellow" -> rgb(242, 196, 40)
             "bw_trousers" -> rgb(52, 56, 88); "bw_hair" -> rgb(64, 42, 24)
+            "bw_dragon" -> rgb(32, 24, 44); "bw_wing" -> rgb(74, 40, 112); "bw_eye" -> rgb(224, 64, 240)
             else -> null
         }
         if (c != null) { t.fill { x, y -> if (x == 0 || y == 0 || x == 15 || y == 15) scale(c, 0.8f) else scale(c, t.jitter(0.04f)) }; return true }
