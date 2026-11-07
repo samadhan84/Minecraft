@@ -152,4 +152,30 @@ class BedwarsTest {
         assertEquals(3, LevelData.read(dir)!!.bedwars)
         assertTrue(Items.shown.isNotEmpty())
     }
+
+    @Test fun shopkeepersTradeLikeVillagers() {
+        val g = game(1)
+        g.update(1 / 20f)
+        val keepers = g.mobs.list.filter { it.shopkeeper }
+        assertEquals(8, keepers.size, "an item shop and an upgrade shop on each of the four islands")
+        val iron = Items.find("Iron Ingot"); val gold = Items.find("Gold Ingot")
+        // The first shopkeeper near you sells the wooden sword (3 iron), golden sword (10 iron) and shears (2 iron).
+        val shop = keepers.first { it.customName!!.startsWith("Shopkeeper") && Math.abs(it.x - g.player.x) < 8f }
+        val up = keepers.first { it.customName == "Upgrade shop" && Math.abs(it.x - g.player.x) < 8f }
+        g.inventory.add(iron, 40); g.inventory.add(gold, 20)
+        assertTrue(g.trade(shop.uid, 2).startsWith("Got"))
+        assertEquals(1, g.inventory.count(Items.find("Golden Sword"))); assertEquals(30, g.inventory.count(iron))
+        g.trade(shop.uid, 3); assertEquals(1, g.inventory.count(Items.find("Shears")))
+        // 10 gold buys 1000 blocks (what does not fit in the bag lands on the ground).
+        g.trade(shop.uid, 13)
+        val planks = g.inventory.count(BwTeam.RED.wool) - 16 + g.drops.list.filter { it.stack.id == BwTeam.RED.wool }.sumOf { it.stack.count }
+        assertTrue(planks >= 1000, "1000 wool for 10 gold, got $planks")
+        assertEquals(10, g.inventory.count(gold))
+        // The attack upgrade: paid in gold, only once.
+        assertTrue(g.trade(up.uid, 0).contains("upgraded")); assertEquals(1, g.bedwars!!.attackLevel)
+        assertTrue(g.trade(up.uid, 0).contains("already")); assertEquals(4, g.inventory.count(gold))
+        // They cannot be hurt.
+        g.mobs.damage(shop, 500f, 0f, 0f); g.update(1 / 20f)
+        assertTrue(shop.health > 0f && !shop.dead)
+    }
 }

@@ -929,6 +929,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
     private fun hit(mobHit: MobHit, item: ItemDef?) {
         var dmg = (item?.attack ?: 1).toFloat()
         if (hasEffect("strength")) dmg += 3f
+        if (level.bedwars > 0) dmg *= 1f + 0.35f * (bedwars?.attackLevel ?: 0)
         // A mace hits harder the further you fall onto the target.
         if (item?.name == "Mace" && player.vy < -6f) dmg += (-player.vy - 6f) * 1.5f
         val len = sqrt(dir[0] * dir[0] + dir[2] * dir[2]).coerceAtLeast(0.01f)
@@ -1235,10 +1236,17 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
     fun trade(uid: Int, index: Int): String {
         val v = mobs.list.firstOrNull { it.uid == uid && it.type == MobType.VILLAGER } ?: return "The villager walked away"
         val t = com.vishucraft.game.world.Trades.jobFor(v.uid).offers.getOrNull(index) ?: return ""
+        val sharp = if (level.bedwars > 0) sharpnessLevel(t.get) else 0
+        if (sharp > 0 && (bedwars?.attackLevel ?: 0) >= sharp) return "You already have this attack upgrade or a better one"
         if (survival && inventory.count(t.give) < t.giveCount) return "You need ${t.giveCount} ${Items.displayName(t.give)}"
         if (survival) inventory.remove(t.give, t.giveCount)
-        val left = inventory.add(t.get, t.getCount)
-        if (left > 0) drops.spawn(ItemStack(t.get, left), player.x, player.y + 1f, player.z)
+        if (sharp > 0) {
+            bedwars?.attackLevel = sharp
+            sound("ding", v.x, v.y + 1.5f, v.z)
+            return "Your attack is upgraded: ${sharp * 35}% more damage"
+        }
+        var left = inventory.add(t.get, t.getCount)
+        while (left > 0) { val n = minOf(left, 64); drops.spawn(ItemStack(t.get, n), player.x, player.y + 1f, player.z); left -= n }
         sound("pop", v.x, v.y + 1.5f, v.z)
         addXp(2)
         award("trade")
@@ -1286,7 +1294,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
         val name = item?.name
         val weapon = item?.tool == ToolType.SWORD || item?.tool == ToolType.AXE
         if (name == "Name Tag") { uiEvents.add("name:${mob.uid}"); return true }
-        if (mob.type == MobType.VILLAGER && !weapon) { uiEvents.add("trade:${mob.uid}"); return true }
+        if (mob.type == MobType.VILLAGER && (!weapon || mob.shopkeeper)) { uiEvents.add("trade:${mob.uid}"); return true }
         if (!weapon && robotTap(mob)) return true
         if (mob.type.isCitizen && !weapon) {
             val hello = if (mob.type == MobType.CITIZEN_KID) listOf("Hi! I'm going to school!", "Do you want to play cricket?", "I love the metro!", "My school bag is so heavy!")

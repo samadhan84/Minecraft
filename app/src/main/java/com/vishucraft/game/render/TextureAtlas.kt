@@ -2367,6 +2367,14 @@ object TextureAtlas {
             else -> null
         }
         if (c != null) { t.fill { x, y -> if (x == 0 || y == 0 || x == 15 || y == 15) scale(c, 0.8f) else scale(c, t.jitter(0.04f)) }; return true }
+        if (name == "bw_sharp") {
+            // An upgrade badge: a red blade on gold.
+            t.fill { x, y -> if (x == 0 || y == 0 || x == 15 || y == 15) rgb(120, 78, 30) else scale(rgb(230, 184, 80), t.jitter(0.04f)) }
+            for (i in 3..12) { t[i, 15 - i] = rgb(230, 230, 240); t[i + 1, 15 - i] = rgb(176, 180, 200); t[i, 14 - i] = rgb(176, 180, 200) }
+            for (i in 2..4) { t[i, 12 + (i - 2) / 2] = rgb(120, 60, 24) }
+            for (y in 10..13) t[4, y] = rgb(214, 48, 49)
+            return true
+        }
         if (name == "bw_shop") {
             // A gold and emerald market block: planks with a coin and a green gem.
             t.fill { x, y -> if (x == 0 || y == 0 || x == 15 || y == 15) rgb(120, 78, 30) else scale(rgb(214, 160, 70), t.jitter(0.05f) * (if (y % 5 == 0) 0.85f else 1f)) }

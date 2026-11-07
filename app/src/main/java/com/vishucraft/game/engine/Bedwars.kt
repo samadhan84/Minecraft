@@ -7,6 +7,7 @@ import com.vishucraft.game.world.ItemStack
 import com.vishucraft.game.world.Items
 import com.vishucraft.game.world.LevelData
 import com.vishucraft.game.world.Shapes
+import com.vishucraft.game.world.Trade
 import com.vishucraft.game.world.floorInt
 import kotlin.math.abs
 import kotlin.math.atan2
@@ -96,6 +97,8 @@ class Bedwars(val difficulty: Int) {
     internal var ironTimer = 0f; internal var goldTimer = 0f; internal var diamondTimer = 0f; internal var emeraldTimer = 0f
     internal var checkTimer = 0f; internal var celebrate = 0f; internal var timeFix = 0f
     internal var warnTimer = 0f
+    /** The player's attack upgrade (0 to 3), bought from the upgrade shopkeeper. */
+    var attackLevel = 0
     internal var dragon: Mob? = null; internal var dragonLife = 0f; internal var dragonHit = 0f
     val level: BwLevel get() = LEVELS[(difficulty - 1).coerceIn(0, 2)]
 }
@@ -169,6 +172,8 @@ private fun Game.startBedwars() {
     player.x = red.cx - 1.5f; player.y = SURF.toFloat(); player.z = red.cz + 0.5f
     player.yaw = -Math.PI.toFloat() / 2
     mobs.hostileEnabled = false
+    com.vishucraft.game.world.Trades.special.clear()
+    for (t in BwTeam.values()) spawnShopkeepers(t)
     timeOfDay = 0.3f
     for (t in BwTeam.values()) for (i in 0 until (if (t == red) 1 else 2)) {
         val b = BwBot(t, i)
@@ -216,6 +221,7 @@ internal fun Game.updateBedwars(dt: Float) {
     }
     generators(bw, dt)
     updateDragons(bw, dt)
+    for (m in mobs.list) if (m.shopkeeper) m.health = m.type.maxHealth.toFloat()
     for (b in bw.bots) updateBot(b, bw, dt)
     bw.checkTimer -= dt
     if (bw.checkTimer <= 0f) { bw.checkTimer = 0.5f; checkMatch(bw) }
@@ -640,4 +646,61 @@ private fun Game.updateDragons(bw: Bedwars, dt: Float) {
             if (hypot(bm.x - m.x, bm.z - m.z) < 5f && abs(bm.y - m.y) < 8f) { mobs.damage(bm, 14f, (bm.x - m.x) / 5f, (bm.z - m.z) / 5f); sound("hurt", bm.x, bm.y + 1f, bm.z, 0.6f) }
         }
     }
+}
+
+// ---------------------------------------------------------------- the shopkeepers
+
+/** Which upgrade a trade result is: 1 to 3 for Sharpness I to III, else 0. */
+fun sharpnessLevel(item: Int): Int = when (Items.get(item)?.name) { "Sharpness I" -> 1; "Sharpness II" -> 2; "Sharpness III" -> 3; else -> 0 }
+
+private val shopkeeperOffers: List<Trade> by lazy {
+    val iron = Items.find("Iron Ingot"); val gold = Items.find("Gold Ingot"); val em = Items.find("Emerald")
+    listOf(
+        Trade(iron, 3, Items.find("Wooden Sword"), 1),
+        Trade(iron, 5, Items.find("Iron Sword"), 1),
+        Trade(iron, 10, Items.find("Golden Sword"), 1),
+        Trade(iron, 2, Items.find("Shears"), 1),
+        Trade(iron, 5, Items.find("Iron Pickaxe"), 1),
+        Trade(iron, 10, Items.find("Iron Axe"), 1),
+        Trade(iron, 4, BwTeam.RED.wool, 16),
+        Trade(iron, 8, Blocks.COBBLESTONE, 16),
+        Trade(iron, 12, Blocks.END_STONE, 12),
+        Trade(iron, 12, Items.find("Iron Chestplate"), 1),
+        Trade(gold, 3, Items.find("Bow"), 1),
+        Trade(iron, 2, Items.find("Arrow"), 8),
+        Trade(gold, 1, BwTeam.RED.wool, 100),
+        Trade(gold, 10, BwTeam.RED.wool, 1000),
+        Trade(gold, 10, Blocks.PLANKS, 1000),
+        Trade(gold, 10, Blocks.COBBLESTONE, 1000),
+        Trade(gold, 2, Items.find("Golden Apple"), 1),
+        Trade(em, 4, Items.find("Ender Pearl"), 1),
+    )
+}
+
+private val upgradeOffers: List<Trade> by lazy {
+    val gold = Items.find("Gold Ingot"); val dia = Items.find("Diamond")
+    listOf(
+        Trade(gold, 6, Items.find("Sharpness I"), 1),
+        Trade(gold, 12, Items.find("Sharpness II"), 1),
+        Trade(dia, 5, Items.find("Sharpness III"), 1),
+        Trade(gold, 3, Items.find("Bow"), 1),
+        Trade(gold, 4, Items.find("Arrow"), 32),
+    )
+}
+
+/** Two shopkeepers on a team's island: one sells swords, tools, blocks and bows for iron and gold, the other sells attack upgrades. Tap one to trade like with a villager. */
+private fun Game.spawnShopkeepers(t: BwTeam) {
+    // Inside the island, a little behind where the team stands, one on each side.
+    fun keeper(side: Int, name: String, offers: List<Trade>) {
+        val x = t.cx + 0.5f - t.ox * 3 - t.oz * 3 * side
+        val z = t.cz + 0.5f - t.oz * 3 + t.ox * 3 * side
+        val m = Mob(MobType.VILLAGER, x, SURF.toFloat(), z)
+        m.shopkeeper = true
+        m.customName = name
+        m.yaw = atan2(-(t.cx + 0.5f - x), t.cz + 0.5f - z)
+        mobs.list.add(m)
+        com.vishucraft.game.world.Trades.special[m.uid] = com.vishucraft.game.world.Trades.Job(name, offers)
+    }
+    keeper(-1, "Shopkeeper: iron and gold", shopkeeperOffers)
+    keeper(1, "Upgrade shop", upgradeOffers)
 }

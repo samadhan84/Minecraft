@@ -115,6 +115,8 @@ class Mob(val type: MobType, var x: Float, var y: Float, var z: Float, val uid: 
     /** Boomling fuse in seconds (-1 when not lit). */
     var fuse = -1f
     var walkPhase = 0f
+    /** A Bedwars shopkeeper: stands still, cannot be hurt, sells what the game says. */
+    var shopkeeper = false
     var moving = false
     var burning = false
     /** Negative while a baby (seconds until grown up). */
@@ -227,7 +229,7 @@ class Mobs(private val world: World) {
             if (m.dead && m.deathTime > 0.8f) { it.remove(); continue }
             // Travellers go wherever their train or plane goes (moved by Passengers.kt), near or far;
             // robots fly where they are told (Robot.kt).
-            if (m.ride != null || m.type == MobType.ROBOT || m.type.isBot || m.type == MobType.ENDER_DRAGON) continue
+            if (m.ride != null || m.type == MobType.ROBOT || m.type.isBot || m.type == MobType.ENDER_DRAGON || m.shopkeeper) continue
             if (far || !world.isLoaded(floorInt(m.x), floorInt(m.z)) || (!hostileEnabled && m.type.hostile && !m.tamed)) {
                 if (persistent(m) && !m.dead && (far || !world.isLoaded(floorInt(m.x), floorInt(m.z)))) parked.add(m)
                 it.remove(); continue
@@ -826,6 +828,7 @@ class Mobs(private val world: World) {
     /** Damage with knockback away from (fromX, fromZ); pass 0,0 direction for none. */
     fun damage(m: Mob, amount: Float, kx: Float, kz: Float) {
         if (m.dead) return
+        if (m.shopkeeper) return
         m.health -= amount
         m.hurtTime = 0.35f
         m.vx += kx * 6f; m.vz += kz * 6f

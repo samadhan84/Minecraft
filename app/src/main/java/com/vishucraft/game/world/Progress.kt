@@ -57,7 +57,10 @@ object Trades {
         )
     }
 
-    fun jobFor(uid: Int): Job = jobs[Math.floorMod(uid * 7919, jobs.size)]
+    /** Shopkeepers made by the game (Bedwars), by the creature's id: they sell what the game says instead of a job's offers. */
+    val special = HashMap<Int, Job>()
+
+    fun jobFor(uid: Int): Job = special[uid] ?: jobs[Math.floorMod(uid * 7919, jobs.size)]
 }
 
 /** Achievements (key -> title and how to get it). */
