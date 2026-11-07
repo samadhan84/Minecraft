@@ -59,7 +59,7 @@ class BwLevel(val income: Float, val delay: Float, val speed: Float, val hitCool
 private val LEVELS: List<BwLevel> = listOf(
     BwLevel(income = 0.6f, delay = 150f, speed = 3.4f, hitCooldown = 1.4f, damage = 0.5f, bridge = 0.5f, breakTime = 8f, sight = 5f),     // Easy
     BwLevel(income = 0.9f, delay = 75f, speed = 4.3f, hitCooldown = 1.0f, damage = 0.8f, bridge = 0.3f, breakTime = 5f, sight = 7f),      // Medium
-    BwLevel(income = 1.3f, delay = 30f, speed = 5.0f, hitCooldown = 0.7f, damage = 1.0f, bridge = 0.15f, breakTime = 3f, sight = 10f),    // Hard
+    BwLevel(income = 1.8f, delay = 15f, speed = 5.6f, hitCooldown = 0.5f, damage = 1.3f, bridge = 0.1f, breakTime = 2f, sight = 14f),     // Hard
 )
 
 /** One bot player. */
