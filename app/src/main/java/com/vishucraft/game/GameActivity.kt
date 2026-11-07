@@ -15,6 +15,7 @@ import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
+import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -317,6 +318,7 @@ class GameActivity : Activity() {
             if (game.isClient) { showToast("The host saves this world"); return@addMenu }
             glView.queueEvent { game.save(); runOnUiThread { showToast("Game saved") } }
         }
+        addMenu("World password") { worldPasswordMenu() }
         addMenu("Save and quit") { saveAndQuit() }
         addMenu(modeLabel()) { b ->
             if (game.isClient) { showToast("The host picks the game mode"); return@addMenu }
@@ -514,8 +516,75 @@ class GameActivity : Activity() {
             .setMessage(text).setPositiveButton("OK", null).show()
     }
 
-    /** Save and quit (the world is saved when the game screen closes). */
-    private fun saveAndQuit() = finish()
+    /**
+     * Save and quit (the world is saved when the game screen closes). A world with no password yet asks whether to
+     * give it one: whatever the player types becomes its password. Saying no is remembered (one can still be added
+     * from the game menu).
+     */
+    private fun saveAndQuit() {
+        if (game.isClient || level.password.isNotEmpty() || level.passwordAsked || level.bedwars > 0) { finish(); return }
+        android.app.AlertDialog.Builder(this).setTitle("Add a password to this world?")
+            .setMessage("Only people who know the password can open it. You choose the password.")
+            .setPositiveButton("Add password") { _, _ -> setPasswordDialog { finish() } }
+            .setNegativeButton("No thanks") { _, _ -> level.passwordAsked = true; finish() }
+            .setNeutralButton("Back to game", null).show()
+    }
+
+    /** Asks for a new password (typed twice) for this world, then runs [then]. */
+    private fun setPasswordDialog(then: () -> Unit) {
+        fun field(hint: String) = EditText(this).apply {
+            this.hint = hint
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
+            setSingleLine()
+        }
+        val first = field("Password"); val again = field("Type it again")
+        val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dpi(20f), dpi(8f), dpi(20f), 0); addView(first); addView(again) }
+        val dialog = android.app.AlertDialog.Builder(this).setTitle("Choose a password")
+            .setMessage("Anything you like (at least ${com.vishucraft.game.engine.WorldLock.MIN_LENGTH} characters). You will type it to open this world.")
+            .setView(box).setPositiveButton("Save", null).setNegativeButton("Cancel", null).create()
+        dialog.setOnShowListener {
+            dialog.getButton(android.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                val problem = com.vishucraft.game.engine.WorldLock.problem(first.text.toString(), again.text.toString())
+                if (problem != null) { again.error = problem; return@setOnClickListener }
+                level.password = com.vishucraft.game.engine.WorldLock.make(first.text.toString())
+                level.passwordAsked = true
+                dialog.dismiss(); showToast("Password saved"); then()
+            }
+            first.requestFocus()
+        }
+        dialog.show()
+    }
+
+    /** Takes the password away: needs the secret code. */
+    private fun removePasswordDialog() {
+        val input = EditText(this).apply {
+            hint = "Secret code"
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
+            setSingleLine()
+        }
+        val box = FrameLayout(this).apply { setPadding(dpi(20f), dpi(8f), dpi(20f), 0); addView(input) }
+        val dialog = android.app.AlertDialog.Builder(this).setTitle("Secret code")
+            .setMessage("Type the secret code to take this world's password away.").setView(box)
+            .setPositiveButton("OK", null).setNegativeButton("Cancel", null).create()
+        dialog.setOnShowListener {
+            dialog.getButton(android.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                if (com.vishucraft.game.engine.WorldLock.secretOk(input.text.toString())) { level.password = ""; dialog.dismiss(); showToast("Password removed") }
+                else { input.error = "Wrong secret code"; input.setText("") }
+            }
+            input.requestFocus()
+        }
+        dialog.show()
+    }
+
+    /** The game menu's password button: add one, or (with the secret code) take it away. */
+    private fun worldPasswordMenu() {
+        if (game.isClient) { showToast("Only the host can set a password"); return }
+        if (level.password.isEmpty()) { setPasswordDialog { } ; return }
+        android.app.AlertDialog.Builder(this).setTitle("This world has a password")
+            .setMessage("To take the password away you need the secret code.")
+            .setPositiveButton("Take it away") { _, _ -> removePasswordDialog() }
+            .setNegativeButton("Close", null).show()
+    }
 
     private fun showControls() {
         android.app.AlertDialog.Builder(this)

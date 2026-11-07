@@ -71,17 +71,41 @@ class CreativeBreakTest {
     }
 }
 
-/** The password asked for before a world opens. */
+/** World passwords: optional, chosen by the player, kept per world as a salted hash. */
 class WorldLockTest {
-    @Test fun onlyThePasswordWorks() {
-        assertTrue(WorldLock.ok("dhruvil@123"))
-        assertTrue(WorldLock.ok("  dhruvil@123 "))
-        assertFalse(WorldLock.ok("Dhruvil@123"))
-        assertFalse(WorldLock.ok(""))
-        assertFalse(WorldLock.ok(null))
-        // The secret code turns the lock off, and is not the password (and the password is not the secret code).
+    @Test fun sha256IsCorrect() {
+        assertEquals("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad", WorldLock.sha256("abc"))
+        assertEquals("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", WorldLock.sha256(""))
+        assertEquals("248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1", WorldLock.sha256("abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq"))
+    }
+
+    @Test fun anyPasswordTheyChooseBecomesTheirPassword() {
+        val stored = WorldLock.make("my secret 42")
+        assertFalse(stored.contains("my secret"), "never kept as text")
+        assertTrue(WorldLock.check(stored, "my secret 42"))
+        assertTrue(WorldLock.check(stored, "  my secret 42 "))
+        assertFalse(WorldLock.check(stored, "my secret 43")); assertFalse(WorldLock.check(stored, "")); assertFalse(WorldLock.check(stored, null))
+        // A different salt gives a different stored value, and a world with no password always opens.
+        assertNotEquals(stored, WorldLock.make("my secret 42"))
+        assertTrue(WorldLock.check("", null)); assertTrue(WorldLock.check("", "anything"))
+        assertNull(WorldLock.problem("abc", "abc")); assertNotNull(WorldLock.problem("ab", "ab")); assertNotNull(WorldLock.problem("abcd", "abce"))
+    }
+
+    @Test fun onlyTheSecretCodeTakesItAway() {
         assertTrue(WorldLock.secretOk("dhu@123")); assertFalse(WorldLock.secretOk("dhruvil@123")); assertFalse(WorldLock.secretOk(null))
-        assertFalse(WorldLock.ok("dhu@123"))
+    }
+
+    @Test fun theWorldFileKeepsThePassword() {
+        val dir = kotlin.io.path.createTempDirectory("pw").toFile()
+        val l = LevelData.create(5L, "Locked", GameMode.SURVIVAL)
+        l.password = WorldLock.make("hello123"); l.passwordAsked = true; l.bedwars = 2
+        l.write(dir)
+        val back = LevelData.read(dir)!!
+        assertTrue(WorldLock.check(back.password, "hello123")); assertFalse(WorldLock.check(back.password, "nope"))
+        assertTrue(back.passwordAsked); assertEquals(2, back.bedwars)
+        // A world with no password reads back with none.
+        val free = LevelData.create(6L, "Free", GameMode.SURVIVAL); val d2 = kotlin.io.path.createTempDirectory("pw2").toFile(); free.write(d2)
+        assertEquals("", LevelData.read(d2)!!.password); assertFalse(LevelData.read(d2)!!.passwordAsked)
         assertTrue(Items.shown.none { it.name.endsWith("Spawn Egg") && (it.name.startsWith("Man") || it.name.startsWith("Woman") || it.name.startsWith("Child")) })
     }
 }

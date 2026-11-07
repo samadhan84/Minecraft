@@ -26,8 +26,6 @@ interface ClientPrefs {
     var weather: Boolean
     var fancy: Boolean
     var playerName: String
-    /** Whether a world asks for the password (see engine/WorldLock); turning it off needs the secret code. */
-    var passwordLock: Boolean
     /** Label + "change" action for each option, shown as buttons on the settings screen. */
     fun rows(): List<Pair<() -> String, () -> Unit>>
     fun playLimit(): com.vishucraft.game.engine.PlayLimit
@@ -68,7 +66,7 @@ interface NetSupport {
  */
 abstract class ClientApp(protected val demo: File?) {
     protected enum class Menu { TITLE, WORLDS, CREATE, JOIN, SETTINGS, CONTROLS, CONFIRM_DELETE, PASSWORD }
-    protected enum class Overlay { NONE, PAUSE, CREATIVE, CONTAINER, SETTINGS, CONTROLS, NAME_MOB, TRADE, ACHIEVEMENTS, SIGN, ENDING, INTERNET, FLIGHTS, FLOORS, METRO, CALL_TRAIN, ROBOT }
+    protected enum class Overlay { NONE, PAUSE, CREATIVE, CONTAINER, SETTINGS, CONTROLS, NAME_MOB, TRADE, ACHIEVEMENTS, SIGN, ENDING, INTERNET, FLIGHTS, FLOORS, METRO, CALL_TRAIN, ROBOT, PASSWORD_ASK, PASSWORD_SET, PASSWORD_REMOVE }
 
     // ---------------------------------------------------------------- platform parts
     protected abstract val prefs: ClientPrefs
@@ -111,9 +109,7 @@ abstract class ClientApp(protected val demo: File?) {
     private var afterPassword: (() -> Unit)? = null
     private var passwordBack = Menu.WORLDS
     private var wrongPassword = false
-    private val secretField = Ui.Field("", "Secret code", 32, secret = true)
-    private var askingSecret = false
-    private var wrongSecret = false
+    private var passwordStored = ""
     protected val seedField = Ui.Field("", "Seed (leave empty for random)")
     protected var survival = true
     /** A new creative world on a flat world (false: normal land with hills, trees and water). */
@@ -187,6 +183,9 @@ abstract class ClientApp(protected val demo: File?) {
             Overlay.METRO -> metroScreen(s)
             Overlay.CALL_TRAIN -> callTrainScreen(s)
             Overlay.ROBOT -> robotScreen(s)
+            Overlay.PASSWORD_ASK -> passwordAskScreen(s)
+            Overlay.PASSWORD_SET -> passwordSetScreen(s)
+            Overlay.PASSWORD_REMOVE -> passwordRemoveScreen(s)
             Overlay.FLOORS -> floorsScreen(s)
             Overlay.ENDING -> endingScreen()
             Overlay.INTERNET -> internetScreen()
@@ -385,30 +384,103 @@ abstract class ClientApp(protected val demo: File?) {
 
     protected var worldScroll = 0f
 
-    /** Asks for the password (see engine/WorldLock), then runs [then] (straight away in the demo run). */
-    protected fun needPassword(back: Menu, then: () -> Unit) {
-        if (demo != null || !prefs.passwordLock) { then(); return }
-        afterPassword = then; passwordBack = back; wrongPassword = false
+    /** Asks for the world's password (see engine/WorldLock) if it has one, then runs [then] (straight away in the demo run). */
+    protected fun needPassword(back: Menu, stored: String, then: () -> Unit) {
+        if (demo != null || stored.isEmpty()) { then(); return }
+        afterPassword = then; passwordBack = back; passwordStored = stored; wrongPassword = false
         passwordField.text = ""; ui.focus = passwordField
         menu = Menu.PASSWORD
     }
 
     private fun passwordScreen() {
         val cx = ui.width / 2
-        title(com.vishucraft.game.engine.WorldLock.TITLE)
+        title("This world has a password")
         val w = 360f
-        ui.text(com.vishucraft.game.engine.WorldLock.MESSAGE, cx, ui.height * 0.34f, 20f, rgba(220, 220, 220), 1)
+        ui.text("Type the password to play.", cx, ui.height * 0.34f, 20f, rgba(220, 220, 220), 1)
         ui.field(passwordField, cx - w / 2, ui.height * 0.42f, w)
-        if (wrongPassword) ui.text(com.vishucraft.game.engine.WorldLock.WRONG, cx, ui.height * 0.42f + 56, 18f, rgba(255, 120, 120), 1)
+        if (wrongPassword) ui.text("Wrong password", cx, ui.height * 0.42f + 56, 18f, rgba(255, 120, 120), 1)
         val y = ui.height * 0.42f + 90
         if (ui.button("OK", cx - w / 2, y, w / 2 - 5, 44f) || ui.takeSubmit()) {
-            if (com.vishucraft.game.engine.WorldLock.ok(passwordField.text)) {
+            if (com.vishucraft.game.engine.WorldLock.check(passwordStored, passwordField.text)) {
                 val go = afterPassword; afterPassword = null; ui.focus = null; passwordField.text = ""
                 menu = passwordBack
                 go?.invoke()
             } else { wrongPassword = true; passwordField.text = ""; ui.focus = passwordField }
         }
         if (ui.button("Cancel", cx + 5, y, w / 2 - 5, 44f)) { afterPassword = null; ui.focus = null; passwordField.text = ""; menu = passwordBack }
+    }
+
+    // ---- Adding and taking away a world's password while playing.
+    private val passNew = Ui.Field("", "Password", 32, secret = true)
+    private val passAgain = Ui.Field("", "Type it again", 32, secret = true)
+    private val removeField = Ui.Field("", "Secret code", 32, secret = true)
+    private var passProblem: String? = null
+    private var leaveAfterSet = false
+
+    private fun leaveToTitle() { leaveWorld(); menu = Menu.TITLE }
+
+    /** The pause menu's "Save and quit": a world with no password yet asks whether to give it one. */
+    protected fun saveAndQuit(s: GameSession) {
+        val l = s.level
+        if (demo != null || s.game.isClient || l.password.isNotEmpty() || l.passwordAsked || l.bedwars > 0) { leaveToTitle(); return }
+        overlay = Overlay.PASSWORD_ASK
+    }
+
+    private fun startSetPassword(leaveAfter: Boolean) {
+        leaveAfterSet = leaveAfter; passNew.text = ""; passAgain.text = ""; passProblem = null
+        ui.focus = passNew; overlay = Overlay.PASSWORD_SET
+    }
+
+    protected fun passwordAskScreen(s: GameSession) {
+        val cx = ui.width / 2; val w = 440f
+        ui.rect(0f, 0f, ui.width, ui.height, rgba(0, 0, 0, 150))
+        title("Add a password to this world?", ui.height * 0.22f)
+        ui.text("Only people who know the password can open it. You choose the password.", cx, ui.height * 0.22f + 62, 18f, rgba(220, 220, 220), 1)
+        var y = ui.height * 0.42f
+        if (ui.button("Add password", cx - w / 2, y, w, 44f)) startSetPassword(true)
+        y += 54
+        if (ui.button("No thanks", cx - w / 2, y, w, 44f)) { s.level.passwordAsked = true; overlay = Overlay.NONE; leaveToTitle() }
+        y += 54
+        if (ui.button("Back to game", cx - w / 2, y, w, 44f)) overlay = Overlay.NONE
+    }
+
+    protected fun passwordSetScreen(s: GameSession) {
+        val cx = ui.width / 2; val w = 420f
+        ui.rect(0f, 0f, ui.width, ui.height, rgba(0, 0, 0, 150))
+        title("Choose a password", ui.height * 0.2f)
+        ui.text("Anything you like (at least ${com.vishucraft.game.engine.WorldLock.MIN_LENGTH} characters).", cx, ui.height * 0.2f + 62, 18f, rgba(220, 220, 220), 1)
+        ui.field(passNew, cx - w / 2, ui.height * 0.38f, w)
+        ui.field(passAgain, cx - w / 2, ui.height * 0.38f + 60, w)
+        passProblem?.let { ui.text(it, cx, ui.height * 0.38f + 122, 18f, rgba(255, 120, 120), 1) }
+        val y = ui.height * 0.38f + 156
+        if (ui.button("Save password", cx - w / 2, y, w / 2 - 5, 44f) || ui.takeSubmit()) {
+            val problem = com.vishucraft.game.engine.WorldLock.problem(passNew.text, passAgain.text)
+            if (problem != null) passProblem = problem
+            else {
+                s.level.password = com.vishucraft.game.engine.WorldLock.make(passNew.text); s.level.passwordAsked = true
+                passNew.text = ""; passAgain.text = ""; ui.focus = null
+                overlay = Overlay.PAUSE; hud?.toast("Password saved", 3f)
+                if (leaveAfterSet) leaveToTitle()
+            }
+        }
+        if (ui.button("Cancel", cx + 5, y, w / 2 - 5, 44f)) { passNew.text = ""; passAgain.text = ""; ui.focus = null; overlay = if (leaveAfterSet) Overlay.PASSWORD_ASK else Overlay.PAUSE }
+    }
+
+    protected fun passwordRemoveScreen(s: GameSession) {
+        val cx = ui.width / 2; val w = 420f
+        ui.rect(0f, 0f, ui.width, ui.height, rgba(0, 0, 0, 150))
+        title("Secret code", ui.height * 0.25f)
+        ui.text(if (passProblem != null) passProblem!! else "Type the secret code to take this world's password away.", cx, ui.height * 0.25f + 62, 18f,
+            if (passProblem != null) rgba(255, 120, 120) else rgba(220, 220, 220), 1)
+        ui.field(removeField, cx - w / 2, ui.height * 0.4f, w)
+        val y = ui.height * 0.4f + 60
+        if (ui.button("OK", cx - w / 2, y, w / 2 - 5, 44f) || ui.takeSubmit()) {
+            if (com.vishucraft.game.engine.WorldLock.secretOk(removeField.text)) {
+                s.level.password = ""; removeField.text = ""; passProblem = null; ui.focus = null
+                overlay = Overlay.PAUSE; hud?.toast("Password removed", 3f)
+            } else { passProblem = "Wrong secret code"; removeField.text = ""; ui.focus = removeField }
+        }
+        if (ui.button("Cancel", cx + 5, y, w / 2 - 5, 44f)) { removeField.text = ""; passProblem = null; ui.focus = null; overlay = Overlay.PAUSE }
     }
 
     protected fun worldsScreen() {
@@ -426,7 +498,7 @@ abstract class ClientApp(protected val demo: File?) {
             val mode = if (wi.level.mode == GameMode.SURVIVAL) "Survival" else "Creative"
             if (ui.button("${wi.level.name}  ·  $mode", cx - w / 2, y, w - 110, 42f)) {
                 message = null
-                needPassword(Menu.WORLDS) { startSession(GameSession(wi.dir, wi.level)) }
+                needPassword(Menu.WORLDS, wi.level.password) { startSession(GameSession(wi.dir, wi.level)) }
                 return
             }
             if (ui.button("Delete", cx + w / 2 - 100, y, 100f, 42f)) { deleteTarget = wi.dir; menu = Menu.CONFIRM_DELETE }
@@ -466,7 +538,7 @@ abstract class ClientApp(protected val demo: File?) {
             val name = nameField.text.trim().ifEmpty { "World $n" }
             ui.focus = null
             val dir = File(worldsDir, "world$n"); val sv = survival; val fl = flatWorld
-            needPassword(Menu.WORLDS) { startSession(GameSession.create(dir, name, seed, sv, fl)); menu = Menu.WORLDS }
+            startSession(GameSession.create(dir, name, seed, sv, fl)); menu = Menu.WORLDS
             return
         }
         if (ui.button("Cancel", cx + 5, y, w / 2 - 5, 44f)) { ui.focus = null; menu = Menu.WORLDS }
@@ -764,25 +836,7 @@ abstract class ClientApp(protected val demo: File?) {
             }
             y += 48
         }
-        // The password lock: turning it off needs the secret code; turning it on again does not.
-        val lockLabel = "Password lock: " + if (prefs.passwordLock) "On (turning it off needs the secret code)" else "Off (tap to turn on)"
-        if (ui.button(lockLabel, cx - 220, y, 440f, 40f)) {
-            if (prefs.passwordLock) { askingSecret = true; wrongSecret = false; secretField.text = ""; ui.focus = secretField }
-            else { prefs.passwordLock = true; askingSecret = false }
-        }
-        y += 48
-        if (askingSecret && prefs.passwordLock) {
-            ui.field(secretField, cx - 220, y, 300f)
-            if (ui.button("OK", cx + 90, y, 130f, 40f) || ui.takeSubmit()) {
-                if (com.vishucraft.game.engine.WorldLock.secretOk(secretField.text)) { prefs.passwordLock = false; askingSecret = false; ui.focus = null }
-                else { wrongSecret = true; secretField.text = ""; ui.focus = secretField }
-            }
-            y += 48
-            ui.text(if (wrongSecret) com.vishucraft.game.engine.WorldLock.SECRET_WRONG else com.vishucraft.game.engine.WorldLock.SECRET_MESSAGE, cx, y - 6, 16f,
-                if (wrongSecret) rgba(255, 120, 120) else rgba(210, 210, 210), 1)
-            y += 28
-        }
-        if (ui.button("Done", cx - 220, y + 16, 440f, 44f)) { askingSecret = false; ui.focus = null; back() }
+        if (ui.button("Done", cx - 220, y + 16, 440f, 44f)) back()
     }
 
     protected fun controlsScreen(back: () -> Unit) {
@@ -813,7 +867,7 @@ abstract class ClientApp(protected val demo: File?) {
         }
         b("Back to game") { overlay = Overlay.NONE }
         b("Save game") { if (game.isClient) hud?.toast("The host saves this world") else { s.save(); hud?.toast("Game saved") } }
-        b("Save and quit to title") { leaveWorld(); menu = Menu.TITLE }
+        b("Save and quit to title") { saveAndQuit(s) }
         y += 10
         twoColumns = true
         b(if (game.survival) "Mode: Survival (switch to Creative)" else "Mode: Creative (switch to Survival)") {
@@ -852,6 +906,10 @@ abstract class ClientApp(protected val demo: File?) {
                 internetText = ""; overlay = Overlay.INTERNET
                 Thread { internetText = n.internetHelp() }.start()
             }
+        }
+        if (!game.isClient) b(if (s.level.password.isEmpty()) "World password: Off (tap to add)" else "World password: On (tap to take away)") {
+            if (s.level.password.isEmpty()) startSetPassword(false)
+            else { removeField.text = ""; passProblem = null; ui.focus = removeField; overlay = Overlay.PASSWORD_REMOVE }
         }
         b("Achievements") { overlay = Overlay.ACHIEVEMENTS }
         b("Settings") { overlay = Overlay.SETTINGS }

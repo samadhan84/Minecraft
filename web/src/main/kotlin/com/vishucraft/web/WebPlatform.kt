@@ -86,7 +86,6 @@ class WebPrefs : ClientPrefs {
     override var showDebug: Boolean get() = b("showDebug", false); set(v) = setPref("showDebug", v.toString())
     override var weather: Boolean get() = b("weather", false); set(v) = setPref("weather", v.toString())
     override var fancy: Boolean get() = b("fancy", true); set(v) = setPref("fancy", v.toString())
-    override var passwordLock: Boolean get() = b("passwordLock", true); set(v) = setPref("passwordLock", v.toString())
     override var playerName: String
         get() = pref("playerName").ifEmpty { ("Player" + (100..999).random()).also { setPref("playerName", it) } }
         set(v) = setPref("playerName", v)

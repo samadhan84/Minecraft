@@ -207,9 +207,9 @@ class MenuActivity : Activity() {
         return true
     }
 
-    /** Asks for the password (see engine/WorldLock), then runs [then]. */
-    private fun askPassword(then: () -> Unit) {
-        if (!com.vishucraft.game.ui.Settings(this).passwordLock) { then(); return }   // switched off with the secret code (Settings)
+    /** Asks for the world's password (see engine/WorldLock) if it has one, then runs [then]. */
+    private fun askPassword(stored: String, then: () -> Unit) {
+        if (stored.isEmpty()) { then(); return }
         val input = EditText(this).apply {
             hint = "Password"
             inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
@@ -217,13 +217,13 @@ class MenuActivity : Activity() {
         }
         val pad = dpi(20f)
         val box = FrameLayout(this).apply { setPadding(pad, dpi(8f), pad, 0); addView(input) }
-        val dialog = AlertDialog.Builder(this).setTitle(com.vishucraft.game.engine.WorldLock.TITLE)
-            .setMessage(com.vishucraft.game.engine.WorldLock.MESSAGE).setView(box)
+        val dialog = AlertDialog.Builder(this).setTitle("This world has a password")
+            .setMessage("Type the password to play.").setView(box)
             .setPositiveButton("OK", null).setNegativeButton("Cancel", null).create()
         dialog.setOnShowListener {
             dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
-                if (com.vishucraft.game.engine.WorldLock.ok(input.text.toString())) { dialog.dismiss(); then() }
-                else { input.error = com.vishucraft.game.engine.WorldLock.WRONG; input.setText("") }
+                if (com.vishucraft.game.engine.WorldLock.check(stored, input.text.toString())) { dialog.dismiss(); then() }
+                else { input.error = "Wrong password"; input.setText("") }
             }
             input.requestFocus()
         }
@@ -232,7 +232,9 @@ class MenuActivity : Activity() {
 
     private fun startGame(dirName: String, seed: Long? = null, name: String? = null, survival: Boolean = false, flat: Boolean = true) {
         if (limitOver()) return
-        askPassword { launchGame(dirName, seed, name, survival, flat) }
+        // A world that already exists may have a password (a new one never does).
+        val stored = if (seed == null) com.vishucraft.game.world.LevelData.read(File(GameActivity.worldsRoot(this), dirName))?.password ?: "" else ""
+        askPassword(stored) { launchGame(dirName, seed, name, survival, flat) }
     }
 
     private fun launchGame(dirName: String, seed: Long?, name: String?, survival: Boolean, flat: Boolean) {

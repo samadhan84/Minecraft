@@ -34,10 +34,6 @@ class Settings(context: Context) {
     var fancy: Boolean
         get() = prefs.getBoolean("fancy", true)
         set(v) = prefs.edit().putBoolean("fancy", v).apply()
-    /** Whether a world asks for the password before it opens (on unless the secret code was typed, see engine/WorldLock). */
-    var passwordLock: Boolean
-        get() = prefs.getBoolean("passwordLock", true)
-        set(v) = prefs.edit().putBoolean("passwordLock", v).apply()
     var largeButtons: Boolean
         get() = prefs.getBoolean("largeButtons", false)
         set(v) = prefs.edit().putBoolean("largeButtons", v).apply()
@@ -75,32 +71,6 @@ fun settingsDialog(ctx: android.app.Activity, onChanged: () -> Unit = {}) {
         b = menuButton(ctx, label()) { action(); b.text = label(); onChanged() }
         col.addView(b, android.widget.LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = ctx.dpi(8f) })
     }
-    // The password lock: turning it off needs the secret code; turning it on again does not.
-    lateinit var lockBtn: android.widget.TextView
-    fun lockLabel() = "Password lock: " + if (s.passwordLock) "On (turning it off needs the secret code)" else "Off (tap to turn on)"
-    lockBtn = menuButton(ctx, lockLabel()) {
-        if (!s.passwordLock) { s.passwordLock = true; lockBtn.text = lockLabel() }
-        else {
-            val input = android.widget.EditText(ctx).apply {
-                hint = "Secret code"
-                inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
-                setSingleLine()
-            }
-            val box = android.widget.FrameLayout(ctx).apply { setPadding(ctx.dpi(20f), ctx.dpi(8f), ctx.dpi(20f), 0); addView(input) }
-            val dlg = android.app.AlertDialog.Builder(ctx).setTitle(com.vishucraft.game.engine.WorldLock.SECRET_TITLE)
-                .setMessage(com.vishucraft.game.engine.WorldLock.SECRET_MESSAGE).setView(box)
-                .setPositiveButton("OK", null).setNegativeButton("Cancel", null).create()
-            dlg.setOnShowListener {
-                dlg.getButton(android.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener {
-                    if (com.vishucraft.game.engine.WorldLock.secretOk(input.text.toString())) { s.passwordLock = false; lockBtn.text = lockLabel(); dlg.dismiss() }
-                    else { input.error = com.vishucraft.game.engine.WorldLock.SECRET_WRONG; input.setText("") }
-                }
-                input.requestFocus()
-            }
-            dlg.show()
-        }
-    }
-    col.addView(lockBtn, android.widget.LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = ctx.dpi(8f) })
     // Player name (shown to others in Wi-Fi games).
     val nameInput = android.widget.EditText(ctx).apply {
         setText(s.playerName); hint = "Player name"

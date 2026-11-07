@@ -254,6 +254,7 @@ class App(demo: File?) : ClientApp(demo) {
             Overlay.ENDING -> if (key == GLFW_KEY_ESCAPE) overlay = Overlay.NONE
             Overlay.INTERNET -> if (key == GLFW_KEY_ESCAPE) overlay = Overlay.PAUSE
             Overlay.SETTINGS, Overlay.CONTROLS, Overlay.NAME_MOB, Overlay.ACHIEVEMENTS -> if (key == GLFW_KEY_ESCAPE) { ui.focus = null; overlay = Overlay.PAUSE }
+            Overlay.PASSWORD_ASK, Overlay.PASSWORD_SET, Overlay.PASSWORD_REMOVE -> if (key == GLFW_KEY_ESCAPE) { ui.focus = null; overlay = Overlay.PAUSE }
             Overlay.CREATIVE, Overlay.CONTAINER -> when (key) {
                 GLFW_KEY_ESCAPE, GLFW_KEY_E, GLFW_KEY_I -> closeOverlay()
                 in GLFW_KEY_1..GLFW_KEY_9 -> input.selectedSlot = key - GLFW_KEY_1

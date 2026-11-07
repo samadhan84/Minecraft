@@ -251,9 +251,15 @@ class LevelData(
     var flat: Boolean = false,
     /** A flat world with oceans and villages (every flat world from this version on). */
     var flatSea: Boolean = false,
+    /** The world's password as kept by engine/WorldLock (a salted hash), or "" when it has none. */
+    var password: String = "",
+    /** The player was asked about a password when leaving and said no (they can still add one from the game menu). */
+    var passwordAsked: Boolean = false,
+    /** 0 for an ordinary world; 1, 2 or 3 for a Bedwars match on Easy, Medium or Hard (see engine/Bedwars). */
+    var bedwars: Int = 0,
 ) {
     companion object {
-        private const val VERSION = 10
+        private const val VERSION = 11
 
         /** Creative worlds start with a useful hotbar; survival starts empty-handed. */
         /**
@@ -305,7 +311,8 @@ class LevelData(
                             l.bedX = d.readInt(); l.bedY = d.readInt(); l.bedZ = d.readInt()
                         }
                         // Worlds no longer have passwords: an old one is dropped so the world just opens.
-                        if (version >= 5) d.readUTF()
+                        // (Versions 5..8 kept an old world password here and it was dropped; from 11 it is the new one.)
+                        if (version >= 5) { val old = d.readUTF(); if (version >= 11) l.password = old }
                         if (version >= 6) {
                             l.xp = d.readInt()
                             repeat(d.readInt()) { l.achievements.add(d.readUTF()) }
@@ -315,6 +322,7 @@ class LevelData(
                         if (version >= 9) l.flat = d.readBoolean()
                         // Flat worlds have oceans and villages now (older ones too, in land not explored yet).
                         l.flatSea = if (version >= 10) d.readBoolean() else l.flat
+                        if (version >= 11) { l.passwordAsked = d.readBoolean(); l.bedwars = d.readInt() }
                     }
                     l.hasPlayer = true
                     l
@@ -345,7 +353,7 @@ class LevelData(
             d.writeBoolean(arriving)
             d.writeBoolean(hasBedSpawn)
             d.writeInt(bedX); d.writeInt(bedY); d.writeInt(bedZ)
-            d.writeUTF("") // where versions 5..8 kept a world password (worlds no longer have one)
+            d.writeUTF(password)
             d.writeInt(xp)
             d.writeInt(achievements.size)
             for (a in achievements) d.writeUTF(a)
@@ -353,6 +361,8 @@ class LevelData(
             d.writeBoolean(bossDefeated)
             d.writeBoolean(flat)
             d.writeBoolean(flatSea)
+            d.writeBoolean(passwordAsked)
+            d.writeInt(bedwars)
         }
         tmp.renameTo(f)
     }
