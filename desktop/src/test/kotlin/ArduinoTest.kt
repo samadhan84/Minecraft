@@ -121,4 +121,12 @@ class SketchTest {
         g.setBlock(4, 100, 5, Blocks.AIR)
         run(g, 1.5f); assertFalse(lit(g, 40, -30))
     }
+
+    @Test fun theHomeScreenPreviewShowsWhatASketchDoes() {
+        val blink = Sketches.preview(Sketches.examples[0].code, false)
+        assertTrue(blink.contains("0.0 s: OUT ON") && blink.contains("1.0 s: OUT OFF"), blink)
+        val button = Sketches.preview(Sketches.examples[1].code, false)
+        assertTrue(button.contains("Input OFF:\n  OUT stays OFF") && button.contains("Input ON:\n  0.0 s: OUT ON"), button)
+        assertEquals("digitalWrite(13, HIGH); delay(5);", Sketches.flatten("// hello\ndigitalWrite(13, HIGH);   /* x\n y */ delay(5);"))
+    }
 }

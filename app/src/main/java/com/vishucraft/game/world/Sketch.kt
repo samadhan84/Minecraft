@@ -72,9 +72,48 @@ object Sketches {
     )
 
     /** The code on one line without comments, for screens that only have a one-line text box. */
-    fun flatten(code: String): String = strip(code).replace(Regex("\\s+"), " ").trim()
+    fun flatten(code: String): String {
+        val sb = StringBuilder(); var space = true
+        for (c in strip(code)) {
+            if (c.isWhitespace()) { if (!space) sb.append(' '); space = true } else { sb.append(c); space = false }
+        }
+        return sb.toString().trim()
+    }
 
-    private fun strip(code: String): String = code.replace(Regex("/\\*.*?\\*/", RegexOption.DOT_MATCHES_ALL), " ").replace(Regex("//[^\\n]*"), " ")
+    /** [code] without its // and /* */ comments (lines are kept so line numbers stay right). */
+    private fun strip(code: String): String {
+        val sb = StringBuilder(); var i = 0
+        while (i < code.length) {
+            val c = code[i]
+            if (c == '/' && i + 1 < code.length && code[i + 1] == '/') { while (i < code.length && code[i] != '\n') i++ }
+            else if (c == '/' && i + 1 < code.length && code[i + 1] == '*') {
+                i += 2
+                while (i + 1 < code.length && !(code[i] == '*' && code[i + 1] == '/')) { if (code[i] == '\n') sb.append('\n'); i++ }
+                i += 2; sb.append(' ')
+            } else { sb.append(c); i++ }
+        }
+        return sb.toString()
+    }
+
+    /** What the sketch would do in 20 seconds, with the input off and with the input on (shown in the IDE after Check). */
+    fun preview(code: String, wifi: Boolean): String {
+        val sketch = compile(code, wifi)
+        fun scenario(input: Boolean): String {
+            val run = SketchRun(sketch)
+            var last = false; var changes = 0
+            val sb = StringBuilder()
+            for (tick in 0 until 200) {
+                run.step(input, false, BooleanArray(3))
+                if (run.out != last || (tick == 0 && run.out)) {
+                    last = run.out
+                    if (changes++ < 10) sb.append("  ").append(tick / 10).append('.').append(tick % 10).append(" s: OUT ").append(if (last) "ON" else "OFF").append('\n')
+                }
+            }
+            if (changes == 0) sb.append("  OUT stays OFF\n") else if (changes > 10) sb.append("  ...\n")
+            return sb.toString()
+        }
+        return "Preview, the first 20 seconds\nInput OFF:\n" + scenario(false) + "Input ON:\n" + scenario(true)
+    }
 
     private class Tok(val text: String, val line: Int)
 

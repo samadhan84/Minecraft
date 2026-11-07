@@ -51,6 +51,10 @@ class MenuActivity : Activity() {
         playButton = add("Play") { if (hasWorld()) showWorlds() else newWorld() }
         add("Join online game") { joinOnline() }
         add("Join Wi-Fi game") { joinGame() }
+        add("Arduino IDE (code + Claude)") {
+            val saved = com.vishucraft.game.ui.Settings(this).ideSketch
+            com.vishucraft.game.ui.ArduinoIde.show(this, "Arduino IDE", saved.ifBlank { com.vishucraft.game.world.Sketches.examples[0].code }, false, false, null)
+        }
         add("Settings") { settingsDialog(this) }
         add("Back up / restore") { backupMenu() }
         if (Updater.enabled(this)) add("Check for updates") { Updater.check(this, manual = true) }
