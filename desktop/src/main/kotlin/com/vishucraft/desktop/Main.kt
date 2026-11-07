@@ -1,6 +1,5 @@
 package com.vishucraft.desktop
 
-import com.vishucraft.game.engine.bedwarsShopTap
 import com.vishucraft.game.engine.buildFestival
 import com.vishucraft.game.engine.buildThemePark
 import com.vishucraft.game.engine.placeBuilding
@@ -813,36 +812,7 @@ class App(demo: File?) : ClientApp(demo) {
                 g.player.yaw = 0f; g.player.pitch = -0.25f
             }
             f == 2530 -> shot("24-festival-decorations")
-            f == 2532 -> {
-                // A Bedwars match on Hard (a creative copy, so the camera can fly).
-                val dir = File(worldsDir, "bedwars"); dir.deleteRecursively(); dir.mkdirs()
-                val level = com.vishucraft.game.engine.newBedwarsLevel(3); level.mode = com.vishucraft.game.world.GameMode.CREATIVE
-                level.write(dir); startSession(GameSession(dir, level))
-            }
-            f == 2600 -> session?.game?.let { g ->
-                g.player.flying = true; g.player.x = 33f; g.player.y = 76f; g.player.z = 14f
-                g.player.yaw = kotlin.math.atan2(7f, -14f).let { kotlin.math.PI.toFloat() - 0.46f }; g.player.pitch = -0.5f
-            }
-            f == 2660 -> shot("25-bedwars-island")
-            f == 2662 -> session?.game?.let { g ->
-                // Close to the shop row and its signs.
-                g.player.x = 40f; g.player.y = 67f; g.player.z = 12f; g.player.yaw = kotlin.math.PI.toFloat(); g.player.pitch = -0.2f
-            }
-            f == 2700 -> shot("26-bedwars-shop")
-            f == 2704 -> session?.game?.let { g ->
-                // Buy the Ender Dragon (10 emeralds) and look at it.
-                val red = com.vishucraft.game.engine.BwTeam.RED
-                g.inventory.add(com.vishucraft.game.world.Items.find("Emerald"), 10)
-                g.bedwarsShopTap(com.vishucraft.game.engine.RayHit(red.shopX(17), 64, red.shopZ(17), 0, 1, 0, com.vishucraft.game.world.Blocks.BW_SHOP))
-                g.player.x = 40f; g.player.y = 70f; g.player.z = 0f; g.player.yaw = kotlin.math.PI.toFloat(); g.player.pitch = 0.1f
-            }
-            f == 2708 -> shot("28-ender-dragon")
-            f == 5600 -> session?.game?.let { g ->
-                // From high above the middle: the bots' wool bridges across the sky.
-                g.player.x = 0f; g.player.y = 140f; g.player.z = 0f; g.player.yaw = 0f; g.player.pitch = -1.5f
-            }
-            f == 5640 -> shot("27-bedwars-bridges")
-            f == 5642 -> glfwSetWindowShouldClose(window, true)
+            f == 2532 -> glfwSetWindowShouldClose(window, true)
         }
     }
 }

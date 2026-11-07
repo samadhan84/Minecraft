@@ -367,9 +367,6 @@ object Items {
         for (fi in com.vishucraft.game.engine.Festivals.newItems) if (list.none { it.name == fi.name })
             add(fi.name, "fest_${fi.shape}_${"%06x".format(fi.rgb)}", food = fi.food)
 
-        // Bedwars attack upgrades, bought from the upgrade shopkeeper (see engine/Bedwars).
-        for (n in listOf("I", "II", "III")) add("Sharpness $n", "bw_sharp", maxStack = 1)
-
         all = list
         for (i in all) { byId[i.id] = i; byName[i.name] = i.id }
     }

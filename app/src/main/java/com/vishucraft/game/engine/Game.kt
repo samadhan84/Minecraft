@@ -76,8 +76,6 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
     val metroNet = MetroNetwork()
     /** Diwali fireworks that are lit, and their sparks. */
     val fireworks = Fireworks()
-    /** The Bedwars match, when this world is one (see engine/Bedwars). */
-    internal var bedwars: Bedwars? = null
     /** Roller coasters (see engine/Coaster). */
     val coasters = Coasters()
     private var coastersUpgraded = false
@@ -461,7 +459,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
                 carts.nearby(player.x, player.y, player.z, dir[0] / len, dir[2] / len)?.let { carts.enter(it, dir[0], dir[2]); offerMetroStations(it) }
             }
             lastVy = player.vy
-            player.speedMul = (if (input.sprint && !player.flying) (if (level.bedwars > 0) 1.7f else 1.3f) else 1f) * (if (hasEffect("swiftness")) 1.4f else 1f)
+            player.speedMul = (if (input.sprint && !player.flying) 1.3f else 1f) * (if (hasEffect("swiftness")) 1.4f else 1f)
             player.jumpMul = if (hasEffect("leaping")) 1.22f else 1f
             if (coasters.riding == null && carts.riding == null && mount == null && boats.riding == null && aircraft.riding == null && vehicles.riding == null && !sitting && !lift.riding &&
                 !rideEscalator(dt)) player.update(dt, world, input.moveForward, input.moveStrafe, input.jumpHeld, input.descendHeld)
@@ -526,7 +524,6 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
         if (!festivalAnnounced && spawned) { festivalAnnounced = true; Festivals.announcement()?.let { uiEvents.add("toast:$it") } }
         if (!peopleRemoved && spawned) { peopleRemoved = true; if (!isClient) removePeople() }
         updateCoasters(dt)
-        updateBedwars(dt)
         updateLift(dt)
         if (bowCooldown > 0f) bowCooldown -= dt
         // Standing in a portal for two seconds travels to the other world.
@@ -593,7 +590,6 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
                 return
             }
             respawn()
-            if (level.bedwars > 0) bedwarsPlayerDied()
         }
     }
 
@@ -813,7 +809,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
         creativeBreakWait -= dt
         // In creative anything breaks with one tap (even bedrock, except the very bottom layer of the world).
         val breakable = t != null && (Blocks[t.block].breakable || (!survival && t.block == Blocks.BEDROCK && t.y > 0))
-        if (!input.breakHeld || t == null || !breakable || (level.bedwars > 0 && !bedwarsMayBreak(t.x, t.y, t.z, t.block))) {
+        if (!input.breakHeld || t == null || !breakable) {
             breakProgress = 0f; breakKey = Long.MIN_VALUE
             if (!input.breakHeld) creativeBreakWait = 0f
             return
@@ -842,7 +838,6 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
     internal fun breakBlock(x: Int, y: Int, z: Int) {
         val id = world.getBlock(x, y, z)
         val meta = world.getMeta(x, y, z)
-        if (level.bedwars > 0 && Blocks.isBed(id)) bedwarsBedBroken(x, z)
         setBlock(x, y, z, Blocks.AIR)
         blockSound(id, x, y, z)
         val be = world.blockEntities.remove(x, y, z)
@@ -929,7 +924,6 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
     private fun hit(mobHit: MobHit, item: ItemDef?) {
         var dmg = (item?.attack ?: 1).toFloat()
         if (hasEffect("strength")) dmg += 3f
-        if (level.bedwars > 0) dmg *= 1f + 0.35f * (bedwars?.attackLevel ?: 0)
         // A mace hits harder the further you fall onto the target.
         if (item?.name == "Mace" && player.vy < -6f) dmg += (-player.vy - 6f) * 1.5f
         val len = sqrt(dir[0] * dir[0] + dir[2] * dir[2]).coerceAtLeast(0.01f)
@@ -1236,17 +1230,10 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
     fun trade(uid: Int, index: Int): String {
         val v = mobs.list.firstOrNull { it.uid == uid && it.type == MobType.VILLAGER } ?: return "The villager walked away"
         val t = com.vishucraft.game.world.Trades.jobFor(v.uid).offers.getOrNull(index) ?: return ""
-        val sharp = if (level.bedwars > 0) sharpnessLevel(t.get) else 0
-        if (sharp > 0 && (bedwars?.attackLevel ?: 0) >= sharp) return "You already have this attack upgrade or a better one"
         if (survival && inventory.count(t.give) < t.giveCount) return "You need ${t.giveCount} ${Items.displayName(t.give)}"
         if (survival) inventory.remove(t.give, t.giveCount)
-        if (sharp > 0) {
-            bedwars?.attackLevel = sharp
-            sound("ding", v.x, v.y + 1.5f, v.z)
-            return "Your attack is upgraded: ${sharp * 35}% more damage"
-        }
-        var left = inventory.add(t.get, t.getCount)
-        while (left > 0) { val n = minOf(left, 64); drops.spawn(ItemStack(t.get, n), player.x, player.y + 1f, player.z); left -= n }
+        val left = inventory.add(t.get, t.getCount)
+        if (left > 0) drops.spawn(ItemStack(t.get, left), player.x, player.y + 1f, player.z)
         sound("pop", v.x, v.y + 1.5f, v.z)
         addXp(2)
         award("trade")
@@ -1294,7 +1281,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
         val name = item?.name
         val weapon = item?.tool == ToolType.SWORD || item?.tool == ToolType.AXE
         if (name == "Name Tag") { uiEvents.add("name:${mob.uid}"); return true }
-        if (mob.type == MobType.VILLAGER && (!weapon || mob.shopkeeper)) { uiEvents.add("trade:${mob.uid}"); return true }
+        if (mob.type == MobType.VILLAGER && !weapon) { uiEvents.add("trade:${mob.uid}"); return true }
         if (!weapon && robotTap(mob)) return true
         if (mob.type.isCitizen && !weapon) {
             val hello = if (mob.type == MobType.CITIZEN_KID) listOf("Hi! I'm going to school!", "Do you want to play cricket?", "I love the metro!", "My school bag is so heavy!")
@@ -1399,7 +1386,6 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
         val crop = Farming.cropFor(item?.name)
         val tgt = target
         if (coasterTap()) return
-        if (bedwarsShopTap(tgt)) return
         if (fireworkUse(item, tgt)) return
         if (festivalUse(item, tgt)) return
         if (coasterUse(item, tgt)) return
@@ -1666,7 +1652,6 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
      * Beds do not work in the other worlds: they explode.
      */
     fun useBed(x: Int, y: Int, z: Int) {
-        if (level.bedwars > 0) return   // no sleeping in a Bedwars match
         if (dimension != com.vishucraft.game.world.Dimension.OVERWORLD) {
             setBlock(x, y, z, Blocks.AIR)
             explode(x + 0.5f, y + 0.5f, z + 0.5f, 3.5f)

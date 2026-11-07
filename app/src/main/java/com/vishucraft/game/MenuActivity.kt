@@ -49,7 +49,6 @@ class MenuActivity : Activity() {
         }
 
         playButton = add("Play") { if (hasWorld()) showWorlds() else newWorld() }
-        add("Bedwars (play against bots)") { bedwarsDifficulty() }
         add("Join online game") { joinOnline() }
         add("Join Wi-Fi game") { joinGame() }
         add("Settings") { settingsDialog(this) }
@@ -194,7 +193,7 @@ class MenuActivity : Activity() {
     private class WorldInfo(val dir: File, val level: com.vishucraft.game.world.LevelData)
 
     private fun worlds(): List<WorldInfo> = GameActivity.worldsRoot(this).listFiles().orEmpty()
-        .filter { it.name != com.vishucraft.game.engine.SHOWCASE_DIR && it.name != com.vishucraft.game.engine.BEDWARS_DIR }
+        .filter { it.name != com.vishucraft.game.engine.SHOWCASE_DIR }
         .mapNotNull { d -> com.vishucraft.game.world.LevelData.read(d)?.let { WorldInfo(d, it) } }
         .sortedByDescending { File(it.dir, "level.dat").lastModified() }
 
@@ -236,23 +235,6 @@ class MenuActivity : Activity() {
         // A world that already exists may have a password (a new one never does).
         val stored = if (seed == null) com.vishucraft.game.world.LevelData.read(File(GameActivity.worldsRoot(this), dirName))?.password ?: "" else ""
         askPassword(stored) { launchGame(dirName, seed, name, survival, flat) }
-    }
-
-    /** Bedwars: pick Easy, Medium or Hard, then a fresh match starts (the last one is thrown away). */
-    private fun bedwarsDifficulty() {
-        if (limitOver()) return
-        buttonDialog("Bedwars: choose how good the bots are", listOf(
-            "Easy: slow bots, light hits" to { startBedwars(1) },
-            "Medium: quicker bots, one guards the bed" to { startBedwars(2) },
-            "Hard: fast, hard-hitting bots that come for you" to { startBedwars(3) },
-        ))
-    }
-
-    private fun startBedwars(difficulty: Int) {
-        val dir = File(GameActivity.worldsRoot(this), com.vishucraft.game.engine.BEDWARS_DIR)
-        dir.deleteRecursively(); dir.mkdirs()
-        com.vishucraft.game.engine.newBedwarsLevel(difficulty).write(dir)
-        launchGame(com.vishucraft.game.engine.BEDWARS_DIR, null, null, true, false)
     }
 
     private fun launchGame(dirName: String, seed: Long?, name: String?, survival: Boolean, flat: Boolean) {

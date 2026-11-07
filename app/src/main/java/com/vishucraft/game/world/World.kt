@@ -16,7 +16,7 @@ import kotlin.math.floor
  */
 enum class Dimension { OVERWORLD, EMBER, SKY }
 
-class World(val seed: Long, private val saveDir: File?, val dimension: Dimension = Dimension.OVERWORLD, val flat: Boolean = false, val flatSea: Boolean = false, val bedwars: Boolean = false) {
+class World(val seed: Long, private val saveDir: File?, val dimension: Dimension = Dimension.OVERWORLD, val flat: Boolean = false, val flatSea: Boolean = false) {
     /** Villagers placed by structure generation, waiting to be spawned on the game thread. */
     val pendingVillagers = java.util.concurrent.ConcurrentLinkedQueue<Triple<Int, Int, Int>>()
     /** Village plazas (x, y, z) from world generation, where survival worlds open a theme park. */
@@ -28,7 +28,7 @@ class World(val seed: Long, private val saveDir: File?, val dimension: Dimension
     /** Positions (see [RedstoneIds.pack]) of every redstone component in loaded chunks. */
     val components: MutableSet<Long> = java.util.Collections.newSetFromMap(ConcurrentHashMap())
     val generator: WorldGenerator = when (dimension) {
-        Dimension.OVERWORLD -> if (bedwars) VoidGenerator() else if (flat) FlatGenerator(seed, flatSea, this) else TerrainGenerator(seed, this)
+        Dimension.OVERWORLD -> if (flat) FlatGenerator(seed, flatSea, this) else TerrainGenerator(seed, this)
         Dimension.EMBER -> EmberGenerator(seed)
         Dimension.SKY -> SkyGenerator(seed)
     }
