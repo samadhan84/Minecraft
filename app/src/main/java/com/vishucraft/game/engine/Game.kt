@@ -76,6 +76,8 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
     val metroNet = MetroNetwork()
     /** Diwali fireworks that are lit, and their sparks. */
     val fireworks = Fireworks()
+    /** The Bedwars match, when this world is one (see engine/Bedwars). */
+    internal var bedwars: Bedwars? = null
     /** Roller coasters (see engine/Coaster). */
     val coasters = Coasters()
     private var coastersUpgraded = false
@@ -524,6 +526,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
         if (!festivalAnnounced && spawned) { festivalAnnounced = true; Festivals.announcement()?.let { uiEvents.add("toast:$it") } }
         if (!peopleRemoved && spawned) { peopleRemoved = true; if (!isClient) removePeople() }
         updateCoasters(dt)
+        updateBedwars(dt)
         updateLift(dt)
         if (bowCooldown > 0f) bowCooldown -= dt
         // Standing in a portal for two seconds travels to the other world.
@@ -590,6 +593,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
                 return
             }
             respawn()
+            if (level.bedwars > 0) bedwarsPlayerDied()
         }
     }
 
@@ -809,7 +813,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
         creativeBreakWait -= dt
         // In creative anything breaks with one tap (even bedrock, except the very bottom layer of the world).
         val breakable = t != null && (Blocks[t.block].breakable || (!survival && t.block == Blocks.BEDROCK && t.y > 0))
-        if (!input.breakHeld || t == null || !breakable) {
+        if (!input.breakHeld || t == null || !breakable || (level.bedwars > 0 && !bedwarsMayBreak(t.x, t.y, t.z, t.block))) {
             breakProgress = 0f; breakKey = Long.MIN_VALUE
             if (!input.breakHeld) creativeBreakWait = 0f
             return
@@ -838,6 +842,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
     internal fun breakBlock(x: Int, y: Int, z: Int) {
         val id = world.getBlock(x, y, z)
         val meta = world.getMeta(x, y, z)
+        if (level.bedwars > 0 && Blocks.isBed(id)) bedwarsBedBroken(x, z)
         setBlock(x, y, z, Blocks.AIR)
         blockSound(id, x, y, z)
         val be = world.blockEntities.remove(x, y, z)
@@ -1386,6 +1391,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
         val crop = Farming.cropFor(item?.name)
         val tgt = target
         if (coasterTap()) return
+        if (bedwarsShopTap(tgt)) return
         if (fireworkUse(item, tgt)) return
         if (festivalUse(item, tgt)) return
         if (coasterUse(item, tgt)) return
@@ -1652,6 +1658,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
      * Beds do not work in the other worlds: they explode.
      */
     fun useBed(x: Int, y: Int, z: Int) {
+        if (level.bedwars > 0) return   // no sleeping in a Bedwars match
         if (dimension != com.vishucraft.game.world.Dimension.OVERWORLD) {
             setBlock(x, y, z, Blocks.AIR)
             explode(x + 0.5f, y + 0.5f, z + 0.5f, 3.5f)

@@ -65,7 +65,7 @@ interface NetSupport {
  * platform adds its window, input and sound, and calls [frame] every frame.
  */
 abstract class ClientApp(protected val demo: File?) {
-    protected enum class Menu { TITLE, WORLDS, CREATE, JOIN, SETTINGS, CONTROLS, CONFIRM_DELETE, PASSWORD }
+    protected enum class Menu { TITLE, WORLDS, CREATE, JOIN, SETTINGS, CONTROLS, CONFIRM_DELETE, PASSWORD, BEDWARS }
     protected enum class Overlay { NONE, PAUSE, CREATIVE, CONTAINER, SETTINGS, CONTROLS, NAME_MOB, TRADE, ACHIEVEMENTS, SIGN, ENDING, INTERNET, FLIGHTS, FLOORS, METRO, CALL_TRAIN, ROBOT, PASSWORD_ASK, PASSWORD_SET, PASSWORD_REMOVE }
 
     // ---------------------------------------------------------------- platform parts
@@ -341,6 +341,8 @@ abstract class ClientApp(protected val demo: File?) {
                 var y = ui.height * 0.42f
                 if (ui.button("Play", cx - bw / 2, y, bw, 44f)) menu = Menu.WORLDS
                 y += 54
+                if (ui.button("Bedwars (play against bots)", cx - bw / 2, y, bw, 44f)) menu = Menu.BEDWARS
+                y += 54
                 if (net != null) {
                     if (ui.button("Join a game (online or Wi-Fi)", cx - bw / 2, y, bw, 44f)) { menu = Menu.JOIN; scan() }
                     y += 54
@@ -355,6 +357,7 @@ abstract class ClientApp(protected val demo: File?) {
             }
             Menu.WORLDS -> worldsScreen()
             Menu.PASSWORD -> passwordScreen()
+            Menu.BEDWARS -> bedwarsScreen()
             Menu.CREATE -> createScreen()
             Menu.JOIN -> joinScreen()
             Menu.SETTINGS -> settingsScreen { menu = Menu.TITLE }
@@ -378,7 +381,7 @@ abstract class ClientApp(protected val demo: File?) {
     protected class WorldInfo(val dir: File, val level: LevelData)
 
     protected fun worlds(): List<WorldInfo> = worldsDir.listFiles().orEmpty()
-        .filter { it.name != com.vishucraft.game.engine.SHOWCASE_DIR }
+        .filter { it.name != com.vishucraft.game.engine.SHOWCASE_DIR && it.name != com.vishucraft.game.engine.BEDWARS_DIR }
         .mapNotNull { d -> LevelData.read(d)?.let { WorldInfo(d, it) } }
         .sortedByDescending { File(it.dir, "level.dat").lastModified() }
 
@@ -481,6 +484,28 @@ abstract class ClientApp(protected val demo: File?) {
             } else { passProblem = "Wrong secret code"; removeField.text = ""; ui.focus = removeField }
         }
         if (ui.button("Cancel", cx + 5, y, w / 2 - 5, 44f)) { removeField.text = ""; passProblem = null; ui.focus = null; overlay = Overlay.PAUSE }
+    }
+
+    /** Bedwars: pick Easy, Medium or Hard, then a fresh match starts (the last one is thrown away). */
+    protected fun bedwarsScreen() {
+        val cx = ui.width / 2; val w = 520f
+        title("Bedwars")
+        ui.text("Break the other beds, protect yours. The bots play too: how good are they?", cx, 130f, 19f, rgba(220, 220, 220), 1)
+        var y = 190f
+        val levels = listOf("Easy: slow bots, light hits", "Medium: quicker bots, one guards the bed", "Hard: fast, hard-hitting bots that come for you")
+        for ((i, label) in levels.withIndex()) {
+            if (ui.button(label, cx - w / 2, y, w, 48f)) {
+                val dir = File(worldsDir, com.vishucraft.game.engine.BEDWARS_DIR)
+                dir.deleteRecursively(); dir.mkdirs()
+                val level = com.vishucraft.game.engine.newBedwarsLevel(i + 1)
+                level.write(dir)
+                startSession(GameSession(dir, level))
+                menu = Menu.TITLE
+                return
+            }
+            y += 60
+        }
+        if (ui.button("Back", cx - w / 2, y + 16, w, 44f)) menu = Menu.TITLE
     }
 
     protected fun worldsScreen() {

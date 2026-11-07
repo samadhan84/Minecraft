@@ -2358,7 +2358,26 @@ object TextureAtlas {
         mask(t, rows, main, if (tri) rgb(250, 250, 250) else rgb(255, 213, 79), if (tri) rgb(19, 136, 8) else rgb(255, 255, 255))
     }
 
+    /** Bedwars: team colours for the bots' clothes, and the shop block. */
+    private fun bedwarsTile(name: String, t: Tile): Boolean {
+        val c = when (name) {
+            "bw_red" -> rgb(214, 48, 49); "bw_blue" -> rgb(52, 112, 230); "bw_green" -> rgb(52, 178, 76); "bw_yellow" -> rgb(242, 196, 40)
+            "bw_trousers" -> rgb(52, 56, 88); "bw_hair" -> rgb(64, 42, 24)
+            else -> null
+        }
+        if (c != null) { t.fill { x, y -> if (x == 0 || y == 0 || x == 15 || y == 15) scale(c, 0.8f) else scale(c, t.jitter(0.04f)) }; return true }
+        if (name == "bw_shop") {
+            // A gold and emerald market block: planks with a coin and a green gem.
+            t.fill { x, y -> if (x == 0 || y == 0 || x == 15 || y == 15) rgb(120, 78, 30) else scale(rgb(214, 160, 70), t.jitter(0.05f) * (if (y % 5 == 0) 0.85f else 1f)) }
+            for (y in 4..11) for (x in 4..11) { val dx = x - 7.5f; val dy = y - 7.5f; if (dx * dx + dy * dy < 17f) t[x, y] = if (dx * dx + dy * dy < 9f) rgb(255, 226, 90) else rgb(176, 120, 20) }
+            for (y in 6..9) for (x in 6..9) if (kotlin.math.abs(x - 7.5f) + kotlin.math.abs(y - 7.5f) < 3.2f) t[x, y] = rgb(60, 220, 120)
+            return true
+        }
+        return false
+    }
+
     private fun paint(name: String, t: Tile) {
+        if (name.startsWith("bw_") && bedwarsTile(name, t)) return
         if (name.startsWith("fest_")) { festivalIcon(name, t); return }
         if (kitchenTile(name, t)) return
         if (pack3Tile(name, t)) return

@@ -14,6 +14,13 @@ interface WorldGenerator {
     fun biomeAt(x: Int, z: Int): Biome
 }
 
+/** A Bedwars world: empty sky. The islands are built by the game (see engine/Bedwars). */
+class VoidGenerator : WorldGenerator {
+    override fun generate(chunk: Chunk) {}
+    override fun surfaceHeight(x: Int, z: Int) = 63
+    override fun biomeAt(x: Int, z: Int) = Biome.PLAINS
+}
+
 /**
  * A flat world for building: bedrock, stone, three layers of dirt and grass on top. Nothing grows on it.
  * With [sea] (new flat worlds) it also has oceans with sandy beaches here and there (never right by the start).

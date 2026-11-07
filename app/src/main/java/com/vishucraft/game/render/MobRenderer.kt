@@ -34,6 +34,17 @@ object MobModels {
         return out
     }
 
+    /** A Bedwars player in a shirt, cap and trousers painted in the team colour [shirt], with a face and swinging arms and legs. */
+    private fun botModel(shirt: String) = listOf(
+        box(-0.25f, 0f, -0.125f, 0f, 0.8f, 0.125f, tiles("bw_trousers"), 1),
+        box(0f, 0f, -0.125f, 0.25f, 0.8f, 0.125f, tiles("bw_trousers"), -1),
+        box(-0.26f, 0.8f, -0.14f, 0.26f, 1.4f, 0.14f, tiles(shirt)),
+        box(-0.24f, 1.4f, -0.24f, 0.24f, 1.85f, 0.24f, tiles("bw_hair", front = "citizen_face")),
+        box(-0.26f, 1.78f, -0.26f, 0.26f, 1.9f, 0.26f, tiles(shirt)),              // the cap
+        box(-0.44f, 0.82f, -0.1f, -0.26f, 1.4f, 0.1f, tiles(shirt), -1, pivotY = 1.36f),
+        box(0.26f, 0.82f, -0.1f, 0.44f, 1.4f, 0.1f, tiles(shirt), 1, pivotY = 1.36f),
+    )
+
     val models: Map<MobType, List<Part>> = mapOf(
         MobType.COW to listOf(
             box(-0.45f, 0.6f, -0.65f, 0.45f, 1.35f, 0.65f, tiles("cow_hide")),
@@ -312,6 +323,9 @@ object MobModels {
             box(0.19f, 0.52f, -0.07f, 0.3f, 0.92f, 0.07f, tiles("kid_shirt"), 1, pivotY = 0.9f),
             box(-0.17f, 0.55f, 0.11f, 0.17f, 0.9f, 0.22f, tiles("school_bag")),
         ),
+        // Bedwars players: a person in a team-coloured shirt, hat and trousers.
+        MobType.BOT_RED to botModel("bw_red"), MobType.BOT_BLUE to botModel("bw_blue"),
+        MobType.BOT_GREEN to botModel("bw_green"), MobType.BOT_YELLOW to botModel("bw_yellow"),
         // The helper robot: a boxy body with a screen, a visor face with glowing eyes, an antenna and a jet.
         MobType.ROBOT to listOf(
             box(-0.14f, 0.02f, -0.1f, 0.14f, 0.2f, 0.1f, tiles("steel", top = "robot_light")),

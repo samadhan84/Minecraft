@@ -28,7 +28,7 @@ class GameSession(
             Dimension.EMBER -> dir?.let { File(it, "ember") }
             Dimension.SKY -> dir?.let { File(it, "sky") }
         }
-        world = World(level.seed, if (remote != null) null else dimDir, level.dimension, level.flat, level.flatSea)
+        world = World(level.seed, if (remote != null) null else dimDir, level.dimension, level.flat, level.flatSea, level.bedwars > 0)
         game = Game(world, level, input, if (remote != null) null else dir)
         remote?.invoke(world, game)
         renderer = WorldRenderer(game)

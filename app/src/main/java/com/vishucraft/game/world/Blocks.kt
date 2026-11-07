@@ -434,7 +434,9 @@ object Blocks {
     const val COASTER_RAIL = 447
     /** A petrol pump (see engine/Kitchen: tap it next to a car to fill the tank). */
     const val PETROL_PUMP = 448
-    const val COUNT = 449
+    /** A Bedwars shop: its meta is the item for sale (see engine/Bedwars). Cannot be broken. */
+    const val BW_SHOP = 449
+    const val COUNT = 450
 
     /** The newer crops' texture names, in id order from RICE_CROP. */
     val NEW_CROPS = listOf("rice", "tomato", "lentil", "beetroot")
@@ -1001,6 +1003,7 @@ object Blocks {
         home(SOLAR_PANEL, "Solar Panel", "solar_panel", "steel", hardness = 0.8f, facing = Facing.HORIZONTAL)
         home(EV_CHARGER, "EV Charger", "white_plastic", "white_plastic", front = "ev_charger", hardness = 1f)
         extraLight[EV_CHARGER] = 5
+        reg(BlockDef(BW_SHOP, "Bedwars Shop", t("bw_shop"), breakable = false, movable = false, inInventory = false))
         home(PETROL_PUMP, "Petrol Pump", "pump_red", "pump_red", front = "petrol_pump", hardness = 1f)
         extraLight[PETROL_PUMP] = 6
         reg(BlockDef(BILLBOARD, "Billboard", t("steel"), t("billboard_back"), t("steel"), hardness = 1f, tool = P,
