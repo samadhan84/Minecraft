@@ -38,6 +38,11 @@
         </activity>
 
         <activity
+            android:name=".IdeActivity"
+            android:exported="false"
+            android:screenOrientation="sensorLandscape"
+            android:windowSoftInputMode="adjustResize" />
+        <activity
             android:name=".GameActivity"
             android:exported="false"
             android:screenOrientation="sensorLandscape"

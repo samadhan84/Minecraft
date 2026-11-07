@@ -364,6 +364,7 @@ class GameActivity : Activity() {
             }.start()
         }
         addMenu("Achievements") { showAchievements() }
+        addMenu("Arduino IDE") { startActivity(android.content.Intent(this, IdeActivity::class.java)) }
         addMenu("Settings") { settingsDialog(this) { applySettings() } }
         addMenu("Controls") { showControls() }
         root.addView(pauseMenu, FrameLayout.LayoutParams(-1, -1))
@@ -455,6 +456,7 @@ class GameActivity : Activity() {
         game.lookScale = settings.sensitivity
         game.fov = settings.fov.toFloat()
         game.renderDistance = settings.renderDistance
+        game.uploadedSketch = settings.uploadedSketch
         game.weatherEnabled = settings.weather
         game.fancyGraphics = settings.fancy
         sounds.volume = settings.soundVolume / 100f
@@ -486,15 +488,6 @@ class GameActivity : Activity() {
         input.lookStickX = 0f; input.lookStickY = 0f
         input.moveForward = 0f; input.moveStrafe = 0f
         input.jumpHeld = false; input.descendHeld = false; input.breakHeld = false
-    }
-
-    /** The Arduino IDE for the board at (x, y, z): write a sketch and upload it. */
-    private fun showIde(x: Int, y: Int, z: Int, code: String) {
-        val id = game.world.getBlock(x, y, z)
-        com.vishucraft.game.ui.ArduinoIde.show(this, "Arduino IDE · ${com.vishucraft.game.world.Blocks[id].name}", code, id == com.vishucraft.game.world.Blocks.ESP32, true,
-            upload = { txt, report -> glView.queueEvent { val err = game.uploadSketch(x, y, z, txt); runOnUiThread { report(err) } } },
-            presets = com.vishucraft.game.world.Boards.programs(id).map { it.title },
-            onPreset = { i -> glView.queueEvent { game.setBoardPreset(x, y, z, i) } })
     }
 
     /** A villager's offers; tap one to trade (the list stays open for more). */
@@ -684,11 +677,6 @@ class GameActivity : Activity() {
                     .setPositiveButton("OK") { _, _ -> val txt = input.text.toString(); glView.queueEvent { game.setSignText(x, y, z, txt) } }
                     .setNegativeButton("Cancel", null).show()
                 input.requestFocus()
-            }
-            e.startsWith("ide:") -> {
-                val (x, y, z) = e.removePrefix("ide:").split(',').map { it.toInt() }
-                releaseInputs()
-                showIde(x, y, z, game.sketchText(x, y, z))
             }
             e.startsWith("floors:") -> {
                 // Tapped an elevator: which floor?
@@ -1028,6 +1016,7 @@ class GameActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
+        if (::game.isInitialized) game.uploadedSketch = settings.uploadedSketch
         playLimit = settings.playLimit()
         limitTick = android.os.SystemClock.elapsedRealtime()
         playLimit.newDay(com.vishucraft.game.engine.PlayLimit.today())

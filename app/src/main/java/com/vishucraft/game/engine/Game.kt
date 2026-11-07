@@ -1144,6 +1144,9 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
             }
     }
 
+    /** The sketch uploaded in the Arduino IDE app (null where there is no such app: the board opens its own editor). */
+    var uploadedSketch: String? = null
+
     /** The code on a board, or the Blink example when it has none yet (for the Arduino IDE screen). */
     fun sketchText(x: Int, y: Int, z: Int): String =
         signText(x, y, z).ifBlank { com.vishucraft.game.world.Sketches.examples[0].code }
@@ -1556,7 +1559,15 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
             Blocks.CAMPFIRE -> if (item != null && campfireCooks(item.name) != null) { cookOnCampfire(t.x, t.y, t.z, item); return }
             Blocks.NOTE_BLOCK -> if (item == null) return
             // Tap an Arduino or ESP32 board to choose the next program it runs.
-            Blocks.ARDUINO, Blocks.ESP32 -> { sound("click", t.x + 0.5f, t.y + 0.5f, t.z + 0.5f); uiEvents.add("ide:${t.x},${t.y},${t.z}"); return }
+            Blocks.ARDUINO, Blocks.ESP32 -> {
+                sound("click", t.x + 0.5f, t.y + 0.5f, t.z + 0.5f)
+                val uploaded = uploadedSketch
+                // With the separate Arduino IDE (Android), a tap puts the sketch uploaded there on the board; without it, the board's own editor opens.
+                if (uploaded == null) uiEvents.add("ide:${t.x},${t.y},${t.z}")
+                else if (uploaded.isBlank()) uiEvents.add("toast:Open the Arduino IDE (home screen or pause menu), write a sketch and press Upload. Then tap the board.")
+                else uploadSketch(t.x, t.y, t.z, uploaded)?.let { uiEvents.add("toast:$it") }
+                return
+            }
         }
 
         if (item != null) {

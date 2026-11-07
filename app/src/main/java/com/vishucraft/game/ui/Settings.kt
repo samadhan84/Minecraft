@@ -25,6 +25,10 @@ class Settings(context: Context) {
     var ideSketch: String
         get() = prefs.getString("ideSketch", "") ?: ""
         set(v) = prefs.edit().putString("ideSketch", v).apply()
+    /** The sketch last uploaded from the Arduino IDE: tap a board in the world to put it on that board. */
+    var uploadedSketch: String
+        get() = prefs.getString("uploadedSketch", "") ?: ""
+        set(v) = prefs.edit().putString("uploadedSketch", v).apply()
     var showDebug: Boolean
         get() = prefs.getBoolean("showDebug", true)
         set(v) = prefs.edit().putBoolean("showDebug", v).apply()
