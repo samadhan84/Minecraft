@@ -1433,7 +1433,7 @@ object TextureAtlas {
 
     /** Colours for spawn eggs: base and spots. */
     private val EGG_COLORS = mapOf(
-        "flame_spinner" to (rgb(250, 190, 40) to rgb(220, 90, 20)), "tear_drifter" to (rgb(236, 236, 240) to rgb(150, 150, 170)), "raider" to (rgb(110, 110, 120) to rgb(60, 70, 60)), "sea_sentinel" to (rgb(60, 130, 120) to rgb(240, 110, 30)), "milkman" to (rgb(244, 244, 238) to rgb(50, 100, 200)), "tusk_boar" to (rgb(120, 76, 56) to rgb(240, 236, 220)), "spell_raider" to (rgb(44, 130, 126) to rgb(200, 220, 220)), "rampage_beast" to (rgb(122, 78, 58) to rgb(250, 190, 40)), "gold_hog" to (rgb(214, 150, 120) to rgb(240, 200, 60)),
+        "flame_spinner" to (rgb(250, 190, 40) to rgb(220, 90, 20)), "tear_drifter" to (rgb(236, 236, 240) to rgb(150, 150, 170)), "raider" to (rgb(110, 110, 120) to rgb(60, 70, 60)), "sea_sentinel" to (rgb(60, 130, 120) to rgb(240, 110, 30)), "milkman" to (rgb(244, 244, 238) to rgb(50, 100, 200)), "tusk_boar" to (rgb(120, 76, 56) to rgb(240, 236, 220)), "camel" to (rgb(214, 174, 112) to rgb(120, 80, 50)), "sniffer" to (rgb(150, 56, 52) to rgb(84, 140, 66)), "spell_raider" to (rgb(44, 130, 126) to rgb(200, 220, 220)), "rampage_beast" to (rgb(122, 78, 58) to rgb(250, 190, 40)), "gold_hog" to (rgb(214, 150, 120) to rgb(240, 200, 60)),
         "citizen" to (rgb(70, 130, 200) to rgb(196, 146, 104)), "citizen_woman" to (rgb(220, 70, 120) to rgb(250, 210, 80)),
         "citizen_kid" to (rgb(236, 236, 240) to rgb(40, 70, 160)), "robot" to (rgb(232, 236, 244) to rgb(60, 130, 230)),
         "cow" to (rgb(68, 50, 38) to rgb(160, 160, 160)), "pig" to (rgb(238, 166, 166) to rgb(200, 110, 110)),
@@ -2465,6 +2465,23 @@ object TextureAtlas {
             "p4_candle", "p4_candle_top" -> {
                 t.fill { x, y -> scale(rgb(244, 238, 214), t.jitter(0.03f) * (if (x % 5 == 0) 0.93f else 1f)) }
                 if (name.endsWith("top")) { for (y in 7..8) for (x in 7..8) t[x, y] = rgb(40, 34, 30); t[7, 6] = rgb(255, 190, 60) }
+                return true
+            }
+            "p4_camel_hide" -> { t.fill { x, y -> scale(rgb(214, 174, 112), t.jitter(0.06f) * (if ((x + y * 2) % 9 == 0) 0.9f else 1f)) }; return true }
+            "p4_camel_face" -> {
+                t.fill { _, _ -> scale(rgb(214, 174, 112), t.jitter(0.04f)) }
+                for (x in 4..11) for (y in 9..13) t[x, y] = rgb(232, 200, 150)
+                t[6, 11] = rgb(80, 52, 36); t[9, 11] = rgb(80, 52, 36)
+                for (x in listOf(3, 4, 11, 12)) { t[x, 5] = rgb(30, 20, 14); t[x, 6] = rgb(30, 20, 14) }
+                return true
+            }
+            "p4_sniffer_skin" -> { t.fill { x, y -> scale(rgb(150, 56, 52), t.jitter(0.06f) * (if ((x / 3 + y / 3) % 2 == 0) 1f else 0.92f)) }; return true }
+            "p4_sniffer_moss" -> { t.fill { x, y -> scale(rgb(84, 140, 66), t.jitter(0.09f)) }; return true }
+            "p4_sniffer_face" -> {
+                t.fill { _, _ -> scale(rgb(150, 56, 52), t.jitter(0.05f)) }
+                for (x in 3..12) for (y in 9..14) t[x, y] = rgb(224, 160, 140)                    // the big nose
+                t[5, 11] = rgb(80, 30, 30); t[10, 11] = rgb(80, 30, 30)
+                for (x in listOf(2, 3, 12, 13)) t[x, 5] = rgb(20, 14, 14)
                 return true
             }
             "p4_milk_packet" -> {

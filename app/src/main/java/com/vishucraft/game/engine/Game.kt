@@ -750,6 +750,8 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
                 i("Blaze Rod") to r.nextInt(2), i("Magma Cream") to (if (r.nextInt(3) == 0) 1 else 0), i("Ghast Tear") to (if (r.nextInt(6) == 0) 1 else 0))
             MobType.WISP -> listOf(i("Emerald") to r.nextInt(2), Blocks.PURPUR to r.nextInt(2), i("Ender Pearl") to r.nextInt(2),
                 i("Amethyst Shard") to r.nextInt(2))
+            MobType.CAMEL -> listOf(i("Leather") to r.nextInt(2))
+            MobType.SNIFFER -> listOf(i("Wheat Seeds") to 1 + r.nextInt(2))
             MobType.VILLAGER, MobType.EXPLORER, MobType.WOLF, MobType.HORSE -> if (m.type == MobType.HORSE) listOf(i("Leather") to r.nextInt(3)) else emptyList()
             MobType.FLAME_SPINNER -> listOf(i("Blaze Rod") to r.nextInt(2), i("Glowstone Dust") to r.nextInt(2))
             MobType.TEAR_DRIFTER -> listOf(i("Ghast Tear") to (if (r.nextInt(2) == 0) 1 else 0), i("Gunpowder") to r.nextInt(3))
@@ -1325,7 +1327,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
             name != null && m.tamed -> "$name (your ${m.type.displayName.lowercase()}${if (m.sitting) ", sitting" else ""})"
             name != null -> name
             m.tamed -> "Your ${m.type.displayName.lowercase()}${if (m.sitting) " (sitting)" else ""}"
-            m.type == MobType.HORSE && m.saddled -> "Saddled horse"
+            (m.type == MobType.HORSE || m.type == MobType.CAMEL) && m.saddled -> "Saddled ${m.type.displayName.lowercase()}"
             else -> null
         }
     }
@@ -1366,7 +1368,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
             uiEvents.add("toast:" + if (mob.leashed) "The ${mob.type.displayName.lowercase()} follows you on the lead" else "Let go of the lead")
             return true
         }
-        if (mob.type == MobType.HORSE) {
+        if (mob.type == MobType.HORSE || mob.type == MobType.CAMEL) {
             if (name == "Saddle" && !mob.saddled) { mob.saddled = true; mob.tamed = true; consumeHeld(); uiEvents.add("toast:Saddled! Tap the horse to ride it"); return true }
             if (mob.saddled && !weapon && !mobs.wantsFood(mob, held)) {
                 mount = mob; carts.riding = null

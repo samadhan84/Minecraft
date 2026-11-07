@@ -98,7 +98,11 @@ enum class MobType(
     /** A raider in a teal robe: throws harmful potions and heals itself. Comes in the later raid waves. */
     SPELL_RAIDER("Spell Raider", 0.3f, 1.95f, 28, true, 2.0f),
     /** A huge charging beast that raiders ride into the last raid wave. */
-    RAMPAGE_BEAST("Rampage Beast", 0.9f, 2.2f, 70, true, 2.8f);
+    RAMPAGE_BEAST("Rampage Beast", 0.9f, 2.2f, 70, true, 2.8f),
+    /** A tall desert mount: put a saddle on it and ride. */
+    CAMEL("Camel", 0.7f, 2.1f, 32, false, 1.8f),
+    /** A gentle giant that sniffs out seeds and digs them up now and then. */
+    SNIFFER("Sniffer", 0.8f, 1.5f, 30, false, 1.1f);
 
     val isRaider get() = this == RAIDER || this == SPELL_RAIDER || this == RAMPAGE_BEAST
     val isCitizen get() = this == CITIZEN || this == CITIZEN_WOMAN || this == CITIZEN_KID
@@ -395,6 +399,17 @@ class Mobs(private val world: World) {
                     m.timer -= dt
                     if (m.health < 10f && m.timer <= 0f) { m.timer = 12f; m.health = minOf(m.type.maxHealth.toFloat(), m.health + 8f); game.sound("eat", m.x, m.y + 1.5f, m.z, 0.6f) }
                 } else wander(m, dt).let { wantX = it.first; wantZ = it.second; speed *= 0.5f }
+            }
+            MobType.SNIFFER -> {
+                // Digs up seeds every few minutes.
+                if (m.timer == 0f) m.timer = 120f + rnd.nextFloat() * 120f
+                m.timer -= dt
+                if (m.timer <= 0f) {
+                    val gift = listOf("Wheat Seeds", "Beetroot Seeds", "Carrot")[rnd.nextInt(3)]
+                    if (m.age >= 0f) game.drops.spawn(com.vishucraft.game.world.ItemStack(com.vishucraft.game.world.Items.find(gift), 1 + rnd.nextInt(2)), m.x, m.y + 0.3f, m.z)
+                    m.timer = 120f + rnd.nextFloat() * 120f
+                }
+                wander(m, dt).let { wantX = it.first; wantZ = it.second; speed *= 0.6f }
             }
             MobType.CHICKEN -> {
                 // Lays an egg every few minutes.
@@ -973,7 +988,7 @@ class Mobs(private val world: World) {
 
     fun voice(t: MobType) = when (t) {
         MobType.WARDEN, MobType.TEAR_DRIFTER -> "enderman"
-        MobType.FLAME_SPINNER, MobType.SEA_SENTINEL, MobType.MILKMAN -> "none"; MobType.RAIDER -> "zombie"; MobType.GOLD_HOG, MobType.TUSK_BOAR, MobType.RAMPAGE_BEAST -> "pig"; MobType.DUSK_WITHER -> "enderman"; MobType.SPELL_RAIDER -> "witch"
+        MobType.FLAME_SPINNER, MobType.SEA_SENTINEL, MobType.MILKMAN -> "none"; MobType.RAIDER -> "zombie"; MobType.GOLD_HOG, MobType.TUSK_BOAR, MobType.RAMPAGE_BEAST, MobType.SNIFFER -> "pig"; MobType.CAMEL -> "horse"; MobType.DUSK_WITHER -> "enderman"; MobType.SPELL_RAIDER -> "witch"
         MobType.DROWNED -> "zombie"; MobType.RABBIT, MobType.SQUID, MobType.COD -> "none"
         MobType.IRON_GOLEM, MobType.SNOW_GOLEM, MobType.TURTLE, MobType.AXOLOTL, MobType.ROBOT -> "none"
         MobType.MOOSHROOM -> "cow"; MobType.POLAR_BEAR, MobType.PANDA -> "bear"
@@ -1067,9 +1082,9 @@ class Mobs(private val world: World) {
             biome == com.vishucraft.game.world.Biome.JUNGLE -> when (r) { 0, 1, 2, 3 -> MobType.PARROT; 4, 5 -> MobType.PANDA; 6, 7 -> MobType.CHICKEN; else -> MobType.PIG }
             biome == com.vishucraft.game.world.Biome.SWAMP -> when (r) { 0, 1, 2, 3, 4 -> MobType.FROG; 5, 6 -> MobType.COW; else -> MobType.CHICKEN }
             biome == com.vishucraft.game.world.Biome.CHERRY -> when (r) { 0, 1, 2, 3 -> MobType.BEE; 4, 5 -> MobType.RABBIT; 6, 7 -> MobType.SHEEP; else -> MobType.PIG }
-            biome == com.vishucraft.game.world.Biome.SAVANNA || biome == com.vishucraft.game.world.Biome.BADLANDS -> when (r) { 0, 1, 2 -> MobType.LLAMA; 3, 4 -> MobType.HORSE; 5 -> MobType.RABBIT; else -> MobType.COW }
-            biome == com.vishucraft.game.world.Biome.DESERT -> MobType.RABBIT
-            biome == com.vishucraft.game.world.Biome.FOREST -> when (r) { 0, 1 -> MobType.FOX; 2 -> MobType.BEE; 3, 4 -> MobType.WOLF; 5, 6 -> MobType.PIG; 7, 8 -> MobType.CHICKEN; else -> MobType.COW }
+            biome == com.vishucraft.game.world.Biome.SAVANNA || biome == com.vishucraft.game.world.Biome.BADLANDS -> when (r) { 0, 1, 2 -> MobType.LLAMA; 3 -> MobType.HORSE; 4 -> MobType.CAMEL; 5 -> MobType.RABBIT; else -> MobType.COW }
+            biome == com.vishucraft.game.world.Biome.DESERT -> if (r < 3) MobType.CAMEL else MobType.RABBIT
+            biome == com.vishucraft.game.world.Biome.FOREST -> when (r) { 0 -> MobType.SNIFFER; 1 -> MobType.FOX; 2 -> MobType.BEE; 3, 4 -> MobType.WOLF; 5, 6 -> MobType.PIG; 7, 8 -> MobType.CHICKEN; else -> MobType.COW }
             else -> when (r) {
                 0, 1 -> MobType.COW; 2, 3 -> MobType.PIG; 4, 5 -> MobType.SHEEP; 6, 7 -> MobType.CHICKEN
                 8 -> MobType.RABBIT; 9 -> MobType.HORSE; 10 -> if (rnd.nextBoolean()) MobType.BEE else MobType.WOLF; else -> MobType.CAT

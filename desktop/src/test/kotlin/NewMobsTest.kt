@@ -209,3 +209,38 @@ class LightningTest {
         assertEquals(far.type.maxHealth.toFloat(), far.health, "a cow far away is fine")
     }
 }
+
+class AnimalsTest {
+    private fun game(): Game {
+        val dir = kotlin.io.path.createTempDirectory("animals").toFile()
+        val level = LevelData.create(6L, "t", GameMode.SURVIVAL)
+        val g = Game(World(level.seed, dir, Dimension.OVERWORLD, flat = true), level, GameInput(), dir)
+        for (cx in -3..3) for (cz in -3..3) g.world.ensureLoaded(cx, cz)
+        g.timeOfDay = 0.3f
+        return g
+    }
+
+    @Test fun aSnifferDigsUpSeeds() {
+        val g = game()
+        val y = g.world.generator.surfaceHeight(0, 0) + 1f
+        g.player.x = 0.5f; g.player.y = y; g.player.z = 0.5f
+        val s = Mob(MobType.SNIFFER, 5f, y, 5f); s.timer = 0.05f
+        g.mobs.list.add(s)
+        var t = 0f
+        while (t < 2f && g.drops.list.isEmpty()) { g.update(1 / 20f); g.dirtyChunks.clear(); t += 1 / 20f }
+        assertTrue(g.drops.list.isNotEmpty(), "it digs something up")
+    }
+
+    @Test fun aSaddledCamelCanBeRidden() {
+        val g = game()
+        val y = g.world.generator.surfaceHeight(0, 0) + 1f
+        g.player.x = 0.5f; g.player.y = y; g.player.z = 0.5f
+        val camel = Mob(MobType.CAMEL, 2f, y, 0.5f); g.mobs.list.add(camel)
+        g.inventory.slots[0] = ItemStack(Items.find("Saddle"), 1); g.input.selectedSlot = 0
+        assertTrue(g.petActions(Items[Items.find("Saddle")], Items.find("Saddle"), camel))
+        assertTrue(camel.saddled)
+        g.inventory.slots[0] = null
+        assertTrue(g.petActions(null, 0, camel))
+        assertSame(camel, g.mount)
+    }
+}

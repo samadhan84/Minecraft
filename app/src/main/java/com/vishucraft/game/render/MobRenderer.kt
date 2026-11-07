@@ -109,6 +109,17 @@ object MobModels {
             box(0.26f, 0.75f, -0.125f, 0.5f, 1.45f, 0.125f, tiles("p4_milk_shirt"), 2, pivotY = 1.35f),
             box(-0.3f, 0.95f, 0.15f, 0.3f, 1.35f, 0.5f, tiles("p4_milk_crate")),               // the crate of milk on his back
         ),
+        MobType.CAMEL to listOf(
+            box(-0.4f, 1.0f, -0.9f, 0.4f, 1.7f, 0.9f, tiles("p4_camel_hide")),
+            box(-0.28f, 1.7f, -0.3f, 0.28f, 2.1f, 0.35f, tiles("p4_camel_hide")),                    // the hump
+            box(-0.18f, 1.5f, -1.2f, 0.18f, 2.45f, -0.85f, tiles("p4_camel_hide")),                  // the neck
+            box(-0.22f, 2.2f, -1.7f, 0.22f, 2.65f, -1.05f, tiles("p4_camel_hide", front = "p4_camel_face")),
+        ) + legs(0.26f, 0.62f, 0.2f, 1.05f, "p4_camel_hide"),
+        MobType.SNIFFER to listOf(
+            box(-0.65f, 0.55f, -0.9f, 0.65f, 1.45f, 0.9f, tiles("p4_sniffer_skin")),
+            box(-0.55f, 1.3f, -0.8f, 0.55f, 1.5f, 0.7f, tiles("p4_sniffer_moss")),                   // moss on its back
+            box(-0.4f, 0.6f, -1.55f, 0.4f, 1.3f, -0.9f, tiles("p4_sniffer_skin", front = "p4_sniffer_face")),
+        ) + legs(0.45f, 0.6f, 0.28f, 0.6f, "p4_sniffer_skin"),
         MobType.TUSK_BOAR to listOf(
             box(-0.55f, 0.45f, -0.8f, 0.55f, 1.2f, 0.8f, tiles("p4_boar_skin")),
             box(-0.45f, 0.55f, -1.4f, 0.45f, 1.25f, -0.8f, tiles("p4_boar_skin", front = "p4_boar_face")),
