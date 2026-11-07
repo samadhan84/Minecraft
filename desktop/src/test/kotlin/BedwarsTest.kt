@@ -81,8 +81,9 @@ class BedwarsTest {
     @Test fun runningIsFasterInBedwars() {
         val g = game(1)
         g.input.sprint = true
-        g.update(1 / 20f)
-        assertTrue(g.player.speedMul >= 1.6f)
+        run(g, 1f)
+        assertFalse(g.player.flying)
+        assertEquals(1.7f, g.player.speedMul, "running is 1.7 times walking in a match")
     }
 
     @Test fun whatYouMayBreak() {
