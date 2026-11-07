@@ -1397,6 +1397,7 @@ object TextureAtlas {
 
     /** Colours for spawn eggs: base and spots. */
     private val EGG_COLORS = mapOf(
+        "flame_spinner" to (rgb(250, 190, 40) to rgb(220, 90, 20)), "tear_drifter" to (rgb(236, 236, 240) to rgb(150, 150, 170)), "raider" to (rgb(110, 110, 120) to rgb(60, 70, 60)),
         "citizen" to (rgb(70, 130, 200) to rgb(196, 146, 104)), "citizen_woman" to (rgb(220, 70, 120) to rgb(250, 210, 80)),
         "citizen_kid" to (rgb(236, 236, 240) to rgb(40, 70, 160)), "robot" to (rgb(232, 236, 244) to rgb(60, 130, 230)),
         "cow" to (rgb(68, 50, 38) to rgb(160, 160, 160)), "pig" to (rgb(238, 166, 166) to rgb(200, 110, 110)),
@@ -2358,7 +2359,41 @@ object TextureAtlas {
         mask(t, rows, main, if (tri) rgb(250, 250, 250) else rgb(255, 213, 79), if (tri) rgb(19, 136, 8) else rgb(255, 255, 255))
     }
 
+    /** Skins for the Flame Spinner, Tear Drifter and Raider. */
+    private fun pack4Tile(name: String, t: Tile): Boolean {
+        when (name) {
+            "p4_flame_skin" -> { t.fill { x, y -> if ((x + y) % 4 == 0) rgb(255, 230, 90) else scale(rgb(240, 140, 30), t.jitter(0.06f)) }; return true }
+            "p4_flame_face" -> {
+                t.fill { _, _ -> scale(rgb(236, 128, 28), t.jitter(0.05f)) }
+                for (x in listOf(3, 4, 10, 11)) for (y in 5..7) t[x, y] = rgb(30, 18, 10)           // dark eyes
+                for (x in 5..10) t[x, 11] = rgb(60, 30, 10)                                          // mouth
+                return true
+            }
+            "p4_flame_rod" -> return false
+            "p4_tear_skin" -> { t.fill { x, y -> scale(rgb(238, 238, 244), t.jitter(0.04f) * (if ((x / 4 + y / 4) % 2 == 0) 1f else 0.94f)) }; return true }
+            "p4_tear_face" -> {
+                t.fill { _, _ -> scale(rgb(238, 238, 244), t.jitter(0.03f)) }
+                for (y in 5..7) for (x in listOf(3, 4, 5, 10, 11, 12)) t[x, y] = rgb(90, 90, 110)    // shut eyes
+                t[4, 8] = rgb(120, 170, 240); t[4, 9] = rgb(120, 170, 240); t[11, 8] = rgb(120, 170, 240); t[11, 9] = rgb(120, 170, 240) // tears
+                for (x in 6..9) for (y in 11..12) t[x, y] = rgb(120, 120, 140)
+                return true
+            }
+            "p4_raider_coat" -> { t.fill { x, y -> if (x == 7 || x == 8) rgb(70, 60, 50) else scale(rgb(104, 106, 112), t.jitter(0.05f)) }; return true }
+            "p4_raider_pants" -> { t.fill { _, _ -> scale(rgb(70, 70, 76), t.jitter(0.05f)) }; return true }
+            "p4_raider_skin" -> { t.fill { _, _ -> scale(rgb(150, 130, 112), t.jitter(0.05f)) }; return true }
+            "p4_raider_face" -> {
+                t.fill { _, y -> if (y < 4) scale(rgb(60, 56, 56), t.jitter(0.04f)) else scale(rgb(150, 130, 112), t.jitter(0.04f)) }
+                for (x in 3..5) t[x, 6] = rgb(240, 240, 240); for (x in 10..12) t[x, 6] = rgb(240, 240, 240)
+                t[4, 6] = rgb(40, 100, 60); t[11, 6] = rgb(40, 100, 60)
+                for (x in 6..9) t[x, 10] = rgb(80, 60, 50)
+                return true
+            }
+        }
+        return false
+    }
+
     private fun paint(name: String, t: Tile) {
+        if (name.startsWith("p4_") && pack4Tile(name, t)) return
         if (name.startsWith("fest_")) { festivalIcon(name, t); return }
         if (kitchenTile(name, t)) return
         if (pack3Tile(name, t)) return

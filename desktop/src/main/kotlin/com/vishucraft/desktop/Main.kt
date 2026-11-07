@@ -812,7 +812,19 @@ class App(demo: File?) : ClientApp(demo) {
                 g.player.yaw = 0f; g.player.pitch = -0.25f
             }
             f == 2530 -> shot("24-festival-decorations")
-            f == 2532 -> glfwSetWindowShouldClose(window, true)
+            f == 2532 -> session?.game?.let { g ->
+                // The new creatures in a row: Flame Spinner, Tear Drifter and Raider.
+                val y = g.world.generator.surfaceHeight(0, 40) + 1f
+                for (cz in 1..4) for (cx in -2..2) g.world.ensureLoaded(cx, cz)
+                g.mobs.hostileEnabled = true
+                g.mobs.list.add(com.vishucraft.game.engine.Mob(com.vishucraft.game.engine.MobType.FLAME_SPINNER, -5f, y + 1.5f, 42f))
+                g.mobs.list.add(com.vishucraft.game.engine.Mob(com.vishucraft.game.engine.MobType.TEAR_DRIFTER, 0f, y + 3f, 44f))
+                g.mobs.list.add(com.vishucraft.game.engine.Mob(com.vishucraft.game.engine.MobType.RAIDER, 5f, y, 42f))
+                g.player.x = 0f; g.player.y = y + 2f; g.player.z = 32f; g.player.flying = true
+                g.player.yaw = kotlin.math.PI.toFloat(); g.player.pitch = 0.05f
+            }
+            f == 2580 -> shot("25-new-mobs")
+            f == 2582 -> glfwSetWindowShouldClose(window, true)
         }
     }
 }

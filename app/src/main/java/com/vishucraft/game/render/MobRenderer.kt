@@ -88,6 +88,26 @@ object MobModels {
             box(-0.62f, 0.7f, -0.14f, -0.4f, 1.55f, 0.14f, tiles("cinder_skin"), 1, pivotY = 1.5f),
             box(0.4f, 0.7f, -0.14f, 0.62f, 1.55f, 0.14f, tiles("cinder_skin"), -1, pivotY = 1.5f),
         ),
+        MobType.FLAME_SPINNER to listOf(
+            box(-0.2f, 0.4f, -0.2f, 0.2f, 1.0f, 0.2f, tiles("p4_flame_skin")),                     // the glowing rods that spin
+            box(-0.35f, 0.7f, -0.05f, 0.35f, 0.8f, 0.05f, tiles("p4_flame_skin"), 2),
+            box(-0.05f, 0.5f, -0.35f, 0.05f, 0.6f, 0.35f, tiles("p4_flame_skin"), 2),
+            box(-0.25f, 1.0f, -0.25f, 0.25f, 1.5f, 0.25f, tiles("p4_flame_skin", front = "p4_flame_face")),
+        ),
+        MobType.TEAR_DRIFTER to listOf(
+            box(-1.0f, 0.3f, -1.0f, 1.0f, 2.2f, 1.0f, tiles("p4_tear_skin", front = "p4_tear_face")),
+            box(-0.9f, 0f, -0.9f, -0.6f, 0.3f, -0.6f, tiles("p4_tear_skin"), 1), box(-0.15f, 0f, -0.9f, 0.15f, 0.3f, -0.6f, tiles("p4_tear_skin"), -1),
+            box(0.6f, 0f, -0.9f, 0.9f, 0.3f, -0.6f, tiles("p4_tear_skin"), 1), box(-0.9f, 0f, 0.6f, -0.6f, 0.3f, 0.9f, tiles("p4_tear_skin"), -1),
+            box(-0.15f, 0f, 0.6f, 0.15f, 0.3f, 0.9f, tiles("p4_tear_skin"), 1), box(0.6f, 0f, 0.6f, 0.9f, 0.3f, 0.9f, tiles("p4_tear_skin"), -1),
+        ),
+        MobType.RAIDER to listOf(
+            box(-0.25f, 0f, -0.125f, 0f, 0.75f, 0.125f, tiles("p4_raider_pants"), 1),
+            box(0f, 0f, -0.125f, 0.25f, 0.75f, 0.125f, tiles("p4_raider_pants"), -1),
+            box(-0.26f, 0.75f, -0.15f, 0.26f, 1.45f, 0.15f, tiles("p4_raider_coat")),
+            box(-0.25f, 1.45f, -0.25f, 0.25f, 1.95f, 0.25f, tiles("p4_raider_skin", front = "p4_raider_face", top = "p4_raider_pants")),
+            box(-0.5f, 0.75f, -0.125f, -0.26f, 1.45f, 0.125f, tiles("p4_raider_coat"), 2, pivotY = 1.35f),
+            box(0.26f, 0.75f, -0.125f, 0.5f, 1.45f, 0.125f, tiles("p4_raider_coat"), 2, pivotY = 1.35f),
+        ),
         MobType.WISP to listOf(
             box(-0.3f, 0.2f, -0.3f, 0.3f, 0.8f, 0.3f, tiles("wisp_core", front = "wisp_face")),
             box(-0.55f, 0.47f, -0.55f, 0.55f, 0.53f, 0.55f, tiles("wisp_ring")),

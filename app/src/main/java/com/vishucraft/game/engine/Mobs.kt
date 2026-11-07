@@ -78,7 +78,13 @@ enum class MobType(
     CITIZEN_WOMAN("Woman", 0.3f, 1.75f, 20, false, 1.1f),
     CITIZEN_KID("Child", 0.25f, 1.25f, 14, false, 1.4f),
     /** A little helper that hovers after you and does what you tell it (see Robot.kt). */
-    ROBOT("Robot", 0.3f, 0.95f, 60, false, 2f);
+    ROBOT("Robot", 0.3f, 0.95f, 60, false, 2f),
+    /** Hovers over you and shoots fireballs; lives in the Ember Realm. */
+    FLAME_SPINNER("Flame Spinner", 0.35f, 1.3f, 20, true, 3.5f),
+    /** A big floating creature that cries and throws heavy fireballs; lives in the Ember Realm. */
+    TEAR_DRIFTER("Tear Drifter", 1.1f, 2.2f, 14, true, 2.0f),
+    /** Raiders attack villages in raids, shooting arrows. */
+    RAIDER("Raider", 0.3f, 1.95f, 24, true, 2.2f);
 
     val isCitizen get() = this == CITIZEN || this == CITIZEN_WOMAN || this == CITIZEN_KID
 
@@ -200,6 +206,7 @@ class Mobs(private val world: World) {
         }
         breed(dt)
         val p = game.player
+        updateRaid(dt, game)
         // Bring kept animals back once their chunk is loaded and the player is near.
         unparkTimer -= dt
         if (unparkTimer <= 0f && parked.isNotEmpty()) {
@@ -421,8 +428,9 @@ class Mobs(private val world: World) {
                     }
                 } else { m.fuse = -1f; wander(m, dt).let { wantX = it.first; wantZ = it.second; speed *= 0.5f } }
             }
-            MobType.RATTLER, MobType.SKELETON -> {
-                val burning = game.daylight > 0.6f && skyExposed(floorInt(m.x), floorInt(m.y + 1.7f), floorInt(m.z)) &&
+            MobType.FLAME_SPINNER, MobType.TEAR_DRIFTER -> { floater(m, dt, game, dist); return }
+            MobType.RATTLER, MobType.SKELETON, MobType.RAIDER -> {
+                val burning = m.type != MobType.RAIDER && game.daylight > 0.6f && skyExposed(floorInt(m.x), floorInt(m.y + 1.7f), floorInt(m.z)) &&
                     world.getBlock(floorInt(m.x), floorInt(m.y + 0.2f), floorInt(m.z)) != Blocks.WATER
                 m.burning = burning
                 if (burning) { m.burnTimer += dt; if (m.burnTimer >= 1f) { m.burnTimer = 0f; damage(m, 1f, 0f, 0f) } }
@@ -439,7 +447,7 @@ class Mobs(private val world: World) {
                         val len = sqrt(tx * tx + ty * ty + tz * tz)
                         val speed = 20f
                         game.projectiles.shoot(sx, sy, sz, tx / len * speed, ty / len * speed + len * 0.28f, tz / len * speed, false, 3f,
-                            if (m.type == MobType.SKELETON) Projectile.ARROW else Projectile.THORN)
+                            if (m.type == MobType.SKELETON || m.type == MobType.RAIDER) Projectile.ARROW else Projectile.THORN)
                         game.sound("bow", sx, sy, sz, 0.7f)
                     }
                 } else wander(m, dt).let { wantX = it.first; wantZ = it.second; speed *= 0.5f }
@@ -595,6 +603,77 @@ class Mobs(private val world: World) {
             m.attackCooldown = 1.5f
             game.hurtTarget(p, if (angry) 9f else 6f, m.x, m.z)
             m.swoopTime = 0f
+        }
+    }
+
+    /** Flame Spinners and Tear Drifters: they hover and circle over the player at a distance and throw fireballs. */
+    private fun floater(m: Mob, dt: Float, game: Game, dist: Float) {
+        val p = game.nearestTarget(m.x, m.z)
+        val big = m.type == MobType.TEAR_DRIFTER
+        m.moving = true; m.walkPhase += dt * (if (big) 2f else 9f)
+        val a = m.walkPhase * (if (big) 0.12f else 0.2f) + m.uid
+        val radius = if (big) 15f else 9f
+        val tx = p.x + cos(a) * radius; val ty = p.y + (if (big) 9f else 4.5f); val tz = p.z + sin(a) * radius
+        val ex = tx - m.x; val ey = ty - m.y; val ez = tz - m.z
+        val len = sqrt(ex * ex + ey * ey + ez * ez).coerceAtLeast(0.1f)
+        val sp = m.type.speed
+        m.vx = approach(m.vx, ex / len * sp, 6f * dt); m.vy = approach(m.vy, ey / len * sp, 6f * dt); m.vz = approach(m.vz, ez / len * sp, 6f * dt)
+        move(m, 0, m.vx * dt); move(m, 1, m.vy * dt); move(m, 2, m.vz * dt)
+        val dx = p.x - m.x; val dz = p.z - m.z
+        m.yaw = atan2(dx, -dz)
+        m.shootTimer -= dt
+        val range = if (big) 34f else 26f
+        if (m.shootTimer <= 0f && game.playerAlive && dist < range) {
+            m.shootTimer = if (big) 4.5f else 2.2f + rnd.nextFloat()
+            val sx = m.x; val sy = m.y + m.height * 0.5f; val sz = m.z
+            val vx = p.x - sx; val vy = p.eyeY - 0.4f - sy; val vz = p.z - sz
+            val l = sqrt(vx * vx + vy * vy + vz * vz).coerceAtLeast(0.1f)
+            val speed = if (big) 12f else 15f
+            game.projectiles.shoot(sx, sy, sz, vx / l * speed, vy / l * speed + l * 0.25f, vz / l * speed, false, if (big) 7f else 4f, Projectile.FIREBALL)
+            game.sound("explode", sx, sy, sz, if (big) 0.7f else 0.35f)
+        }
+    }
+
+    // ---- raids: now and then raiders come for a village. Beat all three waves for a reward.
+    internal var raidWave = 0
+    internal var raidCooldown = 360f
+
+    private fun updateRaid(dt: Float, game: Game) {
+        if (!hostileEnabled || game.dimension != com.vishucraft.game.world.Dimension.OVERWORLD || !game.survival) { raidWave = 0; return }
+        val p = game.player
+        if (raidWave == 0) {
+            raidCooldown -= dt
+            if (raidCooldown > 0f || game.daylight < 0.4f || !game.playerAlive) return
+            val near = list.filter { it.type == MobType.VILLAGER && !it.dead && (it.x - p.x) * (it.x - p.x) + (it.z - p.z) * (it.z - p.z) < 48f * 48f }
+            if (near.size < 2) { raidCooldown = 60f; return }
+            raidWave = 1; raidCooldown = 900f
+            game.uiEvents.add("toast:A RAID is coming! Raiders attack the village: stop them!")
+            game.sound("bell", p.x, p.y + 2f, p.z, 1f)
+            spawnRaiders(game, near.first().x, near.first().z, 3)
+            return
+        }
+        if (list.none { it.type == MobType.RAIDER && !it.dead }) {
+            if (raidWave < 3) {
+                raidWave++
+                val v = list.firstOrNull { it.type == MobType.VILLAGER && !it.dead }
+                game.uiEvents.add("toast:Raid wave $raidWave of 3!")
+                spawnRaiders(game, v?.x ?: p.x, v?.z ?: p.z, 2 + raidWave)
+            } else {
+                raidWave = 0
+                game.uiEvents.add("toast:The village is saved! You beat the raid and get a reward.")
+                game.sound("ding", p.x, p.y + 1f, p.z, 1f)
+                game.drops.spawn(com.vishucraft.game.world.ItemStack(com.vishucraft.game.world.Items.find("Emerald"), 6), p.x, p.y + 1f, p.z)
+            }
+        }
+    }
+
+    private fun spawnRaiders(game: Game, cx: Float, cz: Float, n: Int) {
+        var placed = 0; var tries = 0
+        while (placed < n && tries++ < 60) {
+            val (x, z) = ringPoint(cx, cz, 18f, 30f)
+            if (!world.isLoaded(x, z)) continue
+            val y = surfaceY(x, z)
+            if (y > 0 && roomAt(x, y + 1, z, 2)) { list.add(Mob(MobType.RAIDER, x + 0.5f, y + 1f, z + 0.5f)); placed++ }
         }
     }
 
@@ -803,7 +882,8 @@ class Mobs(private val world: World) {
     }
 
     fun voice(t: MobType) = when (t) {
-        MobType.WARDEN -> "enderman"
+        MobType.WARDEN, MobType.TEAR_DRIFTER -> "enderman"
+        MobType.FLAME_SPINNER -> "none"; MobType.RAIDER -> "zombie"
         MobType.DROWNED -> "zombie"; MobType.RABBIT, MobType.SQUID, MobType.COD -> "none"
         MobType.IRON_GOLEM, MobType.SNOW_GOLEM, MobType.TURTLE, MobType.AXOLOTL, MobType.ROBOT -> "none"
         MobType.MOOSHROOM -> "cow"; MobType.POLAR_BEAR, MobType.PANDA -> "bear"
@@ -931,9 +1011,11 @@ class Mobs(private val world: World) {
             if (!hostileEnabled || hostile >= 8) return
             val (x, z) = ringPoint(p.x, p.z, 14f, 40f)
             if (!world.isLoaded(x, z)) return
-            val type = if (game.dimension == com.vishucraft.game.world.Dimension.EMBER) MobType.CINDER else MobType.WISP
+            val ember = game.dimension == com.vishucraft.game.world.Dimension.EMBER
+            val type = if (!ember) MobType.WISP else when (rnd.nextInt(8)) { 0, 1 -> MobType.FLAME_SPINNER; 2 -> MobType.TEAR_DRIFTER; else -> MobType.CINDER }
             val y = surfaceY(x, z)
-            if (y > 0 && roomAt(x, y + 1, z, 2)) list.add(Mob(type, x + 0.5f, y + 1f, z + 0.5f))
+            val lift = if (type == MobType.FLAME_SPINNER) 3 else if (type == MobType.TEAR_DRIFTER) 5 else 1
+            if (y > 0 && roomAt(x, y + lift, z, 2)) list.add(Mob(type, x + 0.5f, y + lift.toFloat(), z + 0.5f))
             return
         }
 

@@ -699,6 +699,9 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
             MobType.WISP -> listOf(i("Emerald") to r.nextInt(2), Blocks.PURPUR to r.nextInt(2), i("Ender Pearl") to r.nextInt(2),
                 i("Amethyst Shard") to r.nextInt(2))
             MobType.VILLAGER, MobType.EXPLORER, MobType.WOLF, MobType.HORSE -> if (m.type == MobType.HORSE) listOf(i("Leather") to r.nextInt(3)) else emptyList()
+            MobType.FLAME_SPINNER -> listOf(i("Blaze Rod") to r.nextInt(2), i("Glowstone Dust") to r.nextInt(2))
+            MobType.TEAR_DRIFTER -> listOf(i("Ghast Tear") to (if (r.nextInt(2) == 0) 1 else 0), i("Gunpowder") to r.nextInt(3))
+            MobType.RAIDER -> listOf(i("Arrow") to r.nextInt(3), i("Emerald") to (if (r.nextInt(4) == 0) 1 else 0))
             MobType.WARDEN -> listOf(i("Nether Star") to 1, i("Elytra") to 1, i("Diamond") to 6, i("Totem of Undying") to 1)
             MobType.CHICKEN -> listOf(i("Feather") to r.nextInt(3), i("Raw Chicken") to 1)
             MobType.RABBIT -> listOf(i("Rabbit Hide") to r.nextInt(2), i("Raw Rabbit") to 1, i("Rabbit's Foot") to (if (r.nextInt(10) == 0) 1 else 0))
