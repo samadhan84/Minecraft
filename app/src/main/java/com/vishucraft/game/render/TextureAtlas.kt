@@ -1383,7 +1383,7 @@ object TextureAtlas {
                     return true
                 }
                 if (name.startsWith("disc_")) {
-                    val c = when (name) { "disc_meadow" -> rgb(90, 190, 90); "disc_caves" -> rgb(150, 110, 70); else -> rgb(120, 110, 220) }
+                    val c = when (name) { "disc_meadow" -> rgb(90, 190, 90); "disc_caves" -> rgb(150, 110, 70); "disc_doodh" -> rgb(240, 240, 250); else -> rgb(120, 110, 220) }
                     sprite(t); disc(t, 8f, 8f, 7f, rgb(30, 30, 34)); disc(t, 8f, 8f, 3f, c, false); t[7, 7] = rgb(10, 10, 10); t[8, 8] = rgb(10, 10, 10)
                     return true
                 }
@@ -1397,7 +1397,7 @@ object TextureAtlas {
 
     /** Colours for spawn eggs: base and spots. */
     private val EGG_COLORS = mapOf(
-        "flame_spinner" to (rgb(250, 190, 40) to rgb(220, 90, 20)), "tear_drifter" to (rgb(236, 236, 240) to rgb(150, 150, 170)), "raider" to (rgb(110, 110, 120) to rgb(60, 70, 60)), "sea_sentinel" to (rgb(60, 130, 120) to rgb(240, 110, 30)), "gold_hog" to (rgb(214, 150, 120) to rgb(240, 200, 60)),
+        "flame_spinner" to (rgb(250, 190, 40) to rgb(220, 90, 20)), "tear_drifter" to (rgb(236, 236, 240) to rgb(150, 150, 170)), "raider" to (rgb(110, 110, 120) to rgb(60, 70, 60)), "sea_sentinel" to (rgb(60, 130, 120) to rgb(240, 110, 30)), "milkman" to (rgb(244, 244, 238) to rgb(50, 100, 200)), "gold_hog" to (rgb(214, 150, 120) to rgb(240, 200, 60)),
         "citizen" to (rgb(70, 130, 200) to rgb(196, 146, 104)), "citizen_woman" to (rgb(220, 70, 120) to rgb(250, 210, 80)),
         "citizen_kid" to (rgb(236, 236, 240) to rgb(40, 70, 160)), "robot" to (rgb(232, 236, 244) to rgb(60, 130, 230)),
         "cow" to (rgb(68, 50, 38) to rgb(160, 160, 160)), "pig" to (rgb(238, 166, 166) to rgb(200, 110, 110)),
@@ -2402,6 +2402,26 @@ object TextureAtlas {
                 if (!name.endsWith("base")) for (y in 5..10) for (x in 5..10) t[x, y] = if (top) rgb(255, 255, 255) else rgb(200, 240, 255)
                 return true
             }
+            "p4_milk_packet" -> {
+                sprite(t)
+                for (y in 3..13) for (x in 4..11) t[x, y] = if (y in 6..9) rgb(255, 255, 255) else rgb(40, 110, 220)
+                for (x in 5..10) { t[x, 2] = rgb(30, 80, 170); t[x, 14] = rgb(30, 80, 170) }
+                for (x in 6..9) t[x, 7] = rgb(40, 110, 220)                                     // a little drop of writing
+                return true
+            }
+            "p4_milk_shirt" -> { t.fill { x, y -> if (x == 7 || x == 8) rgb(60, 110, 200) else scale(rgb(244, 244, 238), t.jitter(0.03f)) }; return true }
+            "p4_milk_pants" -> { t.fill { _, _ -> scale(rgb(236, 236, 228), t.jitter(0.03f)) }; return true }
+            "p4_milk_skin" -> { t.fill { _, _ -> scale(rgb(176, 124, 86), t.jitter(0.05f)) }; return true }
+            "p4_milk_cap" -> { t.fill { _, _ -> scale(rgb(50, 100, 200), t.jitter(0.04f)) }; return true }
+            "p4_milk_face" -> {
+                t.fill { _, y -> if (y < 4) scale(rgb(50, 100, 200), t.jitter(0.04f)) else scale(rgb(176, 124, 86), t.jitter(0.04f)) }
+                for (x in 3..5) t[x, 6] = rgb(245, 245, 245); for (x in 10..12) t[x, 6] = rgb(245, 245, 245)
+                t[4, 6] = rgb(40, 30, 20); t[11, 6] = rgb(40, 30, 20)
+                for (x in 4..11) t[x, 9] = rgb(40, 30, 24)                                      // moustache
+                for (x in 6..9) t[x, 11] = rgb(120, 70, 60)
+                return true
+            }
+            "p4_milk_crate" -> { t.fill { x, y -> if (y < 4) rgb(40, 110, 220) else if (x % 4 == 0) rgb(230, 230, 235) else scale(rgb(250, 250, 255), t.jitter(0.03f)) }; return true }
             "p4_raider_coat" -> { t.fill { x, y -> if (x == 7 || x == 8) rgb(70, 60, 50) else scale(rgb(104, 106, 112), t.jitter(0.05f)) }; return true }
             "p4_raider_pants" -> { t.fill { _, _ -> scale(rgb(70, 70, 76), t.jitter(0.05f)) }; return true }
             "p4_raider_skin" -> { t.fill { _, _ -> scale(rgb(150, 130, 112), t.jitter(0.05f)) }; return true }

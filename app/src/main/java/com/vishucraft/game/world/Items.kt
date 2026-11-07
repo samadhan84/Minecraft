@@ -371,6 +371,10 @@ object Items {
         for (t in listOf(com.vishucraft.game.engine.MobType.FLAME_SPINNER, com.vishucraft.game.engine.MobType.TEAR_DRIFTER, com.vishucraft.game.engine.MobType.RAIDER, com.vishucraft.game.engine.MobType.SEA_SENTINEL, com.vishucraft.game.engine.MobType.GOLD_HOG))
             add("${t.displayName} Spawn Egg", "spawn_egg_${t.name.lowercase()}", use = ItemUse.SPAWN)
 
+        // The morning milk delivery: milk packets and the Doodh Phonk disc (appended so older item ids stay the same).
+        add("Milk Packet", "p4_milk_packet", food = 5)
+        add("Music Disc (Doodh)", "disc_doodh", maxStack = 1)
+
         all = list
         for (i in all) { byId[i.id] = i; byName[i.name] = i.id }
     }

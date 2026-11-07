@@ -101,6 +101,31 @@ object Synth {
         make("disc_meadow", 14f) { tune(intArrayOf(0, 4, 7, 12, 7, 4, 2, 5, 9, 12, 9, 5, 0, 4, 7, 11, 12, -1, 7, 4, 2, 4, 0, -1, 0, 4, 7, 12, 14, 12, 7, 4, 5, 4, 2, 0), 0.38f, 60, it) }
         make("disc_caves", 14f) { tune(intArrayOf(0, 3, 7, 3, 10, 7, 3, -1, 5, 8, 12, 8, 7, 3, 0, -1, 0, 3, 7, 10, 12, 10, 7, 5, 3, 2, 0, -1, 7, 3, 0, -1), 0.44f, 50, it) }
         make("disc_stars", 14f) { tune(intArrayOf(12, 11, 7, 4, 7, 11, 12, 16, 14, 12, 9, 5, 9, 12, 14, 17, 16, 12, 7, 4, 0, 4, 7, 12, 11, 7, 2, 7, 11, 14, 12, -1), 0.4f, 64, it) }
+        // Doodh Phonk: an original phonk beat (cowbell, 808 bass, claps, hats, a dark bell tune and a "doodh!" chant).
+        make("disc_doodh", 16f) { out ->
+            val beat = 60f / 140f; val step = beat / 4f                   // sixteenth notes at 140 bpm
+            fun at(bar: Int, st: Int) = ((bar * 16 + st) * step * RATE).toInt()
+            val cow = intArrayOf(0, 3, 6, 8, 11, 14)                        // cowbell pattern
+            val kick = intArrayOf(0, 7, 10); val kickNote = intArrayOf(0, 0, 3)  // 808 on F, F, A-flat
+            for (bar in 0 until 8) {
+                for (st in cow) { val s = at(bar, st); tone(out, s, 4000, { 587f }, 0.22f, 0.05f, 0.001f, floatArrayOf(1f, 0.5f, 0.3f)); tone(out, s, 4000, { 845f }, 0.2f, 0.05f, 0.001f, floatArrayOf(1f, 0.4f)) }
+                for ((k, st) in kick.withIndex()) {
+                    val f = 43.65f * Math.pow(2.0, kickNote[k] / 12.0).toFloat()
+                    tone(out, at(bar, st), 14000, { t -> f * (1f + 1.2f * exp(-t * 30f)) }, 0.9f, 0.33f, 0.002f, floatArrayOf(1f, 0.25f))
+                }
+                for (st in intArrayOf(4, 12)) { noiseBurst(out, at(bar, st), 5000, 0.8f, 0.07f, 0.55f); tone(out, at(bar, st), 3000, { 190f }, 0.35f, 0.05f) }      // clap
+                for (st in 0 until 16) noiseBurst(out, at(bar, st), 1400, if (st % 4 == 2) 0.32f else 0.2f, 0.012f, 0.9f)                                   // hats
+                if (bar % 2 == 1) for (r in 0 until 4) noiseBurst(out, at(bar, 12 + r), 1000, 0.28f, 0.01f, 0.9f)                                           // hat roll
+                // The dark bell tune (F phrygian), then the chant.
+                val tune = intArrayOf(0, -1, 1, 0, -1, 7, 5, -1, 0, -1, 1, 0, 3, -1, 1, -1)
+                for ((st, n) in tune.withIndex()) if (n >= 0 && bar >= 2) {
+                    val f = 349.2f * Math.pow(2.0, n / 12.0).toFloat()
+                    tone(out, at(bar, st), 7000, { f }, 0.2f, 0.12f, 0.002f, floatArrayOf(1f, 0.5f, 0.25f, 0.12f))
+                }
+                if (bar >= 1) for (st in intArrayOf(10, 14)) tone(out, at(bar, st), 4600, { t -> 175f - t * 160f }, 0.45f, 0.1f, 0.02f, floatArrayOf(0.4f, 1f, 0.8f, 0.3f))  // "doo-dh!"
+            }
+            for (i in out.indices) out[i] = kotlin.math.tanh(out[i] * 1.6f)                      // grit
+        }
         // Creature pack voices.
         make("chicken", 0.3f) { for (k in 0..2) tone(it, k * 2200, 1800, { t -> 900f + 300f * sin(t * 90f) }, 0.35f, 0.04f, 0.005f, floatArrayOf(1f, 0.5f, 0.3f)) }
         make("wolf", 0.4f) { for (k in 0..1) { tone(it, k * 4400, 3000, { t -> 420f - t * 600f }, 0.6f, 0.06f, 0.004f, floatArrayOf(1f, 0.8f, 0.5f, 0.3f)); noiseBurst(it, k * 4400, 1500, 0.3f, 0.03f, 0.3f) } }

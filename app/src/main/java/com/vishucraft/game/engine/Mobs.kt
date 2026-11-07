@@ -88,7 +88,9 @@ enum class MobType(
     /** A spiky guard of the deep sea: its beam hurts you while you swim near it. */
     SEA_SENTINEL("Sea Sentinel", 0.5f, 0.9f, 30, true, 2.2f),
     /** Lives in the Ember Realm. Fights you unless you wear gold; trades for gold ingots. */
-    GOLD_HOG("Gold Hog", 0.35f, 1.7f, 22, true, 2.6f);
+    GOLD_HOG("Gold Hog", 0.35f, 1.7f, 22, true, 2.6f),
+    /** The morning milk delivery: walks up to you with a crate of milk packets, playing his song. */
+    MILKMAN("Milkman", 0.3f, 1.85f, 20, false, 1.7f);
 
     val isCitizen get() = this == CITIZEN || this == CITIZEN_WOMAN || this == CITIZEN_KID
 
@@ -117,6 +119,8 @@ class Mob(val type: MobType, var x: Float, var y: Float, var z: Float, val uid: 
     /** Boomling fuse in seconds (-1 when not lit). */
     var fuse = -1f
     var walkPhase = 0f
+    /** The milkman has handed over his milk packets. */
+    var delivered = false
     var moving = false
     var burning = false
     /** Negative while a baby (seconds until grown up). */
@@ -167,7 +171,7 @@ class Mobs(private val world: World) {
     private var unparkTimer = 0f
 
     /** Animals, named mobs and pets stay in the world; monsters despawn when far away. */
-    fun persistent(m: Mob) = !m.type.hostile || m.customName != null || m.tamed
+    fun persistent(m: Mob) = m.type != MobType.MILKMAN && (!m.type.hostile || m.customName != null || m.tamed)
 
     fun write(d: java.io.DataOutputStream) {
         val all = (list + parked).filter { !it.dead && persistent(it) && it.type != MobType.EXPLORER }
@@ -211,6 +215,7 @@ class Mobs(private val world: World) {
         breed(dt)
         val p = game.player
         updateRaid(dt, game)
+        updateMilkman(dt, game)
         // Bring kept animals back once their chunk is loaded and the player is near.
         unparkTimer -= dt
         if (unparkTimer <= 0f && parked.isNotEmpty()) {
@@ -434,6 +439,23 @@ class Mobs(private val world: World) {
                 } else { m.fuse = -1f; wander(m, dt).let { wantX = it.first; wantZ = it.second; speed *= 0.5f } }
             }
             MobType.FLAME_SPINNER, MobType.TEAR_DRIFTER -> { floater(m, dt, game, dist); return }
+            MobType.MILKMAN -> {
+                m.timer += dt
+                if (!m.delivered) {
+                    if (dist > 2.3f) { m.yaw = atan2(dx, -dz); wantX = dx / dist; wantZ = dz / dist; speed *= 1.3f }
+                    else {
+                        m.delivered = true; m.timer = 0f
+                        game.drops.spawn(com.vishucraft.game.world.ItemStack(com.vishucraft.game.world.Items.find("Milk Packet"), 3), p.x, p.y + 0.5f, p.z)
+                        game.uiEvents.add("toast:Doodhwala: Doodh le lo! Fresh milk packets, delivered to you")
+                        game.sound("ding", m.x, m.y + 1.5f, m.z, 1f)
+                    }
+                    if (m.timer % 5f < dt) game.sound("bell", m.x, m.y + 1.5f, m.z, 0.6f)   // his cycle bell
+                } else {
+                    // Off to the next house, then gone.
+                    if (dist < 40f) { wantX = -dx / dist; wantZ = -dz / dist }
+                    if (m.timer > 60f) m.x += 400f
+                }
+            }
             MobType.RATTLER, MobType.SKELETON, MobType.RAIDER -> {
                 val burning = m.type != MobType.RAIDER && game.daylight > 0.6f && skyExposed(floorInt(m.x), floorInt(m.y + 1.7f), floorInt(m.z)) &&
                     world.getBlock(floorInt(m.x), floorInt(m.y + 0.2f), floorInt(m.z)) != Blocks.WATER
@@ -636,6 +658,32 @@ class Mobs(private val world: World) {
             val speed = if (big) 12f else 15f
             game.projectiles.shoot(sx, sy, sz, vx / l * speed, vy / l * speed + l * 0.25f, vz / l * speed, false, if (big) 7f else 4f, Projectile.FIREBALL)
             game.sound("explode", sx, sy, sz, if (big) 0.7f else 0.35f)
+        }
+    }
+
+    // ---- the milk delivery: every morning a milkman brings fresh milk packets, with his song playing.
+    private var lastDaylight = 1f
+    private var milkCooldown = 0f
+
+    private fun updateMilkman(dt: Float, game: Game) {
+        milkCooldown -= dt
+        val d = game.daylight
+        val morning = lastDaylight < 0.35f && d >= 0.35f
+        lastDaylight = d
+        if (!morning || milkCooldown > 0f || game.dimension != com.vishucraft.game.world.Dimension.OVERWORLD || !game.playerAlive) return
+        if (list.any { it.type == MobType.MILKMAN }) return
+        val p = game.player
+        for (attempt in 0 until 30) {
+            val (x, z) = ringPoint(p.x, p.z, 22f, 30f)
+            if (!world.isLoaded(x, z)) continue
+            val y = surfaceY(x, z)
+            if (y > 0 && world.getBlock(x, y, z) != Blocks.WATER && roomAt(x, y + 1, z, 2)) {
+                list.add(Mob(MobType.MILKMAN, x + 0.5f, y + 1f, z + 0.5f).also { it.customName = "Doodhwala" })
+                milkCooldown = 600f
+                game.uiEvents.add("toast:Good morning! The Doodhwala is coming with fresh milk")
+                game.sound("disc_doodh", x + 0.5f, y + 2f, z + 0.5f, 1.6f)
+                return
+            }
         }
     }
 
@@ -906,7 +954,7 @@ class Mobs(private val world: World) {
 
     fun voice(t: MobType) = when (t) {
         MobType.WARDEN, MobType.TEAR_DRIFTER -> "enderman"
-        MobType.FLAME_SPINNER, MobType.SEA_SENTINEL -> "none"; MobType.RAIDER -> "zombie"; MobType.GOLD_HOG -> "pig"
+        MobType.FLAME_SPINNER, MobType.SEA_SENTINEL, MobType.MILKMAN -> "none"; MobType.RAIDER -> "zombie"; MobType.GOLD_HOG -> "pig"
         MobType.DROWNED -> "zombie"; MobType.RABBIT, MobType.SQUID, MobType.COD -> "none"
         MobType.IRON_GOLEM, MobType.SNOW_GOLEM, MobType.TURTLE, MobType.AXOLOTL, MobType.ROBOT -> "none"
         MobType.MOOSHROOM -> "cow"; MobType.POLAR_BEAR, MobType.PANDA -> "bear"

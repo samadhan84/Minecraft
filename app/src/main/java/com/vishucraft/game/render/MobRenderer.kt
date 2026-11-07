@@ -100,6 +100,15 @@ object MobModels {
             box(0.6f, 0f, -0.9f, 0.9f, 0.3f, -0.6f, tiles("p4_tear_skin"), 1), box(-0.9f, 0f, 0.6f, -0.6f, 0.3f, 0.9f, tiles("p4_tear_skin"), -1),
             box(-0.15f, 0f, 0.6f, 0.15f, 0.3f, 0.9f, tiles("p4_tear_skin"), 1), box(0.6f, 0f, 0.6f, 0.9f, 0.3f, 0.9f, tiles("p4_tear_skin"), -1),
         ),
+        MobType.MILKMAN to listOf(
+            box(-0.25f, 0f, -0.125f, 0f, 0.75f, 0.125f, tiles("p4_milk_pants"), 1),
+            box(0f, 0f, -0.125f, 0.25f, 0.75f, 0.125f, tiles("p4_milk_pants"), -1),
+            box(-0.26f, 0.75f, -0.15f, 0.26f, 1.45f, 0.15f, tiles("p4_milk_shirt")),
+            box(-0.25f, 1.45f, -0.25f, 0.25f, 1.95f, 0.25f, tiles("p4_milk_skin", front = "p4_milk_face", top = "p4_milk_cap")),
+            box(-0.5f, 0.75f, -0.125f, -0.26f, 1.45f, 0.125f, tiles("p4_milk_shirt"), 2, pivotY = 1.35f),
+            box(0.26f, 0.75f, -0.125f, 0.5f, 1.45f, 0.125f, tiles("p4_milk_shirt"), 2, pivotY = 1.35f),
+            box(-0.3f, 0.95f, 0.15f, 0.3f, 1.35f, 0.5f, tiles("p4_milk_crate")),               // the crate of milk on his back
+        ),
         MobType.GOLD_HOG to listOf(
             box(-0.25f, 0f, -0.15f, -0.02f, 0.8f, 0.15f, tiles("p4_hog_skin"), 1),
             box(0.02f, 0f, -0.15f, 0.25f, 0.8f, 0.15f, tiles("p4_hog_skin"), -1),

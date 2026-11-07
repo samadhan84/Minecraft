@@ -849,7 +849,13 @@ class App(demo: File?) : ClientApp(demo) {
                 g.player.yaw = kotlin.math.PI.toFloat(); g.player.pitch = -0.45f
             }
             f == 2640 -> shot("29-water-steps")
-            f == 2642 -> glfwSetWindowShouldClose(window, true)
+            f == 2642 -> session?.game?.let { g ->
+                val y = g.world.generator.surfaceHeight(33, 40) + 1f
+                g.mobs.list.add(com.vishucraft.game.engine.Mob(com.vishucraft.game.engine.MobType.MILKMAN, 33.5f, y, 40.5f).also { it.delivered = true })
+                g.player.x = 33.5f; g.player.y = y + 0.5f; g.player.z = 35f; g.player.flying = true; g.player.yaw = kotlin.math.PI.toFloat(); g.player.pitch = 0.05f
+            }
+            f == 2650 -> shot("30-milkman")
+            f == 2652 -> glfwSetWindowShouldClose(window, true)
         }
     }
 }
