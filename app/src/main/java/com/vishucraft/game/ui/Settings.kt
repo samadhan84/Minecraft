@@ -5,6 +5,8 @@ import android.content.Context
 /** Player preferences, shared by every world. */
 class Settings(context: Context) {
     private val prefs = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
+    /** Small-memory devices (many TVs) start with a short view so the game does not run out of memory. */
+    private val lowMemory = (context.getSystemService(Context.ACTIVITY_SERVICE) as? android.app.ActivityManager)?.let { it.memoryClass <= 128 || it.isLowRamDevice } ?: false
 
     var sensitivity: Float
         get() = prefs.getFloat("sensitivity", 1f)
@@ -13,7 +15,7 @@ class Settings(context: Context) {
         get() = prefs.getInt("fov", 72)
         set(v) = prefs.edit().putInt("fov", v).apply()
     var renderDistance: Int
-        get() = prefs.getInt("renderDistance", 6)
+        get() = prefs.getInt("renderDistance", if (lowMemory) 3 else 5)
         set(v) = prefs.edit().putInt("renderDistance", v).apply()
     var showDebug: Boolean
         get() = prefs.getBoolean("showDebug", true)
@@ -48,7 +50,7 @@ class Settings(context: Context) {
         fun rows(s: Settings): List<Pair<() -> String, () -> Unit>> = listOf(
             { "Look sensitivity: ${"%.2f".format(s.sensitivity)}x" } to { s.sensitivity = next(listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 2f), s.sensitivity) },
             { "Field of view: ${s.fov}°" } to { s.fov = next(listOf(60, 72, 85, 100), s.fov) },
-            { "Render distance: ${s.renderDistance} chunks" } to { s.renderDistance = next(listOf(4, 6, 8, 10), s.renderDistance) },
+            { "Render distance: ${s.renderDistance} chunks" } to { s.renderDistance = next(listOf(3, 4, 6, 8, 10), s.renderDistance) },
             { "Sound effects: ${s.soundVolume}%" } to { s.soundVolume = next(listOf(0, 40, 80, 100), s.soundVolume) },
             { "Music: ${s.musicVolume}%" } to { s.musicVolume = next(listOf(0, 25, 50, 100), s.musicVolume) },
             { "Weather (rain, snow, storms): ${if (s.weather) "On" else "Off"}" } to { s.weather = !s.weather },

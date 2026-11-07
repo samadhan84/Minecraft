@@ -19,6 +19,7 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:banner="@drawable/tv_banner"
         android:isGame="true"
+        android:largeHeap="true"
         android:appCategory="game"
         android:label="Dhruvil Craft"
         android:theme="@android:style/Theme.Black.NoTitleBar.Fullscreen">

@@ -1823,7 +1823,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
             val cx = pcx + o[0]; val cz = pcz + o[1]
             if (world.getChunk(cx, cz) == null) { world.request(cx, cz); budget-- }
         }
-        val unloadR = renderDistance + 3
+        val unloadR = renderDistance + 2
         val others = net?.players?.values?.map { (floorInt(it.x) shr 4) to (floorInt(it.z) shr 4) }.orEmpty()
         for (c in world.chunks.values) {
             if (max(abs(c.cx - pcx), abs(c.cz - pcz)) <= unloadR) continue

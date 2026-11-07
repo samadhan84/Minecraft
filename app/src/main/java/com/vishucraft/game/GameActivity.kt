@@ -1025,6 +1025,17 @@ class GameActivity : Activity() {
         Updater.attach(this)
     }
 
+    /** When Android says memory is short, look less far: far chunks are let go at once. */
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        if (level >= TRIM_MEMORY_RUNNING_LOW && ::game.isInitialized && game.renderDistance > 2) game.renderDistance -= 1
+    }
+
+    override fun onLowMemory() {
+        super.onLowMemory()
+        if (::game.isInitialized) game.renderDistance = 2
+    }
+
     override fun onPause() {
         handler.removeCallbacks(limitLoop)
         if (::playLimit.isInitialized) {
