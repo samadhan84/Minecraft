@@ -436,7 +436,9 @@ object Blocks {
     const val PETROL_PUMP = 448
     /** Pile iron, gold, diamond or emerald blocks under it (see Game.updateBeacons) and it gives you powers nearby. */
     const val BEACON = 449
-    const val COUNT = 450
+    /** Candles: tap with more candles to add up to four, with flint and steel to light, bare-handed to blow out (meta: bits 0-1 = candles - 1, bit 2 = lit). */
+    const val CANDLE = 450
+    const val COUNT = 451
 
     /** The newer crops' texture names, in id order from RICE_CROP. */
     val NEW_CROPS = listOf("rice", "tomato", "lentil", "beetroot")
@@ -816,6 +818,7 @@ object Blocks {
         shape(SCAFFOLDING, "Scaffolding", "scaffolding", hardness = 0.1f, tool = ToolType.NONE, facing = Facing.NONE, solid = false)
         shape(BREWING_STAND, "Brewing Stand", "brewing_stand", "brewing_stand", "cobblestone", hardness = 0.5f, tool = P, facing = Facing.NONE, solid = false)
         extraLight[BREWING_STAND] = 1
+        shape(CANDLE, "Candle", "p4_candle_top", "p4_candle", "p4_candle", hardness = 0.1f, tool = ToolType.NONE, facing = Facing.NONE, solid = false)
         shape(CAKE, "Cake", "cake_top", "cake_side", "cake_bottom", hardness = 0.5f, tool = ToolType.NONE, facing = Facing.NONE)
         shape(SIGN, "Sign", "oak_planks", hardness = 1f, tool = A, solid = false)
         shape(PAINTING, "Painting", "painting_0", hardness = 0.3f, tool = ToolType.NONE, solid = false)
@@ -1058,6 +1061,7 @@ object Blocks {
     fun lightLevel(id: Int, meta: Int): Int = when (id) {
         GLOWSTONE, SEA_LANTERN, JACK_O_LANTERN, REDSTONE_LAMP_ON -> 15
         TORCH -> 14
+        CANDLE -> if (meta and 4 != 0) minOf(12, 3 * ((meta and 3) + 1)) else 0
         FURNACE, SMOKER, BLAST_FURNACE -> if (meta and 8 != 0) 13 else 0
         CRYING_OBSIDIAN -> 10
         REDSTONE_TORCH -> if (meta == 0) 7 else 0

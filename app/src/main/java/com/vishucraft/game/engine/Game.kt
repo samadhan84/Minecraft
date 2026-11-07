@@ -361,8 +361,12 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
             if (survival) for ((id, n) in mobDrops(m)) drops.spawn(ItemStack(id, n), m.x, m.y + 0.5f, m.z)
             val near = (m.x - player.x) * (m.x - player.x) + (m.z - player.z) * (m.z - player.z) < 24f * 24f
             if (near) {
-                addXp(if (m.type == MobType.WARDEN) 500 else if (m.type.hostile) 5 else 1 + java.util.Random().nextInt(3))
+                addXp(if (m.type == MobType.WARDEN) 500 else if (m.type == MobType.DUSK_WITHER) 400 else if (m.type.hostile) 5 else 1 + java.util.Random().nextInt(3))
                 if (m.type.hostile) award("kill")
+            }
+            if (m.type == MobType.DUSK_WITHER) {
+                if (!survival) for ((id, n) in mobDrops(m)) drops.spawn(ItemStack(id, n), m.x, m.y + 0.5f, m.z)
+                uiEvents.add("toast:You beat the Dusk Wither!")
             }
             if (m.type == MobType.WARDEN) {
                 // The boss drops its loot even in creative, and the game shows the ending.
@@ -737,6 +741,8 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
             MobType.SEA_SENTINEL -> listOf(i("Prismarine Shard") to r.nextInt(3), i("Raw Cod") to r.nextInt(2))
             MobType.GOLD_HOG -> listOf(i("Raw Porkchop") to 1 + r.nextInt(2), i("Gold Nugget") to r.nextInt(3))
             MobType.RAIDER -> listOf(i("Arrow") to r.nextInt(3), i("Emerald") to (if (r.nextInt(4) == 0) 1 else 0))
+            MobType.TUSK_BOAR -> listOf(i("Raw Porkchop") to 2 + r.nextInt(3), i("Leather") to r.nextInt(2))
+            MobType.DUSK_WITHER -> listOf(i("Nether Star") to 1, i("Diamond") to 4, i("Gold Ingot") to 6, i("Netherite Scrap") to 2)
             MobType.WARDEN -> listOf(i("Nether Star") to 1, i("Elytra") to 1, i("Diamond") to 6, i("Totem of Undying") to 1)
             MobType.CHICKEN -> listOf(i("Feather") to r.nextInt(3), i("Raw Chicken") to 1)
             MobType.RABBIT -> listOf(i("Rabbit Hide") to r.nextInt(2), i("Raw Rabbit") to 1, i("Rabbit's Foot") to (if (r.nextInt(10) == 0) 1 else 0))
@@ -1289,7 +1295,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
     }
 
     /** The boss bar: name and health 0..1 while the Sky Warden is around. */
-    fun bossBar(): Pair<String, Float>? = mobs.list.firstOrNull { it.type == MobType.WARDEN && !it.dead }?.let {
+    fun bossBar(): Pair<String, Float>? = mobs.list.firstOrNull { (it.type == MobType.WARDEN || it.type == MobType.DUSK_WITHER) && !it.dead }?.let {
         it.type.displayName to (it.health / it.type.maxHealth).coerceIn(0f, 1f)
     }
 
@@ -1564,6 +1570,15 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
             Blocks.BELL -> { sound("bell", t.x + 0.5f, t.y + 0.5f, t.z + 0.5f); return }
             Blocks.BREWING_STAND -> { brew(); return }
             Blocks.CAKE -> { eatCake(t.x, t.y, t.z); return }
+            Blocks.CANDLE -> {
+                val m = world.getMeta(t.x, t.y, t.z)
+                when {
+                    sel == Blocks.CANDLE && (m and 3) < 3 -> { setBlock(t.x, t.y, t.z, Blocks.CANDLE, m + 1); consumeHeld(); sound("pop", t.x + 0.5f, t.y + 0.5f, t.z + 0.5f, 0.6f) }
+                    item?.name == "Flint and Steel" -> { setBlock(t.x, t.y, t.z, Blocks.CANDLE, m or 4); damageHeld(1); sound("fuse", t.x + 0.5f, t.y + 0.5f, t.z + 0.5f, 0.4f) }
+                    sel != Blocks.CANDLE -> setBlock(t.x, t.y, t.z, Blocks.CANDLE, m xor 4)        // a bare tap lights it or blows it out
+                }
+                return
+            }
             Blocks.SIGN -> { uiEvents.add("signedit:${t.x},${t.y},${t.z}"); return }
             // Tap a billboard to write on it (holding a billboard adds one next to it instead).
             Blocks.BILLBOARD -> if (sel != Blocks.BILLBOARD) { uiEvents.add("signedit:${t.x},${t.y},${t.z}"); return }

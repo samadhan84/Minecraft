@@ -109,6 +109,19 @@ object MobModels {
             box(0.26f, 0.75f, -0.125f, 0.5f, 1.45f, 0.125f, tiles("p4_milk_shirt"), 2, pivotY = 1.35f),
             box(-0.3f, 0.95f, 0.15f, 0.3f, 1.35f, 0.5f, tiles("p4_milk_crate")),               // the crate of milk on his back
         ),
+        MobType.TUSK_BOAR to listOf(
+            box(-0.55f, 0.45f, -0.8f, 0.55f, 1.2f, 0.8f, tiles("p4_boar_skin")),
+            box(-0.45f, 0.55f, -1.4f, 0.45f, 1.25f, -0.8f, tiles("p4_boar_skin", front = "p4_boar_face")),
+            box(-0.12f, 1.2f, -0.6f, 0.12f, 1.4f, 0.5f, tiles("p4_boar_skin")),                    // the mane ridge
+        ) + legs(0.35f, 0.5f, 0.22f, 0.45f, "p4_boar_skin"),
+        MobType.DUSK_WITHER to listOf(
+            box(-0.55f, 1.6f, -0.55f, 0.55f, 2.4f, 0.55f, tiles("p4_wither_bone", front = "p4_wither_face")),         // the middle head
+            box(-1.35f, 1.5f, -0.4f, -0.65f, 2.1f, 0.3f, tiles("p4_wither_bone", front = "p4_wither_face")),          // the side heads
+            box(0.65f, 1.5f, -0.4f, 1.35f, 2.1f, 0.3f, tiles("p4_wither_bone", front = "p4_wither_face")),
+            box(-0.9f, 0.9f, -0.2f, 0.9f, 1.55f, 0.2f, tiles("p4_wither_bone")),                                       // the ribs
+            box(-0.12f, 0.2f, -0.12f, 0.12f, 0.95f, 0.12f, tiles("p4_wither_bone")),                                   // the spine
+            box(-0.45f, 0.3f, -0.1f, 0.45f, 0.5f, 0.1f, tiles("p4_wither_bone")),
+        ),
         MobType.GOLD_HOG to listOf(
             box(-0.25f, 0f, -0.15f, -0.02f, 0.8f, 0.15f, tiles("p4_hog_skin"), 1),
             box(0.02f, 0f, -0.15f, 0.25f, 0.8f, 0.15f, tiles("p4_hog_skin"), -1),

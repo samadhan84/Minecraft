@@ -134,3 +134,60 @@ class WoodTest {
         assertTrue(g.mineTime(Blocks.LOG) < 0.7f, "an axe is much faster: ${g.mineTime(Blocks.LOG)}")
     }
 }
+
+class BossTest {
+    private fun game(): Game {
+        val dir = kotlin.io.path.createTempDirectory("boss").toFile()
+        val level = LevelData.create(9L, "t", GameMode.SURVIVAL)
+        val g = Game(World(level.seed, dir, Dimension.OVERWORLD, flat = true), level, GameInput(), dir)
+        for (cx in -4..4) for (cz in -4..4) g.world.ensureLoaded(cx, cz)
+        g.timeOfDay = 0.3f
+        return g
+    }
+
+    @Test fun theDuskWitherThrowsVolleysHasABossBarAndDropsAStar() {
+        val g = game()
+        g.mobs.hostileEnabled = true
+        val y = g.world.generator.surfaceHeight(0, 0) + 1f
+        g.player.x = 0.5f; g.player.y = y; g.player.z = 0.5f
+        val w = Mob(MobType.DUSK_WITHER, 10f, y + 8f, 10f); g.mobs.list.add(w)
+        var most = 0; var t = 0f
+        while (t < 8f) { g.update(1 / 20f); g.dirtyChunks.clear(); t += 1 / 20f; most = maxOf(most, g.projectiles.list.count { it.kind == Projectile.FIREBALL }) }
+        assertTrue(most >= 3, "a volley of three fireballs, got $most")
+        assertEquals("Dusk Wither", g.bossBar()?.first)
+        g.mobs.damage(w, 9999f, 0f, 0f)
+        run@ for (i in 0 until 60) { g.update(1 / 20f); g.dirtyChunks.clear() }
+        val star = Items.find("Nether Star")
+        assertTrue(g.inventory.count(star) + g.drops.list.filter { it.stack.id == star }.sumOf { it.stack.count } >= 1, "it drops a Nether Star")
+    }
+
+    @Test fun aDuskSigilCallsTheBossAndTuskBoarsCharge() {
+        assertEquals(MobType.DUSK_WITHER, Items.spawnType(Items.find("Dusk Sigil")))
+        assertTrue(Recipes.crafting.any { it.result == Items.find("Dusk Sigil") })
+        val g = game()
+        g.mobs.hostileEnabled = true
+        val y = g.world.generator.surfaceHeight(0, 0) + 1f
+        g.player.x = 0.5f; g.player.y = y; g.player.z = 0.5f
+        g.mobs.list.add(Mob(MobType.TUSK_BOAR, 8f, y, 0.5f))
+        val before = g.health
+        var t = 0f
+        while (t < 6f && g.health >= before) { g.update(1 / 20f); g.dirtyChunks.clear(); t += 1 / 20f }
+        assertTrue(g.health < before, "the boar charges and gores you")
+    }
+}
+
+class CandleTest {
+    @Test fun candlesLightAndStack() {
+        val dir = kotlin.io.path.createTempDirectory("candle").toFile()
+        val level = LevelData.create(2L, "t", GameMode.SURVIVAL)
+        val g = Game(World(level.seed, dir, Dimension.OVERWORLD, flat = true), level, GameInput(), dir)
+        g.world.ensureLoaded(0, 0)
+        val y = g.world.generator.surfaceHeight(0, 0) + 1
+        g.setBlock(0, y, 0, Blocks.CANDLE, 0)
+        assertEquals(0, Blocks.lightLevel(Blocks.CANDLE, 0), "unlit gives no light")
+        assertEquals(3, Blocks.lightLevel(Blocks.CANDLE, 4), "one lit candle")
+        assertEquals(12, Blocks.lightLevel(Blocks.CANDLE, 4 or 3), "four lit candles")
+        assertTrue(Recipes.crafting.any { it.result == Blocks.CANDLE })
+        assertEquals(4, com.vishucraft.game.world.Shapes.boxes(Blocks.CANDLE, 3, false) { 0 }.size, "four candles are drawn")
+    }
+}

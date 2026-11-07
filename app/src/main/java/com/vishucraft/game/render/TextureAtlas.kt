@@ -652,6 +652,42 @@ object TextureAtlas {
         }
     }
 
+    /**
+     * A sword, drawn with care: a blade with a lit edge, a shaded edge and a centre line, a cross-guard, a wrapped grip
+     * and a pommel. Each material has its own character: chipped stone, a fuller on iron, a ruby on gold, a sparkling
+     * diamond blade with a gem pommel and a netherite blade with glowing ember edges.
+     */
+    private fun swordIcon(t: Tile, key: String, mat: Int) {
+        sprite(t)
+        fun p(x: Int, y: Int, c: Int) { if (x in 0..15 && y in 0..15) t[x, y] = c }
+        val light = scale(mat, 1.35f); val dark = scale(mat, 0.6f); val deep = scale(mat, 0.42f)
+        val leather = rgb(120, 78, 40); val leatherDark = rgb(76, 46, 22)
+        val guard = when (key) { "gold", "netherite" -> rgb(240, 196, 60); "diamond" -> rgb(150, 160, 170); "wood" -> rgb(96, 66, 34); else -> rgb(110, 112, 120) }
+        val guardLight = scale(guard, 1.3f); val guardDark = scale(guard, 0.6f)
+        // The blade runs from the guard at (5, 10) up to the tip at (15, 0).
+        val length = if (key == "wood" || key == "stone") 9 else 10
+        for (i in 0..length) {
+            val x = 5 + i; val y = 10 - i
+            p(x, y, light); p(x + 1, y, mat); p(x, y + 1, dark)
+            if (i in 1..length - 1) p(x + 1, y + 1, scale(mat, 0.8f))              // the shaded lower edge
+        }
+        p(5 + length + 1, 10 - length - 1, light); p(5 + length, 10 - length - 1, light)   // the tip
+        when (key) {
+            "stone" -> { p(8, 7, dark); p(11, 4, dark); p(9, 6, scale(mat, 1.25f)) }     // chips and flecks
+            "iron" -> for (i in 3..length - 2) p(6 + i, 10 - i, scale(mat, 1.15f))
+            "gold" -> { p(9, 6, rgb(255, 245, 190)); p(12, 3, rgb(255, 245, 190)) }
+            "diamond" -> { p(9, 6, rgb(255, 255, 255)); p(11, 4, rgb(255, 255, 255)); p(13, 2, rgb(210, 255, 250)); p(7, 8, rgb(200, 255, 250)) }
+            "netherite" -> { for (i in 3..length - 1 step 3) p(6 + i, 10 - i, rgb(255, 120, 30)); p(13, 1, rgb(255, 170, 60)) }
+        }
+        // The cross-guard, across the blade near the handle.
+        for (i in -3..3) { p(5 + i, 10 + i, guard); p(6 + i, 10 + i, if (i < 0) guardLight else guardDark) }
+        p(2, 7, guardDark); p(8, 13, guardDark)
+        // The grip, wrapped, and the pommel.
+        p(4, 11, leather); p(3, 12, leatherDark); p(2, 13, leather); p(4, 12, leatherDark); p(3, 13, leather)
+        val gem = when (key) { "diamond" -> rgb(90, 240, 230); "gold" -> rgb(220, 40, 50); "netherite" -> rgb(255, 120, 30); else -> guard }
+        p(1, 14, gem); p(2, 14, scale(gem, 0.7f)); p(1, 15, scale(gem, 0.6f))
+    }
+
     /** Hand-made 16px tool silhouettes: h/k handle, m/d/l head (mid, dark, light). */
     private val TOOL_MASKS = mapOf(
         "pickaxe" to arrayOf(
@@ -1397,7 +1433,7 @@ object TextureAtlas {
 
     /** Colours for spawn eggs: base and spots. */
     private val EGG_COLORS = mapOf(
-        "flame_spinner" to (rgb(250, 190, 40) to rgb(220, 90, 20)), "tear_drifter" to (rgb(236, 236, 240) to rgb(150, 150, 170)), "raider" to (rgb(110, 110, 120) to rgb(60, 70, 60)), "sea_sentinel" to (rgb(60, 130, 120) to rgb(240, 110, 30)), "milkman" to (rgb(244, 244, 238) to rgb(50, 100, 200)), "gold_hog" to (rgb(214, 150, 120) to rgb(240, 200, 60)),
+        "flame_spinner" to (rgb(250, 190, 40) to rgb(220, 90, 20)), "tear_drifter" to (rgb(236, 236, 240) to rgb(150, 150, 170)), "raider" to (rgb(110, 110, 120) to rgb(60, 70, 60)), "sea_sentinel" to (rgb(60, 130, 120) to rgb(240, 110, 30)), "milkman" to (rgb(244, 244, 238) to rgb(50, 100, 200)), "tusk_boar" to (rgb(120, 76, 56) to rgb(240, 236, 220)), "gold_hog" to (rgb(214, 150, 120) to rgb(240, 200, 60)),
         "citizen" to (rgb(70, 130, 200) to rgb(196, 146, 104)), "citizen_woman" to (rgb(220, 70, 120) to rgb(250, 210, 80)),
         "citizen_kid" to (rgb(236, 236, 240) to rgb(40, 70, 160)), "robot" to (rgb(232, 236, 244) to rgb(60, 130, 230)),
         "cow" to (rgb(68, 50, 38) to rgb(160, 160, 160)), "pig" to (rgb(238, 166, 166) to rgb(200, 110, 110)),
@@ -2402,6 +2438,35 @@ object TextureAtlas {
                 if (!name.endsWith("base")) for (y in 5..10) for (x in 5..10) t[x, y] = if (top) rgb(255, 255, 255) else rgb(200, 240, 255)
                 return true
             }
+            "p4_boar_skin" -> { t.fill { x, y -> scale(rgb(122, 78, 58), t.jitter(0.07f) * (if ((x + y) % 7 == 0) 0.85f else 1f)) }; return true }
+            "p4_boar_face" -> {
+                t.fill { _, _ -> scale(rgb(122, 78, 58), t.jitter(0.05f)) }
+                for (x in 3..12) for (y in 8..13) t[x, y] = scale(rgb(160, 106, 84), 1f)         // the snout
+                t[5, 10] = rgb(60, 30, 24); t[10, 10] = rgb(60, 30, 24)
+                for (y in 5..11) { t[1, y] = rgb(246, 240, 220); t[14, y] = rgb(246, 240, 220) }   // long tusks
+                t[4, 5] = rgb(250, 190, 40); t[11, 5] = rgb(250, 190, 40); t[4, 6] = rgb(30, 10, 10); t[11, 6] = rgb(30, 10, 10)
+                return true
+            }
+            "p4_wither_bone" -> { t.fill { x, y -> scale(rgb(54, 52, 62), t.jitter(0.07f) * (if (y % 4 == 0) 0.8f else 1f)) }; return true }
+            "p4_wither_face" -> {
+                t.fill { _, _ -> scale(rgb(66, 64, 76), t.jitter(0.05f)) }
+                for (y in 5..8) for (x in listOf(3, 4, 5, 10, 11, 12)) t[x, y] = rgb(10, 8, 14)             // dark sockets
+                for (x in listOf(4, 11)) t[x, 7] = rgb(200, 80, 255)                                          // glowing eyes
+                for (x in 4..11) t[x, 12] = rgb(20, 18, 26); for (x in 5..10 step 2) for (y in 11..13) t[x, y] = rgb(20, 18, 26)
+                return true
+            }
+            "p4_dusk_sigil" -> {
+                sprite(t)
+                for (y in 2..13) for (x in 2..13) { val dx = x - 7.5f; val dy = y - 7.5f; if (dx * dx + dy * dy < 30f) t[x, y] = if (dx * dx + dy * dy < 12f) rgb(40, 30, 60) else rgb(90, 80, 120) }
+                for (y in 5..10) for (x in listOf(5, 6, 9, 10)) if (y in 6..8) t[x, y] = rgb(210, 90, 255)
+                t[7, 10] = rgb(230, 230, 240); t[8, 10] = rgb(230, 230, 240)
+                return true
+            }
+            "p4_candle", "p4_candle_top" -> {
+                t.fill { x, y -> scale(rgb(244, 238, 214), t.jitter(0.03f) * (if (x % 5 == 0) 0.93f else 1f)) }
+                if (name.endsWith("top")) { for (y in 7..8) for (x in 7..8) t[x, y] = rgb(40, 34, 30); t[7, 6] = rgb(255, 190, 60) }
+                return true
+            }
             "p4_milk_packet" -> {
                 sprite(t)
                 for (y in 3..13) for (x in 4..11) t[x, y] = if (y in 6..9) rgb(255, 255, 255) else rgb(40, 110, 220)
@@ -2461,7 +2526,7 @@ object TextureAtlas {
             name.startsWith("crack_") -> return
         }
         for ((key, tier) in TIER_COLORS) for (kind in listOf("sword", "pickaxe", "axe", "shovel", "hoe")) {
-            if (name == "${kind}_$key") return tool(t, kind, tier)
+            if (name == "${kind}_$key") return if (kind == "sword") swordIcon(t, key, tier) else tool(t, kind, tier)
         }
         for ((key, w) in WOODS) {
             when (name) {

@@ -855,7 +855,18 @@ class App(demo: File?) : ClientApp(demo) {
                 g.player.x = 33.5f; g.player.y = y + 0.5f; g.player.z = 35f; g.player.flying = true; g.player.yaw = kotlin.math.PI.toFloat(); g.player.pitch = 0.05f
             }
             f == 2650 -> shot("30-milkman")
-            f == 2652 -> glfwSetWindowShouldClose(window, true)
+            f == 2652 -> session?.game?.let { g ->
+                closeOverlay()
+                val y = g.world.generator.surfaceHeight(33, 40) + 1f
+                for (m in g.mobs.list.toList()) if (m.type == com.vishucraft.game.engine.MobType.MILKMAN) g.mobs.list.remove(m)
+                g.mobs.hostileEnabled = true
+                g.mobs.list.add(com.vishucraft.game.engine.Mob(com.vishucraft.game.engine.MobType.TUSK_BOAR, 28f, y, 42f))
+                g.mobs.list.add(com.vishucraft.game.engine.Mob(com.vishucraft.game.engine.MobType.DUSK_WITHER, 36f, y + 3f, 46f))
+                for ((k, c) in (0..3).withIndex()) g.setBlock(33, y.toInt(), 38 + k, com.vishucraft.game.world.Blocks.CANDLE, 3 or 4)
+                g.player.x = 33f; g.player.y = y + 2f; g.player.z = 30f; g.player.flying = true; g.player.yaw = kotlin.math.PI.toFloat(); g.player.pitch = 0.0f
+            }
+            f == 2660 -> shot("31-boar-wither-candles")
+            f == 2662 -> glfwSetWindowShouldClose(window, true)
         }
     }
 }

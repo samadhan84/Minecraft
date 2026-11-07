@@ -90,7 +90,11 @@ enum class MobType(
     /** Lives in the Ember Realm. Fights you unless you wear gold; trades for gold ingots. */
     GOLD_HOG("Gold Hog", 0.35f, 1.7f, 22, true, 2.6f),
     /** The morning milk delivery: walks up to you with a crate of milk packets, playing his song. */
-    MILKMAN("Milkman", 0.3f, 1.85f, 20, false, 1.7f);
+    MILKMAN("Milkman", 0.3f, 1.85f, 20, false, 1.7f),
+    /** A fast charging beast of the Ember Realm with big tusks. */
+    TUSK_BOAR("Tusk Boar", 0.55f, 1.4f, 30, true, 3.2f),
+    /** A three-headed flying boss that throws volleys of dark fireballs; called with a Dusk Sigil. */
+    DUSK_WITHER("Dusk Wither", 1.0f, 2.4f, 300, true, 6f);
 
     val isCitizen get() = this == CITIZEN || this == CITIZEN_WOMAN || this == CITIZEN_KID
 
@@ -479,15 +483,16 @@ class Mobs(private val world: World) {
                     }
                 } else wander(m, dt).let { wantX = it.first; wantZ = it.second; speed *= 0.5f }
             }
-            MobType.CRAWLER, MobType.CINDER, MobType.GOLD_HOG -> {
-                val hunts = when (m.type) { MobType.CINDER -> true; MobType.GOLD_HOG -> m.angry || !goldWorn(game); else -> m.angry || game.daylight < 0.4f }
+            MobType.CRAWLER, MobType.CINDER, MobType.GOLD_HOG, MobType.TUSK_BOAR -> {
+                if (m.type == MobType.TUSK_BOAR && dist < 12f) speed *= 1.5f      // it charges
+                val hunts = when (m.type) { MobType.CINDER, MobType.TUSK_BOAR -> true; MobType.GOLD_HOG -> m.angry || !goldWorn(game); else -> m.angry || game.daylight < 0.4f }
                 if (hunts && dist < 20f && game.playerAlive) {
                     m.yaw = atan2(dx, -dz)
                     if (dist > 0.9f) { wantX = dx / dist; wantZ = dz / dist }
                     m.attackCooldown -= dt
                     if (dist < 1.3f + m.halfWidth && abs(p.y - m.y) < 1.6f && m.attackCooldown <= 0f) {
                         m.attackCooldown = 1f
-                        game.hurtTarget(p, when (m.type) { MobType.CINDER -> 5f; MobType.GOLD_HOG -> 4f; else -> 2.5f }, m.x, m.z)
+                        game.hurtTarget(p, when (m.type) { MobType.CINDER -> 5f; MobType.TUSK_BOAR -> 6f; MobType.GOLD_HOG -> 4f; else -> 2.5f }, m.x, m.z)
                     }
                 } else wander(m, dt).let { wantX = it.first; wantZ = it.second; speed *= 0.5f }
             }
@@ -495,7 +500,7 @@ class Mobs(private val world: World) {
                 flyer(m, dt, game, dist, dx, dz)
                 return
             }
-            MobType.WARDEN -> { boss(m, dt, game); return }
+            MobType.WARDEN, MobType.DUSK_WITHER -> { boss(m, dt, game); return }
             MobType.IRON_GOLEM, MobType.SNOW_GOLEM -> {
                 golem(m, dt, game).let { wantX = it.first; wantZ = it.second }
                 if (m.type == MobType.IRON_GOLEM) speed *= if (wantX != 0f || wantZ != 0f) 1.4f else 0.5f
@@ -616,6 +621,11 @@ class Mobs(private val world: World) {
             val vx = p.x - sx; val vy = p.eyeY - sy; val vz = p.z - sz
             val len = sqrt(vx * vx + vy * vy + vz * vz).coerceAtLeast(0.1f)
             game.projectiles.shoot(sx, sy, sz, vx / len * 18f, vy / len * 18f + len * 0.3f, vz / len * 18f, false, if (angry) 6f else 4f, Projectile.FIREBALL)
+            if (m.type == MobType.DUSK_WITHER) for (side in intArrayOf(-1, 1)) {
+                // The two side heads shoot too, a little to each side.
+                val nx = -vz / len * side * 2.5f; val nz = vx / len * side * 2.5f
+                game.projectiles.shoot(sx, sy, sz, vx / len * 18f + nx, vy / len * 18f + len * 0.3f, vz / len * 18f + nz, false, if (angry) 5f else 3f, Projectile.FIREBALL)
+            }
             game.sound("bow", sx, sy, sz, 1f)
         }
         val ex = tx - m.x; val ey = ty - m.y; val ez = tz - m.z
@@ -803,7 +813,7 @@ class Mobs(private val world: World) {
             return if (d > 1.5f) (dx / d) to (dz / d) else 0f to 0f
         }
         val range = if (iron) 16f else 12f
-        val prey = list.filter { it.type.hostile && !it.dead && !it.tamed && it.type != MobType.WARDEN }
+        val prey = list.filter { it.type.hostile && !it.dead && !it.tamed && it.type != MobType.WARDEN && it.type != MobType.DUSK_WITHER }
             .minByOrNull { (it.x - m.x) * (it.x - m.x) + (it.z - m.z) * (it.z - m.z) }
             ?.takeIf { (it.x - m.x) * (it.x - m.x) + (it.z - m.z) * (it.z - m.z) < range * range }
         m.attackCooldown -= dt
@@ -954,7 +964,7 @@ class Mobs(private val world: World) {
 
     fun voice(t: MobType) = when (t) {
         MobType.WARDEN, MobType.TEAR_DRIFTER -> "enderman"
-        MobType.FLAME_SPINNER, MobType.SEA_SENTINEL, MobType.MILKMAN -> "none"; MobType.RAIDER -> "zombie"; MobType.GOLD_HOG -> "pig"
+        MobType.FLAME_SPINNER, MobType.SEA_SENTINEL, MobType.MILKMAN -> "none"; MobType.RAIDER -> "zombie"; MobType.GOLD_HOG, MobType.TUSK_BOAR -> "pig"; MobType.DUSK_WITHER -> "enderman"
         MobType.DROWNED -> "zombie"; MobType.RABBIT, MobType.SQUID, MobType.COD -> "none"
         MobType.IRON_GOLEM, MobType.SNOW_GOLEM, MobType.TURTLE, MobType.AXOLOTL, MobType.ROBOT -> "none"
         MobType.MOOSHROOM -> "cow"; MobType.POLAR_BEAR, MobType.PANDA -> "bear"
@@ -1083,7 +1093,7 @@ class Mobs(private val world: World) {
             val (x, z) = ringPoint(p.x, p.z, 14f, 40f)
             if (!world.isLoaded(x, z)) return
             val ember = game.dimension == com.vishucraft.game.world.Dimension.EMBER
-            val type = if (!ember) MobType.WISP else when (rnd.nextInt(10)) { 0, 1 -> MobType.FLAME_SPINNER; 2 -> MobType.TEAR_DRIFTER; 3, 4 -> MobType.GOLD_HOG; else -> MobType.CINDER }
+            val type = if (!ember) MobType.WISP else when (rnd.nextInt(12)) { 0, 1 -> MobType.FLAME_SPINNER; 2 -> MobType.TEAR_DRIFTER; 3, 4 -> MobType.GOLD_HOG; 5, 6 -> MobType.TUSK_BOAR; else -> MobType.CINDER }
             val y = surfaceY(x, z)
             val lift = if (type == MobType.FLAME_SPINNER) 3 else if (type == MobType.TEAR_DRIFTER) 5 else 1
             if (y > 0 && roomAt(x, y + lift, z, 2)) list.add(Mob(type, x + 0.5f, y + lift.toFloat(), z + 0.5f))

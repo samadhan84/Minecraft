@@ -136,6 +136,12 @@ object Shapes {
                 b(0f, 0f, 14 * P, 2 * P, 14 * P, 1f), b(14 * P, 0f, 14 * P, 1f, 14 * P, 1f))
             Blocks.BREWING_STAND -> listOf(b(1 * P, 0f, 1 * P, 15 * P, 2 * P, 15 * P), b(7 * P, 2 * P, 7 * P, 9 * P, 14 * P, 9 * P),
                 b(3 * P, 6 * P, 7 * P, 13 * P, 8 * P, 9 * P))
+            Blocks.CANDLE -> {
+                // One to four candles of different heights, side by side.
+                val spots = listOf(7f to 7f, 4f to 9f, 10f to 4f, 10f to 10f)
+                val heights = listOf(6f, 4f, 5f, 3f)
+                (0..(meta and 3)).map { k -> b(spots[k].first * P, 0f, spots[k].second * P, (spots[k].first + 2) * P, heights[k] * P, (spots[k].second + 2) * P) }
+            }
             Blocks.CAKE -> listOf(b(1 * P + (meta and 7) * 2 * P, 0f, 1 * P, 15 * P, 8 * P, 15 * P))
             Blocks.SIGN -> {
                 val ns = f == 2 || f == 3

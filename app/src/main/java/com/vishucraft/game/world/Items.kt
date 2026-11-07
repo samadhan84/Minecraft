@@ -373,6 +373,9 @@ object Items {
 
         // The morning milk delivery: milk packets and the Doodh Phonk disc (appended so older item ids stay the same).
         add("Milk Packet", "p4_milk_packet", food = 5)
+        add("Dusk Sigil", "p4_dusk_sigil", use = ItemUse.SPAWN, maxStack = 4)   // tap the ground to call the Dusk Wither
+        for (t in listOf(com.vishucraft.game.engine.MobType.TUSK_BOAR, com.vishucraft.game.engine.MobType.MILKMAN))
+            add("${t.displayName} Spawn Egg", "spawn_egg_${t.name.lowercase()}", use = ItemUse.SPAWN)
         add("Music Disc (Doodh)", "disc_doodh", maxStack = 1)
 
         all = list
@@ -397,6 +400,7 @@ object Items {
         return when (name) {
             "Axolotl Bucket" -> com.vishucraft.game.engine.MobType.AXOLOTL
             "Cod Bucket" -> com.vishucraft.game.engine.MobType.COD
+            "Dusk Sigil" -> com.vishucraft.game.engine.MobType.DUSK_WITHER
             else -> com.vishucraft.game.engine.MobType.values().firstOrNull { "${it.displayName} Spawn Egg" == name }
         }
     }
