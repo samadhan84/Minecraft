@@ -157,6 +157,8 @@ object Recipes {
         sh(Blocks.RAIL, 16, listOf("M M", "MSM", "M M"), 'M' to iron, 'S' to stick)
         sh(Blocks.POWERED_RAIL, 6, listOf("M M", "MSM", "MRM"), 'M' to gold, 'S' to stick, 'R' to Blocks.REDSTONE_DUST)
         r(Blocks.REPEATER, 1, true, Blocks.REDSTONE_TORCH to 2, Blocks.REDSTONE_DUST to 1, Blocks.STONE to 3)
+        r(Blocks.ARDUINO, 1, true, Blocks.REDSTONE_DUST to 4, i("Iron Ingot") to 2, i("Gold Ingot") to 1)
+        r(Blocks.ESP32, 1, true, Blocks.ARDUINO to 1, Blocks.REDSTONE_DUST to 2, i("Emerald") to 1)
         r(Blocks.OBSERVER, 1, true, cobble to 6, Blocks.REDSTONE_DUST to 2, i("Iron Ingot") to 1)
         r(Blocks.DAYLIGHT_SENSOR, 1, true, Blocks.GLASS to 3, planks to 3, Blocks.REDSTONE_DUST to 1)
         r(Blocks.PRESSURE_PLATE, 1, false, Blocks.STONE to 2)

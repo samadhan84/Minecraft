@@ -43,6 +43,12 @@ class Redstone(private val world: World, private val set: (Int, Int, Int, Int, I
     /** How many things stand on a pressure plate (players and mobs; also dropped items when [items]). */
     var plateLoad: (Int, Int, Int, Boolean) -> Int = { x, y, z, _ -> if (occupied(x, y, z)) 1 else 0 }
     private val fuses = HashMap<Long, Int>()
+    /** What each board remembers: ticks it has run, the input last tick, a toggle, a pulse timer and the delayed input. */
+    private val boardClock = HashMap<Long, Int>()
+    private val boardPrev = HashMap<Long, Boolean>()
+    private val boardMemory = HashMap<Long, Boolean>()
+    private val boardPulse = HashMap<Long, Int>()
+    private val boardHist = HashMap<Long, ArrayDeque<Boolean>>()
     private val rnd = Random()
 
     /** Called with the explosion centre and radius so the game can hurt / knock back the player and mobs. */
@@ -119,6 +125,38 @@ class Redstone(private val world: World, private val set: (Int, Int, Int, Int, I
         }
     }
 
+    /** One tick of a board's program: is its output on? */
+    private fun boardOut(p: Long, id: Int, meta: Int, input: Boolean, wifi: BooleanArray): Boolean {
+        val clock = (boardClock[p] ?: 0) + 1
+        boardClock[p] = clock
+        val rising = input && boardPrev.put(p, input) != true
+        if (!input) boardPrev[p] = false
+        val blink = (clock / 10) % 2 == 0
+        return when (val prog = Boards.program(id, meta)) {
+            Prog.FOLLOW -> input
+            Prog.INVERT -> !input
+            Prog.TOGGLE -> { if (rising) boardMemory[p] = !(boardMemory[p] ?: false); boardMemory[p] ?: false }
+            Prog.BLINK -> blink
+            Prog.BLINK_WHILE -> input && blink
+            Prog.PULSE -> {
+                if (rising) boardPulse[p] = 30
+                val left = boardPulse[p] ?: 0
+                if (left > 0) boardPulse[p] = left - 1
+                left > 0
+            }
+            Prog.NIGHT -> daylight() < 0.5f
+            Prog.DELAY -> {
+                val h = boardHist.getOrPut(p) { ArrayDeque() }
+                h.add(input)
+                if (h.size > 20) h.poll() else false
+            }
+            Prog.ON -> true
+            Prog.SEND_A, Prog.SEND_B, Prog.SEND_C -> false
+            Prog.RECV_A, Prog.RECV_B, Prog.RECV_C -> wifi[Boards.wifiChannel(prog)]
+            Prog.RECV_A_NOT -> !wifi[0]
+        }
+    }
+
     private fun simulate(comps: List<Long>) {
         val sources = HashSet<Long>()
         val strong = HashSet<Long>()
@@ -179,6 +217,10 @@ class Redstone(private val world: World, private val set: (Int, Int, Int, Int, I
                 Blocks.DAYLIGHT_SENSOR -> if (daylight() > 0.5f) sources.add(p)
                 // Directional outputs: they only power what is in front (repeater) or behind (observer).
                 Blocks.REPEATER -> if (meta(p) and Shapes.POWERED != 0) {
+                    val front = dir(p, (meta(p) and 7).coerceIn(2, 5))
+                    if (front >= 0) { strong.add(front); directed.add(front) }
+                }
+                Blocks.ARDUINO, Blocks.ESP32 -> if (Boards.isOn(meta(p))) {
                     val front = dir(p, (meta(p) and 7).coerceIn(2, 5))
                     if (front >= 0) { strong.add(front); directed.add(front) }
                 }
@@ -261,10 +303,21 @@ class Redstone(private val world: World, private val set: (Int, Int, Int, Int, I
             if (meta and 8 != on) setAt(p, Blocks.POWERED_RAIL, (meta and 8.inv()) or on)
         }
 
+        // Wi-Fi: a channel is on when any ESP32 sending on it has power coming in.
+        val wifi = BooleanArray(3)
+        for (p in comps) if (id(p) == Blocks.ESP32) {
+            val m = meta(p)
+            val ch = Boards.wifiChannel(Boards.program(Blocks.ESP32, m))
+            if (ch >= 0 && Boards.program(Blocks.ESP32, m).name.startsWith("SEND") && activated(p, ignoreFace = (m and 7).coerceIn(2, 5))) wifi[ch] = true
+        }
         for (p in comps) {
             val id = id(p)
             val meta = meta(p)
             when (id) {
+                Blocks.ARDUINO, Blocks.ESP32 -> {
+                    val out = boardOut(p, id, meta, activated(p, ignoreFace = (meta and 7).coerceIn(2, 5)), wifi)
+                    if (out != Boards.isOn(meta)) setAt(p, id, (meta and 8.inv()) or (if (out) 8 else 0))
+                }
                 Blocks.REDSTONE_DUST -> {
                     val l = dust[p] ?: 0
                     if (l != meta) setAt(p, id, l)

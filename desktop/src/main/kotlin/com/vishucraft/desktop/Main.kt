@@ -812,7 +812,21 @@ class App(demo: File?) : ClientApp(demo) {
                 g.player.yaw = 0f; g.player.pitch = -0.25f
             }
             f == 2530 -> shot("24-festival-decorations")
-            f == 2532 -> glfwSetWindowShouldClose(window, true)
+            f == 2532 -> session?.game?.let { g ->
+                // An Arduino blinking a lamp, and an ESP32 pair: one sends, the other receives.
+                val B = com.vishucraft.game.world.Blocks
+                for (cz in 0..1) for (cx in 3..6) g.world.ensureLoaded(cx, cz)
+                val ox = 70; val oz = 4
+                val y = g.world.generator.surfaceHeight(ox, oz) + 1
+                for (dx in -4..4) for (dz in -2..9) g.setBlock(ox + dx, y - 1, oz + dz, B.STONE)
+                g.setBlock(ox, y, oz, B.ARDUINO, 4 or (3 shl 4)); g.setBlock(ox + 1, y, oz, B.REDSTONE_LAMP)
+                g.setBlock(ox, y, oz + 3, B.ESP32, 4 or (0 shl 4)); g.setBlock(ox - 1, y, oz + 3, B.REDSTONE_BLOCK)
+                g.setBlock(ox, y, oz + 6, B.ESP32, 4 or (3 shl 4)); g.setBlock(ox + 1, y, oz + 6, B.REDSTONE_LAMP)
+                g.player.x = ox - 3.5f; g.player.y = y + 3f; g.player.z = oz + 3f; g.player.flying = true
+                g.player.yaw = kotlin.math.PI.toFloat() * 0.5f; g.player.pitch = -0.5f
+            }
+            f == 2580 -> shot("25-arduino-esp")
+            f == 2582 -> glfwSetWindowShouldClose(window, true)
         }
     }
 }

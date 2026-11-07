@@ -1222,6 +1222,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
             Blocks.ITEM_FRAME -> (world.blockEntities.get(t.x, t.y, t.z) as? com.vishucraft.game.world.ItemHolderEntity)?.stack?.let { Items.displayName(it.id) }
             Blocks.JUKEBOX -> (world.blockEntities.get(t.x, t.y, t.z) as? com.vishucraft.game.world.ItemHolderEntity)?.stack?.let { "Playing: " + Items.displayName(it.id) }
             Blocks.COMPOSTER -> "Composter ${world.getMeta(t.x, t.y, t.z).coerceAtMost(7)}/7"
+            Blocks.ARDUINO, Blocks.ESP32 -> world.getMeta(t.x, t.y, t.z).let { m -> "${Blocks[t.block].name}: ${com.vishucraft.game.world.Boards.program(t.block, m).title}${if (com.vishucraft.game.world.Boards.isOn(m)) " (on)" else ""}" }
             else -> null
         }
     }
@@ -1524,6 +1525,14 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
             Blocks.JUKEBOX -> { useJukebox(t.x, t.y, t.z); return }
             Blocks.CAMPFIRE -> if (item != null && campfireCooks(item.name) != null) { cookOnCampfire(t.x, t.y, t.z, item); return }
             Blocks.NOTE_BLOCK -> if (item == null) return
+            // Tap an Arduino or ESP32 board to choose the next program it runs.
+            Blocks.ARDUINO, Blocks.ESP32 -> {
+                val m = com.vishucraft.game.world.Boards.next(t.block, world.getMeta(t.x, t.y, t.z))
+                setBlock(t.x, t.y, t.z, t.block, m)
+                sound("click", t.x + 0.5f, t.y + 0.5f, t.z + 0.5f)
+                uiEvents.add("toast:${Blocks[t.block].name}: ${com.vishucraft.game.world.Boards.program(t.block, m).title}")
+                return
+            }
         }
 
         if (item != null) {
@@ -1749,7 +1758,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
                 meta = if (t.nz == 1) 2 else if (t.nz == -1) 3 else if (t.nx == 1) 4 else 5
                 if (id == Blocks.PAINTING) meta = meta or (java.util.Random().nextInt(4) shl 3)
             }
-            Blocks.REPEATER, Blocks.OBSERVER -> meta = meta xor 1
+            Blocks.REPEATER, Blocks.OBSERVER, Blocks.ARDUINO, Blocks.ESP32 -> meta = meta xor 1
             Blocks.LEVER, in Blocks.WOOD_BUTTON_FIRST until Blocks.WOOD_BUTTON_FIRST + 6, Blocks.STONE_BUTTON -> {
                 // Stick it to the face that was tapped: floor, ceiling or a wall (a replaced plant: the floor).
                 val support = if (replace) 1 else when {
