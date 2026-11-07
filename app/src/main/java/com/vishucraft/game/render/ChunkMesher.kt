@@ -244,6 +244,16 @@ class ChunkMesher {
                     for (f in 0 until 6) {
                         val n = NORMALS[f]
                         val nb = block(px + n[0], y + n[1], pz + n[2])
+                        if (nb == id && f >= 2 && surface) {
+                            // Next to lower water of the same kind: fill the step between the two surfaces, so there is no gap.
+                            val nx = px + n[0]; val nz = pz + n[2]
+                            val nAbove = block(nx, y + 1, nz)
+                            val nMeta = padMeta[pidx(nx, y, nz)].toInt() and 0xFF
+                            val nSurface = nAbove != id && !(id == Blocks.WATER && Blocks.isWaterPlant(nAbove))
+                            val hn = if (!nSurface) 1f else if (nMeta == 0) 0.875f else ((8 - nMeta.coerceIn(1, 7)) / 9f).coerceAtLeast(0.12f)
+                            if (h > hn + 0.001f) emitFace(out, px, y, pz, f, def.top, emissive, h, if (id == Blocks.WATER) 12f else 0f, hn)
+                            continue
+                        }
                         if (nb == id || opaque[nb]) continue
                         if (id == Blocks.WATER && Blocks.isWaterPlant(nb)) continue
                         if (f != 0 && nb != Blocks.AIR && Blocks[nb].translucent) continue
@@ -300,7 +310,7 @@ class ChunkMesher {
     }
 
     /** [flag] (a multiple of 4 added to the block light) tells the shader how the vertex sways. */
-    private fun emitFace(out: FloatBuilder, px: Int, y: Int, pz: Int, f: Int, tile: Int, emissive: Boolean, height: Float, flag: Float = 0f) {
+    private fun emitFace(out: FloatBuilder, px: Int, y: Int, pz: Int, f: Int, tile: Int, emissive: Boolean, height: Float, flag: Float = 0f, bottom: Float = 0f) {
         val n = NORMALS[f]
         val lx = px + n[0]; val ly = y + n[1]; val lz = pz + n[2]
         val shade = FACE_SHADE[f]
@@ -341,8 +351,8 @@ class ChunkMesher {
             val c = (start + k) and 3
             val cv = corners[c]
             val uv = UVS[c]
-            val vy = if (cv[1] == 1) height else 0f
-            val vTex = if (f >= 2 && cv[1] == 1 && height < 1f) 1f - height else uv[1]
+            val vy = if (cv[1] == 1) height else bottom
+            val vTex = if (f >= 2 && (height < 1f || bottom > 0f)) 1f - vy else uv[1]
             out.put(
                 bx + cv[0], by + vy, bz + cv[2],
                 u0 + uv[0] * TILE_UV, v0 + vTex * TILE_UV,

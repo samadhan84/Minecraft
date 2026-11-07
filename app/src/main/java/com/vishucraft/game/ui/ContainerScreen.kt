@@ -105,12 +105,12 @@ class ContainerScreen(
 
     companion object {
         const val INV = 0; const val ARMOR = 1; const val CHEST_SLOT = 2; const val FURNACE_SLOT = 3; const val RECIPE = 4
-        const val GRID = 5; const val OUTPUT = 6
+        const val GRID = 5; const val OUTPUT = 6; const val BOOK = 7
     }
 
     fun open(m: Mode, chestEntity: ChestEntity? = null, furnaceEntity: FurnaceEntity? = null) {
         mode = m; chest = chestEntity; furnace = furnaceEntity
-        selected = null; cursor = -1; recipeScroll = 0f
+        selected = null; cursor = -1; recipeScroll = 0f; book = false
         visibility = VISIBLE
         invalidate()
     }
@@ -119,62 +119,68 @@ class ContainerScreen(
 
     // ---------------------------------------------------------------- layout
 
+    /** The recipe book (a list of recipes beside the window) is closed until the Book button is tapped. */
+    private var book = false
+    private val panelRect = RectF()
+    private var unit = 1f
+
+    /**
+     * The same arrangement as in Minecraft: a grey window 176 by 166 units, armour on the left, the crafting grid on
+     * the right (2x2 in the inventory, 3x3 at a crafting table), the inventory in three rows and the hotbar under it.
+     * Returns the whole area, including the recipe book when it is open.
+     */
     private fun layoutCells(): RectF {
         cells.clear()
+        val hopper = mode == Mode.CHEST && chest is com.vishucraft.game.world.HopperEntity
         val showRecipes = mode == Mode.INVENTORY || mode == Mode.CRAFTING
-        val cell = minOf(dp(40f), (width - dp(48f)) / (if (showRecipes || mode == Mode.FURNACE) 17f else 11f), (height - dp(90f)) / 8f)
-        val leftW = cell * 10.2f
-        val rightW = if (showRecipes) cell * 7.5f else if (mode == Mode.FURNACE) cell * 5f else 0f
-        val w = leftW + rightW + dp(24f)
-        val rows = if (mode == Mode.CHEST) 7.6f else 4.6f + if (mode == Mode.INVENTORY) 0f else 0f
-        val h = dp(40f) + cell * maxOf(rows, if (showRecipes) 7.2f else 4.6f) + dp(26f)
-        val p = RectF((width - w) / 2, (height - h) / 2, (width + w) / 2, (height + h) / 2)
-        var y = p.top + dp(34f)
-        val x0 = p.left + dp(12f) + cell * 1.2f
-        if (mode == Mode.CHEST) {
-            val n = chest?.slots?.size ?: 27
-            for (i in 0 until n) cells.add(Cell(CHEST_SLOT, i, RectF(x0 + (i % 9) * cell, y + (i / 9) * cell, x0 + (i % 9 + 1) * cell, y + (i / 9 + 1) * cell)))
-            y += cell * 3.3f
+        val bookOn = book && showRecipes
+        val ph = if (hopper) 133f else 166f
+        val totalW = 176f + if (bookOn) 160f else 0f
+        val u = minOf((width - dp(16f)) / totalW, (height - dp(16f)) / ph)
+        unit = u
+        val left = (width - totalW * u) / 2; val top = (height - ph * u) / 2
+        panelRect.set(left, top, left + 176 * u, top + ph * u)
+        fun slot(kind: Int, i: Int, gx: Float, gy: Float, big: Boolean = false) {
+            val x = left + gx * u; val y = top + gy * u
+            val sz = (if (big) 26f else 18f) * u
+            cells.add(Cell(kind, i, RectF(x, y, x + sz, y + sz)))
         }
-        // Armor column on the left.
-        for (i in 0 until 4) {
-            val ax = p.left + dp(10f)
-            cells.add(Cell(ARMOR, i, RectF(ax, y + i * cell, ax + cell, y + (i + 1) * cell)))
+        when (mode) {
+            Mode.CHEST -> {
+                val n = chest?.slots?.size ?: 27
+                for (i in 0 until n) if (hopper) slot(CHEST_SLOT, i, 44f + i * 18, 20f) else slot(CHEST_SLOT, i, 8f + (i % 9) * 18, 18f + (i / 9) * 18)
+            }
+            Mode.FURNACE -> { slot(FURNACE_SLOT, 0, 56f, 17f); slot(FURNACE_SLOT, 1, 56f, 53f); slot(FURNACE_SLOT, 2, 112f, 31f, big = true) }
+            Mode.INVENTORY -> {
+                for (i in 0 until 4) slot(ARMOR, i, 8f, 8f + i * 18)
+                for (i in 0 until 4) slot(GRID, i, 98f + (i % 2) * 18, 18f + (i / 2) * 18)
+                slot(OUTPUT, 0, 150f, 24f, big = true)
+                arrowRect.set(left + 136 * u, top + 31 * u, left + 148 * u, top + 41 * u)
+                slot(BOOK, 0, 104f, 60f)
+            }
+            Mode.CRAFTING -> {
+                for (i in 0 until 9) slot(GRID, i, 30f + (i % 3) * 18, 17f + (i / 3) * 18)
+                slot(OUTPUT, 0, 120f, 31f, big = true)
+                arrowRect.set(left + 92 * u, top + 36 * u, left + 114 * u, top + 46 * u)
+                slot(BOOK, 0, 5f, 34f)
+            }
         }
-        // Main inventory rows (9..35) then the hotbar (0..8) slightly separated.
-        for (i in 9 until 36) {
-            val r = (i - 9) / 9; val c = (i - 9) % 9
-            cells.add(Cell(INV, i, RectF(x0 + c * cell, y + r * cell, x0 + (c + 1) * cell, y + (r + 1) * cell)))
-        }
-        val hy = y + cell * 3.2f
-        for (i in 0 until 9) cells.add(Cell(INV, i, RectF(x0 + i * cell, hy, x0 + (i + 1) * cell, hy + cell)))
+        val invY = if (hopper) 51f else 84f; val hotY = if (hopper) 109f else 142f
+        for (i in 9 until 36) slot(INV, i, 8f + (i - 9) % 9 * 18, invY + (i - 9) / 9 * 18)
+        for (i in 0 until 9) slot(INV, i, 8f + i * 18, hotY)
 
-        val rx = p.left + dp(12f) + leftW + dp(6f)
-        if (showRecipes) {
+        recipes = emptyList()
+        recipeArea.setEmpty()
+        if (bookOn) {
             recipes = Recipes.available(game.inventory, mode == Mode.CRAFTING).sortedByDescending { it.canCraft(game.inventory) }
-            // Crafting grid (2x2 in the inventory, 3x3 at a crafting table) with its output slot.
-            val gs = gridSize()
-            val gy = p.top + dp(34f)
-            for (i in 0 until gs * gs) {
-                val gx = rx + (i % gs) * cell; val gyy = gy + (i / gs) * cell
-                cells.add(Cell(GRID, i, RectF(gx, gyy, gx + cell, gyy + cell)))
-            }
-            val ox = rx + (gs + 1.2f) * cell; val oy = gy + (gs - 1) * cell / 2
-            cells.add(Cell(OUTPUT, 0, RectF(ox, oy, ox + cell, oy + cell)))
-            arrowRect.set(rx + gs * cell + dp(4f), oy + cell * 0.4f, ox - dp(4f), oy + cell * 0.6f)
-            recipeArea.set(rx, gy + gs * cell + dp(22f), p.right - dp(10f), p.bottom - dp(24f))
-            val rh = cell * 0.95f
+            recipeArea.set(left + 184 * u, top + 14 * u, left + totalW * u - 8 * u, top + ph * u - 8 * u)
+            val rh = 17f * u
             for ((i, _) in recipes.withIndex()) {
-                val top = recipeArea.top + i * rh - recipeScroll
-                cells.add(Cell(RECIPE, i, RectF(rx, top, recipeArea.right, top + rh - dp(3f))))
+                val t = recipeArea.top + i * rh - recipeScroll
+                cells.add(Cell(RECIPE, i, RectF(recipeArea.left, t, recipeArea.right, t + rh - dp(3f))))
             }
-        } else if (mode == Mode.FURNACE) {
-            val fy = p.top + dp(40f)
-            cells.add(Cell(FURNACE_SLOT, 0, RectF(rx + cell * 0.5f, fy, rx + cell * 1.5f, fy + cell)))
-            cells.add(Cell(FURNACE_SLOT, 1, RectF(rx + cell * 0.5f, fy + cell * 2f, rx + cell * 1.5f, fy + cell * 3f)))
-            cells.add(Cell(FURNACE_SLOT, 2, RectF(rx + cell * 3f, fy + cell, rx + cell * 4.2f, fy + cell * 2.2f)))
         }
-        return p
+        return RectF(left, top, left + totalW * u, top + ph * u)
     }
 
     // ---------------------------------------------------------------- slot access (game thread)
@@ -295,6 +301,7 @@ class ContainerScreen(
 
     private fun tap(c: Cell) {
         if (c.kind == OUTPUT) { craftFromGrid(); refresh(); return }
+        if (c.kind == BOOK) { book = !book; recipeScroll = 0f; refresh(); return }
         val sel0 = selected
         if (c.kind == GRID && sel0 != null && sel0.kind != GRID) {
             // Keep the selection so the player can keep dropping items into the grid.
@@ -401,46 +408,97 @@ class ContainerScreen(
 
     // ---------------------------------------------------------------- drawing
 
+    private val black = Paint().apply { color = Color.BLACK }
+    private val white = Paint().apply { color = Color.WHITE }
+    private val shade = Paint().apply { color = Color.rgb(85, 85, 85) }
+    private val slotTop = Paint().apply { color = Color.rgb(55, 55, 55) }
+
+    /** The grey Minecraft window: black outline, light top and left edge, dark bottom and right edge. */
+    private fun window(c: Canvas, r: RectF, u: Float) {
+        c.drawRect(r, black)
+        c.drawRect(r.left + u, r.top + u, r.right - u, r.bottom - u, panel)
+        c.drawRect(r.left + u, r.top + u, r.right - u, r.top + 2 * u, white)
+        c.drawRect(r.left + u, r.top + u, r.left + 2 * u, r.bottom - u, white)
+        c.drawRect(r.left + u, r.bottom - 2 * u, r.right - u, r.bottom - u, shade)
+        c.drawRect(r.right - 2 * u, r.top + u, r.right - u, r.bottom - u, shade)
+    }
+
+    /** A sunken slot: dark on the top and left, light on the bottom and right. */
+    private fun slotBox(c: Canvas, r: RectF, u: Float) {
+        c.drawRect(r, slotTop)
+        c.drawRect(r.left + u, r.top + u, r.right, r.bottom, white)
+        c.drawRect(r.left + u, r.top + u, r.right - u, r.bottom - u, slotPaint)
+    }
+
     override fun onDraw(canvas: Canvas) {
-        val p = layoutCells()
+        val all = layoutCells()
+        val u = unit; val pr = panelRect
         canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), dim)
-        canvas.drawRect(p, panel); canvas.drawRect(p, border)
+        window(canvas, pr, u)
+        if (all.right > pr.right + 1f) window(canvas, RectF(pr.right + 4 * u, pr.top, all.right, pr.bottom), u)
+        val hopper = mode == Mode.CHEST && chest is com.vishucraft.game.world.HopperEntity
+        title.textSize = 7f * u; small.textSize = 6f * u
         val name = when (mode) {
-            Mode.INVENTORY -> "Inventory"; Mode.CRAFTING -> "Crafting Table"; Mode.FURNACE -> "Furnace"
-            Mode.CHEST -> if (chest is com.vishucraft.game.world.HopperEntity) "Hopper" else "Chest"
+            Mode.INVENTORY, Mode.CRAFTING -> "Crafting"; Mode.FURNACE -> "Furnace"
+            Mode.CHEST -> if (hopper) "Item Hopper" else "Chest"
         }
-        canvas.drawText(name, p.left + dp(12f), p.top + dp(24f), title)
-        val hint = when (mode) {
-            Mode.CHEST, Mode.FURNACE -> "Tap an item to move it across"
-            else -> "Pick an item, tap grid squares to lay it out, then tap the result · or tap a recipe"
+        val tx = pr.left + (when (mode) { Mode.INVENTORY -> 98f; Mode.CRAFTING -> 28f; Mode.FURNACE -> 60f; else -> 8f }) * u
+        canvas.drawText(name, tx, pr.top + 14 * u, title)
+        if (mode != Mode.INVENTORY) canvas.drawText("Inventory", pr.left + 8 * u, pr.top + ((if (hopper) 51f else 84f) - 3f) * u, title)
+        if (mode == Mode.INVENTORY) {
+            // The player in the box between the armour and the crafting grid.
+            val bx = pr.left + 26 * u; val by = pr.top + 8 * u
+            canvas.drawRect(bx, by, bx + 49 * u, by + 70 * u, black)
+            canvas.drawRect(bx + 2, by + 2, bx + 49 * u - 2, by + 70 * u - 2, slotTop)
+            val cx = bx + 24.5f * u; val k = 70f * u / 36f
+            fun box(l: Float, t: Float, w: Float, h: Float, color: Int) { canvas.drawRect(cx + l * k, by + t * k, cx + (l + w) * k, by + (t + h) * k, Paint().apply { this.color = color }) }
+            box(-4f, 4f, 8f, 8f, Color.rgb(196, 146, 104)); box(-4f, 4f, 8f, 3f, Color.rgb(70, 44, 24))
+            box(-4f, 12f, 8f, 12f, Color.rgb(0, 170, 170)); box(-8f, 12f, 4f, 12f, Color.rgb(196, 146, 104)); box(4f, 12f, 4f, 12f, Color.rgb(196, 146, 104))
+            box(-4f, 24f, 4f, 12f, Color.rgb(54, 56, 130)); box(0f, 24f, 4f, 12f, Color.rgb(54, 56, 130))
         }
-        canvas.drawText(hint, p.left + dp(12f), p.bottom - dp(8f), small)
 
         for ((i, c) in cells.withIndex()) {
             if (c.kind == RECIPE) continue
             val r = c.rect
-            canvas.drawRect(r.left + 2, r.top + 2, r.right - 2, r.bottom - 2, if (c.kind == ARMOR) slotDark else slotPaint)
-            StackPainter.draw(canvas, get(game, c.kind, c.index), r.left, r.top, r.width())
+            if (c.kind == BOOK) {
+                canvas.drawRect(r, black)
+                canvas.drawRect(r.left + u, r.top + u, r.right - u, r.bottom - u, if (book) rowOk else rowNo)
+                small.textAlign = Paint.Align.CENTER
+                canvas.drawText("Book", r.centerX(), r.centerY() + 2.5f * u, small); small.textAlign = Paint.Align.LEFT
+            } else {
+                slotBox(canvas, r, u)
+                val pad = (r.width() - 18f * u) / 2
+                if (c.kind == ARMOR && get(game, c.kind, c.index) == null) {
+                    small.textAlign = Paint.Align.CENTER
+                    canvas.drawText(listOf("H", "B", "L", "F")[c.index], r.centerX(), r.centerY() + 2.5f * u, small); small.textAlign = Paint.Align.LEFT
+                }
+                StackPainter.draw(canvas, get(game, c.kind, c.index), r.left + pad, r.top + pad, 18f * u)
+            }
             if (selected?.let { it.kind == c.kind && it.index == c.index } == true) canvas.drawRect(r, selPaint)
             if (i == cursor) canvas.drawRect(r, curPaint)
         }
 
         if (mode == Mode.INVENTORY || mode == Mode.CRAFTING) {
-            canvas.drawRect(arrowRect, slotDark)
-            canvas.drawText("Recipes (tap to craft):", recipeArea.left, recipeArea.top - dp(6f), small)
-            drawRecipes(canvas)
+            title.textAlign = Paint.Align.CENTER; title.textSize = 14f * u
+            canvas.drawText("→", arrowRect.centerX(), arrowRect.centerY() + 5f * u, title)
+            title.textAlign = Paint.Align.LEFT; title.textSize = 7f * u
+            if (book) { canvas.drawText("Recipes (tap to craft):", recipeArea.left, recipeArea.top - 3f * u, small); drawRecipes(canvas) }
         }
         if (mode == Mode.FURNACE) furnace?.let { f ->
             val out = cells.first { it.kind == FURNACE_SLOT && it.index == 2 }.rect
             val inp = cells.first { it.kind == FURNACE_SLOT && it.index == 0 }.rect
-            val arrowL = inp.right + dp(6f); val arrowR = out.left - dp(6f)
-            val ay = out.centerY()
-            canvas.drawRect(arrowL, ay - dp(3f), arrowR, ay + dp(3f), slotDark)
-            canvas.drawRect(arrowL, ay - dp(3f), arrowL + (arrowR - arrowL) * (f.progress / FurnaceEntity.SMELT_SECONDS), ay + dp(3f), progress)
+            val fuel = cells.first { it.kind == FURNACE_SLOT && it.index == 1 }.rect
+            // The flame between the two slots burns down; the arrow towards the result fills up.
+            val fl = inp.left + 2 * u; val ft = inp.bottom + 2 * u; val fh = fuel.top - inp.bottom - 4 * u
+            canvas.drawRect(fl, ft, fl + 14 * u, ft + fh, slotDark)
             if (f.burnLeft > 0f && f.burnTotal > 0f) {
-                val h = inp.height() * (f.burnLeft / f.burnTotal).coerceIn(0f, 1f)
-                canvas.drawRect(inp.left + inp.width() * 0.3f, inp.bottom + inp.height() - h, inp.right - inp.width() * 0.3f, inp.bottom + inp.height(), flame)
+                val h = fh * (f.burnLeft / f.burnTotal).coerceIn(0f, 1f)
+                canvas.drawRect(fl, ft + fh - h, fl + 14 * u, ft + fh, flame)
             }
+            val arrowL = inp.right + 8 * u; val arrowR = out.left - 8 * u
+            val ay = out.centerY()
+            canvas.drawRect(arrowL, ay - 8 * u, arrowR, ay + 8 * u, slotDark)
+            canvas.drawRect(arrowL, ay - 8 * u, arrowL + (arrowR - arrowL) * (f.progress / FurnaceEntity.SMELT_SECONDS).coerceIn(0f, 1f), ay + 8 * u, progress)
             postInvalidateDelayed(200)
         }
     }

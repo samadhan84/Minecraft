@@ -828,7 +828,28 @@ class App(demo: File?) : ClientApp(demo) {
                 g.player.yaw = kotlin.math.PI.toFloat(); g.player.pitch = 0.05f
             }
             f == 2580 -> shot("25-new-mobs")
-            f == 2582 -> glfwSetWindowShouldClose(window, true)
+            f == 2584 -> session?.game?.let { g ->
+                g.inventory.add(com.vishucraft.game.world.Items.find("Iron Ingot"), 12); g.inventory.add(com.vishucraft.game.world.Blocks.PLANKS, 30)
+                g.inventory.add(com.vishucraft.game.world.Blocks.LOG, 9)
+                openContainer(com.vishucraft.client.ContainerScreen.Mode.INVENTORY)
+            }
+            f == 2590 -> shot("26-inventory")
+            f == 2592 -> openContainer(com.vishucraft.client.ContainerScreen.Mode.CRAFTING)
+            f == 2598 -> shot("27-crafting-table")
+            f == 2600 -> session?.game?.let { g -> openContainer(com.vishucraft.client.ContainerScreen.Mode.CHEST, chest = g.world.blockEntities.chest(0, 200, 0)!!.also { it.slots[0] = com.vishucraft.game.world.ItemStack(com.vishucraft.game.world.Blocks.PLANKS, 20) }) }
+            f == 2606 -> shot("28-chest")
+            f == 2608 -> session?.game?.let { g ->
+                closeOverlay()
+                // Flowing water of every level in a row, to check that there are no gaps between the steps.
+                val B = com.vishucraft.game.world.Blocks
+                val y = g.world.generator.surfaceHeight(30, 50) + 1
+                for (x in 28..40) for (z in 48..53) g.setBlock(x, y - 1, z, B.STONE)
+                for (z in 49..52) for ((k, x) in (30..37).withIndex()) g.setBlock(x, y, z, B.WATER, k)
+                g.player.x = 33.5f; g.player.y = y + 3.2f; g.player.z = 44f; g.player.flying = true
+                g.player.yaw = kotlin.math.PI.toFloat(); g.player.pitch = -0.45f
+            }
+            f == 2640 -> shot("29-water-steps")
+            f == 2642 -> glfwSetWindowShouldClose(window, true)
         }
     }
 }

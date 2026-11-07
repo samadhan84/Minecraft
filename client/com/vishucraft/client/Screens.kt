@@ -278,7 +278,7 @@ class ContainerScreen(private val game: Game) {
     }
 
     fun open(m: Mode, chestEntity: ChestEntity? = null, furnaceEntity: FurnaceEntity? = null) {
-        mode = m; chest = chestEntity; furnace = furnaceEntity; held = null; recipeScroll = 0f
+        mode = m; chest = chestEntity; furnace = furnaceEntity; held = null; recipeScroll = 0f; book = false
     }
 
     /** Puts anything still on the cursor or in the crafting grid back into the inventory. */
@@ -416,70 +416,112 @@ class ContainerScreen(private val game: Game) {
         game.uiEvents.add("craft")
     }
 
+    private var book = false
+
+    /** The grey Minecraft window: black outline, light top and left edge, dark bottom and right edge. */
+    private fun window(ui: Ui, x: Float, y: Float, w: Float, h: Float, u: Float) {
+        ui.rect(x, y, w, h, rgba(0, 0, 0))
+        ui.rect(x + u, y + u, w - 2 * u, h - 2 * u, PANEL)
+        ui.rect(x + u, y + u, w - 2 * u, u, rgba(255, 255, 255))
+        ui.rect(x + u, y + u, u, h - 2 * u, rgba(255, 255, 255))
+        ui.rect(x + u, y + h - 2 * u, w - 2 * u, u, rgba(85, 85, 85))
+        ui.rect(x + w - 2 * u, y + u, u, h - 2 * u, rgba(85, 85, 85))
+    }
+
+    /** A slot: sunken, dark on the top and left, light on the bottom and right. */
+    private fun slotBox(ui: Ui, x: Float, y: Float, size: Float, u: Float) {
+        ui.rect(x, y, size, size, rgba(55, 55, 55))
+        ui.rect(x + u, y + u, size - u, size - u, rgba(255, 255, 255))
+        ui.rect(x + u, y + u, size - 2 * u, size - 2 * u, SLOT)
+    }
+
+    /** Steve-like figure in the box of the inventory screen. */
+    private fun figure(ui: Ui, x: Float, y: Float, w: Float, h: Float) {
+        ui.rect(x, y, w, h, rgba(20, 20, 20)); ui.rect(x + 2, y + 2, w - 4, h - 4, rgba(60, 60, 64))
+        val cx = x + w / 2; val u = h / 36f
+        ui.rect(cx - 4 * u, y + 4 * u, 8 * u, 8 * u, rgba(196, 146, 104))        // head
+        ui.rect(cx - 4 * u, y + 4 * u, 8 * u, 3 * u, rgba(70, 44, 24))           // hair
+        ui.rect(cx - 4 * u, y + 12 * u, 8 * u, 12 * u, rgba(0, 170, 170))        // shirt
+        ui.rect(cx - 8 * u, y + 12 * u, 4 * u, 12 * u, rgba(196, 146, 104)); ui.rect(cx + 4 * u, y + 12 * u, 4 * u, 12 * u, rgba(196, 146, 104))
+        ui.rect(cx - 4 * u, y + 24 * u, 4 * u, 12 * u, rgba(54, 56, 130)); ui.rect(cx, y + 24 * u, 4 * u, 12 * u, rgba(54, 56, 130))
+    }
+
     /** Returns false when the screen should close. */
     fun draw(ui: Ui): Boolean {
-        val cell = 40f
-        val showRecipes = mode == Mode.INVENTORY || mode == Mode.CRAFTING
-        val leftW = cell * 10.4f
-        val rightW = if (showRecipes) cell * 8f else if (mode == Mode.FURNACE) cell * 5.5f else 0f
-        val pw = leftW + rightW + 30
-        val topRows = if (mode == Mode.CHEST) 3.4f else 0f
-        val ph = 50 + cell * (4.4f + topRows) + 40 + (if (showRecipes) cell * 2.4f else 0f)
-        val px = (ui.width - pw) / 2; val py = (ui.height - ph) / 2
+        val u = 2.5f                       // one Minecraft pixel
+        val cell = 18 * u
+        val hopper = chest is HopperEntity
+        val pw = 176 * u
+        val ph = (if (mode == Mode.CHEST && hopper) 133 else 166) * u
+        val bookW = if (book && (mode == Mode.INVENTORY || mode == Mode.CRAFTING)) cell * 8f + 12 else 0f
+        val px = (ui.width - pw - bookW) / 2; val py = (ui.height - ph) / 2
         ui.rect(0f, 0f, ui.width, ui.height, rgba(0, 0, 0, 150))
-        if (ui.clicked && !ui.hover(px, py, pw, ph) && held == null) return false
-        ui.rect(px, py, pw, ph, PANEL); ui.frame(px, py, pw, ph, DARK, 3f)
+        if (ui.clicked && !ui.hover(px, py, pw + bookW, ph) && held == null) return false
+        window(ui, px, py, pw, ph, u)
         val title = when (mode) {
-            Mode.INVENTORY -> "Inventory"; Mode.CRAFTING -> "Crafting Table"; Mode.FURNACE -> "Furnace"
-            Mode.CHEST -> if (chest is HopperEntity) "Hopper" else "Chest"
+            Mode.INVENTORY -> "Crafting"; Mode.CRAFTING -> "Crafting"; Mode.FURNACE -> "Furnace"
+            Mode.CHEST -> if (hopper) "Item Hopper" else "Chest"
         }
-        ui.text(title, px + 14, py + 10, 20f, INK, shadow = false)
+        fun at(gx: Int, gy: Int) = (px + gx * u) to (py + gy * u)
 
         cells.clear()
-        var y = py + 42
-        val x0 = px + 14 + cell * 1.3f
-        if (mode == Mode.CHEST) {
-            val n = chest?.slots?.size ?: 27
-            for (i in 0 until n) cells.add(Cell(CHEST_SLOT, i, x0 + (i % 9) * cell, y + (i / 9) * cell, cell))
-            y += cell * topRows
-        }
-        for (i in 0 until 4) cells.add(Cell(ARMOR, i, px + 12, y + i * cell, cell))
-        for (i in 9 until 36) cells.add(Cell(INV, i, x0 + (i - 9) % 9 * cell, y + (i - 9) / 9 * cell, cell))
-        for (i in 0 until 9) cells.add(Cell(INV, i, x0 + i * cell, y + cell * 3.3f, cell))
+        val invY = if (mode == Mode.CHEST && hopper) 51 else 84
+        val hotY = if (mode == Mode.CHEST && hopper) 109 else 142
+        for (i in 9 until 36) { val (x, y) = at(8 + (i - 9) % 9 * 18, invY + (i - 9) / 9 * 18); cells.add(Cell(INV, i, x, y, cell)) }
+        for (i in 0 until 9) { val (x, y) = at(8 + i * 18, hotY); cells.add(Cell(INV, i, x, y, cell)) }
+        ui.text(if (mode == Mode.INVENTORY) "Crafting" else title, px + (if (mode == Mode.INVENTORY) 98 else if (mode == Mode.CRAFTING) 28 else 8) * u, py + 6 * u, 15f, INK, shadow = false)
+        if (mode != Mode.INVENTORY) ui.text("Inventory", px + 8 * u, py + (invY - 11) * u, 15f, INK, shadow = false)
+        var bookBtn: Triple<Float, Float, Float>? = null
 
-        val rx = px + 14 + leftW + 8
-        val gy = py + 42
-        if (showRecipes) {
-            val gs = gridSize()
-            for (i in 0 until gs * gs) cells.add(Cell(GRID, i, rx + (i % gs) * cell, gy + (i / gs) * cell, cell))
-            val ox = rx + (gs + 1.4f) * cell; val oy = gy + (gs - 1) * cell / 2
-            ui.text("→", rx + gs * cell + cell * 0.2f, oy + 6, 26f, INK, shadow = false)
-            cells.add(Cell(OUTPUT, 0, ox, oy, cell * 1.1f))
-        } else if (mode == Mode.FURNACE) {
-            cells.add(Cell(FURNACE_SLOT, 0, rx + cell * 0.5f, gy, cell))
-            cells.add(Cell(FURNACE_SLOT, 1, rx + cell * 0.5f, gy + cell * 2f, cell))
-            cells.add(Cell(FURNACE_SLOT, 2, rx + cell * 3.2f, gy + cell, cell * 1.2f))
-            furnace?.let { f ->
-                val ay = gy + cell * 1.6f
-                val l = rx + cell * 1.7f; val r = rx + cell * 3.0f
-                ui.rect(l, ay - 3, r - l, 6f, SLOT_DARK)
-                ui.rect(l, ay - 3, (r - l) * (f.progress / FurnaceEntity.SMELT_SECONDS).coerceIn(0f, 1f), 6f, rgba(250, 250, 250))
-                if (f.burnLeft > 0f && f.burnTotal > 0f) {
-                    val fh = cell * 0.8f * (f.burnLeft / f.burnTotal).coerceIn(0f, 1f)
-                    ui.rect(rx + cell * 0.8f, gy + cell * 1.9f - fh, cell * 0.4f, fh, rgba(255, 150, 40))
+        when (mode) {
+            Mode.INVENTORY -> {
+                for (i in 0 until 4) { val (x, y) = at(8, 8 + i * 18); cells.add(Cell(ARMOR, i, x, y, cell)) }
+                val (fx, fy) = at(26, 8); figure(ui, fx, fy, 49 * u, 70 * u)
+                for (i in 0 until 4) { val (x, y) = at(98 + (i % 2) * 18, 18 + (i / 2) * 18); cells.add(Cell(GRID, i, x, y, cell)) }
+                val (ax, ay) = at(134, 28); ui.text("→", ax, ay, 26f, INK, shadow = false)
+                val (ox, oy) = at(154, 28); cells.add(Cell(OUTPUT, 0, ox, oy, cell))
+                val (bx, by) = at(104, 60); bookBtn = Triple(bx, by, 20 * u)
+            }
+            Mode.CRAFTING -> {
+                for (i in 0 until 9) { val (x, y) = at(30 + (i % 3) * 18, 17 + (i / 3) * 18); cells.add(Cell(GRID, i, x, y, cell)) }
+                val (ax, ay) = at(92, 36); ui.text("→", ax, ay, 26f, INK, shadow = false)
+                val (ox, oy) = at(124, 35); cells.add(Cell(OUTPUT, 0, ox - 4 * u, oy - 4 * u, cell + 8 * u))
+                val (bx, by) = at(5, 34); bookBtn = Triple(bx, by, 20 * u)
+            }
+            Mode.CHEST -> {
+                val n = chest?.slots?.size ?: 27
+                if (hopper) for (i in 0 until n) { val (x, y) = at(44 + i * 18, 20); cells.add(Cell(CHEST_SLOT, i, x, y, cell)) }
+                else for (i in 0 until n) { val (x, y) = at(8 + (i % 9) * 18, 18 + (i / 9) * 18); cells.add(Cell(CHEST_SLOT, i, x, y, cell)) }
+            }
+            Mode.FURNACE -> {
+                val (ix, iy) = at(56, 17); cells.add(Cell(FURNACE_SLOT, 0, ix, iy, cell))
+                val (fx, fy) = at(56, 53); cells.add(Cell(FURNACE_SLOT, 1, fx, fy, cell))
+                val (ox, oy) = at(116, 35); cells.add(Cell(FURNACE_SLOT, 2, ox - 4 * u, oy - 4 * u, cell + 8 * u))
+                furnace?.let { f ->
+                    // The flame (burns down) and the arrow (fills up) between the slots.
+                    val (flx, fly) = at(56, 36)
+                    ui.rect(flx + u, fly, 14 * u, 14 * u, rgba(60, 60, 60))
+                    if (f.burnLeft > 0f && f.burnTotal > 0f) {
+                        val fh = 14 * u * (f.burnLeft / f.burnTotal).coerceIn(0f, 1f)
+                        ui.rect(flx + u, fly + 14 * u - fh, 14 * u, fh, rgba(255, 150, 40))
+                    }
+                    val (arx, ary) = at(79, 34)
+                    ui.rect(arx, ary, 24 * u, 17 * u, rgba(139, 139, 139))
+                    ui.rect(arx, ary, 24 * u * (f.progress / FurnaceEntity.SMELT_SECONDS).coerceIn(0f, 1f), 17 * u, rgba(250, 250, 250))
                 }
             }
         }
 
         var hoverStack: ItemStack? = null
         for (c in cells) {
-            ui.rect(c.x + 2, c.y + 2, c.size - 4, c.size - 4, if (c.kind == ARMOR || c.kind == OUTPUT) SLOT_DARK else SLOT)
+            val big = c.size > cell
+            slotBox(ui, c.x, c.y, c.size, u)
             if (c.kind == ARMOR && get(c.kind, c.index) == null) {
-                ui.text(listOf("Head", "Body", "Legs", "Feet")[c.index], c.x + c.size / 2, c.y + c.size / 2 - 7, 12f, rgba(80, 80, 80), 1, shadow = false)
+                ui.text(listOf("H", "B", "L", "F")[c.index], c.x + c.size / 2, c.y + c.size / 2 - 7, 14f, rgba(95, 95, 95), 1, shadow = false)
             }
-            ui.stack(get(c.kind, c.index), c.x, c.y, c.size)
+            ui.stack(get(c.kind, c.index), c.x + (if (big) 4 * u else 0f), c.y + (if (big) 4 * u else 0f), cell)
             if (ui.hover(c.x, c.y, c.size, c.size)) {
-                ui.rect(c.x + 2, c.y + 2, c.size - 4, c.size - 4, rgba(255, 255, 255, 60))
+                ui.rect(c.x + u, c.y + u, c.size - 2 * u, c.size - 2 * u, rgba(255, 255, 255, 110))
                 hoverStack = get(c.kind, c.index)
                 when {
                     ui.clicked && ui.shift -> shiftClick(c)
@@ -489,12 +531,21 @@ class ContainerScreen(private val game: Game) {
             }
         }
 
-        if (showRecipes) hoverStack = drawRecipes(ui, rx, gy + gridSize() * cell + 16, px + pw - 12, py + ph - 30) ?: hoverStack
-        val hint = when (mode) {
-            Mode.CHEST, Mode.FURNACE -> "Click to pick up / put down · right-click: half / one · shift-click: move across"
-            else -> "Lay items in the grid and take the result, or click a recipe · shift-click: move · right-click: one"
+        // The recipe book button: open it for a list of recipes to craft from what you carry.
+        bookBtn?.let { (bx, by, w) ->
+            val h = 18 * u
+            ui.rect(bx, by, w, h, rgba(0, 0, 0)); ui.rect(bx + u, by + u, w - 2 * u, h - 2 * u, if (book) rgba(140, 200, 140) else rgba(170, 170, 170))
+            ui.text("Book", bx + w / 2, by + h / 2 - 7, 13f, INK, 1, shadow = false)
+            if (ui.hover(bx, by, w, h)) {
+                ui.frame(bx, by, w, h, YELLOW, 2f)
+                if (ui.clicked && held == null) book = !book
+            }
         }
-        ui.text(hint, px + 14, py + ph - 24, 14f, INK, shadow = false)
+        if (bookW > 0f) {
+            val rx = px + pw + 8
+            ui.rect(rx - 4, py, bookW, ph, rgba(0, 0, 0)); ui.rect(rx - 3, py + 1, bookW - 2, ph - 2, PANEL)
+            hoverStack = drawRecipes(ui, rx + 4, py + 18, px + pw + bookW - 8, py + ph - 10) ?: hoverStack
+        }
 
         val h = held
         if (h != null) ui.stack(h, ui.mouseX - cell / 2, ui.mouseY - cell / 2, cell)

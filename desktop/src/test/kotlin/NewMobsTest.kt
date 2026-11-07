@@ -121,3 +121,16 @@ class NewMobsTest {
         assertTrue(g.health < before, "the beam hits you in the water")
     }
 }
+
+class WoodTest {
+    @Test fun woodTakesAWhileWithBareHands() {
+        val dir = kotlin.io.path.createTempDirectory("wood").toFile()
+        val level = LevelData.create(3L, "t", GameMode.SURVIVAL)
+        val g = Game(World(level.seed, dir, Dimension.OVERWORLD, flat = true), level, GameInput(), dir)
+        g.inventory.slots[0] = null; g.input.selectedSlot = 0
+        assertTrue(g.mineTime(Blocks.LOG) >= 2f, "a log takes seconds by hand: ${g.mineTime(Blocks.LOG)}")
+        assertTrue(g.mineTime(Blocks.PLANKS) >= 2f)
+        g.inventory.slots[0] = ItemStack(Items.find("Iron Axe"), 1)
+        assertTrue(g.mineTime(Blocks.LOG) < 0.7f, "an axe is much faster: ${g.mineTime(Blocks.LOG)}")
+    }
+}
