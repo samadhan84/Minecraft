@@ -250,7 +250,7 @@ class App(demo: File?) : ClientApp(demo) {
             }
             Overlay.PAUSE -> if (key == GLFW_KEY_ESCAPE) overlay = Overlay.NONE
             Overlay.TRADE -> if (key == GLFW_KEY_ESCAPE || key == GLFW_KEY_E) overlay = Overlay.NONE
-            Overlay.SIGN, Overlay.FLIGHTS, Overlay.FLOORS, Overlay.METRO, Overlay.CALL_TRAIN, Overlay.ROBOT -> if (key == GLFW_KEY_ESCAPE) { ui.focus = null; overlay = Overlay.NONE }
+            Overlay.SIGN, Overlay.IDE, Overlay.FLIGHTS, Overlay.FLOORS, Overlay.METRO, Overlay.CALL_TRAIN, Overlay.ROBOT -> if (key == GLFW_KEY_ESCAPE) { ui.focus = null; overlay = Overlay.NONE }
             Overlay.ENDING -> if (key == GLFW_KEY_ESCAPE) overlay = Overlay.NONE
             Overlay.INTERNET -> if (key == GLFW_KEY_ESCAPE) overlay = Overlay.PAUSE
             Overlay.SETTINGS, Overlay.CONTROLS, Overlay.NAME_MOB, Overlay.ACHIEVEMENTS -> if (key == GLFW_KEY_ESCAPE) { ui.focus = null; overlay = Overlay.PAUSE }

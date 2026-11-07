@@ -68,3 +68,57 @@ class ArduinoTest {
         assertTrue(Boards.programs(Blocks.ESP32).any { it.name.startsWith("SEND") } && Boards.programs(Blocks.ESP32).any { it.name.startsWith("RECV") })
     }
 }
+
+class SketchTest {
+    private fun game(): Game {
+        val dir = kotlin.io.path.createTempDirectory("sk").toFile()
+        val level = LevelData.create(7L, "t", GameMode.CREATIVE)
+        val world = World(level.seed, dir, Dimension.OVERWORLD, flat = true)
+        val g = Game(world, level, GameInput(), dir)
+        for (cx in -3..3) for (cz in -3..3) world.ensureLoaded(cx, cz)
+        return g
+    }
+    private fun run(g: Game, seconds: Float) { var t = 0f; while (t < seconds) { g.update(1 / 20f); g.dirtyChunks.clear(); t += 1 / 20f } }
+    private fun lit(g: Game, x: Int, z: Int = 5) = g.world.getBlock(x + 1, 100, z) == Blocks.REDSTONE_LAMP_ON
+
+    @Test fun everyExampleCompilesAndMistakesAreExplained() {
+        for (e in Sketches.examples) { Sketches.compile(e.code, true); Sketches.compile(Sketches.flatten(e.code), true) }
+        for (e in Sketches.examples) if (!e.needsWifi) Sketches.compile(e.code, false)
+        fun err(code: String, wifi: Boolean = false) = assertFailsWith<SketchError> { Sketches.compile(code, wifi) }
+        assertTrue(err("digitalWrte(13, HIGH);").message!!.contains("digitalWrite"), "a typo gets a suggestion")
+        assertEquals(2, err("digitalWrite(13, HIGH);\ndelay(abc);").line)
+        assertTrue(err("wifiSend(A, HIGH);").message!!.contains("ESP32"))
+        assertTrue(err("void loop() { digitalWrite(13, HIGH);").message!!.contains("}"))
+        Sketches.compile("wifiSend(A, HIGH);", true)
+    }
+
+    @Test fun aSketchRunsOnTheBoard() {
+        val g = game()
+        g.setBlock(5, 100, 5, Blocks.ARDUINO, 4); g.setBlock(6, 100, 5, Blocks.REDSTONE_LAMP)
+        assertNull(g.uploadSketch(5, 100, 5, "void loop() { digitalWrite(13, HIGH); delay(1000); digitalWrite(13, LOW); delay(1000); }"))
+        var on = 0; var off = 0
+        repeat(60) { run(g, 0.1f); if (lit(g, 5)) on++ else off++ }
+        assertTrue(on > 15 && off > 15, "the sketch blinks (on $on, off $off)")
+        // A mistake is refused and the old sketch keeps running.
+        assertNotNull(g.uploadSketch(5, 100, 5, "digitalWrite(13, HI);"))
+        // The input: button turns on the light.
+        assertNull(g.uploadSketch(5, 100, 5, "if (digitalRead(2) == HIGH) { digitalWrite(13, HIGH); } else { digitalWrite(13, LOW); }"))
+        run(g, 1f); assertFalse(lit(g, 5))
+        g.setBlock(4, 100, 5, Blocks.REDSTONE_BLOCK)
+        run(g, 1f); assertTrue(lit(g, 5))
+        // Empty code goes back to the ready-made program.
+        assertNull(g.uploadSketch(5, 100, 5, ""))
+        assertEquals("", g.signText(5, 100, 5))
+    }
+
+    @Test fun anEspSketchSendsOverWifi() {
+        val g = game()
+        g.setBlock(5, 100, 5, Blocks.ESP32, 4); g.setBlock(4, 100, 5, Blocks.REDSTONE_BLOCK)
+        g.setBlock(40, 100, -30, Blocks.ESP32, 4); g.setBlock(41, 100, -30, Blocks.REDSTONE_LAMP)
+        assertNull(g.uploadSketch(5, 100, 5, "if (digitalRead(2) == HIGH) { wifiSend(B, HIGH); } else { wifiSend(B, LOW); }"))
+        assertNull(g.uploadSketch(40, 100, -30, "if (wifiRead(B) == HIGH) { digitalWrite(13, HIGH); } else { digitalWrite(13, LOW); }"))
+        run(g, 1.5f); assertTrue(lit(g, 40, -30))
+        g.setBlock(4, 100, 5, Blocks.AIR)
+        run(g, 1.5f); assertFalse(lit(g, 40, -30))
+    }
+}

@@ -488,6 +488,37 @@ class GameActivity : Activity() {
         input.jumpHeld = false; input.descendHeld = false; input.breakHeld = false
     }
 
+    /** The Arduino IDE: write a sketch for the board at (x, y, z) and upload it. [message] says what was wrong with the last upload. */
+    private fun showIde(x: Int, y: Int, z: Int, code: String, message: String?) {
+        val id = game.world.getBlock(x, y, z)
+        val input = android.widget.EditText(this).apply {
+            setText(code); typeface = android.graphics.Typeface.MONOSPACE; textSize = 15f
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE or android.text.InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
+            gravity = android.view.Gravity.TOP; minLines = 12; maxLines = 20
+        }
+        val b = android.app.AlertDialog.Builder(this).setTitle("Arduino IDE · ${com.vishucraft.game.world.Blocks[id].name}").setView(input)
+        if (message != null) b.setMessage("⚠ $message")
+        b.setPositiveButton("Upload") { _, _ ->
+            val txt = input.text.toString()
+            glView.queueEvent {
+                val err = game.uploadSketch(x, y, z, txt)
+                if (err != null) runOnUiThread { showIde(x, y, z, txt, err) }
+            }
+        }
+        b.setNeutralButton("Examples") { _, _ ->
+            val txt = input.text.toString()
+            val ex = com.vishucraft.game.world.Sketches.examples
+            val ready = com.vishucraft.game.world.Boards.programs(id)
+            val names = (ex.map { it.title } + ready.map { "Ready-made: ${it.title}" }).toTypedArray()
+            android.app.AlertDialog.Builder(this).setTitle("Examples").setItems(names) { _, i ->
+                if (i < ex.size) showIde(x, y, z, ex[i].code, null)
+                else glView.queueEvent { game.setBoardPreset(x, y, z, i - ex.size) }
+            }.setNegativeButton("Back") { _, _ -> showIde(x, y, z, txt, null) }.show()
+        }
+        b.setNegativeButton("Close", null).show()
+        input.requestFocus()
+    }
+
     /** A villager's offers; tap one to trade (the list stays open for more). */
     private fun showTrades(uid: Int) {
         releaseInputs()
@@ -675,6 +706,11 @@ class GameActivity : Activity() {
                     .setPositiveButton("OK") { _, _ -> val txt = input.text.toString(); glView.queueEvent { game.setSignText(x, y, z, txt) } }
                     .setNegativeButton("Cancel", null).show()
                 input.requestFocus()
+            }
+            e.startsWith("ide:") -> {
+                val (x, y, z) = e.removePrefix("ide:").split(',').map { it.toInt() }
+                releaseInputs()
+                showIde(x, y, z, game.sketchText(x, y, z), null)
             }
             e.startsWith("floors:") -> {
                 // Tapped an elevator: which floor?

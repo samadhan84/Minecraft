@@ -49,6 +49,20 @@ class Redstone(private val world: World, private val set: (Int, Int, Int, Int, I
     private val boardMemory = HashMap<Long, Boolean>()
     private val boardPulse = HashMap<Long, Int>()
     private val boardHist = HashMap<Long, ArrayDeque<Boolean>>()
+    /** Sketches written in the Arduino IDE: the code each board last ran, and the running copy. */
+    private class Running(val code: String, val run: SketchRun?)
+    private val sketches = HashMap<Long, Running>()
+    private val sketchSent = HashMap<Long, BooleanArray>()
+
+    /** The sketch on the board at [p], or null when it runs one of the ready-made programs. */
+    private fun sketchOn(p: Long, id: Int): Running? {
+        val code = (world.blockEntities.get(RedstoneIds.x(p), RedstoneIds.y(p), RedstoneIds.z(p)) as? SignEntity)?.text.orEmpty()
+        if (code.isBlank()) { sketches.remove(p); sketchSent.remove(p); return null }
+        val have = sketches[p]
+        if (have != null && have.code == code) return have
+        val run = try { SketchRun(Sketches.compile(code, id == Blocks.ESP32)) } catch (e: SketchError) { null }
+        return Running(code, run).also { sketches[p] = it }
+    }
     private val rnd = Random()
 
     /** Called with the explosion centre and radius so the game can hurt / knock back the player and mobs. */
@@ -127,6 +141,12 @@ class Redstone(private val world: World, private val set: (Int, Int, Int, Int, I
 
     /** One tick of a board's program: is its output on? */
     private fun boardOut(p: Long, id: Int, meta: Int, input: Boolean, wifi: BooleanArray): Boolean {
+        sketchOn(p, id)?.let { sk ->
+            val run = sk.run ?: return false
+            run.step(input, daylight() < 0.5f, wifi)
+            if (id == Blocks.ESP32) sketchSent[p] = run.sent
+            return run.out
+        }
         val clock = (boardClock[p] ?: 0) + 1
         boardClock[p] = clock
         val rising = input && boardPrev.put(p, input) != true
@@ -307,6 +327,10 @@ class Redstone(private val world: World, private val set: (Int, Int, Int, Int, I
         val wifi = BooleanArray(3)
         for (p in comps) if (id(p) == Blocks.ESP32) {
             val m = meta(p)
+            if (sketches[p] != null || sketchOn(p, Blocks.ESP32) != null) {
+                sketchSent[p]?.let { for (c in 0..2) if (it[c]) wifi[c] = true }
+                continue
+            }
             val ch = Boards.wifiChannel(Boards.program(Blocks.ESP32, m))
             if (ch >= 0 && Boards.program(Blocks.ESP32, m).name.startsWith("SEND") && activated(p, ignoreFace = (m and 7).coerceIn(2, 5))) wifi[ch] = true
         }
