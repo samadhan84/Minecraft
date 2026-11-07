@@ -434,7 +434,9 @@ object Blocks {
     const val COASTER_RAIL = 447
     /** A petrol pump (see engine/Kitchen: tap it next to a car to fill the tank). */
     const val PETROL_PUMP = 448
-    const val COUNT = 449
+    /** Pile iron, gold, diamond or emerald blocks under it (see Game.updateBeacons) and it gives you powers nearby. */
+    const val BEACON = 449
+    const val COUNT = 450
 
     /** The newer crops' texture names, in id order from RICE_CROP. */
     val NEW_CROPS = listOf("rice", "tomato", "lentil", "beetroot")
@@ -761,6 +763,7 @@ object Blocks {
         reg(BlockDef(OBSERVER, "Observer", t("observer_top"), t("observer_side"), t("observer_top"), hardness = 1f, tool = P,
             category = R2, facing = Facing.ALL, front = t("observer_front"), back = t("observer_back")))
         t("observer_back_on")
+        reg(BlockDef(BEACON, "Beacon", t("p4_beacon_top"), t("p4_beacon_side"), t("p4_beacon_base"), hardness = 3f, tool = P, category = R2, emissive = true))
         shape(DAYLIGHT_SENSOR, "Daylight Sensor", "daylight_sensor", "daylight_sensor_side", "oak_planks", hardness = 0.3f,
             tool = A, cat = R2, facing = Facing.NONE)
         shape(PRESSURE_PLATE, "Stone Pressure Plate", "stone", hardness = 0.4f, tool = P, cat = R2, facing = Facing.NONE, solid = false)

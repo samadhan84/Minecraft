@@ -100,6 +100,19 @@ object MobModels {
             box(0.6f, 0f, -0.9f, 0.9f, 0.3f, -0.6f, tiles("p4_tear_skin"), 1), box(-0.9f, 0f, 0.6f, -0.6f, 0.3f, 0.9f, tiles("p4_tear_skin"), -1),
             box(-0.15f, 0f, 0.6f, 0.15f, 0.3f, 0.9f, tiles("p4_tear_skin"), 1), box(0.6f, 0f, 0.6f, 0.9f, 0.3f, 0.9f, tiles("p4_tear_skin"), -1),
         ),
+        MobType.GOLD_HOG to listOf(
+            box(-0.25f, 0f, -0.15f, -0.02f, 0.8f, 0.15f, tiles("p4_hog_skin"), 1),
+            box(0.02f, 0f, -0.15f, 0.25f, 0.8f, 0.15f, tiles("p4_hog_skin"), -1),
+            box(-0.3f, 0.8f, -0.2f, 0.3f, 1.35f, 0.2f, tiles("p4_hog_cloth")),
+            box(-0.3f, 1.35f, -0.28f, 0.3f, 1.8f, 0.28f, tiles("p4_hog_skin", front = "p4_hog_face")),
+            box(-0.5f, 0.8f, -0.12f, -0.3f, 1.4f, 0.12f, tiles("p4_hog_skin"), 2, pivotY = 1.35f),
+            box(0.3f, 0.8f, -0.12f, 0.5f, 1.4f, 0.12f, tiles("p4_hog_skin"), 2, pivotY = 1.35f),
+        ),
+        MobType.SEA_SENTINEL to listOf(
+            box(-0.5f, 0.1f, -0.5f, 0.5f, 0.9f, 0.5f, tiles("p4_sentinel_skin", front = "p4_sentinel_eye")),
+            box(-0.12f, 0.9f, -0.12f, 0.12f, 1.15f, 0.12f, tiles("p4_sentinel_skin")), box(-0.65f, 0.4f, -0.1f, -0.5f, 0.6f, 0.1f, tiles("p4_sentinel_skin")),
+            box(0.5f, 0.4f, -0.1f, 0.65f, 0.6f, 0.1f, tiles("p4_sentinel_skin")), box(-0.1f, 0.4f, 0.5f, 0.1f, 0.6f, 0.65f, tiles("p4_sentinel_skin")),
+        ),
         MobType.RAIDER to listOf(
             box(-0.25f, 0f, -0.125f, 0f, 0.75f, 0.125f, tiles("p4_raider_pants"), 1),
             box(0f, 0f, -0.125f, 0.25f, 0.75f, 0.125f, tiles("p4_raider_pants"), -1),

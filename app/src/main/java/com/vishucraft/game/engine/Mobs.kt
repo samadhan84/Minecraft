@@ -84,11 +84,15 @@ enum class MobType(
     /** A big floating creature that cries and throws heavy fireballs; lives in the Ember Realm. */
     TEAR_DRIFTER("Tear Drifter", 1.1f, 2.2f, 14, true, 2.0f),
     /** Raiders attack villages in raids, shooting arrows. */
-    RAIDER("Raider", 0.3f, 1.95f, 24, true, 2.2f);
+    RAIDER("Raider", 0.3f, 1.95f, 24, true, 2.2f),
+    /** A spiky guard of the deep sea: its beam hurts you while you swim near it. */
+    SEA_SENTINEL("Sea Sentinel", 0.5f, 0.9f, 30, true, 2.2f),
+    /** Lives in the Ember Realm. Fights you unless you wear gold; trades for gold ingots. */
+    GOLD_HOG("Gold Hog", 0.35f, 1.7f, 22, true, 2.6f);
 
     val isCitizen get() = this == CITIZEN || this == CITIZEN_WOMAN || this == CITIZEN_KID
 
-    val swims get() = this == SQUID || this == COD || this == AXOLOTL
+    val swims get() = this == SQUID || this == COD || this == AXOLOTL || this == SEA_SENTINEL
     /** Fly without gravity. */
     val flies get() = this == BAT || this == BEE || this == PARROT
     /** Peaceful until hit, then fight back. */
@@ -297,6 +301,7 @@ class Mobs(private val world: World) {
             physics(m, dt)
             return
         }
+        if (m.type == MobType.SEA_SENTINEL) sentinelBeam(m, dt, game)
         if (m.type.swims) { swim(m, dt, game); return }
         if (game.mount === m) { ridden(m, dt, game); return }
         val p = game.nearestTarget(m.x, m.z)
@@ -452,15 +457,15 @@ class Mobs(private val world: World) {
                     }
                 } else wander(m, dt).let { wantX = it.first; wantZ = it.second; speed *= 0.5f }
             }
-            MobType.CRAWLER, MobType.CINDER -> {
-                val hunts = m.type == MobType.CINDER || m.angry || game.daylight < 0.4f
+            MobType.CRAWLER, MobType.CINDER, MobType.GOLD_HOG -> {
+                val hunts = when (m.type) { MobType.CINDER -> true; MobType.GOLD_HOG -> m.angry || !goldWorn(game); else -> m.angry || game.daylight < 0.4f }
                 if (hunts && dist < 20f && game.playerAlive) {
                     m.yaw = atan2(dx, -dz)
                     if (dist > 0.9f) { wantX = dx / dist; wantZ = dz / dist }
                     m.attackCooldown -= dt
                     if (dist < 1.3f + m.halfWidth && abs(p.y - m.y) < 1.6f && m.attackCooldown <= 0f) {
                         m.attackCooldown = 1f
-                        game.hurtTarget(p, if (m.type == MobType.CINDER) 5f else 2.5f, m.x, m.z)
+                        game.hurtTarget(p, when (m.type) { MobType.CINDER -> 5f; MobType.GOLD_HOG -> 4f; else -> 2.5f }, m.x, m.z)
                     }
                 } else wander(m, dt).let { wantX = it.first; wantZ = it.second; speed *= 0.5f }
             }
@@ -631,6 +636,24 @@ class Mobs(private val world: World) {
             val speed = if (big) 12f else 15f
             game.projectiles.shoot(sx, sy, sz, vx / l * speed, vy / l * speed + l * 0.25f, vz / l * speed, false, if (big) 7f else 4f, Projectile.FIREBALL)
             game.sound("explode", sx, sy, sz, if (big) 0.7f else 0.35f)
+        }
+    }
+
+    private fun goldWorn(game: Game) = game.inventory.armor.any { s -> s?.let { com.vishucraft.game.world.Items[it.id]?.name?.startsWith("Golden") } == true }
+
+    /** The Sea Sentinel swims at you and, while you are in the water near it, hits you with its beam every couple of seconds. */
+    private fun sentinelBeam(m: Mob, dt: Float, game: Game) {
+        val p = game.nearestTarget(m.x, m.z)
+        val dx = p.x - m.x; val dz = p.z - m.z; val dy = p.y + 1f - m.y
+        val d = sqrt(dx * dx + dy * dy + dz * dz)
+        val playerWet = world.getBlock(floorInt(p.x), floorInt(p.y + 0.5f), floorInt(p.z)) == Blocks.WATER
+        if (!playerWet || !game.playerAlive || d > 22f) return
+        m.wanderYaw = atan2(dx, -dz); m.aiTimer = 1f; m.vy = (dy / d.coerceAtLeast(0.1f)) * 1.5f
+        m.shootTimer -= dt
+        if (m.shootTimer <= 0f && d < 12f) {
+            m.shootTimer = 2.5f
+            game.hurtTarget(p, 3f, m.x, m.z)
+            game.sound("hurt", p.x, p.y + 1f, p.z, 0.6f)
         }
     }
 
@@ -883,7 +906,7 @@ class Mobs(private val world: World) {
 
     fun voice(t: MobType) = when (t) {
         MobType.WARDEN, MobType.TEAR_DRIFTER -> "enderman"
-        MobType.FLAME_SPINNER -> "none"; MobType.RAIDER -> "zombie"
+        MobType.FLAME_SPINNER, MobType.SEA_SENTINEL -> "none"; MobType.RAIDER -> "zombie"; MobType.GOLD_HOG -> "pig"
         MobType.DROWNED -> "zombie"; MobType.RABBIT, MobType.SQUID, MobType.COD -> "none"
         MobType.IRON_GOLEM, MobType.SNOW_GOLEM, MobType.TURTLE, MobType.AXOLOTL, MobType.ROBOT -> "none"
         MobType.MOOSHROOM -> "cow"; MobType.POLAR_BEAR, MobType.PANDA -> "bear"
@@ -1012,7 +1035,7 @@ class Mobs(private val world: World) {
             val (x, z) = ringPoint(p.x, p.z, 14f, 40f)
             if (!world.isLoaded(x, z)) return
             val ember = game.dimension == com.vishucraft.game.world.Dimension.EMBER
-            val type = if (!ember) MobType.WISP else when (rnd.nextInt(8)) { 0, 1 -> MobType.FLAME_SPINNER; 2 -> MobType.TEAR_DRIFTER; else -> MobType.CINDER }
+            val type = if (!ember) MobType.WISP else when (rnd.nextInt(10)) { 0, 1 -> MobType.FLAME_SPINNER; 2 -> MobType.TEAR_DRIFTER; 3, 4 -> MobType.GOLD_HOG; else -> MobType.CINDER }
             val y = surfaceY(x, z)
             val lift = if (type == MobType.FLAME_SPINNER) 3 else if (type == MobType.TEAR_DRIFTER) 5 else 1
             if (y > 0 && roomAt(x, y + lift, z, 2)) list.add(Mob(type, x + 0.5f, y + lift.toFloat(), z + 0.5f))
@@ -1026,8 +1049,9 @@ class Mobs(private val world: World) {
                 val ground = world.getBlock(x, y, z)
                 if (y > 0 && ground == Blocks.WATER && rnd.nextInt(2) == 0) {
                     // Squid and fish in lakes and seas.
-                    val type = when (rnd.nextInt(8)) { 0, 1 -> MobType.SQUID; 2 -> MobType.AXOLOTL; else -> MobType.COD }
-                    repeat(if (type == MobType.COD) 3 else 1) { list.add(Mob(type, x + 0.5f + it * 0.4f, y - 1.5f, z + 0.5f)) }
+                    val deep = world.getBlock(x, y - 8, z) == Blocks.WATER && hostileEnabled && list.count { it.type == MobType.SEA_SENTINEL } < 3 && rnd.nextInt(3) == 0
+                    val type = if (deep) MobType.SEA_SENTINEL else when (rnd.nextInt(8)) { 0, 1 -> MobType.SQUID; 2 -> MobType.AXOLOTL; else -> MobType.COD }
+                    repeat(if (type == MobType.COD) 3 else 1) { list.add(Mob(type, x + 0.5f + it * 0.4f, y - (if (deep) 6f else 1.5f), z + 0.5f)) }
                 } else if (y > 0 && (ground == Blocks.GRASS || ground == Blocks.SNOW_GRASS || ground == Blocks.SAND || ground == Blocks.MYCELIUM ||
                         ground == Blocks.RED_SAND || ground == Blocks.PODZOL || ground == Blocks.MUD || ground == Blocks.SNOW_LAYER || ground == Blocks.STONE) &&
                     roomAt(x, y + 1, z, 2)) {

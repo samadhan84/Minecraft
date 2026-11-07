@@ -1397,7 +1397,7 @@ object TextureAtlas {
 
     /** Colours for spawn eggs: base and spots. */
     private val EGG_COLORS = mapOf(
-        "flame_spinner" to (rgb(250, 190, 40) to rgb(220, 90, 20)), "tear_drifter" to (rgb(236, 236, 240) to rgb(150, 150, 170)), "raider" to (rgb(110, 110, 120) to rgb(60, 70, 60)),
+        "flame_spinner" to (rgb(250, 190, 40) to rgb(220, 90, 20)), "tear_drifter" to (rgb(236, 236, 240) to rgb(150, 150, 170)), "raider" to (rgb(110, 110, 120) to rgb(60, 70, 60)), "sea_sentinel" to (rgb(60, 130, 120) to rgb(240, 110, 30)), "gold_hog" to (rgb(214, 150, 120) to rgb(240, 200, 60)),
         "citizen" to (rgb(70, 130, 200) to rgb(196, 146, 104)), "citizen_woman" to (rgb(220, 70, 120) to rgb(250, 210, 80)),
         "citizen_kid" to (rgb(236, 236, 240) to rgb(40, 70, 160)), "robot" to (rgb(232, 236, 244) to rgb(60, 130, 230)),
         "cow" to (rgb(68, 50, 38) to rgb(160, 160, 160)), "pig" to (rgb(238, 166, 166) to rgb(200, 110, 110)),
@@ -2376,6 +2376,30 @@ object TextureAtlas {
                 for (y in 5..7) for (x in listOf(3, 4, 5, 10, 11, 12)) t[x, y] = rgb(90, 90, 110)    // shut eyes
                 t[4, 8] = rgb(120, 170, 240); t[4, 9] = rgb(120, 170, 240); t[11, 8] = rgb(120, 170, 240); t[11, 9] = rgb(120, 170, 240) // tears
                 for (x in 6..9) for (y in 11..12) t[x, y] = rgb(120, 120, 140)
+                return true
+            }
+            "p4_hog_skin" -> { t.fill { _, _ -> scale(rgb(214, 150, 120), t.jitter(0.06f)) }; return true }
+            "p4_hog_cloth" -> { t.fill { x, y -> if (y % 4 == 0) rgb(210, 170, 40) else scale(rgb(240, 200, 60), t.jitter(0.05f)) }; return true }
+            "p4_hog_face" -> {
+                t.fill { _, _ -> scale(rgb(214, 150, 120), t.jitter(0.04f)) }
+                for (x in 4..11) for (y in 8..12) t[x, y] = scale(rgb(232, 170, 140), 1f)          // the snout
+                t[6, 10] = rgb(110, 60, 50); t[9, 10] = rgb(110, 60, 50)
+                t[3, 12] = rgb(246, 240, 220); t[12, 12] = rgb(246, 240, 220); t[3, 11] = rgb(246, 240, 220); t[12, 11] = rgb(246, 240, 220)  // tusks
+                for (x in listOf(3, 4, 11, 12)) { t[x, 5] = rgb(30, 20, 20) }
+                return true
+            }
+            "p4_sentinel_skin" -> { t.fill { x, y -> if ((x + y) % 5 == 0) rgb(170, 220, 190) else scale(rgb(60, 130, 120), t.jitter(0.07f)) }; return true }
+            "p4_sentinel_eye" -> {
+                t.fill { _, _ -> scale(rgb(60, 130, 120), t.jitter(0.05f)) }
+                for (y in 5..10) for (x in 5..10) t[x, y] = if ((x - 7.5f) * (x - 7.5f) + (y - 7.5f) * (y - 7.5f) < 9f) rgb(250, 250, 240) else rgb(40, 90, 80)
+                for (y in 7..8) for (x in 7..8) t[x, y] = rgb(240, 110, 30)
+                return true
+            }
+            "p4_beacon_top", "p4_beacon_side", "p4_beacon_base" -> {
+                val top = name.endsWith("top"); val side = name.endsWith("side")
+                t.fill { x, y -> scale(rgb(30, 22, 52), t.jitter(0.05f)) }
+                for (y in 1..14) for (x in 1..14) if (!(x in 4..11 && y in 4..11)) t[x, y] = if (side || top) rgb(170, 220, 230) else scale(rgb(30, 22, 52), 1f)
+                if (!name.endsWith("base")) for (y in 5..10) for (x in 5..10) t[x, y] = if (top) rgb(255, 255, 255) else rgb(200, 240, 255)
                 return true
             }
             "p4_raider_coat" -> { t.fill { x, y -> if (x == 7 || x == 8) rgb(70, 60, 50) else scale(rgb(104, 106, 112), t.jitter(0.05f)) }; return true }

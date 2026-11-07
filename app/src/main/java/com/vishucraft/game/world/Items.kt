@@ -368,7 +368,7 @@ object Items {
             add(fi.name, "fest_${fi.shape}_${"%06x".format(fi.rgb)}", food = fi.food)
 
         // Spawn eggs for the new Ember Realm creatures and raiders (appended so older item ids stay the same).
-        for (t in listOf(com.vishucraft.game.engine.MobType.FLAME_SPINNER, com.vishucraft.game.engine.MobType.TEAR_DRIFTER, com.vishucraft.game.engine.MobType.RAIDER))
+        for (t in listOf(com.vishucraft.game.engine.MobType.FLAME_SPINNER, com.vishucraft.game.engine.MobType.TEAR_DRIFTER, com.vishucraft.game.engine.MobType.RAIDER, com.vishucraft.game.engine.MobType.SEA_SENTINEL, com.vishucraft.game.engine.MobType.GOLD_HOG))
             add("${t.displayName} Spawn Egg", "spawn_egg_${t.name.lowercase()}", use = ItemUse.SPAWN)
 
         all = list

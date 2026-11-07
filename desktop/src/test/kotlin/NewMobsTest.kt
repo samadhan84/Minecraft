@@ -62,4 +62,62 @@ class NewMobsTest {
         val reward = g.inventory.count(emeralds) + g.drops.list.filter { it.stack.id == emeralds }.sumOf { it.stack.count }
         assertTrue(reward >= 6, "the reward is paid, got $reward")
     }
+
+    @Test fun aBeaconWithABaseGivesPowersNearby() {
+        val g = game()
+        val y = g.world.generator.surfaceHeight(0, 0) + 1
+        g.setBlock(0, y, 0, Blocks.BEACON)
+        run(g, 1.5f); assertFalse(g.hasEffect("swiftness"), "no base, no power")
+        for (dx in -1..1) for (dz in -1..1) g.setBlock(dx, y - 1, dz, Blocks.IRON_BLOCK)
+        assertEquals(1, g.beaconTiers(0, y, 0))
+        g.player.x = 5f; g.player.y = y.toFloat(); g.player.z = 0.5f
+        run(g, 1.5f); assertTrue(g.hasEffect("swiftness"))
+        assertFalse(g.hasEffect("leaping"))
+        for (dx in -2..2) for (dz in -2..2) g.setBlock(dx, y - 2, dz, Blocks.GOLD_BLOCK)
+        assertEquals(2, g.beaconTiers(0, y, 0))
+        run(g, 1.5f); assertTrue(g.hasEffect("leaping"))
+        assertTrue(Recipes.crafting.any { it.result == Blocks.BEACON })
+    }
+
+    @Test fun goldHogsFightUnlessYouWearGoldAndTradeForIngots() {
+        val g = game()
+        g.mobs.hostileEnabled = true
+        val y = g.world.generator.surfaceHeight(0, 0) + 1f
+        g.player.x = 0.5f; g.player.y = y; g.player.z = 0.5f
+        val hog = Mob(MobType.GOLD_HOG, 3f, y, 0.5f); g.mobs.list.add(hog)
+        val before = g.health
+        run(g, 4f)
+        assertTrue(g.health < before, "an angry hog hurts you")
+        // Wearing gold calms it.
+        val g2 = game()
+        g2.mobs.hostileEnabled = true
+        g2.player.x = 0.5f; g2.player.y = y; g2.player.z = 0.5f
+        g2.inventory.armor[3] = ItemStack(Items.find("Golden Helmet"), 1)
+        g2.mobs.list.add(Mob(MobType.GOLD_HOG, 3f, y, 0.5f))
+        val calm = g2.health
+        run(g2, 4f)
+        assertEquals(calm, g2.health, "a hog leaves you alone when you wear gold")
+        // And trades a gold ingot for something.
+        val ingot = Items.find("Gold Ingot")
+        g2.inventory.slots[0] = ItemStack(ingot, 2); g2.input.selectedSlot = 0
+        val dropsBefore = g2.drops.list.size
+        assertTrue(g2.petActions(Items[ingot], ingot, g2.mobs.list.first { it.type == MobType.GOLD_HOG }))
+        assertEquals(1, g2.inventory.count(ingot)); assertTrue(g2.drops.list.size > dropsBefore, "the hog gives something back")
+    }
+
+    @Test fun seaSentinelsHurtSwimmers() {
+        val g = game(flat = false)
+        // A pool of water in the air.
+        val y = 120
+        for (dx in -9..9) for (dz in -9..9) {
+            g.setBlock(dx, y - 1, dz, Blocks.STONE)
+            for (dy in 0..6) g.setBlock(dx, y + dy, dz, if (Math.abs(dx) == 9 || Math.abs(dz) == 9) Blocks.STONE else Blocks.WATER)
+        }
+        g.player.x = 0.5f; g.player.y = y + 1f; g.player.z = 0.5f; g.player.flying = false
+        g.mobs.hostileEnabled = true
+        g.mobs.list.add(Mob(MobType.SEA_SENTINEL, 4f, y + 2f, 0.5f))
+        val before = g.health
+        run(g, 5f)
+        assertTrue(g.health < before, "the beam hits you in the water")
+    }
 }

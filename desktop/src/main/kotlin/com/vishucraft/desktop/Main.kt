@@ -820,6 +820,10 @@ class App(demo: File?) : ClientApp(demo) {
                 g.mobs.list.add(com.vishucraft.game.engine.Mob(com.vishucraft.game.engine.MobType.FLAME_SPINNER, -5f, y + 1.5f, 42f))
                 g.mobs.list.add(com.vishucraft.game.engine.Mob(com.vishucraft.game.engine.MobType.TEAR_DRIFTER, 0f, y + 3f, 44f))
                 g.mobs.list.add(com.vishucraft.game.engine.Mob(com.vishucraft.game.engine.MobType.RAIDER, 5f, y, 42f))
+                g.mobs.list.add(com.vishucraft.game.engine.Mob(com.vishucraft.game.engine.MobType.GOLD_HOG, 9f, y, 42f))
+                g.mobs.list.add(com.vishucraft.game.engine.Mob(com.vishucraft.game.engine.MobType.SEA_SENTINEL, -9f, y + 0.5f, 42f))
+                for (dx in -1..1) for (dz in -1..1) g.setBlock(14 + dx, y.toInt() - 1, 42 + dz, com.vishucraft.game.world.Blocks.GOLD_BLOCK)
+                g.setBlock(14, y.toInt(), 42, com.vishucraft.game.world.Blocks.BEACON)
                 g.player.x = 0f; g.player.y = y + 2f; g.player.z = 32f; g.player.flying = true
                 g.player.yaw = kotlin.math.PI.toFloat(); g.player.pitch = 0.05f
             }

@@ -233,6 +233,38 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
 
     /** Active potion effects: key (see Items.POTIONS) -> seconds left. */
     val effects = HashMap<String, Float>()
+    private var beaconTimer = 0f
+
+    /** How many layers of iron, gold, diamond or emerald blocks (1 to 4) sit under the beacon at (x, y, z). */
+    fun beaconTiers(x: Int, y: Int, z: Int): Int {
+        val base = setOf(Blocks.IRON_BLOCK, Blocks.GOLD_BLOCK, Blocks.DIAMOND_BLOCK, Blocks.EMERALD_BLOCK)
+        var tiers = 0
+        for (k in 1..4) {
+            var ok = true
+            for (dx in -k..k) for (dz in -k..k) if (world.getBlock(x + dx, y - k, z + dz) !in base) ok = false
+            if (!ok) break
+            tiers = k
+        }
+        return tiers
+    }
+
+    /** Every second: standing near a beacon with a base gives swiftness, then leaping, strength and fire resistance with more layers. */
+    private fun updateBeacons(dt: Float) {
+        beaconTimer -= dt
+        if (beaconTimer > 0f) return
+        beaconTimer = 1f
+        for (c in world.components.toList()) {
+            val x = com.vishucraft.game.world.RedstoneIds.x(c); val y = com.vishucraft.game.world.RedstoneIds.y(c); val z = com.vishucraft.game.world.RedstoneIds.z(c)
+            if (world.getBlock(x, y, z) != Blocks.BEACON) continue
+            val tiers = beaconTiers(x, y, z)
+            if (tiers == 0) continue
+            val range = 10f + 10f * tiers
+            if ((player.x - x) * (player.x - x) + (player.z - z) * (player.z - z) > range * range) continue
+            val keys = listOf("swiftness", "leaping", "strength", "fire_resistance")
+            for (k in 0 until tiers) effects[keys[k]] = maxOf(effects[keys[k]] ?: 0f, 12f)
+        }
+    }
+
     fun hasEffect(key: String) = (effects[key] ?: 0f) > 0f
     /** Looking through a spyglass. */
     var zoomed = false
@@ -524,6 +556,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
         if (!festivalAnnounced && spawned) { festivalAnnounced = true; Festivals.announcement()?.let { uiEvents.add("toast:$it") } }
         if (!peopleRemoved && spawned) { peopleRemoved = true; if (!isClient) removePeople() }
         updateCoasters(dt)
+        updateBeacons(dt)
         updateLift(dt)
         if (bowCooldown > 0f) bowCooldown -= dt
         // Standing in a portal for two seconds travels to the other world.
@@ -701,6 +734,8 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
             MobType.VILLAGER, MobType.EXPLORER, MobType.WOLF, MobType.HORSE -> if (m.type == MobType.HORSE) listOf(i("Leather") to r.nextInt(3)) else emptyList()
             MobType.FLAME_SPINNER -> listOf(i("Blaze Rod") to r.nextInt(2), i("Glowstone Dust") to r.nextInt(2))
             MobType.TEAR_DRIFTER -> listOf(i("Ghast Tear") to (if (r.nextInt(2) == 0) 1 else 0), i("Gunpowder") to r.nextInt(3))
+            MobType.SEA_SENTINEL -> listOf(i("Prismarine Shard") to r.nextInt(3), i("Raw Cod") to r.nextInt(2))
+            MobType.GOLD_HOG -> listOf(i("Raw Porkchop") to 1 + r.nextInt(2), i("Gold Nugget") to r.nextInt(3))
             MobType.RAIDER -> listOf(i("Arrow") to r.nextInt(3), i("Emerald") to (if (r.nextInt(4) == 0) 1 else 0))
             MobType.WARDEN -> listOf(i("Nether Star") to 1, i("Elytra") to 1, i("Diamond") to 6, i("Totem of Undying") to 1)
             MobType.CHICKEN -> listOf(i("Feather") to r.nextInt(3), i("Raw Chicken") to 1)
@@ -1279,11 +1314,20 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
     }
 
     /** Pets, horses, name tags and leads. Returns true when the tap was used. */
-    private fun petActions(item: ItemDef?, held: Int, mob: Mob): Boolean {
+    internal fun petActions(item: ItemDef?, held: Int, mob: Mob): Boolean {
         val rnd = java.util.Random()
         val name = item?.name
         val weapon = item?.tool == ToolType.SWORD || item?.tool == ToolType.AXE
         if (name == "Name Tag") { uiEvents.add("name:${mob.uid}"); return true }
+        if (mob.type == MobType.GOLD_HOG && name == "Gold Ingot") {
+            // Gold Hogs trade: a gold ingot for something from the Ember Realm.
+            consumeHeld()
+            val gift = listOf("Ender Pearl" to 1, "String" to 4, "Obsidian" to 0, "Glowstone Dust" to 3, "Gunpowder" to 2, "Raw Porkchop" to 2)[rnd.nextInt(6)]
+            if (gift.first == "Obsidian") drops.spawn(ItemStack(Blocks.OBSIDIAN, 1), mob.x, mob.y + 0.8f, mob.z)
+            else drops.spawn(ItemStack(Items.find(gift.first), gift.second), mob.x, mob.y + 0.8f, mob.z)
+            sound("pop", mob.x, mob.y + 1f, mob.z); uiEvents.add("toast:The Gold Hog grunts and trades with you")
+            return true
+        }
         if (mob.type == MobType.VILLAGER && !weapon) { uiEvents.add("trade:${mob.uid}"); return true }
         if (!weapon && robotTap(mob)) return true
         if (mob.type.isCitizen && !weapon) {
