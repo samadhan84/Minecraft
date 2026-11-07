@@ -53,8 +53,10 @@ class NewMobsTest {
         assertTrue(g.mobs.list.count { it.type == MobType.RAIDER } >= 3, "wave one")
         val emeralds = Items.find("Emerald")
         for (wave in 1..3) {
+            if (wave == 2) assertTrue(g.mobs.list.any { it.type == MobType.SPELL_RAIDER }, "wave two has a spell raider")
+            if (wave == 3) assertTrue(g.mobs.list.any { it.type == MobType.RAMPAGE_BEAST }, "wave three has a rampage beast")
             // Defeat every raider in this wave.
-            for (r in g.mobs.list.filter { it.type == MobType.RAIDER }) g.mobs.damage(r, 999f, 0f, 0f)
+            for (r in g.mobs.list.filter { it.type.isRaider }) g.mobs.damage(r, 999f, 0f, 0f)
             run(g, 1.5f)
             if (wave < 3) assertEquals(wave + 1, g.mobs.raidWave, "wave ${wave + 1} follows")
         }
@@ -189,5 +191,21 @@ class CandleTest {
         assertEquals(12, Blocks.lightLevel(Blocks.CANDLE, 4 or 3), "four lit candles")
         assertTrue(Recipes.crafting.any { it.result == Blocks.CANDLE })
         assertEquals(4, com.vishucraft.game.world.Shapes.boxes(Blocks.CANDLE, 3, false) { 0 }.size, "four candles are drawn")
+    }
+}
+
+class LightningTest {
+    @Test fun aLightningStrikeHurtsWhatItHits() {
+        val dir = kotlin.io.path.createTempDirectory("bolt").toFile()
+        val level = LevelData.create(4L, "t", GameMode.SURVIVAL)
+        val g = Game(World(level.seed, dir, Dimension.OVERWORLD, flat = true), level, GameInput(), dir)
+        for (cx in -2..2) for (cz in -2..2) g.world.ensureLoaded(cx, cz)
+        val y = g.world.generator.surfaceHeight(0, 0) + 1f
+        g.player.x = 30.5f; g.player.y = y; g.player.z = 30.5f
+        val cow = Mob(MobType.COW, 1f, y, 1f); g.mobs.list.add(cow)
+        val far = Mob(MobType.COW, 20f, y, 20f); g.mobs.list.add(far)
+        g.lightningStrike(1f, 1f)
+        assertTrue(cow.health < cow.type.maxHealth, "the cow under the bolt is hurt")
+        assertEquals(far.type.maxHealth.toFloat(), far.health, "a cow far away is fine")
     }
 }

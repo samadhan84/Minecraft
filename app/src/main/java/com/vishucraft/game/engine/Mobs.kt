@@ -94,8 +94,13 @@ enum class MobType(
     /** A fast charging beast of the Ember Realm with big tusks. */
     TUSK_BOAR("Tusk Boar", 0.55f, 1.4f, 30, true, 3.2f),
     /** A three-headed flying boss that throws volleys of dark fireballs; called with a Dusk Sigil. */
-    DUSK_WITHER("Dusk Wither", 1.0f, 2.4f, 300, true, 6f);
+    DUSK_WITHER("Dusk Wither", 1.0f, 2.4f, 300, true, 6f),
+    /** A raider in a teal robe: throws harmful potions and heals itself. Comes in the later raid waves. */
+    SPELL_RAIDER("Spell Raider", 0.3f, 1.95f, 28, true, 2.0f),
+    /** A huge charging beast that raiders ride into the last raid wave. */
+    RAMPAGE_BEAST("Rampage Beast", 0.9f, 2.2f, 70, true, 2.8f);
 
+    val isRaider get() = this == RAIDER || this == SPELL_RAIDER || this == RAMPAGE_BEAST
     val isCitizen get() = this == CITIZEN || this == CITIZEN_WOMAN || this == CITIZEN_KID
 
     val swims get() = this == SQUID || this == COD || this == AXOLOTL || this == SEA_SENTINEL
@@ -373,7 +378,7 @@ class Mobs(private val world: World) {
                 physics(m, dt)
                 return
             }
-            MobType.WITCH -> {
+            MobType.WITCH, MobType.SPELL_RAIDER -> {
                 if (dist < 18f && game.playerAlive) {
                     m.yaw = atan2(dx, -dz)
                     if (dist < 5f) { wantX = -dx / dist; wantZ = -dz / dist } else if (dist > 10f) { wantX = dx / dist; wantZ = dz / dist }
@@ -483,16 +488,16 @@ class Mobs(private val world: World) {
                     }
                 } else wander(m, dt).let { wantX = it.first; wantZ = it.second; speed *= 0.5f }
             }
-            MobType.CRAWLER, MobType.CINDER, MobType.GOLD_HOG, MobType.TUSK_BOAR -> {
-                if (m.type == MobType.TUSK_BOAR && dist < 12f) speed *= 1.5f      // it charges
-                val hunts = when (m.type) { MobType.CINDER, MobType.TUSK_BOAR -> true; MobType.GOLD_HOG -> m.angry || !goldWorn(game); else -> m.angry || game.daylight < 0.4f }
+            MobType.CRAWLER, MobType.CINDER, MobType.GOLD_HOG, MobType.TUSK_BOAR, MobType.RAMPAGE_BEAST -> {
+                if ((m.type == MobType.TUSK_BOAR || m.type == MobType.RAMPAGE_BEAST) && dist < 12f) speed *= 1.5f      // it charges
+                val hunts = when (m.type) { MobType.CINDER, MobType.TUSK_BOAR, MobType.RAMPAGE_BEAST -> true; MobType.GOLD_HOG -> m.angry || !goldWorn(game); else -> m.angry || game.daylight < 0.4f }
                 if (hunts && dist < 20f && game.playerAlive) {
                     m.yaw = atan2(dx, -dz)
                     if (dist > 0.9f) { wantX = dx / dist; wantZ = dz / dist }
                     m.attackCooldown -= dt
                     if (dist < 1.3f + m.halfWidth && abs(p.y - m.y) < 1.6f && m.attackCooldown <= 0f) {
                         m.attackCooldown = 1f
-                        game.hurtTarget(p, when (m.type) { MobType.CINDER -> 5f; MobType.TUSK_BOAR -> 6f; MobType.GOLD_HOG -> 4f; else -> 2.5f }, m.x, m.z)
+                        game.hurtTarget(p, when (m.type) { MobType.CINDER -> 5f; MobType.TUSK_BOAR -> 6f; MobType.RAMPAGE_BEAST -> 10f; MobType.GOLD_HOG -> 4f; else -> 2.5f }, m.x, m.z)
                     }
                 } else wander(m, dt).let { wantX = it.first; wantZ = it.second; speed *= 0.5f }
             }
@@ -730,15 +735,15 @@ class Mobs(private val world: World) {
             raidWave = 1; raidCooldown = 900f
             game.uiEvents.add("toast:A RAID is coming! Raiders attack the village: stop them!")
             game.sound("bell", p.x, p.y + 2f, p.z, 1f)
-            spawnRaiders(game, near.first().x, near.first().z, 3)
+            spawnRaiders(game, near.first().x, near.first().z, 3, 1)
             return
         }
-        if (list.none { it.type == MobType.RAIDER && !it.dead }) {
+        if (list.none { it.type.isRaider && !it.dead }) {
             if (raidWave < 3) {
                 raidWave++
                 val v = list.firstOrNull { it.type == MobType.VILLAGER && !it.dead }
                 game.uiEvents.add("toast:Raid wave $raidWave of 3!")
-                spawnRaiders(game, v?.x ?: p.x, v?.z ?: p.z, 2 + raidWave)
+                spawnRaiders(game, v?.x ?: p.x, v?.z ?: p.z, 2 + raidWave, raidWave)
             } else {
                 raidWave = 0
                 game.uiEvents.add("toast:The village is saved! You beat the raid and get a reward.")
@@ -748,13 +753,17 @@ class Mobs(private val world: World) {
         }
     }
 
-    private fun spawnRaiders(game: Game, cx: Float, cz: Float, n: Int) {
+    private fun spawnRaiders(game: Game, cx: Float, cz: Float, n: Int, wave: Int) {
         var placed = 0; var tries = 0
         while (placed < n && tries++ < 60) {
             val (x, z) = ringPoint(cx, cz, 18f, 30f)
             if (!world.isLoaded(x, z)) continue
             val y = surfaceY(x, z)
-            if (y > 0 && roomAt(x, y + 1, z, 2)) { list.add(Mob(MobType.RAIDER, x + 0.5f, y + 1f, z + 0.5f)); placed++ }
+            if (y > 0 && roomAt(x, y + 1, z, 2)) {
+                // Later waves bring a spell caster, and the last one a rampage beast.
+                val type = if (wave >= 2 && placed == 0) MobType.SPELL_RAIDER else if (wave >= 3 && placed == 1) MobType.RAMPAGE_BEAST else MobType.RAIDER
+                list.add(Mob(type, x + 0.5f, y + 1f, z + 0.5f)); placed++
+            }
         }
     }
 
@@ -964,7 +973,7 @@ class Mobs(private val world: World) {
 
     fun voice(t: MobType) = when (t) {
         MobType.WARDEN, MobType.TEAR_DRIFTER -> "enderman"
-        MobType.FLAME_SPINNER, MobType.SEA_SENTINEL, MobType.MILKMAN -> "none"; MobType.RAIDER -> "zombie"; MobType.GOLD_HOG, MobType.TUSK_BOAR -> "pig"; MobType.DUSK_WITHER -> "enderman"
+        MobType.FLAME_SPINNER, MobType.SEA_SENTINEL, MobType.MILKMAN -> "none"; MobType.RAIDER -> "zombie"; MobType.GOLD_HOG, MobType.TUSK_BOAR, MobType.RAMPAGE_BEAST -> "pig"; MobType.DUSK_WITHER -> "enderman"; MobType.SPELL_RAIDER -> "witch"
         MobType.DROWNED -> "zombie"; MobType.RABBIT, MobType.SQUID, MobType.COD -> "none"
         MobType.IRON_GOLEM, MobType.SNOW_GOLEM, MobType.TURTLE, MobType.AXOLOTL, MobType.ROBOT -> "none"
         MobType.MOOSHROOM -> "cow"; MobType.POLAR_BEAR, MobType.PANDA -> "bear"

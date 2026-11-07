@@ -1433,7 +1433,7 @@ object TextureAtlas {
 
     /** Colours for spawn eggs: base and spots. */
     private val EGG_COLORS = mapOf(
-        "flame_spinner" to (rgb(250, 190, 40) to rgb(220, 90, 20)), "tear_drifter" to (rgb(236, 236, 240) to rgb(150, 150, 170)), "raider" to (rgb(110, 110, 120) to rgb(60, 70, 60)), "sea_sentinel" to (rgb(60, 130, 120) to rgb(240, 110, 30)), "milkman" to (rgb(244, 244, 238) to rgb(50, 100, 200)), "tusk_boar" to (rgb(120, 76, 56) to rgb(240, 236, 220)), "gold_hog" to (rgb(214, 150, 120) to rgb(240, 200, 60)),
+        "flame_spinner" to (rgb(250, 190, 40) to rgb(220, 90, 20)), "tear_drifter" to (rgb(236, 236, 240) to rgb(150, 150, 170)), "raider" to (rgb(110, 110, 120) to rgb(60, 70, 60)), "sea_sentinel" to (rgb(60, 130, 120) to rgb(240, 110, 30)), "milkman" to (rgb(244, 244, 238) to rgb(50, 100, 200)), "tusk_boar" to (rgb(120, 76, 56) to rgb(240, 236, 220)), "spell_raider" to (rgb(44, 130, 126) to rgb(200, 220, 220)), "rampage_beast" to (rgb(122, 78, 58) to rgb(250, 190, 40)), "gold_hog" to (rgb(214, 150, 120) to rgb(240, 200, 60)),
         "citizen" to (rgb(70, 130, 200) to rgb(196, 146, 104)), "citizen_woman" to (rgb(220, 70, 120) to rgb(250, 210, 80)),
         "citizen_kid" to (rgb(236, 236, 240) to rgb(40, 70, 160)), "robot" to (rgb(232, 236, 244) to rgb(60, 130, 230)),
         "cow" to (rgb(68, 50, 38) to rgb(160, 160, 160)), "pig" to (rgb(238, 166, 166) to rgb(200, 110, 110)),
@@ -2487,6 +2487,7 @@ object TextureAtlas {
                 return true
             }
             "p4_milk_crate" -> { t.fill { x, y -> if (y < 4) rgb(40, 110, 220) else if (x % 4 == 0) rgb(230, 230, 235) else scale(rgb(250, 250, 255), t.jitter(0.03f)) }; return true }
+            "p4_spell_coat" -> { t.fill { x, y -> if (y % 5 == 0) rgb(30, 90, 90) else scale(rgb(44, 130, 126), t.jitter(0.05f)) }; return true }
             "p4_raider_coat" -> { t.fill { x, y -> if (x == 7 || x == 8) rgb(70, 60, 50) else scale(rgb(104, 106, 112), t.jitter(0.05f)) }; return true }
             "p4_raider_pants" -> { t.fill { _, _ -> scale(rgb(70, 70, 76), t.jitter(0.05f)) }; return true }
             "p4_raider_skin" -> { t.fill { _, _ -> scale(rgb(150, 130, 112), t.jitter(0.05f)) }; return true }

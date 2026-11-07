@@ -135,6 +135,18 @@ object MobModels {
             box(-0.12f, 0.9f, -0.12f, 0.12f, 1.15f, 0.12f, tiles("p4_sentinel_skin")), box(-0.65f, 0.4f, -0.1f, -0.5f, 0.6f, 0.1f, tiles("p4_sentinel_skin")),
             box(0.5f, 0.4f, -0.1f, 0.65f, 0.6f, 0.1f, tiles("p4_sentinel_skin")), box(-0.1f, 0.4f, 0.5f, 0.1f, 0.6f, 0.65f, tiles("p4_sentinel_skin")),
         ),
+        MobType.SPELL_RAIDER to listOf(
+            box(-0.28f, 0f, -0.16f, 0.28f, 0.8f, 0.16f, tiles("p4_spell_coat")),                 // the long robe
+            box(-0.27f, 0.8f, -0.15f, 0.27f, 1.45f, 0.15f, tiles("p4_spell_coat")),
+            box(-0.25f, 1.45f, -0.25f, 0.25f, 1.95f, 0.25f, tiles("p4_raider_skin", front = "p4_raider_face", top = "p4_spell_coat")),
+            box(-0.5f, 0.8f, -0.125f, -0.27f, 1.45f, 0.125f, tiles("p4_spell_coat"), 2, pivotY = 1.35f),
+            box(0.27f, 0.8f, -0.125f, 0.5f, 1.45f, 0.125f, tiles("p4_spell_coat"), 2, pivotY = 1.35f),
+        ),
+        MobType.RAMPAGE_BEAST to listOf(
+            box(-0.9f, 0.8f, -1.2f, 0.9f, 2.0f, 1.2f, tiles("p4_boar_skin")),
+            box(-0.65f, 1.0f, -2.1f, 0.65f, 2.1f, -1.2f, tiles("p4_boar_skin", front = "p4_boar_face")),
+            box(-0.2f, 2.0f, -1.0f, 0.2f, 2.3f, 0.9f, tiles("p4_boar_skin")),
+        ) + legs(0.55f, 0.75f, 0.35f, 0.8f, "p4_boar_skin"),
         MobType.RAIDER to listOf(
             box(-0.25f, 0f, -0.125f, 0f, 0.75f, 0.125f, tiles("p4_raider_pants"), 1),
             box(0f, 0f, -0.125f, 0.25f, 0.75f, 0.125f, tiles("p4_raider_pants"), -1),

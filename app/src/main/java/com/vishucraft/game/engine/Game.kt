@@ -429,11 +429,26 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
         if (thunder && rain > 0.8f && r.nextFloat() < dt / 14f) {
             flash = 0.9f
             thunderDelay = 0.3f + r.nextFloat() * 1.8f
+            if (!isClient) lightningStrike(player.x + (r.nextFloat() - 0.5f) * 60f, player.z + (r.nextFloat() - 0.5f) * 60f)
         }
         if (thunderDelay > 0f) {
             thunderDelay -= dt
             if (thunderDelay <= 0f) { thunderDelay = -1f; sound("thunder", Float.NaN, 0f, 0f, 1f) }
         }
+    }
+
+    /** A lightning bolt hits the ground at (x, z): it hurts anything within a few blocks, you included, and cracks the grass under it. */
+    fun lightningStrike(x: Float, z: Float) {
+        val bx = floorInt(x); val bz = floorInt(z)
+        if (!world.isLoaded(bx, bz)) return
+        var y = world.columnHeight(bx, bz) - 1
+        while (y > 0 && !Blocks.solid[world.getBlock(bx, y, bz)]) y--
+        sound("explode", x, y + 1f, z, 1.4f)
+        for (m in mobs.list) if (!m.dead && (m.x - x) * (m.x - x) + (m.z - z) * (m.z - z) < 16f)
+            mobs.damage(m, 12f, (m.x - x) * 0.2f, (m.z - z) * 0.2f)
+        if (playerAlive && (player.x - x) * (player.x - x) + (player.z - z) * (player.z - z) < 12f) hurtPlayer(8f, x, z)
+        if (world.getBlock(bx, y, bz) == Blocks.GRASS) setBlock(bx, y, bz, Blocks.DIRT)
+        uiEvents.add("lightning:$x,${y + 1},$z")
     }
 
     fun setWeather(rainOn: Boolean, storm: Boolean) {
@@ -740,6 +755,8 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
             MobType.TEAR_DRIFTER -> listOf(i("Ghast Tear") to (if (r.nextInt(2) == 0) 1 else 0), i("Gunpowder") to r.nextInt(3))
             MobType.SEA_SENTINEL -> listOf(i("Prismarine Shard") to r.nextInt(3), i("Raw Cod") to r.nextInt(2))
             MobType.GOLD_HOG -> listOf(i("Raw Porkchop") to 1 + r.nextInt(2), i("Gold Nugget") to r.nextInt(3))
+            MobType.SPELL_RAIDER -> listOf(i("Emerald") to r.nextInt(2), i("Glass Bottle") to r.nextInt(2))
+            MobType.RAMPAGE_BEAST -> listOf(i("Leather") to 1 + r.nextInt(3), i("Raw Porkchop") to 2, i("Emerald") to 1)
             MobType.RAIDER -> listOf(i("Arrow") to r.nextInt(3), i("Emerald") to (if (r.nextInt(4) == 0) 1 else 0))
             MobType.TUSK_BOAR -> listOf(i("Raw Porkchop") to 2 + r.nextInt(3), i("Leather") to r.nextInt(2))
             MobType.DUSK_WITHER -> listOf(i("Nether Star") to 1, i("Diamond") to 4, i("Gold Ingot") to 6, i("Netherite Scrap") to 2)
