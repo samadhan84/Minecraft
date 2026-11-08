@@ -114,6 +114,50 @@ object MobModels {
             box(-0.62f, 0.4f, -0.04f, -0.18f, 0.55f, 0.28f, tiles("p4_glimmer_wing"), 2, pivotY = 0.5f),         // the wings
             box(0.18f, 0.4f, -0.04f, 0.62f, 0.55f, 0.28f, tiles("p4_glimmer_wing"), 2, pivotY = 0.5f),
         ),
+        MobType.FROST_ARCHER to listOf(
+            box(-0.2f, 0f, -0.06f, -0.08f, 0.75f, 0.06f, tiles("p4_frost_bone"), 1),
+            box(0.08f, 0f, -0.06f, 0.2f, 0.75f, 0.06f, tiles("p4_frost_bone"), -1),
+            box(-0.22f, 0.75f, -0.1f, 0.22f, 1.45f, 0.1f, tiles("p4_frost_bone")),
+            box(-0.25f, 1.45f, -0.25f, 0.25f, 1.95f, 0.25f, tiles("p4_frost_bone", front = "p4_frost_face")),
+            box(-0.28f, 1.8f, -0.28f, 0.28f, 2.0f, 0.28f, tiles("p4_frost_bone")),                          // a frosty cap
+            box(-0.36f, 0.8f, -0.06f, -0.24f, 1.45f, 0.06f, tiles("p4_frost_bone"), 2, pivotY = 1.4f),
+            box(0.24f, 0.8f, -0.06f, 0.36f, 1.45f, 0.06f, tiles("p4_frost_bone"), 2, pivotY = 1.4f),
+        ),
+        MobType.ASH_SKELETON to listOf(
+            box(-0.26f, 0f, -0.08f, -0.08f, 1.15f, 0.08f, tiles("p4_ash_bone"), 1),
+            box(0.08f, 0f, -0.08f, 0.26f, 1.15f, 0.08f, tiles("p4_ash_bone"), -1),
+            box(-0.3f, 1.15f, -0.12f, 0.3f, 1.95f, 0.12f, tiles("p4_ash_bone")),
+            box(-0.28f, 1.95f, -0.28f, 0.28f, 2.45f, 0.28f, tiles("p4_ash_bone", front = "p4_ash_face")),
+            box(-0.46f, 1.1f, -0.08f, -0.3f, 1.95f, 0.08f, tiles("p4_ash_bone"), 2, pivotY = 1.9f),
+            box(0.3f, 1.1f, -0.08f, 0.46f, 1.95f, 0.08f, tiles("p4_ash_bone"), 2, pivotY = 1.9f),
+        ),
+        MobType.SPINY_PUFFER to listOf(
+            box(-0.25f, 0.05f, -0.25f, 0.25f, 0.5f, 0.25f, tiles("p4_puffer_skin", front = "p4_puffer_face")),
+            box(-0.03f, 0.5f, -0.03f, 0.03f, 0.62f, 0.03f, tiles("p4_puffer_skin")), box(-0.34f, 0.2f, -0.03f, -0.25f, 0.3f, 0.03f, tiles("p4_puffer_skin")),
+            box(0.25f, 0.2f, -0.03f, 0.34f, 0.3f, 0.03f, tiles("p4_puffer_skin")), box(-0.03f, 0.2f, 0.25f, 0.03f, 0.3f, 0.34f, tiles("p4_puffer_skin")),
+        ),
+        MobType.SHELL_GUARD to listOf(
+            box(-0.45f, 0f, -0.45f, 0.45f, 0.4f, 0.45f, tiles("p4_shell")),
+            box(-0.2f, 0.4f, -0.2f, 0.2f, 0.75f, 0.2f, tiles("p4_shell_core", front = "p4_shell_core")),     // the soft creature inside
+            box(-0.5f, 0.75f, -0.5f, 0.5f, 0.98f, 0.5f, tiles("p4_shell")),                                   // the lid, raised
+        ),
+        MobType.VOID_MITE to listOf(
+            box(-0.18f, 0.05f, -0.12f, 0.18f, 0.3f, 0.22f, tiles("p4_mite", front = "p4_mite_face")),
+            box(-0.1f, 0.05f, 0.22f, 0.1f, 0.22f, 0.38f, tiles("p4_mite"), 1),
+        ),
+        MobType.HUSK_HOG to listOf(
+            box(-0.25f, 0f, -0.15f, -0.02f, 0.8f, 0.15f, tiles("p4_husk_skin"), 1),
+            box(0.02f, 0f, -0.15f, 0.25f, 0.8f, 0.15f, tiles("p4_husk_skin"), -1),
+            box(-0.3f, 0.8f, -0.2f, 0.3f, 1.4f, 0.2f, tiles("p4_hog_cloth")),
+            box(-0.3f, 1.4f, -0.28f, 0.3f, 1.85f, 0.28f, tiles("p4_husk_skin", front = "p4_husk_face")),
+            box(-0.5f, 0.85f, -0.12f, -0.3f, 1.45f, 0.12f, tiles("p4_husk_skin"), 2, pivotY = 1.4f),
+            box(0.3f, 0.85f, -0.12f, 0.5f, 1.45f, 0.12f, tiles("p4_husk_skin"), 2, pivotY = 1.4f),
+        ),
+        MobType.LAVA_STRIDER to listOf(
+            box(-0.5f, 0.95f, -0.5f, 0.5f, 1.65f, 0.5f, tiles("p4_strider_body", front = "p4_strider_face")),
+            box(-0.35f, 0f, -0.1f, -0.2f, 0.95f, 0.1f, tiles("p4_strider_leg"), 1),
+            box(0.2f, 0f, -0.1f, 0.35f, 0.95f, 0.1f, tiles("p4_strider_leg"), -1),
+        ),
         MobType.CAMEL to listOf(
             box(-0.4f, 1.0f, -0.9f, 0.4f, 1.7f, 0.9f, tiles("p4_camel_hide")),
             box(-0.28f, 1.7f, -0.3f, 0.28f, 2.1f, 0.35f, tiles("p4_camel_hide")),                    // the hump

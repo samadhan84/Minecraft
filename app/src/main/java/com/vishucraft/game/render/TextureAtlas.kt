@@ -1439,7 +1439,7 @@ object TextureAtlas {
 
     /** Colours for spawn eggs: base and spots. */
     private val EGG_COLORS = mapOf(
-        "flame_spinner" to (rgb(250, 190, 40) to rgb(220, 90, 20)), "tear_drifter" to (rgb(236, 236, 240) to rgb(150, 150, 170)), "raider" to (rgb(110, 110, 120) to rgb(60, 70, 60)), "sea_sentinel" to (rgb(60, 130, 120) to rgb(240, 110, 30)), "milkman" to (rgb(244, 244, 238) to rgb(50, 100, 200)), "tusk_boar" to (rgb(120, 76, 56) to rgb(240, 236, 220)), "camel" to (rgb(214, 174, 112) to rgb(120, 80, 50)), "glimmer" to (rgb(120, 220, 255) to rgb(255, 255, 255)), "sniffer" to (rgb(150, 56, 52) to rgb(84, 140, 66)), "spell_raider" to (rgb(44, 130, 126) to rgb(200, 220, 220)), "rampage_beast" to (rgb(122, 78, 58) to rgb(250, 190, 40)), "gold_hog" to (rgb(214, 150, 120) to rgb(240, 200, 60)),
+        "flame_spinner" to (rgb(250, 190, 40) to rgb(220, 90, 20)), "tear_drifter" to (rgb(236, 236, 240) to rgb(150, 150, 170)), "raider" to (rgb(110, 110, 120) to rgb(60, 70, 60)), "sea_sentinel" to (rgb(60, 130, 120) to rgb(240, 110, 30)), "milkman" to (rgb(244, 244, 238) to rgb(50, 100, 200)), "tusk_boar" to (rgb(120, 76, 56) to rgb(240, 236, 220)), "camel" to (rgb(214, 174, 112) to rgb(120, 80, 50)), "glimmer" to (rgb(120, 220, 255) to rgb(255, 255, 255)), "frost_archer" to (rgb(170, 200, 214) to rgb(70, 120, 170)), "ash_skeleton" to (rgb(50, 48, 52) to rgb(200, 90, 40)), "spiny_puffer" to (rgb(236, 190, 70) to rgb(120, 80, 30)), "shell_guard" to (rgb(110, 84, 150) to rgb(240, 230, 150)), "void_mite" to (rgb(60, 30, 90) to rgb(210, 90, 255)), "husk_hog" to (rgb(120, 150, 100) to rgb(240, 200, 60)), "lava_strider" to (rgb(200, 70, 40) to rgb(60, 50, 50)), "sniffer" to (rgb(150, 56, 52) to rgb(84, 140, 66)), "spell_raider" to (rgb(44, 130, 126) to rgb(200, 220, 220)), "rampage_beast" to (rgb(122, 78, 58) to rgb(250, 190, 40)), "gold_hog" to (rgb(214, 150, 120) to rgb(240, 200, 60)),
         "citizen" to (rgb(70, 130, 200) to rgb(196, 146, 104)), "citizen_woman" to (rgb(220, 70, 120) to rgb(250, 210, 80)),
         "citizen_kid" to (rgb(236, 236, 240) to rgb(40, 70, 160)), "robot" to (rgb(232, 236, 244) to rgb(60, 130, 230)),
         "cow" to (rgb(68, 50, 38) to rgb(160, 160, 160)), "pig" to (rgb(238, 166, 166) to rgb(200, 110, 110)),
@@ -2516,6 +2516,55 @@ object TextureAtlas {
                     }
                 }
                 if (face == "front") for (y in 4..8) for (x in 7..8) t[x, y] = rgb(200, 200, 210)
+                return true
+            }
+            "p4_frost_bone" -> { t.fill { x, y -> scale(rgb(176, 204, 218), t.jitter(0.05f) * (if (y % 4 == 0) 0.88f else 1f)) }; return true }
+            "p4_frost_face" -> {
+                t.fill { _, _ -> scale(rgb(176, 204, 218), t.jitter(0.04f)) }
+                for (y in 5..8) for (x in listOf(3, 4, 5, 10, 11, 12)) t[x, y] = rgb(20, 40, 70)
+                for (x in listOf(4, 11)) t[x, 7] = rgb(120, 220, 255)
+                for (x in 4..11) t[x, 12] = if (x % 2 == 0) rgb(40, 60, 90) else rgb(220, 236, 244)
+                return true
+            }
+            "p4_ash_bone" -> { t.fill { x, y -> scale(rgb(54, 50, 54), t.jitter(0.07f) * (if (y % 5 == 0) 0.8f else 1f)) }; return true }
+            "p4_ash_face" -> {
+                t.fill { _, _ -> scale(rgb(58, 54, 58), t.jitter(0.05f)) }
+                for (y in 5..8) for (x in listOf(3, 4, 5, 10, 11, 12)) t[x, y] = rgb(10, 8, 8)
+                for (x in listOf(4, 11)) t[x, 7] = rgb(255, 120, 40)
+                for (x in 4..11) t[x, 12] = rgb(18, 16, 16)
+                return true
+            }
+            "p4_puffer_skin" -> { t.fill { x, y -> if (y > 9) scale(rgb(244, 224, 170), t.jitter(0.05f)) else scale(rgb(220, 170, 60), t.jitter(0.07f) * (if ((x + y) % 5 == 0) 0.85f else 1f)) }; return true }
+            "p4_puffer_face" -> {
+                t.fill { _, y -> if (y > 9) scale(rgb(244, 224, 170), t.jitter(0.04f)) else scale(rgb(220, 170, 60), t.jitter(0.05f)) }
+                for (cx in listOf(4, 11)) for (dy in 0..2) for (dx in 0..2) t[cx + dx - 1, 4 + dy] = if (dx == 1 && dy == 1) rgb(20, 20, 20) else rgb(250, 250, 240)
+                for (x in 6..9) t[x, 11] = rgb(150, 90, 40)
+                return true
+            }
+            "p4_shell" -> { t.fill { x, y -> scale(rgb(104, 82, 142), t.jitter(0.06f) * (if (y % 4 == 0) 0.85f else 1f)) }; return true }
+            "p4_shell_core" -> {
+                t.fill { _, _ -> scale(rgb(104, 82, 142), t.jitter(0.05f)) }
+                for (y in 4..11) for (x in 4..11) t[x, y] = rgb(240, 232, 160)
+                for (x in listOf(6, 9)) for (y in 6..7) t[x, y] = rgb(60, 40, 20)
+                return true
+            }
+            "p4_mite" -> { t.fill { x, y -> scale(rgb(58, 30, 88), t.jitter(0.08f)) }; return true }
+            "p4_mite_face" -> { t.fill { _, _ -> scale(rgb(58, 30, 88), t.jitter(0.06f)) }; for (x in listOf(3, 4, 11, 12)) for (y in 5..7) t[x, y] = rgb(210, 90, 255); return true }
+            "p4_husk_skin" -> { t.fill { x, y -> scale(rgb(118, 148, 98), t.jitter(0.07f) * (if ((x * 3 + y) % 11 == 0) 0.8f else 1f)) }; return true }
+            "p4_husk_face" -> {
+                t.fill { _, _ -> scale(rgb(118, 148, 98), t.jitter(0.05f)) }
+                for (x in 4..11) for (y in 8..12) t[x, y] = rgb(142, 172, 120)
+                t[6, 10] = rgb(50, 70, 40); t[9, 10] = rgb(50, 70, 40)
+                for (x in listOf(3, 4, 11, 12)) t[x, 5] = rgb(210, 40, 30)
+                t[3, 12] = rgb(240, 236, 210); t[12, 12] = rgb(240, 236, 210)
+                return true
+            }
+            "p4_strider_body" -> { t.fill { x, y -> scale(rgb(196, 68, 42), t.jitter(0.08f) * (if (y % 3 == 0) 0.9f else 1f)) }; return true }
+            "p4_strider_leg" -> { t.fill { _, _ -> scale(rgb(64, 52, 52), t.jitter(0.07f)) }; return true }
+            "p4_strider_face" -> {
+                t.fill { _, _ -> scale(rgb(196, 68, 42), t.jitter(0.05f)) }
+                for (y in 5..6) for (x in listOf(2, 3, 12, 13)) t[x, y] = rgb(20, 14, 14)
+                for (x in 5..10) t[x, 11] = rgb(80, 30, 20)
                 return true
             }
             "p4_milk_packet" -> {

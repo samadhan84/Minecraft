@@ -770,6 +770,12 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
             MobType.TEAR_DRIFTER -> listOf(i("Ghast Tear") to (if (r.nextInt(2) == 0) 1 else 0), i("Gunpowder") to r.nextInt(3))
             MobType.SEA_SENTINEL -> listOf(i("Prismarine Shard") to r.nextInt(3), i("Raw Cod") to r.nextInt(2))
             MobType.GOLD_HOG -> listOf(i("Raw Porkchop") to 1 + r.nextInt(2), i("Gold Nugget") to r.nextInt(3))
+            MobType.FROST_ARCHER -> listOf(i("Bone") to r.nextInt(3), i("Arrow") to r.nextInt(3), i("Snowball") to r.nextInt(3))
+            MobType.ASH_SKELETON -> listOf(i("Bone") to r.nextInt(3), i("Coal") to r.nextInt(3), i("Netherite Scrap") to (if (r.nextInt(25) == 0) 1 else 0))
+            MobType.SPINY_PUFFER -> listOf(i("Raw Cod") to 1, i("Bone Meal") to r.nextInt(2))
+            MobType.SHELL_GUARD -> listOf(i("Amethyst Shard") to 1 + r.nextInt(2), i("Ender Pearl") to (if (r.nextInt(5) == 0) 1 else 0))
+            MobType.HUSK_HOG -> listOf(i("Gold Nugget") to r.nextInt(3), i("Rotten Flesh") to r.nextInt(3), i("Raw Porkchop") to r.nextInt(2))
+            MobType.LAVA_STRIDER -> listOf(i("String") to 2 + r.nextInt(4))
             MobType.SPELL_RAIDER -> listOf(i("Emerald") to r.nextInt(2), i("Glass Bottle") to r.nextInt(2))
             MobType.RAMPAGE_BEAST -> listOf(i("Leather") to 1 + r.nextInt(3), i("Raw Porkchop") to 2, i("Emerald") to 1)
             MobType.RAIDER -> listOf(i("Arrow") to r.nextInt(3), i("Emerald") to (if (r.nextInt(4) == 0) 1 else 0))
@@ -1461,6 +1467,8 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
         player.x = x; player.y = y; player.z = z
         player.vx = 0f; player.vy = 0f; player.vz = 0f
         hurtPlayer(2f, x, z, knockback = false, ignoreArmor = true)
+        // Now and then a Void Mite comes out of the warp.
+        if (!isClient && java.util.Random().nextInt(5) == 0) mobs.list.add(Mob(MobType.VOID_MITE, x + 1f, y, z).also { it.angry = true })
         sound("pop", x, y, z)
     }
 

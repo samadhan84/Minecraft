@@ -324,3 +324,69 @@ class WeaknessTest {
         assertTrue(s.health < before, "a snowball hurts it")
     }
 }
+
+class MoreCreaturesTest {
+    private fun game(): Game {
+        val dir = kotlin.io.path.createTempDirectory("more").toFile()
+        val level = LevelData.create(14L, "t", GameMode.SURVIVAL)
+        val g = Game(World(level.seed, dir, Dimension.OVERWORLD, flat = true), level, GameInput(), dir)
+        for (cx in -3..3) for (cz in -3..3) g.world.ensureLoaded(cx, cz)
+        g.timeOfDay = 0.3f
+        g.mobs.hostileEnabled = true
+        return g
+    }
+    private fun run(g: Game, seconds: Float, until: () -> Boolean = { false }) { var t = 0f; while (t < seconds && !until()) { g.update(1 / 20f); g.dirtyChunks.clear(); t += 1 / 20f } }
+
+    @Test fun frostArchersAndShellGuardsShoot() {
+        for (type in listOf(MobType.FROST_ARCHER, MobType.SHELL_GUARD)) {
+            val g = game()
+            val y = g.world.generator.surfaceHeight(0, 0) + 1f
+            g.player.x = 0.5f; g.player.y = y; g.player.z = 0.5f
+            g.mobs.list.add(Mob(type, 9f, y, 0.5f))
+            run(g, 8f) { g.projectiles.list.isNotEmpty() }
+            assertTrue(g.projectiles.list.isNotEmpty(), "$type shoots")
+        }
+    }
+
+    @Test fun ashSkeletonsAndVoidMitesFight() {
+        for (type in listOf(MobType.ASH_SKELETON, MobType.VOID_MITE)) {
+            val g = game()
+            val y = g.world.generator.surfaceHeight(0, 0) + 1f
+            g.player.x = 0.5f; g.player.y = y; g.player.z = 0.5f
+            g.mobs.list.add(Mob(type, 5f, y, 0.5f).also { it.angry = true })
+            val before = g.health
+            run(g, 8f) { g.health < before }
+            assertTrue(g.health < before, "$type hurts you")
+        }
+    }
+
+    @Test fun huskHogsAreCalmUntilHitThenTheWholePackFights() {
+        val g = game()
+        val y = g.world.generator.surfaceHeight(0, 0) + 1f
+        g.player.x = 0.5f; g.player.y = y; g.player.z = 0.5f
+        val a = Mob(MobType.HUSK_HOG, 4f, y, 0.5f); val b = Mob(MobType.HUSK_HOG, 8f, y, 3f)
+        g.mobs.list.add(a); g.mobs.list.add(b)
+        val before = g.health
+        run(g, 4f)
+        assertEquals(before, g.health, "calm hogs leave you alone")
+        g.mobs.damage(a, 1f, 0f, 0f)
+        assertTrue(a.angry && b.angry, "the whole pack turns on you")
+    }
+
+    @Test fun aLavaStriderWalksOnLava() {
+        val g = game()
+        val y = g.world.generator.surfaceHeight(0, 0) + 1
+        for (dx in -6..6) for (dz in -6..6) { g.setBlock(dx, y - 1, dz, Blocks.LAVA); g.setBlock(dx, y - 2, dz, Blocks.STONE) }
+        g.player.x = 40f; g.player.y = y.toFloat(); g.player.z = 40f
+        val s = Mob(MobType.LAVA_STRIDER, 0.5f, y + 0.2f, 0.5f); g.mobs.list.add(s)
+        val sx = s.x; val sz = s.z
+        run(g, 6f)
+        assertTrue(Math.abs(s.y - (y - 1 + 0.95f)) < 0.5f, "it stays on top of the lava, y=${s.y}")
+        assertTrue(Math.hypot((s.x - sx).toDouble(), (s.z - sz).toDouble()) > 0.5, "and strolls about")
+    }
+
+    @Test fun spawnEggsExistForTheNewCreatures() {
+        for (t in listOf(MobType.FROST_ARCHER, MobType.ASH_SKELETON, MobType.SPINY_PUFFER, MobType.SHELL_GUARD, MobType.VOID_MITE, MobType.HUSK_HOG, MobType.LAVA_STRIDER))
+            assertEquals(t, Items.spawnType(Items.find("${t.displayName} Spawn Egg")))
+    }
+}
