@@ -255,9 +255,22 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
         beaconTimer = 1f
         for (c in world.components.toList()) {
             val x = com.vishucraft.game.world.RedstoneIds.x(c); val y = com.vishucraft.game.world.RedstoneIds.y(c); val z = com.vishucraft.game.world.RedstoneIds.z(c)
-            if (world.getBlock(x, y, z) != Blocks.BEACON) continue
+            val here = world.getBlock(x, y, z)
+            if (here == Blocks.BEAM) {
+                // A beam block stays only while the beacon under it still has a base.
+                var yy = y - 1
+                while (yy > 0 && world.getBlock(x, yy, z) == Blocks.BEAM) yy--
+                if (world.getBlock(x, yy, z) != Blocks.BEACON || beaconTiers(x, yy, z) == 0) setBlock(x, y, z, Blocks.AIR)
+                continue
+            }
+            if (here != Blocks.BEACON) continue
             val tiers = beaconTiers(x, y, z)
             if (tiers == 0) continue
+            // The light beam shoots up from the beacon.
+            for (yy in y + 1..minOf(y + 48, com.vishucraft.game.world.Chunk.HEIGHT - 2)) {
+                val b = world.getBlock(x, yy, z)
+                if (b == Blocks.AIR) setBlock(x, yy, z, Blocks.BEAM) else if (b != Blocks.BEAM) break
+            }
             val range = 10f + 10f * tiers
             if ((player.x - x) * (player.x - x) + (player.z - z) * (player.z - z) > range * range) continue
             val keys = listOf("swiftness", "leaping", "strength", "fire_resistance")

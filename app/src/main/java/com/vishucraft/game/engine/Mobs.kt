@@ -102,7 +102,9 @@ enum class MobType(
     /** A tall desert mount: put a saddle on it and ride. */
     CAMEL("Camel", 0.7f, 2.1f, 32, false, 1.8f),
     /** A gentle giant that sniffs out seeds and digs them up now and then. */
-    SNIFFER("Sniffer", 0.8f, 1.5f, 30, false, 1.1f);
+    SNIFFER("Sniffer", 0.8f, 1.5f, 30, false, 1.1f),
+    /** A tiny glowing helper that flies around you and fetches the items lying about. */
+    GLIMMER("Glimmer Sprite", 0.25f, 0.6f, 20, false, 3.2f);
 
     val isRaider get() = this == RAIDER || this == SPELL_RAIDER || this == RAMPAGE_BEAST
     val isCitizen get() = this == CITIZEN || this == CITIZEN_WOMAN || this == CITIZEN_KID
@@ -229,6 +231,7 @@ class Mobs(private val world: World) {
         val p = game.player
         updateRaid(dt, game)
         updateMilkman(dt, game)
+        updateFangs(dt, game)
         // Bring kept animals back once their chunk is loaded and the player is near.
         unparkTimer -= dt
         if (unparkTimer <= 0f && parked.isNotEmpty()) {
@@ -388,18 +391,22 @@ class Mobs(private val world: World) {
                     if (dist < 5f) { wantX = -dx / dist; wantZ = -dz / dist } else if (dist > 10f) { wantX = dx / dist; wantZ = dz / dist }
                     m.shootTimer -= dt
                     if (m.shootTimer <= 0f && dist < 14f) {
-                        // Throws a harmful splash potion.
+                        // Throws a harmful splash potion; a Spell Raider calls fangs up from the ground every other time.
                         m.shootTimer = 3f + rnd.nextFloat()
-                        val sx = m.x; val sy = m.y + 1.6f; val sz = m.z
-                        val tx = p.x - sx; val ty = p.eyeY - 0.5f - sy; val tz = p.z - sz
-                        val len = sqrt(tx * tx + ty * ty + tz * tz)
-                        game.projectiles.shoot(sx, sy, sz, tx / len * 14f, ty / len * 14f + len * 0.45f, tz / len * 14f, false, 4f, Projectile.POTION)
+                        if (m.type == MobType.SPELL_RAIDER && rnd.nextBoolean()) castFangs(m, p.x, p.z)
+                        else {
+                            val sx = m.x; val sy = m.y + 1.6f; val sz = m.z
+                            val tx = p.x - sx; val ty = p.eyeY - 0.5f - sy; val tz = p.z - sz
+                            val len = sqrt(tx * tx + ty * ty + tz * tz)
+                            game.projectiles.shoot(sx, sy, sz, tx / len * 14f, ty / len * 14f + len * 0.45f, tz / len * 14f, false, 4f, Projectile.POTION)
+                        }
                     }
                     // Drinks a healing potion when hurt.
                     m.timer -= dt
                     if (m.health < 10f && m.timer <= 0f) { m.timer = 12f; m.health = minOf(m.type.maxHealth.toFloat(), m.health + 8f); game.sound("eat", m.x, m.y + 1.5f, m.z, 0.6f) }
                 } else wander(m, dt).let { wantX = it.first; wantZ = it.second; speed *= 0.5f }
             }
+            MobType.GLIMMER -> { glimmer(m, dt, game); return }
             MobType.SNIFFER -> {
                 // Digs up seeds every few minutes.
                 if (m.timer == 0f) m.timer = 120f + rnd.nextFloat() * 120f
@@ -717,6 +724,57 @@ class Mobs(private val world: World) {
         }
     }
 
+    /** The Glimmer Sprite hovers near you; when items lie around it flies to the nearest one and brings it to you. */
+    private fun glimmer(m: Mob, dt: Float, game: Game) {
+        val p = game.player
+        m.moving = true; m.walkPhase += dt * 10f
+        val item = game.drops.list.filter { !it.stack.id.equals(0) && (it.x - m.x) * (it.x - m.x) + (it.z - m.z) * (it.z - m.z) < 14f * 14f && kotlin.math.abs(it.y - m.y) < 8f }
+            .minByOrNull { (it.x - m.x) * (it.x - m.x) + (it.z - m.z) * (it.z - m.z) }
+        val a = m.walkPhase * 0.05f + m.uid
+        val tx = if (item != null) item.x else p.x + cos(a) * 2.2f
+        val ty = if (item != null) item.y + 0.4f else p.y + 2.2f + sin(a * 2f) * 0.3f
+        val tz = if (item != null) item.z else p.z + sin(a) * 2.2f
+        val ex = tx - m.x; val ey = ty - m.y; val ez = tz - m.z
+        val len = sqrt(ex * ex + ey * ey + ez * ez).coerceAtLeast(0.05f)
+        val sp = m.type.speed * (if (len > 6f) 1.6f else 1f)
+        m.vx = approach(m.vx, ex / len * sp, 8f * dt); m.vy = approach(m.vy, ey / len * sp, 8f * dt); m.vz = approach(m.vz, ez / len * sp, 8f * dt)
+        m.yaw = atan2(m.vx, -m.vz)
+        move(m, 0, m.vx * dt); move(m, 1, m.vy * dt); move(m, 2, m.vz * dt)
+        if (item != null && len < 1.0f) {
+            val left = game.inventory.add(item.stack.id, item.stack.count, item.stack.damage)
+            if (left < item.stack.count) {
+                if (left <= 0) game.drops.list.remove(item) else item.stack.count = left
+                game.sound("pop", m.x, m.y, m.z, 0.5f)
+            }
+        }
+    }
+
+    // ---- the Spell Raider's fangs: a line of spikes rises from the ground towards you.
+    private class Fang(val x: Float, val z: Float, var delay: Float)
+    private val fangs = ArrayList<Fang>()
+
+    private fun updateFangs(dt: Float, game: Game) {
+        if (fangs.isEmpty()) return
+        val p = game.player
+        val it = fangs.iterator()
+        while (it.hasNext()) {
+            val f = it.next()
+            f.delay -= dt
+            if (f.delay > 0f) continue
+            it.remove()
+            val y = surfaceY(floorInt(f.x), floorInt(f.z)).toFloat() + 1f
+            game.fireworks.colourBurst(f.x, y, f.z, 14, 2.2f, com.vishucraft.game.engine.Fireworks.PINKS, 0.5f, 4f)
+            game.sound("hit_stone", f.x, y, f.z, 0.5f)
+            if (game.playerAlive && (p.x - f.x) * (p.x - f.x) + (p.z - f.z) * (p.z - f.z) < 1.1f && kotlin.math.abs(p.y - y) < 2f) game.hurtPlayer(5f, f.x, f.z)
+        }
+    }
+
+    private fun castFangs(m: Mob, tx: Float, tz: Float) {
+        val dx = tx - m.x; val dz = tz - m.z
+        val d = sqrt(dx * dx + dz * dz).coerceAtLeast(0.1f)
+        for (i in 1..7) fangs.add(Fang(m.x + dx / d * i * 1.3f, m.z + dz / d * i * 1.3f, i * 0.14f))
+    }
+
     private fun goldWorn(game: Game) = game.inventory.armor.any { s -> s?.let { com.vishucraft.game.world.Items[it.id]?.name?.startsWith("Golden") } == true }
 
     /** The Sea Sentinel swims at you and, while you are in the water near it, hits you with its beam every couple of seconds. */
@@ -988,7 +1046,7 @@ class Mobs(private val world: World) {
 
     fun voice(t: MobType) = when (t) {
         MobType.WARDEN, MobType.TEAR_DRIFTER -> "enderman"
-        MobType.FLAME_SPINNER, MobType.SEA_SENTINEL, MobType.MILKMAN -> "none"; MobType.RAIDER -> "zombie"; MobType.GOLD_HOG, MobType.TUSK_BOAR, MobType.RAMPAGE_BEAST, MobType.SNIFFER -> "pig"; MobType.CAMEL -> "horse"; MobType.DUSK_WITHER -> "enderman"; MobType.SPELL_RAIDER -> "witch"
+        MobType.FLAME_SPINNER, MobType.SEA_SENTINEL, MobType.MILKMAN -> "none"; MobType.RAIDER -> "zombie"; MobType.GOLD_HOG, MobType.TUSK_BOAR, MobType.RAMPAGE_BEAST, MobType.SNIFFER -> "pig"; MobType.GLIMMER -> "none"; MobType.CAMEL -> "horse"; MobType.DUSK_WITHER -> "enderman"; MobType.SPELL_RAIDER -> "witch"
         MobType.DROWNED -> "zombie"; MobType.RABBIT, MobType.SQUID, MobType.COD -> "none"
         MobType.IRON_GOLEM, MobType.SNOW_GOLEM, MobType.TURTLE, MobType.AXOLOTL, MobType.ROBOT -> "none"
         MobType.MOOSHROOM -> "cow"; MobType.POLAR_BEAR, MobType.PANDA -> "bear"
@@ -1081,7 +1139,7 @@ class Mobs(private val world: World) {
             y > 88 -> if (r < 8) MobType.GOAT else MobType.LLAMA
             biome == com.vishucraft.game.world.Biome.JUNGLE -> when (r) { 0, 1, 2, 3 -> MobType.PARROT; 4, 5 -> MobType.PANDA; 6, 7 -> MobType.CHICKEN; else -> MobType.PIG }
             biome == com.vishucraft.game.world.Biome.SWAMP -> when (r) { 0, 1, 2, 3, 4 -> MobType.FROG; 5, 6 -> MobType.COW; else -> MobType.CHICKEN }
-            biome == com.vishucraft.game.world.Biome.CHERRY -> when (r) { 0, 1, 2, 3 -> MobType.BEE; 4, 5 -> MobType.RABBIT; 6, 7 -> MobType.SHEEP; else -> MobType.PIG }
+            biome == com.vishucraft.game.world.Biome.CHERRY -> when (r) { 0, 1, 2 -> MobType.BEE; 3 -> MobType.GLIMMER; 4, 5 -> MobType.RABBIT; 6, 7 -> MobType.SHEEP; else -> MobType.PIG }
             biome == com.vishucraft.game.world.Biome.SAVANNA || biome == com.vishucraft.game.world.Biome.BADLANDS -> when (r) { 0, 1, 2 -> MobType.LLAMA; 3 -> MobType.HORSE; 4 -> MobType.CAMEL; 5 -> MobType.RABBIT; else -> MobType.COW }
             biome == com.vishucraft.game.world.Biome.DESERT -> if (r < 3) MobType.CAMEL else MobType.RABBIT
             biome == com.vishucraft.game.world.Biome.FOREST -> when (r) { 0 -> MobType.SNIFFER; 1 -> MobType.FOX; 2 -> MobType.BEE; 3, 4 -> MobType.WOLF; 5, 6 -> MobType.PIG; 7, 8 -> MobType.CHICKEN; else -> MobType.COW }

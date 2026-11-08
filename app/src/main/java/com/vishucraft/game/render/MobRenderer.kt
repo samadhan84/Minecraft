@@ -109,6 +109,11 @@ object MobModels {
             box(0.26f, 0.75f, -0.125f, 0.5f, 1.45f, 0.125f, tiles("p4_milk_shirt"), 2, pivotY = 1.35f),
             box(-0.3f, 0.95f, 0.15f, 0.3f, 1.35f, 0.5f, tiles("p4_milk_crate")),               // the crate of milk on his back
         ),
+        MobType.GLIMMER to listOf(
+            box(-0.18f, 0.15f, -0.16f, 0.18f, 0.6f, 0.16f, tiles("p4_glimmer_body", front = "p4_glimmer_face")),
+            box(-0.62f, 0.4f, -0.04f, -0.18f, 0.55f, 0.28f, tiles("p4_glimmer_wing"), 2, pivotY = 0.5f),         // the wings
+            box(0.18f, 0.4f, -0.04f, 0.62f, 0.55f, 0.28f, tiles("p4_glimmer_wing"), 2, pivotY = 0.5f),
+        ),
         MobType.CAMEL to listOf(
             box(-0.4f, 1.0f, -0.9f, 0.4f, 1.7f, 0.9f, tiles("p4_camel_hide")),
             box(-0.28f, 1.7f, -0.3f, 0.28f, 2.1f, 0.35f, tiles("p4_camel_hide")),                    // the hump

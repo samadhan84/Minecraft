@@ -1433,7 +1433,7 @@ object TextureAtlas {
 
     /** Colours for spawn eggs: base and spots. */
     private val EGG_COLORS = mapOf(
-        "flame_spinner" to (rgb(250, 190, 40) to rgb(220, 90, 20)), "tear_drifter" to (rgb(236, 236, 240) to rgb(150, 150, 170)), "raider" to (rgb(110, 110, 120) to rgb(60, 70, 60)), "sea_sentinel" to (rgb(60, 130, 120) to rgb(240, 110, 30)), "milkman" to (rgb(244, 244, 238) to rgb(50, 100, 200)), "tusk_boar" to (rgb(120, 76, 56) to rgb(240, 236, 220)), "camel" to (rgb(214, 174, 112) to rgb(120, 80, 50)), "sniffer" to (rgb(150, 56, 52) to rgb(84, 140, 66)), "spell_raider" to (rgb(44, 130, 126) to rgb(200, 220, 220)), "rampage_beast" to (rgb(122, 78, 58) to rgb(250, 190, 40)), "gold_hog" to (rgb(214, 150, 120) to rgb(240, 200, 60)),
+        "flame_spinner" to (rgb(250, 190, 40) to rgb(220, 90, 20)), "tear_drifter" to (rgb(236, 236, 240) to rgb(150, 150, 170)), "raider" to (rgb(110, 110, 120) to rgb(60, 70, 60)), "sea_sentinel" to (rgb(60, 130, 120) to rgb(240, 110, 30)), "milkman" to (rgb(244, 244, 238) to rgb(50, 100, 200)), "tusk_boar" to (rgb(120, 76, 56) to rgb(240, 236, 220)), "camel" to (rgb(214, 174, 112) to rgb(120, 80, 50)), "glimmer" to (rgb(120, 220, 255) to rgb(255, 255, 255)), "sniffer" to (rgb(150, 56, 52) to rgb(84, 140, 66)), "spell_raider" to (rgb(44, 130, 126) to rgb(200, 220, 220)), "rampage_beast" to (rgb(122, 78, 58) to rgb(250, 190, 40)), "gold_hog" to (rgb(214, 150, 120) to rgb(240, 200, 60)),
         "citizen" to (rgb(70, 130, 200) to rgb(196, 146, 104)), "citizen_woman" to (rgb(220, 70, 120) to rgb(250, 210, 80)),
         "citizen_kid" to (rgb(236, 236, 240) to rgb(40, 70, 160)), "robot" to (rgb(232, 236, 244) to rgb(60, 130, 230)),
         "cow" to (rgb(68, 50, 38) to rgb(160, 160, 160)), "pig" to (rgb(238, 166, 166) to rgb(200, 110, 110)),
@@ -2482,6 +2482,20 @@ object TextureAtlas {
                 for (x in 3..12) for (y in 9..14) t[x, y] = rgb(224, 160, 140)                    // the big nose
                 t[5, 11] = rgb(80, 30, 30); t[10, 11] = rgb(80, 30, 30)
                 for (x in listOf(2, 3, 12, 13)) t[x, 5] = rgb(20, 14, 14)
+                return true
+            }
+            "p4_beam" -> { t.fill { x, y -> withAlpha(mix(rgb(170, 240, 255), rgb(255, 255, 255), if (x in 5..10) 0.6f else 0.1f), if (x in 5..10) 200 else 130) }; return true }
+            "p4_glimmer_body" -> { t.fill { x, y -> scale(rgb(112, 214, 250), t.jitter(0.05f) * (if ((x + y) % 5 == 0) 1.15f else 1f)) }; return true }
+            "p4_glimmer_wing" -> { t.fill { x, y -> if (x == 0 || y == 0 || x == 15 || y == 15) rgb(150, 230, 255) else rgb(200, 245, 255) }; return true }
+            "p4_glimmer_face" -> {
+                t.fill { _, _ -> scale(rgb(112, 214, 250), t.jitter(0.04f)) }
+                for (y in 6..8) for (x in listOf(4, 5, 10, 11)) t[x, y] = rgb(20, 40, 80)
+                for (x in 6..9) t[x, 11] = rgb(30, 70, 110)
+                return true
+            }
+            "p4_echo" -> {
+                t.fill { x, y -> scale(rgb(10, 36, 44), t.jitter(0.08f)) }
+                for ((x, y) in listOf(3 to 3, 11 to 4, 6 to 9, 12 to 12, 2 to 12, 9 to 14, 14 to 8)) { t[x, y] = rgb(60, 220, 230); if (x + 1 < 16) t[x + 1, y] = rgb(30, 130, 150) }
                 return true
             }
             "p4_milk_packet" -> {

@@ -27,7 +27,7 @@ object Raycast {
         var t = 0f
         while (t <= maxDist) {
             val b = world.getBlock(x, y, z)
-            if (b != Blocks.AIR && (hitWater || b != Blocks.WATER)) return RayHit(x, y, z, nx, ny, nz, b)
+            if (b != Blocks.AIR && b != Blocks.BEAM && (hitWater || b != Blocks.WATER)) return RayHit(x, y, z, nx, ny, nz, b)
             if (tMaxX < tMaxY && tMaxX < tMaxZ) {
                 x += stepX; t = tMaxX; tMaxX += tDeltaX; nx = -stepX; ny = 0; nz = 0
             } else if (tMaxY < tMaxZ) {

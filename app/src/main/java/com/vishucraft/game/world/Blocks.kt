@@ -438,7 +438,11 @@ object Blocks {
     const val BEACON = 449
     /** Candles: tap with more candles to add up to four, with flint and steel to light, bare-handed to blow out (meta: bits 0-1 = candles - 1, bit 2 = lit). */
     const val CANDLE = 450
-    const val COUNT = 451
+    /** The light beam above a beacon that has a base (made and removed by the game; not in the inventory). */
+    const val BEAM = 451
+    /** A dark growth with glowing flecks that creeps in deep caves; it gives a faint light. */
+    const val ECHO_GROWTH = 452
+    const val COUNT = 453
 
     /** The newer crops' texture names, in id order from RICE_CROP. */
     val NEW_CROPS = listOf("rice", "tomato", "lentil", "beetroot")
@@ -818,6 +822,10 @@ object Blocks {
         shape(SCAFFOLDING, "Scaffolding", "scaffolding", hardness = 0.1f, tool = ToolType.NONE, facing = Facing.NONE, solid = false)
         shape(BREWING_STAND, "Brewing Stand", "brewing_stand", "brewing_stand", "cobblestone", hardness = 0.5f, tool = P, facing = Facing.NONE, solid = false)
         extraLight[BREWING_STAND] = 1
+        reg(BlockDef(BEAM, "Beacon Beam", t("p4_beam"), render = RenderType.BOX, opaque = false, solid = false, translucent = true, blocksLight = false, emissive = true,
+            hardness = 0f, box = floatArrayOf(0.375f, 0f, 0.375f, 0.625f, 1f, 0.625f), inInventory = false, movable = false))
+        reg(BlockDef(ECHO_GROWTH, "Echo Growth", t("p4_echo"), hardness = 0.6f, tool = ToolType.HOE, category = Category.NATURE))
+        extraLight[ECHO_GROWTH] = 2
         shape(CANDLE, "Candle", "p4_candle_top", "p4_candle", "p4_candle", hardness = 0.1f, tool = ToolType.NONE, facing = Facing.NONE, solid = false)
         shape(CAKE, "Cake", "cake_top", "cake_side", "cake_bottom", hardness = 0.5f, tool = ToolType.NONE, facing = Facing.NONE)
         shape(SIGN, "Sign", "oak_planks", hardness = 1f, tool = A, solid = false)

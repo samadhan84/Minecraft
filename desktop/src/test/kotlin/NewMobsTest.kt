@@ -79,6 +79,13 @@ class NewMobsTest {
         assertEquals(2, g.beaconTiers(0, y, 0))
         run(g, 1.5f); assertTrue(g.hasEffect("leaping"))
         assertTrue(Recipes.crafting.any { it.result == Blocks.BEACON })
+        // The light beam shoots up while the base is there, and goes when the base is gone.
+        assertEquals(Blocks.BEAM, g.world.getBlock(0, y + 1, 0), "beam above the beacon")
+        assertEquals(Blocks.BEAM, g.world.getBlock(0, y + 20, 0))
+        for (dx in -1..1) for (dz in -1..1) g.setBlock(dx, y - 1, dz, Blocks.DIRT)
+        for (dx in -2..2) for (dz in -2..2) g.setBlock(dx, y - 2, dz, Blocks.DIRT)
+        run(g, 4f)
+        assertEquals(Blocks.AIR, g.world.getBlock(0, y + 1, 0), "no base, no beam")
     }
 
     @Test fun goldHogsFightUnlessYouWearGoldAndTradeForIngots() {
@@ -242,5 +249,40 @@ class AnimalsTest {
         g.inventory.slots[0] = null
         assertTrue(g.petActions(null, 0, camel))
         assertSame(camel, g.mount)
+    }
+}
+
+class HelpersTest {
+    private fun game(): Game {
+        val dir = kotlin.io.path.createTempDirectory("helpers").toFile()
+        val level = LevelData.create(8L, "t", GameMode.SURVIVAL)
+        val g = Game(World(level.seed, dir, Dimension.OVERWORLD, flat = true), level, GameInput(), dir)
+        for (cx in -3..3) for (cz in -3..3) g.world.ensureLoaded(cx, cz)
+        g.timeOfDay = 0.3f
+        return g
+    }
+
+    @Test fun aGlimmerSpriteFetchesItems() {
+        val g = game()
+        val y = g.world.generator.surfaceHeight(0, 0) + 1f
+        g.player.x = 0.5f; g.player.y = y; g.player.z = 0.5f
+        g.mobs.list.add(Mob(MobType.GLIMMER, 3f, y + 2f, 3f))
+        val stone = Blocks.STONE
+        g.drops.spawn(ItemStack(stone, 5), 8.5f, y + 0.3f, 8.5f)
+        var t = 0f
+        while (t < 20f && g.drops.list.any { it.stack.id == stone }) { g.update(1 / 20f); g.dirtyChunks.clear(); t += 1 / 20f }
+        assertTrue(g.inventory.count(stone) >= 5, "the sprite brought the items to you: ${g.inventory.count(stone)}")
+    }
+
+    @Test fun aSpellRaiderCallsFangsThatHurt() {
+        val g = game()
+        g.mobs.hostileEnabled = true
+        val y = g.world.generator.surfaceHeight(0, 0) + 1f
+        g.player.x = 0.5f; g.player.y = y; g.player.z = 0.5f
+        g.mobs.list.add(Mob(MobType.SPELL_RAIDER, 9f, y, 0.5f))
+        val before = g.health
+        var t = 0f
+        while (t < 40f && g.health >= before) { g.update(1 / 20f); g.dirtyChunks.clear(); t += 1 / 20f }
+        assertTrue(g.health < before, "a spell raider's potion or fangs hurt")
     }
 }
