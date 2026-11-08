@@ -860,16 +860,22 @@ object TextureAtlas {
                 for (x in 0 until 16) { t[x, 14] = rgb(40, 36, 32); t[x, 15] = rgb(40, 36, 32) }
             }
             "boomling_shell" -> {
-                val (_, edge) = voronoi(t.rnd, 7)
-                t.fill { x, y -> if (edge[y][x] < 0.9f) rgb(240, 124, 34) else scale(shell, t.jitter(0.1f)) }
+                // A leafy green shell: soft patches of light and dark green, nothing glowing.
+                t.fill { x, y ->
+                    val patch = ((x / 3) * 7 + (y / 3) * 13) % 5
+                    val c = when (patch) { 0 -> rgb(84, 150, 66); 1 -> rgb(70, 132, 58); 2 -> rgb(96, 164, 76); 3 -> rgb(62, 118, 52); else -> rgb(78, 142, 62) }
+                    scale(c, t.jitter(0.06f))
+                }
             }
-            "boomling_leg" -> noisy(t, rgb(42, 40, 44), 0.1f, 0.2f)
+            "boomling_leg" -> noisy(t, rgb(48, 92, 46), 0.08f, 0.2f)
             "boomling_face" -> {
-                val (_, edge) = voronoi(t.rnd, 5)
-                t.fill { x, y -> if (edge[y][x] < 0.7f && y > 12) rgb(200, 100, 30) else scale(shell, t.jitter(0.08f)) }
-                for (y in 4..6) { for (x in 3..5) t[x, y] = rgb(255, 222, 80); for (x in 10..12) t[x, y] = rgb(255, 222, 80) }
-                t[4, 5] = rgb(120, 40, 10); t[11, 5] = rgb(120, 40, 10)
-                for (x in 3..12) t[x, if (x % 2 == 0) 9 else 10] = rgb(255, 150, 40)
+                t.fill { x, y ->
+                    val patch = ((x / 3) * 7 + (y / 3) * 13) % 5
+                    scale(if (patch % 2 == 0) rgb(84, 150, 66) else rgb(72, 134, 60), t.jitter(0.05f))
+                }
+                // Big round eyes and a small round mouth: a friendly little face with its own look.
+                for ((cx, cy) in listOf(4 to 5, 11 to 5)) for (dy in -1..1) for (dx in -1..1) t[cx + dx, cy + dy] = if (dx == 0 && dy == 0) rgb(20, 30, 20) else rgb(240, 244, 230)
+                for ((x, y) in listOf(7 to 10, 8 to 10, 6 to 11, 9 to 11, 7 to 12, 8 to 12)) t[x, y] = rgb(30, 50, 30)
             }
             "boomling_fuse" -> t.fill { _, y ->
                 when {
@@ -1438,7 +1444,7 @@ object TextureAtlas {
         "citizen_kid" to (rgb(236, 236, 240) to rgb(40, 70, 160)), "robot" to (rgb(232, 236, 244) to rgb(60, 130, 230)),
         "cow" to (rgb(68, 50, 38) to rgb(160, 160, 160)), "pig" to (rgb(238, 166, 166) to rgb(200, 110, 110)),
         "sheep" to (rgb(230, 230, 230) to rgb(250, 180, 180)), "zombie" to (rgb(0, 170, 170) to rgb(110, 140, 90)),
-        "boomling" to (rgb(62, 60, 66) to rgb(240, 124, 34)), "rattler" to (rgb(92, 70, 46) to rgb(80, 140, 60)),
+        "boomling" to (rgb(84, 150, 66) to rgb(240, 244, 230)), "rattler" to (rgb(92, 70, 46) to rgb(80, 140, 60)),
         "crawler" to (rgb(78, 94, 130) to rgb(255, 190, 60)), "glider" to (rgb(80, 60, 110) to rgb(220, 210, 240)),
         "cinder" to (rgb(70, 30, 22) to rgb(255, 150, 30)), "wisp" to (rgb(120, 60, 200) to rgb(250, 240, 180)),
         "villager" to (rgb(90, 60, 50) to rgb(190, 140, 110)), "chicken" to (rgb(230, 230, 230) to rgb(220, 40, 40)),

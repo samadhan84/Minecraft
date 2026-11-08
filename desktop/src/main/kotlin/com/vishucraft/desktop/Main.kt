@@ -875,7 +875,14 @@ class App(demo: File?) : ClientApp(demo) {
                 g.player.x = 33.5f; g.player.y = y + 2.2f; g.player.z = 33f; g.player.flying = true; g.player.yaw = kotlin.math.PI.toFloat(); g.player.pitch = -0.4f
             }
             f == 2670 -> shot("32-chests")
-            f == 2672 -> glfwSetWindowShouldClose(window, true)
+            f == 2672 -> session?.game?.let { g ->
+                val y = g.world.generator.surfaceHeight(33, 50) + 1f
+                g.mobs.hostileEnabled = true
+                g.mobs.list.add(com.vishucraft.game.engine.Mob(com.vishucraft.game.engine.MobType.BOOMLING, 33f, y, 41f).also { it.angry = true })
+                g.player.x = 33f; g.player.y = y + 1f; g.player.z = 36f; g.player.flying = true; g.player.yaw = kotlin.math.PI.toFloat(); g.player.pitch = 0f
+            }
+            f == 2676 -> shot("33-boomling")
+            f == 2678 -> glfwSetWindowShouldClose(window, true)
         }
     }
 }
