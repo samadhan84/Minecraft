@@ -307,3 +307,20 @@ class ChestTest {
         assertEquals(Blocks.REDSTONE_LAMP, g.world.getBlock(1, y, 0), "and goes out afterwards")
     }
 }
+
+class WeaknessTest {
+    @Test fun snowballsHurtAFlameSpinner() {
+        val dir = kotlin.io.path.createTempDirectory("weak").toFile()
+        val level = LevelData.create(13L, "t", GameMode.SURVIVAL)
+        val g = Game(World(level.seed, dir, Dimension.OVERWORLD, flat = true), level, GameInput(), dir)
+        for (cx in -3..3) for (cz in -3..3) g.world.ensureLoaded(cx, cz)
+        val y = g.world.generator.surfaceHeight(0, 0) + 1f
+        g.player.x = 0.5f; g.player.y = y; g.player.z = 0.5f
+        val s = Mob(MobType.FLAME_SPINNER, 6f, y + 1f, 0.5f); g.mobs.list.add(s)
+        val before = s.health
+        g.projectiles.shoot(2f, y + 1.3f, 0.5f, 20f, 0f, 0f, true, 0f, Projectile.SNOWBALL)
+        var t = 0f
+        while (t < 1f && s.health >= before) { g.projectiles.update(1 / 20f, g); t += 1 / 20f }
+        assertTrue(s.health < before, "a snowball hurts it")
+    }
+}

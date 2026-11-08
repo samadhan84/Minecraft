@@ -674,6 +674,10 @@ class Mobs(private val world: World) {
     private fun floater(m: Mob, dt: Float, game: Game, dist: Float) {
         val p = game.nearestTarget(m.x, m.z)
         val big = m.type == MobType.TEAR_DRIFTER
+        // Water and rain hurt a Flame Spinner.
+        if (!big && (world.getBlock(floorInt(m.x), floorInt(m.y + 0.5f), floorInt(m.z)) == Blocks.WATER || (game.rain > 0.5f && skyExposed(floorInt(m.x), floorInt(m.y + 2f), floorInt(m.z))))) {
+            m.burnTimer += dt; if (m.burnTimer > 1f) { m.burnTimer = 0f; damage(m, 2f, 0f, 0f) }
+        }
         m.moving = true; m.walkPhase += dt * (if (big) 2f else 9f)
         val a = m.walkPhase * (if (big) 0.12f else 0.2f) + m.uid
         val radius = if (big) 15f else 9f

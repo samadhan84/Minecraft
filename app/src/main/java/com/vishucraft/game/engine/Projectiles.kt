@@ -54,7 +54,8 @@ class Projectiles(private val world: World) {
                     if (m != null) {
                         val len = sqrt(a.vx * a.vx + a.vz * a.vz).coerceAtLeast(0.1f)
                         // Snowballs and eggs only knock back; they do no damage.
-                        game.mobs.damage(m, a.damage, a.vx / len * 0.6f, a.vz / len * 0.6f)
+                        // Snowballs only knock most things back, but they really hurt a Flame Spinner.
+                        game.mobs.damage(m, if (a.kind == Projectile.SNOWBALL && m.type == MobType.FLAME_SPINNER) 3f else a.damage, a.vx / len * 0.6f, a.vz / len * 0.6f)
                         game.sound("arrow_hit", a.x, a.y, a.z, 0.8f)
                         if (a.kind == Projectile.PEARL) game.pearlLanded(a.x, m.y, a.z)
                         if (a.kind == Projectile.EGG) game.eggLanded(a.x, m.y, a.z)
