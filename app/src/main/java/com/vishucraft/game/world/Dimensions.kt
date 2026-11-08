@@ -178,6 +178,65 @@ class Structures(private val seed: Long, private val gen: WorldGenerator, privat
                 if (gen.surfaceHeight(x, z) - 8 < y) continue
                 dungeon(p, x, y, z, rnd)
             }
+        // Abandoned mines: long timber-framed tunnels under the hills, on a 96-block grid.
+        val mineCell = 96
+        for (rz in (p.z0 - 40).floorDiv(mineCell)..(p.z0 + 56).floorDiv(mineCell))
+            for (rx in (p.x0 - 40).floorDiv(mineCell)..(p.x0 + 56).floorDiv(mineCell)) {
+                val rnd = Random(seed xor (rx * 49979687L) xor (rz * 86028121L) xor 0xA11CE)
+                if (rnd.nextInt(3) != 0) continue
+                val x = rx * mineCell + 20 + rnd.nextInt(mineCell - 40); val z = rz * mineCell + 20 + rnd.nextInt(mineCell - 40)
+                val y = 16 + rnd.nextInt(14)
+                if (gen.surfaceHeight(x, z) - 10 < y) continue
+                mine(p, x, y, z, rnd)
+            }
+    }
+
+    // ---------------------------------------------------------------- abandoned mine
+
+    /** A tunnel [length] long from (x, y, z) towards +x (or +z when [alongZ]): 3 wide, 3 tall, with timber frames, cobwebs and torches. */
+    private fun mineTunnel(p: Put, x: Int, y: Int, z: Int, length: Int, alongZ: Boolean, rnd: Random) {
+        for (i in 0 until length) {
+            val tx = if (alongZ) x else x + i; val tz = if (alongZ) z + i else z
+            for (w in -1..1) for (h in 0..2) {
+                val px = if (alongZ) tx + w else tx; val pz = if (alongZ) tz else tz + w
+                set(p, px, y + h, pz, Blocks.AIR)
+            }
+            // Floor planks now and then, like old boardwalks.
+            if (i % 3 != 2) for (w in -1..1) { val px = if (alongZ) tx + w else tx; val pz = if (alongZ) tz else tz + w; if (rnd.nextInt(4) != 0) set(p, px, y - 1, pz, Blocks.PLANKS) }
+            // A timber frame every four blocks: two posts and a beam.
+            if (i % 4 == 0) {
+                for (side in intArrayOf(-1, 1)) {
+                    val px = if (alongZ) tx + side else tx; val pz = if (alongZ) tz else tz + side
+                    set(p, px, y, pz, Blocks.OAK_FENCE); set(p, px, y + 1, pz, Blocks.OAK_FENCE)
+                }
+                for (w in -1..1) { val px = if (alongZ) tx + w else tx; val pz = if (alongZ) tz else tz + w; set(p, px, y + 2, pz, Blocks.PLANKS) }
+                if (rnd.nextInt(3) == 0) set(p, tx, y + 1, tz, Blocks.COBWEB)
+            }
+            if (i % 8 == 6 && rnd.nextInt(2) == 0) set(p, if (alongZ) tx - 1 else tx, y + 1, if (alongZ) tz else tz - 1, Blocks.TORCH)
+        }
+    }
+
+    private fun mine(p: Put, x: Int, y: Int, z: Int, rnd: Random) {
+        val main = 28 + rnd.nextInt(20)
+        mineTunnel(p, x, y, z, main, false, rnd)
+        // Side tunnels leave the main one every so often, in both directions.
+        var i = 8
+        while (i < main - 6) {
+            val len = 10 + rnd.nextInt(14)
+            mineTunnel(p, x + i, y, z + 1, len, true, rnd)
+            if (rnd.nextBoolean()) mineTunnel(p, x + i, y, z - len, len, true, rnd)
+            if (rnd.nextInt(2) == 0) {
+                val loot = listOf(
+                    Items.find("Coal") to 1..6, Items.find("Iron Ingot") to 0..4, Items.find("Gold Ingot") to 0..2, Items.find("Bread") to 0..3,
+                    Blocks.TORCH to 2..8, Blocks.REDSTONE_DUST to 0..4, Items.find("Lapis Lazuli") to 0..4, Items.find("Diamond") to (if (rnd.nextInt(4) == 0) 1..1 else 0..0),
+                    Items.find("Iron Pickaxe") to (if (rnd.nextInt(5) == 0) 1..1 else 0..0),
+                )
+                lootChest(p, x + i + 1, y, z + len - 1, rnd, loot, 4)
+            }
+            i += 10 + rnd.nextInt(8)
+        }
+        // A little ore at the end of the main tunnel.
+        for (k in 0..3) set(p, x + main + k % 2, y + k / 2, z + 1, if (rnd.nextBoolean()) Blocks.IRON_ORE else Blocks.COAL_ORE)
     }
 
     // ---------------------------------------------------------------- dungeon

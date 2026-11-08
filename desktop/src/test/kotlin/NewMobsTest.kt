@@ -364,12 +364,16 @@ class MoreCreaturesTest {
         val g = game()
         val y = g.world.generator.surfaceHeight(0, 0) + 1f
         g.player.x = 0.5f; g.player.y = y; g.player.z = 0.5f
-        val a = Mob(MobType.HUSK_HOG, 4f, y, 0.5f); val b = Mob(MobType.HUSK_HOG, 5.5f, y, 1.5f)
-        g.mobs.list.add(a); g.mobs.list.add(b)
+        g.mobs.list.add(Mob(MobType.HUSK_HOG, 4f, y, 0.5f)); g.mobs.list.add(Mob(MobType.HUSK_HOG, 5.5f, y, 1.5f))
         val before = g.health
         run(g, 4f)
         assertEquals(before, g.health, "calm hogs leave you alone")
-        g.mobs.damage(a, 1f, 0f, 0f)
+        // A fresh pack: hit one and all of them turn on you (no waiting about, so they cannot wander apart).
+        val g2 = game()
+        g2.player.x = 0.5f; g2.player.y = y; g2.player.z = 0.5f
+        val a = Mob(MobType.HUSK_HOG, 4f, y, 0.5f); val b = Mob(MobType.HUSK_HOG, 5.5f, y, 1.5f)
+        g2.mobs.list.add(a); g2.mobs.list.add(b)
+        g2.mobs.damage(a, 1f, 0f, 0f)
         assertTrue(a.angry && b.angry, "the whole pack turns on you")
     }
 
@@ -417,5 +421,20 @@ class ShellBoxTest {
         val again = g.world.blockEntities.chest(3, y, 3)!!
         assertEquals(7, again.slots[0]!!.count); assertEquals(33, again.slots[5]!!.count)
         assertNull(g.level.boxes[item.damage], "the stored copy is used up")
+    }
+}
+
+class MineTest {
+    @Test fun abandonedMinesAreFoundUnderTheHills() {
+        val dir = kotlin.io.path.createTempDirectory("mine").toFile()
+        val world = World(21L, dir, Dimension.OVERWORLD)
+        for (cx in -12..12) for (cz in -12..12) world.ensureLoaded(cx, cz)
+        var frames = 0; var chests = 0
+        for (x in -192..192) for (z in -192..192) for (y in 14..34) {
+            val b = world.getBlock(x, y, z)
+            if (b == Blocks.OAK_FENCE) frames++
+            if (b == Blocks.CHEST) chests++
+        }
+        assertTrue(frames > 20, "timber frames of a mine were generated, found $frames")
     }
 }
