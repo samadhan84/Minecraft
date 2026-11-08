@@ -866,7 +866,16 @@ class App(demo: File?) : ClientApp(demo) {
                 g.player.x = 33f; g.player.y = y + 2f; g.player.z = 30f; g.player.flying = true; g.player.yaw = kotlin.math.PI.toFloat(); g.player.pitch = 0.0f
             }
             f == 2660 -> shot("31-boar-wither-candles")
-            f == 2662 -> glfwSetWindowShouldClose(window, true)
+            f == 2662 -> session?.game?.let { g ->
+                val B = com.vishucraft.game.world.Blocks
+                val y = g.world.generator.surfaceHeight(33, 40) + 1
+                for (dx in -3..3) for (dz in -1..2) g.setBlock(33 + dx, y - 1, 38 + dz, B.STONE)
+                g.setBlock(30, y, 38, B.CHEST, 2); g.setBlock(32, y, 38, B.TRAPPED_CHEST, 2); g.setBlock(34, y, 38, B.ENDER_CHEST, 2); g.setBlock(36, y, 38, B.BARREL)
+                g.setBlock(31, y + 1, 40, B.STONE); g.setBlock(33, y + 1, 40, B.STONE)
+                g.player.x = 33.5f; g.player.y = y + 2.2f; g.player.z = 33f; g.player.flying = true; g.player.yaw = kotlin.math.PI.toFloat(); g.player.pitch = -0.4f
+            }
+            f == 2670 -> shot("32-chests")
+            f == 2672 -> glfwSetWindowShouldClose(window, true)
         }
     }
 }

@@ -1595,6 +1595,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
             }
             Blocks.HOPPER -> { world.blockEntities.hopper(t.x, t.y, t.z); net?.openContainer(t.x, t.y, t.z, 2); uiEvents.add("open:hopper:${t.x},${t.y},${t.z}"); return }
             Blocks.FURNACE, Blocks.SMOKER, Blocks.BLAST_FURNACE -> { world.blockEntities.furnace(t.x, t.y, t.z); net?.openContainer(t.x, t.y, t.z, 1); uiEvents.add("open:furnace:${t.x},${t.y},${t.z}"); return }
+            Blocks.TRAPPED_CHEST -> { redstone.openedTrappedChest(t.x, t.y, t.z); world.blockEntities.chest(t.x, t.y, t.z); net?.openContainer(t.x, t.y, t.z, 0); uiEvents.add("open:chest:${t.x},${t.y},${t.z}"); return }
             Blocks.CHEST, Blocks.BARREL -> { world.blockEntities.chest(t.x, t.y, t.z); net?.openContainer(t.x, t.y, t.z, 0); uiEvents.add("open:chest:${t.x},${t.y},${t.z}"); return }
             Blocks.ENDER_CHEST -> { uiEvents.add("open:ender"); sound("door", t.x + 0.5f, t.y + 0.5f, t.z + 0.5f, 0.5f); return }
             Blocks.ANVIL -> { repairHeld(); return }

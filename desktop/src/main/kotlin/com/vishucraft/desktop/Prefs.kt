@@ -58,7 +58,7 @@ class Prefs : com.vishucraft.client.ClientPrefs {
         { "Sound effects: $soundVolume%" } to { soundVolume = next(listOf(0, 40, 80, 100), soundVolume) },
         { "Music: $musicVolume%" } to { musicVolume = next(listOf(0, 25, 50, 100), musicVolume) },
         { "Weather (rain, snow, storms): ${if (weather) "On" else "Off"}" } to { weather = !weather },
-        { "Fancy graphics (waving grass, 3D clouds, stars, shadows): ${if (fancy) "On" else "Off"}" } to { fancy = !fancy },
+        { "Fancy graphics (waving grass, 3D clouds, stars): ${if (fancy) "On" else "Off"}" } to { fancy = !fancy },
         { "Fullscreen: ${if (fullscreen) "On" else "Off"} (F11)" } to { fullscreen = !fullscreen },
         { "FPS & coordinates: ${if (showDebug) "On" else "Off"} (F3)" } to { showDebug = !showDebug },
     )

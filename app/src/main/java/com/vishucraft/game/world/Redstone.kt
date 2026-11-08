@@ -43,6 +43,15 @@ class Redstone(private val world: World, private val set: (Int, Int, Int, Int, I
     /** How many things stand on a pressure plate (players and mobs; also dropped items when [items]). */
     var plateLoad: (Int, Int, Int, Boolean) -> Int = { x, y, z, _ -> if (occupied(x, y, z)) 1 else 0 }
     private val fuses = HashMap<Long, Int>()
+    /** Trapped chests that were just opened: ticks left of their signal. */
+    private val trapped = HashMap<Long, Int>()
+
+    /** A trapped chest was opened: it gives a signal for a second and a half. */
+    fun openedTrappedChest(x: Int, y: Int, z: Int) {
+        val p = RedstoneIds.pack(x, y, z)
+        trapped[p] = 15
+        set(x, y, z, Blocks.TRAPPED_CHEST, world.getMeta(x, y, z) or 8)
+    }
     private val rnd = Random()
 
     /** Called with the explosion centre and radius so the game can hurt / knock back the player and mobs. */
@@ -100,6 +109,16 @@ class Redstone(private val world: World, private val set: (Int, Int, Int, Int, I
             }
         }
 
+        if (trapped.isNotEmpty()) {
+            val ti = trapped.entries.iterator()
+            while (ti.hasNext()) {
+                val e = ti.next(); e.setValue(e.value - 1)
+                if (e.value <= 0) {
+                    if (id(e.key) == Blocks.TRAPPED_CHEST) setAt(e.key, Blocks.TRAPPED_CHEST, meta(e.key) and 8.inv())
+                    ti.remove()
+                }
+            }
+        }
         val comps = world.components.toList()
         if (comps.isNotEmpty()) simulate(comps)
 
@@ -173,6 +192,7 @@ class Redstone(private val world: World, private val set: (Int, Int, Int, Int, I
             }
             when (pid) {
                 Blocks.REDSTONE_BLOCK -> sources.add(p)
+                Blocks.TRAPPED_CHEST -> if (meta(p) and 8 != 0) sources.add(p)
                 Blocks.REDSTONE_TORCH -> if (meta(p) == 0) {
                     sources.add(p); dir(p, 0).let { if (it >= 0) strong.add(it) }
                 }

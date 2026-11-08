@@ -286,3 +286,24 @@ class HelpersTest {
         assertTrue(g.health < before, "a spell raider's potion or fangs hurt")
     }
 }
+
+class ChestTest {
+    @Test fun chestsAreSmallerThanABlockAndTrappedChestsGiveASignal() {
+        val dir = kotlin.io.path.createTempDirectory("chest").toFile()
+        val level = LevelData.create(12L, "t", GameMode.CREATIVE)
+        val g = Game(World(level.seed, dir, Dimension.OVERWORLD, flat = true), level, GameInput(), dir)
+        for (cx in -2..2) for (cz in -2..2) g.world.ensureLoaded(cx, cz)
+        val box = Blocks[Blocks.CHEST].box!!
+        assertEquals(14f / 16f, box[3] - box[0], 1e-4f, "a chest is 14 pixels wide")
+        assertEquals(14f / 16f, box[4] - box[1], 1e-4f, "and 14 pixels tall")
+        val y = g.world.generator.surfaceHeight(0, 0) + 1
+        g.setBlock(0, y, 0, Blocks.TRAPPED_CHEST, 2)
+        g.setBlock(1, y, 0, Blocks.REDSTONE_LAMP)
+        g.redstone.openedTrappedChest(0, y, 0)
+        var lit = false; var t = 0f
+        while (t < 1.2f) { g.update(1 / 20f); g.dirtyChunks.clear(); t += 1 / 20f; if (g.world.getBlock(1, y, 0) == Blocks.REDSTONE_LAMP_ON) lit = true }
+        assertTrue(lit, "the lamp beside it lights while the chest is open")
+        run@ for (i in 0 until 60) { g.update(1 / 20f); g.dirtyChunks.clear() }
+        assertEquals(Blocks.REDSTONE_LAMP, g.world.getBlock(1, y, 0), "and goes out afterwards")
+    }
+}

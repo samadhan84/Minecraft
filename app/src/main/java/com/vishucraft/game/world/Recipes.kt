@@ -71,6 +71,7 @@ object Recipes {
         sh(stick, 4, listOf("M", "M"), 'M' to planks)
         sh(Blocks.CRAFTING_TABLE, 1, listOf("MM", "MM"), 'M' to planks)
         r(Blocks.TORCH, 4, false, coal to 1, stick to 1)
+        r(Blocks.TRAPPED_CHEST, 1, false, Blocks.CHEST to 1, i("Iron Ingot") to 1, i("Stick") to 1)
         sh(Blocks.CHEST, 1, listOf("MMM", "M M", "MMM"), 'M' to planks)
         sh(Blocks.FURNACE, 1, listOf("MMM", "M M", "MMM"), 'M' to cobble)
         sh(Blocks.OAK_SLAB, 6, listOf("MMM"), 'M' to planks)

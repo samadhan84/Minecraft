@@ -331,7 +331,7 @@ class ChunkMesher {
             val s1 = opaque[block(s1x, s1y, s1z)]
             val s2 = opaque[block(s2x, s2y, s2z)]
             val d = opaque[block(dx, dy, dz)]
-            val ao = if (s1 && s2) 0 else 3 - ((if (s1) 1 else 0) + (if (s2) 1 else 0) + (if (d) 1 else 0))
+            val ao = 3   // no darkening in the corners of blocks: faces are lit evenly
             var skySum = baseSky
             var blockSum = baseBlock
             var cnt = 1

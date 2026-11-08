@@ -442,7 +442,9 @@ object Blocks {
     const val BEAM = 451
     /** A dark growth with glowing flecks that creeps in deep caves; it gives a faint light. */
     const val ECHO_GROWTH = 452
-    const val COUNT = 453
+    /** A chest that gives a redstone signal while it is open (see Redstone). */
+    const val TRAPPED_CHEST = 453
+    const val COUNT = 454
 
     /** The newer crops' texture names, in id order from RICE_CROP. */
     val NEW_CROPS = listOf("rice", "tomato", "lentil", "beetroot")
@@ -670,7 +672,8 @@ object Blocks {
         reg(BlockDef(FURNACE, "Furnace", t("furnace_top"), t("furnace_side"), t("furnace_top"),
             hardness = 1.2f, tool = P, facing = Facing.HORIZONTAL, front = t("furnace_front")))
         reg(BlockDef(CHEST, "Chest", t("chest_top"), t("chest_side"), t("chest_top"),
-            hardness = 0.8f, tool = A, facing = Facing.HORIZONTAL, front = t("chest_front")))
+            hardness = 0.8f, tool = A, facing = Facing.HORIZONTAL, front = t("chest_front"), render = RenderType.BOX, opaque = false, blocksLight = false,
+            box = floatArrayOf(0.0625f, 0f, 0.0625f, 0.9375f, 0.875f, 0.9375f)))
         reg(BlockDef(TNT, "TNT", t("tnt_top"), t("tnt_side"), t("tnt_bottom"), hardness = 0f, category = Category.REDSTONE))
         column(HAY_BALE, "Hay Bale", "hay_top", "hay_side", "hay_top", 0.4f, ToolType.HOE, N)
         column(MELON, "Melon", "melon_top", "melon_side", "melon_top", 0.6f, A, N)
@@ -814,7 +817,11 @@ object Blocks {
         extraLight[CAMPFIRE] = 14
         reg(BlockDef(BARREL, "Barrel", t("barrel_top"), t("barrel_side"), t("barrel_top"), hardness = 1f, tool = A))
         reg(BlockDef(ENDER_CHEST, "Ender Chest", t("ender_chest_top"), t("ender_chest_side"), t("ender_chest_top"), hardness = 5f, tool = P,
-            facing = Facing.HORIZONTAL, front = t("ender_chest_front"), movable = false))
+            facing = Facing.HORIZONTAL, front = t("ender_chest_front"), movable = false, render = RenderType.BOX, opaque = false, blocksLight = false,
+            box = floatArrayOf(0.0625f, 0f, 0.0625f, 0.9375f, 0.875f, 0.9375f)))
+        reg(BlockDef(TRAPPED_CHEST, "Trapped Chest", t("p4_trap_top"), t("p4_trap_side"), t("p4_trap_top"), hardness = 0.8f, tool = A, facing = Facing.HORIZONTAL,
+            front = t("p4_trap_front"), category = Category.REDSTONE, render = RenderType.BOX, opaque = false, blocksLight = false,
+            box = floatArrayOf(0.0625f, 0f, 0.0625f, 0.9375f, 0.875f, 0.9375f)))
         extraLight[ENDER_CHEST] = 7
         shape(ANVIL, "Anvil", "anvil_top", "anvil", "anvil", hardness = 3f, tool = P, blocksLight = false)
         shape(COMPOSTER, "Composter", "composter_top", "composter_side", "composter_side", hardness = 0.6f, tool = A, facing = Facing.NONE)

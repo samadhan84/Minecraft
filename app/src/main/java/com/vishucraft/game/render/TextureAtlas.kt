@@ -2498,6 +2498,20 @@ object TextureAtlas {
                 for ((x, y) in listOf(3 to 3, 11 to 4, 6 to 9, 12 to 12, 2 to 12, 9 to 14, 14 to 8)) { t[x, y] = rgb(60, 220, 230); if (x + 1 < 16) t[x + 1, y] = rgb(30, 130, 150) }
                 return true
             }
+            "p4_trap_top", "p4_trap_side", "p4_trap_front" -> {
+                val wood = rgb(150, 100, 44); val face = name.removePrefix("p4_trap_")
+                t.fill { x, y ->
+                    val edge = x == 0 || y == 0 || x == 15 || y == 15
+                    when {
+                        edge -> rgb(64, 40, 16)
+                        face != "top" && y == 5 -> rgb(64, 40, 16)
+                        face != "top" && y in 6..7 -> rgb(170, 40, 36)                              // the red stripe of a trapped chest
+                        else -> scale(wood, (if ((y + x / 5) % 4 == 0) 0.9f else 1f) * t.jitter(0.05f))
+                    }
+                }
+                if (face == "front") for (y in 4..8) for (x in 7..8) t[x, y] = rgb(200, 200, 210)
+                return true
+            }
             "p4_milk_packet" -> {
                 sprite(t)
                 for (y in 3..13) for (x in 4..11) t[x, y] = if (y in 6..9) rgb(255, 255, 255) else rgb(40, 110, 220)
