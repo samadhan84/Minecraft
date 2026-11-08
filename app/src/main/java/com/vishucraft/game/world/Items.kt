@@ -394,7 +394,7 @@ object Items {
 
     fun find(name: String): Int = byName[name] ?: error("unknown item $name")
 
-    fun maxStack(slot: Int): Int = get(slot)?.maxStack ?: 64
+    fun maxStack(slot: Int): Int = if (slot == Blocks.SHELL_BOX) 1 else get(slot)?.maxStack ?: 64
 
     /** The creature a spawn egg or mob bucket places. */
     fun spawnType(slot: Int): com.vishucraft.game.engine.MobType? {

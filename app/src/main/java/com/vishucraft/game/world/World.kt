@@ -258,8 +258,12 @@ class LevelData(
     /** 0 for an ordinary world; 1, 2 or 3 for a Bedwars match on Easy, Medium or Hard (see engine/Bedwars). */
     var bedwars: Int = 0,
 ) {
+    /** What the Shell Boxes you carry hold: box number (kept in the item's damage) to its 27 slots. */
+    val boxes = HashMap<Int, Array<ItemStack?>>()
+    var nextBox = 1
+
     companion object {
-        private const val VERSION = 11
+        private const val VERSION = 12
 
         /** Creative worlds start with a useful hotbar; survival starts empty-handed. */
         /**
@@ -323,6 +327,10 @@ class LevelData(
                         // Flat worlds have oceans and villages now (older ones too, in land not explored yet).
                         l.flatSea = if (version >= 10) d.readBoolean() else l.flat
                         if (version >= 11) { l.passwordAsked = d.readBoolean(); l.bedwars = d.readInt() }
+                        if (version >= 12) {
+                            l.nextBox = d.readInt()
+                            repeat(d.readInt()) { val key = d.readInt(); l.boxes[key] = Array(27) { Inventory.readStack(d) } }
+                        }
                     }
                     l.hasPlayer = true
                     l
@@ -363,6 +371,9 @@ class LevelData(
             d.writeBoolean(flatSea)
             d.writeBoolean(passwordAsked)
             d.writeInt(bedwars)
+            d.writeInt(nextBox)
+            d.writeInt(boxes.size)
+            for ((key, slots) in boxes) { d.writeInt(key); for (s in slots) Inventory.writeStack(d, s) }
         }
         tmp.renameTo(f)
     }

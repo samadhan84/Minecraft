@@ -923,7 +923,13 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
         setBlock(x, y, z, Blocks.AIR)
         blockSound(id, x, y, z)
         val be = world.blockEntities.remove(x, y, z)
-        if (survival) {
+        if (survival && id == Blocks.SHELL_BOX && be is ChestEntity) {
+            // The box keeps what is in it: the things are stored under a number, and the item carries that number.
+            val full = be.slots.any { it != null }
+            var key = 0
+            if (full) { key = level.nextBox++; level.boxes[key] = Array(27) { be.slots.getOrNull(it) } }
+            drops.spawn(ItemStack(Blocks.SHELL_BOX, 1, key), x + 0.5f, y + 0.3f, z + 0.5f)
+        } else if (survival) {
             val dropped = Drops.forBlock(id, heldItem(), meta)
             for ((dropId, n) in dropped) drops.spawn(ItemStack(dropId, n), x + 0.5f, y + 0.3f, z + 0.5f)
             if (dropped.isNotEmpty()) addXp(when (id) {
@@ -1604,7 +1610,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
             Blocks.HOPPER -> { world.blockEntities.hopper(t.x, t.y, t.z); net?.openContainer(t.x, t.y, t.z, 2); uiEvents.add("open:hopper:${t.x},${t.y},${t.z}"); return }
             Blocks.FURNACE, Blocks.SMOKER, Blocks.BLAST_FURNACE -> { world.blockEntities.furnace(t.x, t.y, t.z); net?.openContainer(t.x, t.y, t.z, 1); uiEvents.add("open:furnace:${t.x},${t.y},${t.z}"); return }
             Blocks.TRAPPED_CHEST -> { redstone.openedTrappedChest(t.x, t.y, t.z); world.blockEntities.chest(t.x, t.y, t.z); net?.openContainer(t.x, t.y, t.z, 0); uiEvents.add("open:chest:${t.x},${t.y},${t.z}"); return }
-            Blocks.CHEST, Blocks.BARREL -> { world.blockEntities.chest(t.x, t.y, t.z); net?.openContainer(t.x, t.y, t.z, 0); uiEvents.add("open:chest:${t.x},${t.y},${t.z}"); return }
+            Blocks.CHEST, Blocks.BARREL, Blocks.SHELL_BOX -> { world.blockEntities.chest(t.x, t.y, t.z); net?.openContainer(t.x, t.y, t.z, 0); uiEvents.add("open:chest:${t.x},${t.y},${t.z}"); return }
             Blocks.ENDER_CHEST -> { uiEvents.add("open:ender"); sound("door", t.x + 0.5f, t.y + 0.5f, t.z + 0.5f, 0.5f); return }
             Blocks.ANVIL -> { repairHeld(); return }
             Blocks.COMPOSTER -> { compost(t.x, t.y, t.z, item); return }
@@ -1806,7 +1812,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
         if (shape != com.vishucraft.game.world.Rails.shape(id, m)) setBlock(x, y, z, id, (m and mask.inv()) or shape)
     }
 
-    private fun place(t: RayHit, id: Int) {
+    internal fun place(t: RayHit, id: Int) {
         if (id <= Blocks.AIR || id >= Blocks.COUNT) return
         val def = Blocks[id]
         // Clicking a plant replaces it instead of placing next to it.
@@ -1868,7 +1874,11 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
             uiEvents.add("toast:Can't join a rail onto a metro, railway or bullet line: it keeps just its two tracks")
             return
         }
+        val boxKey = if (id == Blocks.SHELL_BOX) heldStack()?.damage ?: 0 else 0
         setBlock(x, y, z, id, meta)
+        if (id == Blocks.SHELL_BOX && boxKey > 0) level.boxes.remove(boxKey)?.let { saved ->
+            world.blockEntities.chest(x, y, z)?.let { c -> for (i in saved.indices) if (i < c.slots.size) c.slots[i] = saved[i] }
+        }
         if (id == Blocks.SIGN) uiEvents.add("signedit:$x,$y,$z")
         if (id == Blocks.ESCALATOR) joinEscalator(x, y, z)
         if (com.vishucraft.game.world.Rails.isRail(id)) {

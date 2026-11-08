@@ -2567,6 +2567,19 @@ object TextureAtlas {
                 for (x in 5..10) t[x, 11] = rgb(80, 30, 20)
                 return true
             }
+            "p4_shellbox_top", "p4_shellbox_side", "p4_shellbox_front" -> {
+                val face = name.removePrefix("p4_shellbox_")
+                t.fill { x, y ->
+                    val edge = x == 0 || y == 0 || x == 15 || y == 15
+                    when {
+                        edge -> rgb(70, 52, 104)
+                        face != "top" && y == 6 -> rgb(70, 52, 104)
+                        else -> scale(rgb(112, 88, 150), t.jitter(0.06f) * (if (y % 4 == 0) 0.9f else 1f))
+                    }
+                }
+                if (face == "front") for (y in 5..8) for (x in 7..8) t[x, y] = rgb(240, 232, 160)
+                return true
+            }
             "p4_milk_packet" -> {
                 sprite(t)
                 for (y in 3..13) for (x in 4..11) t[x, y] = if (y in 6..9) rgb(255, 255, 255) else rgb(40, 110, 220)

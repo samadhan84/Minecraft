@@ -364,7 +364,7 @@ class MoreCreaturesTest {
         val g = game()
         val y = g.world.generator.surfaceHeight(0, 0) + 1f
         g.player.x = 0.5f; g.player.y = y; g.player.z = 0.5f
-        val a = Mob(MobType.HUSK_HOG, 4f, y, 0.5f); val b = Mob(MobType.HUSK_HOG, 8f, y, 3f)
+        val a = Mob(MobType.HUSK_HOG, 4f, y, 0.5f); val b = Mob(MobType.HUSK_HOG, 5.5f, y, 1.5f)
         g.mobs.list.add(a); g.mobs.list.add(b)
         val before = g.health
         run(g, 4f)
@@ -388,5 +388,34 @@ class MoreCreaturesTest {
     @Test fun spawnEggsExistForTheNewCreatures() {
         for (t in listOf(MobType.FROST_ARCHER, MobType.ASH_SKELETON, MobType.SPINY_PUFFER, MobType.SHELL_GUARD, MobType.VOID_MITE, MobType.HUSK_HOG, MobType.LAVA_STRIDER))
             assertEquals(t, Items.spawnType(Items.find("${t.displayName} Spawn Egg")))
+    }
+}
+
+class ShellBoxTest {
+    @Test fun aShellBoxKeepsItsThingsWhenPickedUp() {
+        val dir = kotlin.io.path.createTempDirectory("shell").toFile()
+        val level = LevelData.create(15L, "t", GameMode.SURVIVAL)
+        val g = Game(World(level.seed, dir, Dimension.OVERWORLD, flat = true), level, GameInput(), dir)
+        for (cx in -2..2) for (cz in -2..2) g.world.ensureLoaded(cx, cz)
+        val y = g.world.generator.surfaceHeight(0, 0) + 1
+        g.setBlock(0, y, 0, Blocks.SHELL_BOX, 2)
+        val chest = g.world.blockEntities.chest(0, y, 0)!!
+        chest.slots[0] = ItemStack(Items.find("Diamond"), 7)
+        chest.slots[5] = ItemStack(Blocks.STONE, 33)
+        g.breakBlock(0, y, 0)
+        val item = g.drops.list.first { it.stack.id == Blocks.SHELL_BOX }.stack
+        assertTrue(item.damage > 0, "the item carries the number of its contents")
+        assertTrue(g.drops.list.none { it.stack.id == Items.find("Diamond") }, "the diamonds did not spill out")
+        assertEquals(1, Items.maxStack(Blocks.SHELL_BOX), "boxes do not stack")
+        // The contents are kept in the world file.
+        g.level.write(dir)
+        val back = LevelData.read(dir)!!
+        assertEquals(7, back.boxes[item.damage]!![0]!!.count)
+        // Place it again somewhere else: everything is back inside.
+        g.inventory.slots[0] = ItemStack(Blocks.SHELL_BOX, 1, item.damage); g.input.selectedSlot = 0
+        g.place(RayHit(3, y - 1, 3, 0, 1, 0, Blocks.GRASS), Blocks.SHELL_BOX)
+        val again = g.world.blockEntities.chest(3, y, 3)!!
+        assertEquals(7, again.slots[0]!!.count); assertEquals(33, again.slots[5]!!.count)
+        assertNull(g.level.boxes[item.damage], "the stored copy is used up")
     }
 }

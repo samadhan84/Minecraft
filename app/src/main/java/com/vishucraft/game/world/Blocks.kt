@@ -444,7 +444,9 @@ object Blocks {
     const val ECHO_GROWTH = 452
     /** A chest that gives a redstone signal while it is open (see Redstone). */
     const val TRAPPED_CHEST = 453
-    const val COUNT = 454
+    /** A chest that keeps its things when you pick it up: the contents travel with the item (see LevelData.boxes). */
+    const val SHELL_BOX = 454
+    const val COUNT = 455
 
     /** The newer crops' texture names, in id order from RICE_CROP. */
     val NEW_CROPS = listOf("rice", "tomato", "lentil", "beetroot")
@@ -833,6 +835,7 @@ object Blocks {
             hardness = 0f, box = floatArrayOf(0.375f, 0f, 0.375f, 0.625f, 1f, 0.625f), inInventory = false, movable = false))
         reg(BlockDef(ECHO_GROWTH, "Echo Growth", t("p4_echo"), hardness = 0.6f, tool = ToolType.HOE, category = Category.NATURE))
         extraLight[ECHO_GROWTH] = 2
+        reg(BlockDef(SHELL_BOX, "Shell Box", t("p4_shellbox_top"), t("p4_shellbox_side"), t("p4_shellbox_top"), hardness = 1.5f, tool = ToolType.PICKAXE, facing = Facing.HORIZONTAL, front = t("p4_shellbox_front")))
         shape(CANDLE, "Candle", "p4_candle_top", "p4_candle", "p4_candle", hardness = 0.1f, tool = ToolType.NONE, facing = Facing.NONE, solid = false)
         shape(CAKE, "Cake", "cake_top", "cake_side", "cake_bottom", hardness = 0.5f, tool = ToolType.NONE, facing = Facing.NONE)
         shape(SIGN, "Sign", "oak_planks", hardness = 1f, tool = A, solid = false)

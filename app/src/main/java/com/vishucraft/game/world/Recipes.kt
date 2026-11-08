@@ -158,6 +158,7 @@ object Recipes {
         sh(Blocks.RAIL, 16, listOf("M M", "MSM", "M M"), 'M' to iron, 'S' to stick)
         sh(Blocks.POWERED_RAIL, 6, listOf("M M", "MSM", "MRM"), 'M' to gold, 'S' to stick, 'R' to Blocks.REDSTONE_DUST)
         r(Blocks.REPEATER, 1, true, Blocks.REDSTONE_TORCH to 2, Blocks.REDSTONE_DUST to 1, Blocks.STONE to 3)
+        r(Blocks.SHELL_BOX, 1, true, Blocks.CHEST to 1, i("Amethyst Shard") to 2)
         r(Blocks.CANDLE, 2, false, i("String") to 1, i("Honeycomb") to 1)
         r(i("Dusk Sigil"), 1, true, i("Netherite Scrap") to 2, i("Ghast Tear") to 1, i("Blaze Rod") to 1)
         r(Blocks.BEACON, 1, true, i("Nether Star") to 1, Blocks.GLASS to 5, Blocks.OBSIDIAN to 3)
