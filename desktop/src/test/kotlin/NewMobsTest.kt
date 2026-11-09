@@ -465,3 +465,23 @@ class TexturePackTest {
         assertTrue(n > 10, "echo growth was found in caves: $n")
     }
 }
+
+class EatTest {
+    @Test fun tappingDigInTheSkyEatsTheFoodInHand() {
+        val dir = kotlin.io.path.createTempDirectory("eat").toFile()
+        val level = LevelData.create(41L, "t", GameMode.SURVIVAL)
+        level.food = 5f
+        val g = Game(World(level.seed, dir, Dimension.OVERWORLD, flat = true), level, GameInput(), dir)
+        for (cx in -2..2) for (cz in -2..2) g.world.ensureLoaded(cx, cz)
+        g.player.y = g.world.generator.surfaceHeight(0, 0) + 1f
+        g.inventory.slots[0] = ItemStack(Items.find("Bread"), 3); g.input.selectedSlot = 0
+        g.player.pitch = 1.4f                                  // looking up at the sky
+        g.update(1 / 20f)
+        assertNull(g.target, "nothing is under the crosshair")
+        val before = g.food
+        g.input.actions.add(GameInput.Action.ATTACK)
+        g.update(1 / 20f)
+        assertTrue(g.food > before, "the bread was eaten: ${g.food}")
+        assertEquals(2, g.inventory.count(Items.find("Bread")))
+    }
+}

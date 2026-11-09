@@ -489,7 +489,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
             val action = input.actions.poll() ?: break
             when (action) {
                 GameInput.Action.PLACE -> use()
-                GameInput.Action.ATTACK -> attack()
+                GameInput.Action.ATTACK -> if (eatInsteadOfDig()) use() else attack()
                 GameInput.Action.DROP, GameInput.Action.DROP_STACK -> dropHeld(action == GameInput.Action.DROP_STACK)
                 GameInput.Action.TOGGLE_FLY -> if (!survival) { player.flying = !player.flying; player.vy = 0f }
             }
@@ -1000,6 +1000,14 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
 
     /** Tap: interact with levers/buttons, use the held item, or place the held block. */
     /** Hits the mob in front if it is closer than the targeted block (left click on computers). */
+    /** Tapping dig with nothing under the crosshair (the sky, say) and food or a drink in hand eats or drinks it, like the use button does. */
+    private fun eatInsteadOfDig(): Boolean {
+        val item = heldItem() ?: return false
+        if (item.use != ItemUse.EAT && item.use != ItemUse.DRINK) return false
+        if (target != null) return false
+        return mobs.raycast(player.x, player.eyeY, player.z, dir[0], dir[1], dir[2], 4f) == null
+    }
+
     private fun attack() {
         val mobHit = mobs.raycast(player.x, player.eyeY, player.z, dir[0], dir[1], dir[2], 4f) ?: return
         val blockDist = target?.let {
