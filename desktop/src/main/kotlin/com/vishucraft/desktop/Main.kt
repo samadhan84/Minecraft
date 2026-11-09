@@ -119,6 +119,7 @@ class App(demo: File?) : ClientApp(demo) {
         installCallbacks()
 
         fonts = ::awtFonts
+        if (demo == null) TexturePackLoader.load(File(Paths.home, "texturepack"))
         ui = Ui()
         audio = Audio()
         applySettings()

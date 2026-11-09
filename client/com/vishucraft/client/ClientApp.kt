@@ -337,7 +337,7 @@ abstract class ClientApp(protected val demo: File?) {
                     return
                 }
                 ui.text("Dhruvil Craft", cx, ui.height * 0.16f, 72f, rgba(255, 220, 90), 1)
-                ui.text("Build, explore and survive", cx, ui.height * 0.16f + 84, 20f, rgba(220, 220, 220), 1)
+                ui.text("Dream it, build it", cx, ui.height * 0.16f + 84, 20f, rgba(220, 220, 220), 1)
                 var y = ui.height * 0.42f
                 if (ui.button("Play", cx - bw / 2, y, bw, 44f)) menu = Menu.WORLDS
                 y += 54

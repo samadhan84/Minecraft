@@ -205,6 +205,7 @@ class TerrainGenerator(private val seed: Long, private val world: World? = null)
         }
 
         placeOres(chunk, rnd)
+        echoPatches(chunk, rnd)
         decorate(chunk, rnd, tops)
         world?.let { Structures(seed, this, it).place(chunk) }
     }
@@ -241,6 +242,31 @@ class TerrainGenerator(private val seed: Long, private val world: World? = null)
         Blocks.GOLD_ORE -> Blocks.DEEPSLATE_ORE_FIRST + 2; Blocks.DIAMOND_ORE -> Blocks.DEEPSLATE_ORE_FIRST + 3
         Blocks.REDSTONE_ORE -> Blocks.DEEPSLATE_ORE_FIRST + 4; Blocks.LAPIS_ORE -> Blocks.DEEPSLATE_ORE_FIRST + 5
         else -> ore
+    }
+
+    /** Dark, softly glowing patches of Echo Growth on the floors of deep caves. */
+    private fun echoPatches(chunk: Chunk, rnd: Random) {
+        if (rnd.nextInt(5) != 0) return
+        for (attempt in 0 until 12) {
+            val cx = rnd.nextInt(Chunk.SIZE); val cz = rnd.nextInt(Chunk.SIZE)
+            var y = 26
+            var found = -1
+            while (y > 6) {
+                if (chunk.get(cx, y, cz) == Blocks.AIR && Blocks.solid[chunk.get(cx, y - 1, cz)] && chunk.get(cx, y - 1, cz) != Blocks.BEDROCK) { found = y; break }
+                y--
+            }
+            if (found < 0) continue
+            for (dx in -3..3) for (dz in -3..3) {
+                val x = cx + dx; val z = cz + dz
+                if (x !in 0 until Chunk.SIZE || z !in 0 until Chunk.SIZE || dx * dx + dz * dz > 9) continue
+                for (yy in found - 2..found + 2) {
+                    if (yy < 5 || chunk.get(x, yy, z) == Blocks.AIR || !Blocks.solid[chunk.get(x, yy, z)] || chunk.get(x, yy + 1, z) != Blocks.AIR) continue
+                    if (rnd.nextInt(4) != 0) chunk.set(x, yy, z, Blocks.ECHO_GROWTH)
+                    break
+                }
+            }
+            return
+        }
     }
 
     private fun vein(chunk: Chunk, rnd: Random, ore: Int, count: Int, size: Int, maxY: Int) {

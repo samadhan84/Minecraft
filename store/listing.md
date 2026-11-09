@@ -1,9 +1,9 @@
 # Google Play listing – Dhruvil Craft
 
-**App name (30 chars max):** Dhruvil Craft: Build & Explore
+**App name (30 chars max):** Dhruvil Craft: Dream It, Build It
 
 **Short description (80 chars max):**
-Build, explore, ride roller coasters and metros – alone or with friends.
+Dream it, build it – alone or with friends.
 
 **Full description:**
 

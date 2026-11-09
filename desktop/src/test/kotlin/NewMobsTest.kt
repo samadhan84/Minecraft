@@ -438,3 +438,30 @@ class MineTest {
         assertTrue(frames > 20, "timber frames of a mine were generated, found $frames")
     }
 }
+
+class TexturePackTest {
+    @Test fun aTexturePackPictureReplacesATile() {
+        val before = com.vishucraft.game.render.TextureAtlas.pixels.copyOf()
+        assertTrue("oak_planks" in com.vishucraft.game.render.TextureAtlas.tileNames(), "the tile names are listed")
+        // A 32 by 32 picture, red above and blue below, is shrunk to the 16 by 16 tile.
+        val img = IntArray(32 * 32) { if (it / 32 < 16) 0xFFFF0000.toInt() else 0xFF0000FF.toInt() }
+        assertTrue(com.vishucraft.game.render.TextureAtlas.setTile("oak_planks", 32, 32, img))
+        assertFalse(com.vishucraft.game.render.TextureAtlas.setTile("no_such_tile_name", 32, 32, img))
+        val index = com.vishucraft.game.world.Tiles.id("oak_planks")
+        val ox = (index % 64) * 16; val oy = (index / 64) * 16
+        val px = com.vishucraft.game.render.TextureAtlas.pixels
+        assertEquals(0xFFFF0000.toInt(), px[(oy + 2) * com.vishucraft.game.render.TextureAtlas.SIZE + ox + 5])
+        assertEquals(0xFF0000FF.toInt(), px[(oy + 13) * com.vishucraft.game.render.TextureAtlas.SIZE + ox + 5])
+        // Put the real picture back so the other tests are not affected.
+        for (y in 0 until 16) for (x in 0 until 16) px[(oy + y) * com.vishucraft.game.render.TextureAtlas.SIZE + ox + x] = before[(oy + y) * com.vishucraft.game.render.TextureAtlas.SIZE + ox + x]
+    }
+
+    @Test fun echoGrowthGrowsInDeepCaves() {
+        val dir = kotlin.io.path.createTempDirectory("echo").toFile()
+        val world = World(31L, dir, Dimension.OVERWORLD)
+        for (cx in -10..10) for (cz in -10..10) world.ensureLoaded(cx, cz)
+        var n = 0
+        for (x in -160..160) for (z in -160..160) for (y in 5..28) if (world.getBlock(x, y, z) == Blocks.ECHO_GROWTH) n++
+        assertTrue(n > 10, "echo growth was found in caves: $n")
+    }
+}

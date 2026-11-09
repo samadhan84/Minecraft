@@ -20,6 +20,25 @@ object TextureAtlas {
 
     val pixels: IntArray by lazy { build() }
 
+    /**
+     * Replaces the picture of one tile with the player's own (a texture pack): [argb] is a [w] by [h] image (any size,
+     * scaled to the tile with nearest-neighbour). Call it once at start-up, before the atlas is uploaded to the screen.
+     * Returns false when no tile has that name.
+     */
+    /** The names of all the tiles (a texture pack has one PNG per name). */
+    fun tileNames(): List<String> { pixels; return Tiles.all().keys.sorted() }
+
+    fun setTile(name: String, w: Int, h: Int, argb: IntArray): Boolean {
+        if (w <= 0 || h <= 0 || argb.size < w * h) return false
+        val index = Tiles.all()[name] ?: return false
+        val ox = (index % TILES_PER_ROW) * TILE; val oy = (index / TILES_PER_ROW) * TILE
+        val atlas = pixels
+        // A pack's picture may hold animation frames stacked downwards: only the first square is used.
+        val side = minOf(w, h)
+        for (y in 0 until TILE) for (x in 0 until TILE) atlas[(oy + y) * SIZE + ox + x] = argb[(y * side / TILE) * w + (x * side / TILE)]
+        return true
+    }
+
     // ---------------------------------------------------------------- colour helpers
 
     private fun argb(a: Int, r: Int, g: Int, b: Int): Int =

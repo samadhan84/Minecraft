@@ -2,16 +2,13 @@ import com.vishucraft.game.engine.*
 import com.vishucraft.game.world.*
 import kotlin.test.*
 
-/** Only the Smart City, Metro Station and Bullet Train Station blueprints are offered; no normal railways; 5 worlds. */
+/** No blueprints are offered (all are hidden); no normal railways; 5 worlds. */
 class BlueprintRulesTest {
-    @Test fun onlyThreeBlueprints() {
-        val blueprints = Items.shown.filter { it.name.startsWith("Blueprint: ") }.map { it.name.removePrefix("Blueprint: ") }
-        assertEquals(setOf("Smart City", "Metro Station", "Bullet Train Station"), blueprints.toSet())
+    @Test fun noBlueprintsAtAll() {
+        assertTrue(Items.shown.none { it.name.startsWith("Blueprint: ") }, "no blueprints are offered")
         assertTrue(Items.shown.none { it.name == "Train Engine" })
         for (r in Recipes.crafting) assertFalse(Items.hidden(Items[r.result]?.name), "recipe for ${Items[r.result]?.name}")
-        assertNull(blueprintOf("Blueprint: Mega City"))
-        assertNull(blueprintOf("Blueprint: Railway Station"))
-        assertEquals("Smart City", blueprintOf("Blueprint: Smart City"))
+        for (n in listOf("Smart City", "Metro Station", "Bullet Train Station", "Mega City")) assertNull(blueprintOf("Blueprint: $n"))
         assertEquals(5, MAX_WORLDS)
     }
 

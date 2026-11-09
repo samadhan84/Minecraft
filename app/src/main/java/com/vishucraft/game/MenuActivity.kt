@@ -23,6 +23,7 @@ class MenuActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        Thread { com.vishucraft.game.ui.TexturePackAndroid.load(this) }.also { it.start(); it.join() }   // your own pictures, if you put any in the texture pack folder
 
         val root = FrameLayout(this)
         // The Dhruvil Craft title picture fills the screen; it already shows the game's name and logo.
@@ -54,6 +55,12 @@ class MenuActivity : Activity() {
         add("Settings") { settingsDialog(this) }
         add("Back up / restore") { backupMenu() }
         if (Updater.enabled(this)) add("Check for updates") { Updater.check(this, manual = true) }
+        add("Texture pack") {
+            val dir = com.vishucraft.game.ui.TexturePackAndroid.folder(this)
+            android.app.AlertDialog.Builder(this).setTitle("Texture pack")
+                .setMessage("Use your own pictures: put PNG files in this folder, named like the tiles (the file tile-names.txt in it lists every name, for example oak_planks.png), then close and open the game again.\n\n${dir?.path ?: "No folder available"}\n\nPictures used now: ${com.vishucraft.game.ui.TexturePackAndroid.load(this)}")
+                .setPositiveButton("OK", null).show()
+        }
         add("How to play", last = true) { help() }
 
         root.addView(col, FrameLayout.LayoutParams(-2, -2, Gravity.START or Gravity.CENTER_VERTICAL).apply {
