@@ -554,3 +554,52 @@ class MutantTest {
         assertTrue(low.health < b2, "on the ground it hits you")
     }
 }
+
+class FluidTest {
+    private fun game(): Game {
+        val dir = kotlin.io.path.createTempDirectory("fluid").toFile()
+        val level = LevelData.create(61L, "t", GameMode.CREATIVE)
+        val g = Game(World(level.seed, dir, Dimension.OVERWORLD, flat = true), level, GameInput(), dir)
+        for (cx in -2..2) for (cz in -2..2) g.world.ensureLoaded(cx, cz)
+        g.player.x = 40.5f; g.player.z = 40.5f; g.player.flying = true
+        return g
+    }
+    private fun run(g: Game, seconds: Float) { var t = 0f; while (t < seconds) { g.update(1 / 20f); g.dirtyChunks.clear(); t += 1 / 20f } }
+
+    /** A cell with stone round it for water at x=0, the gap at x=1 and lava at x=2 (a row along x). */
+    private fun generator(g: Game, y: Int) {
+        for (x in -1..3) for (z in -1..1) { g.setBlock(x, y - 1, z, Blocks.STONE); g.setBlock(x, y + 1, z, Blocks.STONE) }
+        for (x in -1..3) { g.setBlock(x, y, -1, Blocks.STONE); g.setBlock(x, y, 1, Blocks.STONE) }
+        g.setBlock(-1, y, 0, Blocks.STONE); g.setBlock(3, y, 0, Blocks.STONE)
+        g.setBlock(0, y, 0, Blocks.WATER, 0); g.setBlock(1, y, 0, Blocks.COBBLESTONE); g.setBlock(2, y, 0, Blocks.LAVA, 0)
+    }
+
+    @Test fun breakTheBlockBetweenWaterAndLavaAndYouGetCobblestoneEveryTime() {
+        val g = game()
+        val y = g.world.generator.surfaceHeight(0, 0) + 3
+        generator(g, y)
+        run(g, 3f)
+        assertEquals(Blocks.COBBLESTONE, g.world.getBlock(1, y, 0))
+        for (round in 1..3) {
+            g.setBlock(1, y, 0, Blocks.AIR)
+            run(g, 4f)
+            assertEquals(Blocks.COBBLESTONE, g.world.getBlock(1, y, 0), "cobblestone again (round $round)")
+            assertEquals(Blocks.WATER, g.world.getBlock(0, y, 0), "the water source is still there")
+            assertEquals(Blocks.LAVA, g.world.getBlock(2, y, 0), "and so is the lava source")
+            assertEquals(0, g.world.getMeta(2, y, 0))
+        }
+    }
+
+    @Test fun waterOnTopOfALavaSourceMakesObsidian() {
+        val g = game()
+        val y = g.world.generator.surfaceHeight(0, 0) + 3
+        for (dx in -1..1) for (dz in -1..1) { g.setBlock(dx, y - 1, dz, Blocks.STONE) }
+        for (d in listOf(-1 to 0, 1 to 0, 0 to -1, 0 to 1)) { g.setBlock(d.first, y, d.second, Blocks.STONE); g.setBlock(d.first, y + 1, d.second, Blocks.STONE) }
+        g.setBlock(0, y, 0, Blocks.LAVA, 0)
+        run(g, 2f)
+        assertEquals(Blocks.LAVA, g.world.getBlock(0, y, 0), "lava alone stays")
+        g.setBlock(0, y + 1, 0, Blocks.WATER, 0)
+        run(g, 3f)
+        assertEquals(Blocks.OBSIDIAN, g.world.getBlock(0, y, 0), "water above lava gives obsidian")
+    }
+}

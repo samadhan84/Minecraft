@@ -4,8 +4,14 @@ import com.vishucraft.game.render.ChunkMesher
 
 /**
  * Flowing water and lava. Meta 0 is a source block; 1..7 is the distance from a source.
- * Water spreads 7 blocks and updates 4x a second; lava spreads 3 blocks and updates once a second.
- * Two water sources side by side create a new source; water meeting lava makes obsidian or cobblestone.
+ * Water spreads 7 blocks and updates 4x a second; lava spreads 3 blocks and updates every 1.5 seconds.
+ * Two water sources side by side create a new source. Where the two liquids meet:
+ *  - a flowing block that touches the other liquid (beside it, or the other liquid above it) turns into cobblestone, so a
+ *    cobblestone generator works: water on one side, lava on the other, and break the block between them;
+ *  - water above a lava source makes obsidian;
+ *  - lava flowing down onto water makes stone, lava flowing sideways into water makes cobblestone;
+ *  - water flowing down onto lava makes obsidian (a lava source) or cobblestone (flowing lava).
+ * The sources themselves are never used up by a generator.
  */
 class Fluids(private val world: World, private val set: (Int, Int, Int, Int, Int) -> Unit) {
     private val pendingWater = LinkedHashSet<Long>()
@@ -35,7 +41,7 @@ class Fluids(private val world: World, private val set: (Int, Int, Int, Int, Int
     fun tick(dt: Float) {
         waterTimer += dt; lavaTimer += dt
         if (waterTimer >= 0.25f) { waterTimer = 0f; process(pendingWater) }
-        if (lavaTimer >= 1f) { lavaTimer = 0f; process(pendingLava) }
+        if (lavaTimer >= 1.5f) { lavaTimer = 0f; process(pendingLava) }
     }
 
     private fun process(queue: LinkedHashSet<Long>) {
@@ -57,13 +63,13 @@ class Fluids(private val world: World, private val set: (Int, Int, Int, Int, Int
 
         // Water and lava meeting.
         val other = if (id == Blocks.WATER) Blocks.LAVA else Blocks.WATER
-        for (n in N) {
-            val nx = x + n[0]; val ny = y + n[1]; val nz = z + n[2]
-            if (world.getBlock(nx, ny, nz) != other) continue
-            if (id == Blocks.LAVA) { set(x, y, z, if (meta == 0) Blocks.OBSIDIAN else Blocks.COBBLESTONE, 0); return }
-            val lavaMeta = world.getMeta(nx, ny, nz)
-            set(nx, ny, nz, if (lavaMeta == 0) Blocks.OBSIDIAN else Blocks.COBBLESTONE, 0)
+        if (meta != 0) {
+            // A flowing block that touches the other liquid beside it or above it turns to cobblestone (the sources are left alone).
+            if (world.getBlock(x, y + 1, z) == other) { set(x, y, z, Blocks.COBBLESTONE, 0); return }
+            for (f in 2 until 6) { val n = N[f]; if (world.getBlock(x + n[0], y, z + n[2]) == other) { set(x, y, z, Blocks.COBBLESTONE, 0); return } }
         }
+        // Water right above a lava source makes obsidian.
+        if (id == Blocks.LAVA && meta == 0 && world.getBlock(x, y + 1, z) == Blocks.WATER) { set(x, y, z, Blocks.OBSIDIAN, 0); return }
 
         var level = meta
         if (meta != 0) {
@@ -94,6 +100,9 @@ class Fluids(private val world: World, private val set: (Int, Int, Int, Int, Int
             set(x, y - 1, z, id, 1)
             return
         }
+        // Falling onto the other liquid.
+        if (y > 0 && id == Blocks.WATER && below == Blocks.LAVA) { set(x, y - 1, z, if (world.getMeta(x, y - 1, z) == 0) Blocks.OBSIDIAN else Blocks.COBBLESTONE, 0); return }
+        if (y > 0 && id == Blocks.LAVA && below == Blocks.WATER) { set(x, y - 1, z, Blocks.STONE, 0); return }
         if (below == id && level != 0) return
         if (level >= maxLevel(id)) return
         for (f in 2 until 6) {
@@ -102,6 +111,9 @@ class Fluids(private val world: World, private val set: (Int, Int, Int, Int, Int
             val b = world.getBlock(nx, y, nz)
             if (canFlowInto(b)) set(nx, y, nz, id, level + 1)
             else if (b == id && world.getMeta(nx, y, nz) > level + 1) set(nx, y, nz, id, level + 1)
+            // Lava flowing sideways into water, or water flowing sideways into flowing lava, makes cobblestone.
+            else if (id == Blocks.LAVA && b == Blocks.WATER) set(nx, y, nz, Blocks.COBBLESTONE, 0)
+            else if (id == Blocks.WATER && b == Blocks.LAVA && world.getMeta(nx, y, nz) != 0) set(nx, y, nz, Blocks.COBBLESTONE, 0)
         }
     }
 }
