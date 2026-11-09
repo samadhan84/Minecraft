@@ -859,6 +859,14 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
     }
 
     /** Hoppers pull from the container above (and items lying on top) and push into the one below. */
+    /** The container block at (x, y, z), made on the spot when it was never opened (so a hopper can fill a chest nobody has tapped yet). */
+    private fun containerAt(x: Int, y: Int, z: Int): com.vishucraft.game.world.BlockEntity? = when (world.getBlock(x, y, z)) {
+        Blocks.CHEST, Blocks.BARREL, Blocks.TRAPPED_CHEST, Blocks.SHELL_BOX -> world.blockEntities.chest(x, y, z)
+        Blocks.HOPPER -> world.blockEntities.hopper(x, y, z)
+        Blocks.FURNACE, Blocks.SMOKER, Blocks.BLAST_FURNACE -> world.blockEntities.furnace(x, y, z)
+        else -> world.blockEntities.get(x, y, z)
+    }
+
     private fun tickHoppers(dt: Float) {
         for ((pos, e) in world.blockEntities.map) {
             if (e !is com.vishucraft.game.world.HopperEntity) continue
@@ -871,11 +879,11 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
             val facing = world.getMeta(x, y, z).let { if (it in 2..5) it else 1 }
             val out = ChunkMesher.NORMALS[facing]
             // If nothing is there, a hopper that points down still fills a chest standing beside it.
-            var target = world.blockEntities.get(x + out[0], y + out[1], z + out[2])
+            var target = containerAt(x + out[0], y + out[1], z + out[2])
             if (target !is ChestEntity && target !is FurnaceEntity) {
                 for (f in 2..5) {
                     val n = ChunkMesher.NORMALS[f]
-                    val side = world.blockEntities.get(x + n[0], y, z + n[2])
+                    val side = containerAt(x + n[0], y, z + n[2])
                     if (side is ChestEntity && side !is com.vishucraft.game.world.HopperEntity) { target = side; break }
                 }
             }
@@ -893,7 +901,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
                 else -> {}
             }
             // Pull one item from above.
-            when (val above = world.blockEntities.get(x, y + 1, z)) {
+            when (val above = containerAt(x, y + 1, z)) {
                 is FurnaceEntity -> above.output?.let { o -> if (e.insert(o.id, 1) == 0) { o.count--; if (o.count <= 0) above.output = null } }
                 is ChestEntity -> above.slots.firstOrNull { it != null }?.let { s -> if (e.insert(s.id, 1, s.damage) == 0) above.takeOne() }
                 else -> {}
@@ -1955,6 +1963,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
             world.blockEntities.chest(x, y, z)?.let { c -> for (i in saved.indices) if (i < c.slots.size) c.slots[i] = saved[i] }
         }
         if (id == Blocks.SIGN) uiEvents.add("signedit:$x,$y,$z")
+        if (id == Blocks.HOPPER) world.blockEntities.hopper(x, y, z)       // a hopper works as soon as it is placed
         if (id == Blocks.ESCALATOR) joinEscalator(x, y, z)
         if (com.vishucraft.game.world.Rails.isRail(id)) {
             updateRail(x, y, z)

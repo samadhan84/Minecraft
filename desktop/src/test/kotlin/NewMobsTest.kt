@@ -639,12 +639,12 @@ class GeneratorFarmTest {
         for (x in -1..3) { g.setBlock(x, y, -1, Blocks.STONE); g.setBlock(x, y, 1, Blocks.STONE) }
         g.setBlock(-1, y, 0, Blocks.STONE); g.setBlock(3, y, 0, Blocks.STONE)
         g.setBlock(0, y, 0, Blocks.WATER, 0); g.setBlock(1, y, 0, Blocks.COBBLESTONE); g.setBlock(2, y, 0, Blocks.LAVA, 0)
-        g.setBlock(1, y - 1, 0, Blocks.HOPPER, 0); g.world.blockEntities.hopper(1, y - 1, 0)
-        g.setBlock(2, y - 1, 0, Blocks.CHEST, 2); g.world.blockEntities.chest(2, y - 1, 0)
+        // (Nobody opens the hopper or the chest: they have to work as soon as they are placed.)
+        g.setBlock(1, y - 1, 0, Blocks.HOPPER, 0)
+        g.setBlock(2, y - 1, 0, Blocks.CHEST, 2)
         // You stand right beside it with an enchanted diamond pickaxe.
         g.player.x = 1.5f; g.player.y = (y - 1).toFloat() + 0.1f; g.player.z = 3.5f
         g.inventory.slots[0] = ItemStack(Items.find("Enchanted Diamond Pickaxe"), 1); g.input.selectedSlot = 0
-        val chest = g.world.blockEntities.chest(2, y - 1, 0)!!
         for (round in 1..4) {
             var t = 0f
             while (t < 4f && g.world.getBlock(1, y, 0) != Blocks.COBBLESTONE) { g.update(1 / 20f); g.dirtyChunks.clear(); t += 1 / 20f }
@@ -652,8 +652,9 @@ class GeneratorFarmTest {
             g.breakBlock(1, y, 0)
         }
         var t = 0f
-        while (t < 10f && chest.slots.sumOf { it?.count ?: 0 } < 4) { g.update(1 / 20f); g.dirtyChunks.clear(); t += 1 / 20f }
-        val total = chest.slots.filter { it != null && it.id == Blocks.COBBLESTONE }.sumOf { it!!.count }
+        fun chest() = g.world.blockEntities.chest(2, y - 1, 0)!!
+        while (t < 10f && chest().slots.sumOf { it?.count ?: 0 } < 4) { g.update(1 / 20f); g.dirtyChunks.clear(); t += 1 / 20f }
+        val total = chest().slots.filter { it != null && it.id == Blocks.COBBLESTONE }.sumOf { it!!.count }
         assertEquals(4, total, "all four stones went through the hopper into the chest")
         assertEquals(0, g.inventory.count(Blocks.COBBLESTONE), "none were picked up by hand")
     }
