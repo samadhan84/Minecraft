@@ -118,7 +118,11 @@ enum class MobType(
     /** A green-skinned hog warrior of the Ember Realm: calm until hit, then the whole pack fights. */
     HUSK_HOG("Husk Hog", 0.35f, 1.75f, 26, false, 2.4f),
     /** Walks on lava, and shivers in water. */
-    LAVA_STRIDER("Lava Strider", 0.5f, 1.7f, 20, false, 1.4f);
+    LAVA_STRIDER("Lava Strider", 0.5f, 1.7f, 20, false, 1.4f),
+    /** A zombie struck by lightning: as big and strong as an iron golem. */
+    MUTANT_ZOMBIE("Mutant Zombie", 0.8f, 3.2f, 100, true, 1.9f),
+    /** A Boomling struck by lightning: it blows up with the force of a thousand TNT. */
+    MUTANT_BOOMLING("Mutant Boomling", 0.9f, 3.4f, 60, true, 1.6f);
 
     val isRaider get() = this == RAIDER || this == SPELL_RAIDER || this == RAMPAGE_BEAST
     val isCitizen get() = this == CITIZEN || this == CITIZEN_WOMAN || this == CITIZEN_KID
@@ -465,6 +469,38 @@ class Mobs(private val world: World) {
                     m.burnTimer += dt
                     if (m.burnTimer >= 1f) { m.burnTimer = 0f; damage(m, 1f, 0f, 0f) }
                 }
+            }
+            MobType.MUTANT_ZOMBIE -> {
+                if (dist < 40f && game.playerAlive) {
+                    m.yaw = atan2(dx, -dz)
+                    if (dist > 1.6f) { wantX = dx / dist; wantZ = dz / dist }
+                    m.attackCooldown -= dt
+                    // Like an iron golem: it only reaches two blocks and cannot hit you when you are up on a block.
+                    if (dist < 2.4f && p.y - m.y < 1.0f && abs(p.y - m.y) < 3f && m.attackCooldown <= 0f) {
+                        m.attackCooldown = 1.4f
+                        game.hurtTarget(p, 9f, m.x, m.z); if (p.x == game.player.x && p.z == game.player.z) game.player.vy = maxOf(game.player.vy, 7f)
+                        game.sound("hit_stone", p.x, p.y + 1f, p.z)
+                    }
+                } else wander(m, dt).let { wantX = it.first; wantZ = it.second; speed *= 0.5f }
+            }
+            MobType.MUTANT_BOOMLING -> {
+                if (dist < 40f && game.playerAlive) {
+                    m.yaw = atan2(dx, -dz)
+                    if (m.fuse >= 0f) {
+                        if (dist > 16f) m.fuse = -1f
+                        else {
+                            m.fuse += dt
+                            if (m.fuse >= 3f) {
+                                m.health = 0f; m.deathTime = 1f
+                                game.bigExplosion(m.x, m.y + 1f, m.z, 28f)
+                                return
+                            }
+                        }
+                    } else {
+                        if (dist < 7f && abs(p.y - m.y) < 5f) { m.fuse = 0f; game.sound("fuse", m.x, m.y + 1f, m.z, 1.6f) }
+                        else { wantX = dx / dist; wantZ = dz / dist }
+                    }
+                } else { m.fuse = -1f; wander(m, dt).let { wantX = it.first; wantZ = it.second; speed *= 0.5f } }
             }
             MobType.BOOMLING -> {
                 if (dist < 18f && game.playerAlive) {
@@ -957,7 +993,8 @@ class Mobs(private val world: World) {
             if (!game.playerAlive || d > 40f) { m.angry = false; return 0f to 0f }
             m.yaw = atan2(dx, -dz)
             m.attackCooldown -= dt
-            if (d < 2f + m.halfWidth && abs(p.y - m.y) < 2.5f && m.attackCooldown <= 0f) {
+            // It can only hit what is within two blocks, and not you when you stand higher than it (on a block, say).
+            if (d < 2.2f && p.y - m.y < 1.0f && m.y - p.y < 2.5f && m.attackCooldown <= 0f) {
                 m.attackCooldown = 1.5f
                 game.hurtPlayer(7f, m.x, m.z)
                 p.vy = maxOf(p.vy, 8f)   // the golem's punch throws you up in the air
@@ -1117,7 +1154,7 @@ class Mobs(private val world: World) {
 
     fun voice(t: MobType) = when (t) {
         MobType.WARDEN, MobType.TEAR_DRIFTER -> "enderman"
-        MobType.FLAME_SPINNER, MobType.SEA_SENTINEL, MobType.MILKMAN -> "none"; MobType.RAIDER -> "zombie"; MobType.GOLD_HOG, MobType.TUSK_BOAR, MobType.RAMPAGE_BEAST, MobType.SNIFFER, MobType.HUSK_HOG -> "pig"; MobType.FROST_ARCHER, MobType.ASH_SKELETON -> "skeleton"; MobType.SPINY_PUFFER, MobType.SHELL_GUARD, MobType.LAVA_STRIDER -> "none"; MobType.VOID_MITE -> "spider"; MobType.GLIMMER -> "none"; MobType.CAMEL -> "horse"; MobType.DUSK_WITHER -> "enderman"; MobType.SPELL_RAIDER -> "witch"
+        MobType.FLAME_SPINNER, MobType.SEA_SENTINEL, MobType.MILKMAN -> "none"; MobType.MUTANT_ZOMBIE -> "zombie"; MobType.MUTANT_BOOMLING -> "boomling"; MobType.RAIDER -> "zombie"; MobType.GOLD_HOG, MobType.TUSK_BOAR, MobType.RAMPAGE_BEAST, MobType.SNIFFER, MobType.HUSK_HOG -> "pig"; MobType.FROST_ARCHER, MobType.ASH_SKELETON -> "skeleton"; MobType.SPINY_PUFFER, MobType.SHELL_GUARD, MobType.LAVA_STRIDER -> "none"; MobType.VOID_MITE -> "spider"; MobType.GLIMMER -> "none"; MobType.CAMEL -> "horse"; MobType.DUSK_WITHER -> "enderman"; MobType.SPELL_RAIDER -> "witch"
         MobType.DROWNED -> "zombie"; MobType.RABBIT, MobType.SQUID, MobType.COD -> "none"
         MobType.IRON_GOLEM, MobType.SNOW_GOLEM, MobType.TURTLE, MobType.AXOLOTL, MobType.ROBOT -> "none"
         MobType.MOOSHROOM -> "cow"; MobType.POLAR_BEAR, MobType.PANDA -> "bear"

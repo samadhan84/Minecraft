@@ -34,7 +34,28 @@ object MobModels {
         return out
     }
 
+    private fun scaled(parts: List<Part>, k: Float) = parts.map { p -> Part(FloatArray(6) { p.b[it] * k }, p.pivotY * k, p.pivotZ * k, p.swing, p.tiles) }
+
+    /** A zombie 1.8 times as big. */
+    private fun mutantZombie() = scaled(listOf(
+        box(-0.25f, 0f, -0.125f, 0f, 0.75f, 0.125f, tiles("zombie_pants"), 1),
+        box(0f, 0f, -0.125f, 0.25f, 0.75f, 0.125f, tiles("zombie_pants"), -1),
+        box(-0.25f, 0.75f, -0.14f, 0.25f, 1.45f, 0.14f, tiles("zombie_shirt")),
+        box(-0.25f, 1.45f, -0.25f, 0.25f, 1.95f, 0.25f, tiles("zombie_skin", front = "zombie_face", top = "zombie_hair", back = "zombie_hair")),
+        box(-0.5f, 0.75f, -0.125f, -0.25f, 1.45f, 0.125f, tiles("zombie_skin", top = "zombie_shirt"), 2, pivotY = 1.35f),
+        box(0.25f, 0.75f, -0.125f, 0.5f, 1.45f, 0.125f, tiles("zombie_skin", top = "zombie_shirt"), 2, pivotY = 1.35f),
+    ), 1.7f)
+
+    /** A Boomling 2.6 times as big. */
+    private fun mutantBoomling() = scaled(listOf(
+        box(-0.4f, 0.35f, -0.4f, 0.4f, 1.1f, 0.4f, tiles("boomling_shell", front = "boomling_face")),
+        box(-0.3f, 1.1f, -0.3f, 0.3f, 1.2f, 0.3f, tiles("boomling_shell")),
+        box(-0.05f, 1.2f, -0.05f, 0.05f, 1.45f, 0.05f, tiles("boomling_fuse")),
+    ) + legs(0.22f, 0.22f, 0.25f, 0.35f, "boomling_leg"), 2.6f)
+
     val models: Map<MobType, List<Part>> = mapOf(
+        MobType.MUTANT_ZOMBIE to mutantZombie(),
+        MobType.MUTANT_BOOMLING to mutantBoomling(),
         MobType.COW to listOf(
             box(-0.45f, 0.6f, -0.65f, 0.45f, 1.35f, 0.65f, tiles("cow_hide")),
             box(-0.28f, 1.0f, -1.05f, 0.28f, 1.5f, -0.65f, tiles("cow_hide", front = "cow_face")),

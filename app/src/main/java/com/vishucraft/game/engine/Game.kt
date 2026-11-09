@@ -451,14 +451,56 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
     }
 
     /** A lightning bolt hits the ground at (x, z): it hurts anything within a few blocks, you included, and cracks the grass under it. */
+    // ---- a blast of a thousand TNT: the crater is dug a few thousand blocks a frame so the game does not freeze.
+    private class Blast(val cx: Int, val cy: Int, val cz: Int, val r: Int) { var dx = -r; var dy = -r; var dz = -r; var done = false }
+    private val blasts = ArrayList<Blast>()
+
+    fun bigExplosion(x: Float, y: Float, z: Float, r: Float) {
+        redstone.onExplosion?.invoke(x, y, z, r)
+        sound("explode", x, y, z, 2f); sound("explode", x, y, z, 2f)
+        blasts.add(Blast(floorInt(x), floorInt(y), floorInt(z), r.toInt()))
+    }
+
+    private fun updateBlasts() {
+        if (blasts.isEmpty()) return
+        val rnd = java.util.Random()
+        val it = blasts.iterator()
+        while (it.hasNext()) {
+            val b = it.next()
+            var budget = 6000
+            while (budget > 0 && !b.done) {
+                val d = sqrt((b.dx * b.dx + b.dy * b.dy + b.dz * b.dz).toFloat())
+                if (d <= b.r * (0.85f + rnd.nextFloat() * 0.15f)) {
+                    val x = b.cx + b.dx; val y = b.cy + b.dy; val z = b.cz + b.dz
+                    if (y > 0 && y < Chunk.HEIGHT) {
+                        val id = world.getBlock(x, y, z)
+                        if (id != Blocks.AIR && id != Blocks.WATER && id != Blocks.BEDROCK && Blocks[id].breakable) { setBlock(x, y, z, Blocks.AIR); budget-- }
+                    }
+                }
+                budget--
+                if (++b.dx > b.r) { b.dx = -b.r; if (++b.dz > b.r) { b.dz = -b.r; if (++b.dy > b.r) b.done = true } }
+            }
+            if (b.done) it.remove()
+        }
+    }
+
     fun lightningStrike(x: Float, z: Float) {
         val bx = floorInt(x); val bz = floorInt(z)
         if (!world.isLoaded(bx, bz)) return
         var y = world.columnHeight(bx, bz) - 1
         while (y > 0 && !Blocks.solid[world.getBlock(bx, y, bz)]) y--
         sound("explode", x, y + 1f, z, 1.4f)
-        for (m in mobs.list) if (!m.dead && (m.x - x) * (m.x - x) + (m.z - z) * (m.z - z) < 16f)
-            mobs.damage(m, 12f, (m.x - x) * 0.2f, (m.z - z) * 0.2f)
+        // A zombie or a Boomling struck by the bolt turns into a mutant; anything else near it is hurt.
+        val mutate = ArrayList<Mob>()
+        for (m in mobs.list) if (!m.dead && (m.x - x) * (m.x - x) + (m.z - z) * (m.z - z) < 16f) {
+            if (m.type == MobType.ZOMBIE || m.type == MobType.BOOMLING) mutate.add(m)
+            else mobs.damage(m, 12f, (m.x - x) * 0.2f, (m.z - z) * 0.2f)
+        }
+        for (m in mutate) {
+            mobs.list.remove(m)
+            mobs.list.add(Mob(if (m.type == MobType.ZOMBIE) MobType.MUTANT_ZOMBIE else MobType.MUTANT_BOOMLING, m.x, m.y, m.z))
+            uiEvents.add("toast:The lightning made a ${if (m.type == MobType.ZOMBIE) "Mutant Zombie" else "Mutant Boomling"}!")
+        }
         if (playerAlive && (player.x - x) * (player.x - x) + (player.z - z) * (player.z - z) < 12f) hurtPlayer(8f, x, z)
         if (world.getBlock(bx, y, bz) == Blocks.GRASS) setBlock(bx, y, bz, Blocks.DIRT)
         uiEvents.add("lightning:$x,${y + 1},$z")
@@ -589,6 +631,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
         if (!peopleRemoved && spawned) { peopleRemoved = true; if (!isClient) removePeople() }
         updateCoasters(dt)
         updateBeacons(dt)
+        updateBlasts()
         updateLift(dt)
         if (bowCooldown > 0f) bowCooldown -= dt
         // Standing in a portal for two seconds travels to the other world.
@@ -776,6 +819,8 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
             MobType.SHELL_GUARD -> listOf(i("Amethyst Shard") to 1 + r.nextInt(2), i("Ender Pearl") to (if (r.nextInt(5) == 0) 1 else 0))
             MobType.HUSK_HOG -> listOf(i("Gold Nugget") to r.nextInt(3), i("Rotten Flesh") to r.nextInt(3), i("Raw Porkchop") to r.nextInt(2))
             MobType.LAVA_STRIDER -> listOf(i("String") to 2 + r.nextInt(4))
+            MobType.MUTANT_ZOMBIE -> listOf(i("Rotten Flesh") to 3 + r.nextInt(4), i("Iron Ingot") to 2 + r.nextInt(3), i("Emerald") to r.nextInt(3))
+            MobType.MUTANT_BOOMLING -> listOf(i("Gunpowder") to 6 + r.nextInt(6))
             MobType.SPELL_RAIDER -> listOf(i("Emerald") to r.nextInt(2), i("Glass Bottle") to r.nextInt(2))
             MobType.RAMPAGE_BEAST -> listOf(i("Leather") to 1 + r.nextInt(3), i("Raw Porkchop") to 2, i("Emerald") to 1)
             MobType.RAIDER -> listOf(i("Arrow") to r.nextInt(3), i("Emerald") to (if (r.nextInt(4) == 0) 1 else 0))
@@ -1020,6 +1065,8 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
     private fun hit(mobHit: MobHit, item: ItemDef?) {
         var dmg = (item?.attack ?: 1).toFloat()
         if (hasEffect("strength")) dmg += 3f
+        // An iron golem goes down in five hits, whatever you hit it with.
+        if (mobHit.mob.type == MobType.IRON_GOLEM) dmg = maxOf(dmg, mobHit.mob.type.maxHealth / 5f)
         // A mace hits harder the further you fall onto the target.
         if (item?.name == "Mace" && player.vy < -6f) dmg += (-player.vy - 6f) * 1.5f
         val len = sqrt(dir[0] * dir[0] + dir[2] * dir[2]).coerceAtLeast(0.01f)

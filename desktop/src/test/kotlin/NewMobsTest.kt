@@ -485,3 +485,72 @@ class EatTest {
         assertEquals(2, g.inventory.count(Items.find("Bread")))
     }
 }
+
+class MutantTest {
+    private fun game(): Game {
+        val dir = kotlin.io.path.createTempDirectory("mutant").toFile()
+        val level = LevelData.create(51L, "t", GameMode.SURVIVAL)
+        val g = Game(World(level.seed, dir, Dimension.OVERWORLD, flat = true), level, GameInput(), dir)
+        for (cx in -4..4) for (cz in -4..4) g.world.ensureLoaded(cx, cz)
+        g.timeOfDay = 0.3f
+        g.mobs.hostileEnabled = true
+        return g
+    }
+    private fun run(g: Game, seconds: Float, until: () -> Boolean = { false }) { var t = 0f; while (t < seconds && !until()) { g.update(1 / 20f); g.dirtyChunks.clear(); t += 1 / 20f } }
+
+    @Test fun lightningMakesMutants() {
+        val g = game()
+        val y = g.world.generator.surfaceHeight(0, 0) + 1f
+        g.player.x = 30.5f; g.player.y = y; g.player.z = 30.5f
+        g.mobs.list.add(Mob(MobType.ZOMBIE, 1f, y, 1f)); g.mobs.list.add(Mob(MobType.BOOMLING, 2f, y, 2f))
+        g.lightningStrike(1.5f, 1.5f)
+        assertTrue(g.mobs.list.any { it.type == MobType.MUTANT_ZOMBIE }, "the zombie became a Mutant Zombie")
+        assertTrue(g.mobs.list.any { it.type == MobType.MUTANT_BOOMLING }, "the Boomling became a Mutant Boomling")
+        assertTrue(g.mobs.list.none { it.type == MobType.ZOMBIE || it.type == MobType.BOOMLING })
+    }
+
+    @Test fun aMutantBoomlingBlowsAHugeCrater() {
+        val g = game()
+        val y = g.world.generator.surfaceHeight(0, 0)
+        g.player.x = 20.5f; g.player.y = y + 1f; g.player.z = 0.5f
+        val mb = Mob(MobType.MUTANT_BOOMLING, 4f, y + 1f, 0.5f); g.mobs.list.add(mb)
+        assertTrue(g.world.getBlock(10, y, 0) != Blocks.AIR && g.world.getBlock(4, y - 6, 0) != Blocks.AIR, "solid ground before")
+        run(g, 15f) { mb.dead }
+        assertTrue(mb.dead, "it blew up")
+        run(g, 3f)
+        assertEquals(Blocks.AIR, g.world.getBlock(4, y - 10, 0), "a crater ten blocks deep")
+        assertEquals(Blocks.AIR, g.world.getBlock(20, y - 3, 0), "and wide: sixteen blocks away")
+    }
+
+    @Test fun anIronGolemDiesInFiveHits() {
+        val g = game()
+        val y = g.world.generator.surfaceHeight(0, 0) + 1f
+        g.player.x = 0.5f; g.player.y = y; g.player.z = 0.5f; g.player.yaw = 0f; g.player.pitch = 0f
+        val golem = Mob(MobType.IRON_GOLEM, 0.5f, y, -1.6f); g.mobs.list.add(golem)
+        var hits = 0
+        // (A hit knocks it back, so stand in front of it again before each hit.)
+        while (!golem.dead && hits < 12) {
+            golem.x = 0.5f; golem.z = -1.6f; golem.vx = 0f; golem.vz = 0f
+            g.input.actions.add(GameInput.Action.ATTACK); g.update(1 / 20f); g.dirtyChunks.clear(); hits++
+        }
+        assertTrue(golem.dead, "it died")
+        assertEquals(5, hits, "it took exactly five hits")
+    }
+
+    @Test fun anIronGolemCannotReachYouWhenYouStandHigherThanIt() {
+        val high = game()
+        val y = high.world.generator.surfaceHeight(0, 0) + 1
+        high.setBlock(0, y, 0, Blocks.STONE); high.setBlock(0, y + 1, 0, Blocks.STONE)        // a pillar two blocks tall
+        high.player.x = 0.5f; high.player.y = y + 2f; high.player.z = 0.5f
+        val gh = Mob(MobType.IRON_GOLEM, 2.2f, y.toFloat(), 0.5f).also { it.angry = true }; high.mobs.list.add(gh)
+        val before = high.health
+        run(high, 6f)
+        assertEquals(before, high.health, "standing higher than the golem you are safe")
+        val low = game()
+        low.player.x = 0.5f; low.player.y = y.toFloat(); low.player.z = 0.5f
+        low.mobs.list.add(Mob(MobType.IRON_GOLEM, 2.2f, y.toFloat(), 0.5f).also { it.angry = true })
+        val b2 = low.health
+        run(low, 6f) { low.health < b2 }
+        assertTrue(low.health < b2, "on the ground it hits you")
+    }
+}
