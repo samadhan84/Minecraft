@@ -870,7 +870,16 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
             // Push one item the way the hopper points (down, or sideways into a chest it was placed against).
             val facing = world.getMeta(x, y, z).let { if (it in 2..5) it else 1 }
             val out = ChunkMesher.NORMALS[facing]
-            when (val below = world.blockEntities.get(x + out[0], y + out[1], z + out[2])) {
+            // If nothing is there, a hopper that points down still fills a chest standing beside it.
+            var target = world.blockEntities.get(x + out[0], y + out[1], z + out[2])
+            if (target !is ChestEntity && target !is FurnaceEntity) {
+                for (f in 2..5) {
+                    val n = ChunkMesher.NORMALS[f]
+                    val side = world.blockEntities.get(x + n[0], y, z + n[2])
+                    if (side is ChestEntity && side !is com.vishucraft.game.world.HopperEntity) { target = side; break }
+                }
+            }
+            when (val below = target) {
                 is ChestEntity -> e.slots.firstOrNull { it != null }?.let { s -> if (below.insert(s.id, 1, s.damage) == 0) e.takeOne() }
                 is FurnaceEntity -> e.slots.firstOrNull { it != null }?.let { s ->
                     val smelt = com.vishucraft.game.world.Recipes.smelting.containsKey(s.id)
@@ -978,7 +987,12 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
             drops.spawn(ItemStack(Blocks.SHELL_BOX, 1, key), x + 0.5f, y + 0.3f, z + 0.5f)
         } else if (survival) {
             val dropped = Drops.forBlock(id, heldItem(), meta)
-            for ((dropId, n) in dropped) drops.spawn(ItemStack(dropId, n), x + 0.5f, y + 0.3f, z + 0.5f)
+            // A hopper right under the block catches what it drops before anything else can (like items falling into it).
+            val hopperBelow = if (world.getBlock(x, y - 1, z) == Blocks.HOPPER) world.blockEntities.hopper(x, y - 1, z) else null
+            for ((dropId, n) in dropped) {
+                val left = hopperBelow?.insert(dropId, n) ?: n
+                if (left > 0) drops.spawn(ItemStack(dropId, left), x + 0.5f, y + 0.3f, z + 0.5f)
+            }
             if (dropped.isNotEmpty()) addXp(when (id) {
                 Blocks.COAL_ORE -> 1; Blocks.REDSTONE_ORE, Blocks.LAPIS_ORE -> 3; Blocks.DIAMOND_ORE, Blocks.EMERALD_ORE -> 5; else -> 0
             })
