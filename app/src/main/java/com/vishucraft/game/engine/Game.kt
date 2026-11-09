@@ -995,8 +995,10 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
             drops.spawn(ItemStack(Blocks.SHELL_BOX, 1, key), x + 0.5f, y + 0.3f, z + 0.5f)
         } else if (survival) {
             val dropped = Drops.forBlock(id, heldItem(), meta)
-            // A hopper right under the block catches what it drops before anything else can (like items falling into it).
-            val hopperBelow = if (world.getBlock(x, y - 1, z) == Blocks.HOPPER) world.blockEntities.hopper(x, y - 1, z) else null
+            // A hopper touching the block (under it first, then above or beside it) catches what it drops before anything else can.
+            val hopperBelow = listOf(intArrayOf(0, -1, 0), intArrayOf(0, 1, 0), intArrayOf(1, 0, 0), intArrayOf(-1, 0, 0), intArrayOf(0, 0, 1), intArrayOf(0, 0, -1))
+                .firstOrNull { world.getBlock(x + it[0], y + it[1], z + it[2]) == Blocks.HOPPER }
+                ?.let { world.blockEntities.hopper(x + it[0], y + it[1], z + it[2]) }
             for ((dropId, n) in dropped) {
                 val left = hopperBelow?.insert(dropId, n) ?: n
                 if (left > 0) drops.spawn(ItemStack(dropId, left), x + 0.5f, y + 0.3f, z + 0.5f)

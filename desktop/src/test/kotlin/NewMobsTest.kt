@@ -659,3 +659,24 @@ class GeneratorFarmTest {
         assertEquals(0, g.inventory.count(Blocks.COBBLESTONE), "none were picked up by hand")
     }
 }
+
+class HopperSidesTest {
+    @Test fun aHopperAboveOrBesideTheBrokenStoneCatchesItToo() {
+        for ((hx, hy, hz) in listOf(Triple(0, 1, 0), Triple(1, 0, 0), Triple(0, 0, -1))) {
+            val dir = kotlin.io.path.createTempDirectory("sides").toFile()
+            val level = LevelData.create(91L, "t", GameMode.SURVIVAL)
+            val g = Game(World(level.seed, dir, Dimension.OVERWORLD, flat = true), level, GameInput(), dir)
+            for (cx in -2..2) for (cz in -2..2) g.world.ensureLoaded(cx, cz)
+            val y = g.world.generator.surfaceHeight(0, 0) + 6
+            g.player.x = 5.5f; g.player.y = y.toFloat(); g.player.z = 5.5f
+            g.setBlock(0, y, 0, Blocks.COBBLESTONE)
+            g.setBlock(hx, y + hy, hz, Blocks.HOPPER, 1)
+            g.setBlock(hx, y + hy - 1 + (if (hy == 1) -1 else 0), hz + (if (hy == 0 && hx == 0) -1 else 0), Blocks.CHEST, 2)   // a chest under the hopper
+            g.inventory.slots[0] = ItemStack(Items.find("Wooden Pickaxe"), 1); g.input.selectedSlot = 0
+            g.breakBlock(0, y, 0)
+            assertEquals(0, g.drops.list.count { it.stack.id == Blocks.COBBLESTONE }, "nothing is left lying on the ground ($hx,$hy,$hz)")
+            val hopper = g.world.blockEntities.hopper(hx, y + hy, hz)!!
+            assertTrue(hopper.slots.any { it != null && it.id == Blocks.COBBLESTONE }, "the hopper at ($hx,$hy,$hz) has the stone")
+        }
+    }
+}
