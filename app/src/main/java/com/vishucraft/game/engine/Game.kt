@@ -867,8 +867,10 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
             e.cooldown -= dt
             if (e.cooldown > 0f) continue
             e.cooldown = 0.4f
-            // Push one item down.
-            when (val below = world.blockEntities.get(x, y - 1, z)) {
+            // Push one item the way the hopper points (down, or sideways into a chest it was placed against).
+            val facing = world.getMeta(x, y, z).let { if (it in 2..5) it else 1 }
+            val out = ChunkMesher.NORMALS[facing]
+            when (val below = world.blockEntities.get(x + out[0], y + out[1], z + out[2])) {
                 is ChestEntity -> e.slots.firstOrNull { it != null }?.let { s -> if (below.insert(s.id, 1, s.damage) == 0) e.takeOne() }
                 is FurnaceEntity -> e.slots.firstOrNull { it != null }?.let { s ->
                     val smelt = com.vishucraft.game.world.Recipes.smelting.containsKey(s.id)
@@ -889,7 +891,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
             }
             // Swallow items lying on top.
             for (d in drops.list) {
-                if (floorInt(d.x) == x && floorInt(d.z) == z && d.y >= y + 0.5f && d.y < y + 1.6f && d.stack.count > 0) {
+                if (floorInt(d.x) == x && floorInt(d.z) == z && d.y >= y + 0.3f && d.y < y + 2.2f && d.stack.count > 0) {
                     d.stack.count = e.insert(d.stack.id, d.stack.count, d.stack.damage)
                 }
             }
@@ -1914,6 +1916,10 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
                 if (id == Blocks.PAINTING) meta = meta or (java.util.Random().nextInt(4) shl 3)
             }
             Blocks.REPEATER, Blocks.OBSERVER -> meta = meta xor 1
+            // A hopper placed against the side of a chest (or a furnace, or another hopper) points into it; otherwise it points down.
+            Blocks.HOPPER -> meta = if (!replace && t.ny == 0 && world.blockEntities.get(t.x, t.y, t.z) != null) {
+                (2..5).firstOrNull { ChunkMesher.NORMALS[it][0] == -t.nx && ChunkMesher.NORMALS[it][2] == -t.nz } ?: 1
+            } else 1
             Blocks.LEVER, in Blocks.WOOD_BUTTON_FIRST until Blocks.WOOD_BUTTON_FIRST + 6, Blocks.STONE_BUTTON -> {
                 // Stick it to the face that was tapped: floor, ceiling or a wall (a replaced plant: the floor).
                 val support = if (replace) 1 else when {

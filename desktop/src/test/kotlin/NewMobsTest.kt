@@ -603,3 +603,26 @@ class FluidTest {
         assertEquals(Blocks.OBSIDIAN, g.world.getBlock(0, y, 0), "water above lava gives obsidian")
     }
 }
+
+class HopperTest {
+    @Test fun aHopperUnderAGeneratorCollectsTheBrokenBlockIntoAChestBesideIt() {
+        val dir = kotlin.io.path.createTempDirectory("hop").toFile()
+        val level = LevelData.create(71L, "t", GameMode.SURVIVAL)
+        val g = Game(World(level.seed, dir, Dimension.OVERWORLD, flat = true), level, GameInput(), dir)
+        for (cx in -2..2) for (cz in -2..2) g.world.ensureLoaded(cx, cz)
+        val y = g.world.generator.surfaceHeight(0, 0) + 5
+        g.player.x = 30.5f; g.player.y = y.toFloat(); g.player.z = 30.5f
+        // A hopper pointing east into a chest, and a cobblestone block on top of the hopper.
+        g.setBlock(1, y, 0, Blocks.CHEST, 2)
+        g.world.blockEntities.chest(1, y, 0)
+        g.setBlock(0, y, 0, Blocks.HOPPER, 4)              // meta 4: points east (+x)
+        g.world.blockEntities.hopper(0, y, 0)
+        g.setBlock(0, y + 1, 0, Blocks.COBBLESTONE)
+        g.inventory.slots[0] = ItemStack(Items.find("Wooden Pickaxe"), 1); g.input.selectedSlot = 0   // cobblestone needs a pickaxe to drop
+        g.breakBlock(0, y + 1, 0)                           // the broken block drops as an item above the hopper
+        var t = 0f
+        val chest = g.world.blockEntities.chest(1, y, 0)!!
+        while (t < 8f && chest.slots.none { it != null }) { g.update(1 / 20f); g.dirtyChunks.clear(); t += 1 / 20f }
+        assertTrue(chest.slots.any { it != null && it.id == Blocks.COBBLESTONE }, "the cobblestone ended up in the chest")
+    }
+}
