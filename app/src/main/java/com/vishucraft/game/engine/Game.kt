@@ -126,7 +126,15 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
         level.mode = if (survival) GameMode.CREATIVE else GameMode.SURVIVAL
         // A fresh start either way: full health and food, and no flying in survival.
         health = 20f; food = 20f; air = 10f
-        if (survival) { player.flying = false; return "Survival mode: collect, craft and survive. Your items are kept" }
+        if (survival) {
+            player.flying = false
+            // A single block, bed or other stackable thing taken in creative becomes a full stack; tools, swords and boxes stay single.
+            for (st in inventory.slots) if (st != null && st.count == 1) {
+                val max = Items.maxStack(st.id)
+                if (max > 1) st.count = max
+            }
+            return "Survival mode: collect, craft and survive. Single blocks and items became full stacks"
+        }
         return "Creative mode: every block, flying (double-jump or FLY) and no damage"
     }
 
@@ -999,8 +1007,12 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
             val hopperBelow = listOf(intArrayOf(0, -1, 0), intArrayOf(0, 1, 0), intArrayOf(1, 0, 0), intArrayOf(-1, 0, 0), intArrayOf(0, 0, 1), intArrayOf(0, 0, -1))
                 .firstOrNull { world.getBlock(x + it[0], y + it[1], z + it[2]) == Blocks.HOPPER }
                 ?.let { world.blockEntities.hopper(x + it[0], y + it[1], z + it[2]) }
+            val touchesFluid = listOf(intArrayOf(0, -1, 0), intArrayOf(0, 1, 0), intArrayOf(1, 0, 0), intArrayOf(-1, 0, 0), intArrayOf(0, 0, 1), intArrayOf(0, 0, -1))
+                .any { val b = world.getBlock(x + it[0], y + it[1], z + it[2]); b == Blocks.WATER || b == Blocks.LAVA }
             for ((dropId, n) in dropped) {
-                val left = hopperBelow?.insert(dropId, n) ?: n
+                var left = hopperBelow?.insert(dropId, n) ?: n
+                // Stone made by lava meeting water sits in a tiny gap the next flow can fill again, so it goes straight into your inventory.
+                if (left > 0 && touchesFluid) left = inventory.add(dropId, left)
                 if (left > 0) drops.spawn(ItemStack(dropId, left), x + 0.5f, y + 0.3f, z + 0.5f)
             }
             if (dropped.isNotEmpty()) addXp(when (id) {

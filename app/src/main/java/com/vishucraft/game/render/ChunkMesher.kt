@@ -59,8 +59,8 @@ class ChunkMesher {
             arrayOf(intArrayOf(0, 0, 0), intArrayOf(0, 0, 1), intArrayOf(0, 1, 1), intArrayOf(0, 1, 0)),
         )
         val UVS = arrayOf(floatArrayOf(0f, 1f), floatArrayOf(1f, 1f), floatArrayOf(1f, 0f), floatArrayOf(0f, 0f))
-        val FACE_SHADE = floatArrayOf(1.0f, 0.5f, 0.8f, 0.8f, 0.65f, 0.65f)
-        val AO_CURVE = floatArrayOf(0.45f, 0.62f, 0.8f, 1.0f)
+        val FACE_SHADE = floatArrayOf(1f, 1f, 1f, 1f, 1f, 1f)   // no side shading
+        val AO_CURVE = floatArrayOf(1f, 1f, 1f, 1f)
 
         /** For each face and corner: offsets (relative to the block) of side1, side2 and the diagonal cell. */
         val AO_OFFSETS: Array<Array<IntArray>> = Array(6) { f ->
@@ -81,7 +81,7 @@ class ChunkMesher {
         }
 
         /** Darkness floor for places the sky cannot reach. */
-        const val CAVE = 0.05f
+        const val CAVE = 1f   // nothing is darkened underground
         private const val LW = Chunk.SIZE * 3 // light region: the chunk and all 8 neighbours
 
         fun tileU(tile: Int) = (tile % TextureAtlas.TILES_PER_ROW) * TILE_UV

@@ -680,3 +680,41 @@ class HopperSidesTest {
         }
     }
 }
+
+class GeneratorHandTest {
+    @Test fun theStoneFromAGeneratorEndsUpInYourInventory() {
+        val dir = kotlin.io.path.createTempDirectory("hand").toFile()
+        val level = LevelData.create(83L, "t", GameMode.SURVIVAL)
+        val g = Game(World(level.seed, dir, Dimension.OVERWORLD, flat = true), level, GameInput(), dir)
+        for (cx in -2..2) for (cz in -2..2) g.world.ensureLoaded(cx, cz)
+        val y = g.world.generator.surfaceHeight(0, 0) + 6
+        for (x in -1..3) for (z in -1..1) { g.setBlock(x, y - 1, z, Blocks.STONE); g.setBlock(x, y + 1, z, Blocks.STONE) }
+        for (x in -1..3) { g.setBlock(x, y, -1, Blocks.STONE); g.setBlock(x, y, 1, Blocks.STONE) }
+        g.setBlock(-1, y, 0, Blocks.STONE); g.setBlock(3, y, 0, Blocks.STONE)
+        g.setBlock(0, y, 0, Blocks.WATER, 0); g.setBlock(2, y, 0, Blocks.LAVA, 0)
+        g.player.x = 1.5f; g.player.y = (y - 1).toFloat() + 0.1f; g.player.z = 3.5f
+        g.inventory.slots[0] = ItemStack(Items.find("Enchanted Diamond Pickaxe"), 1); g.input.selectedSlot = 0
+        for (round in 1..3) {
+            var t = 0f
+            while (t < 6f && g.world.getBlock(1, y, 0) != Blocks.COBBLESTONE) { g.update(1 / 20f); g.dirtyChunks.clear(); t += 1 / 20f }
+            assertEquals(Blocks.COBBLESTONE, g.world.getBlock(1, y, 0), "round $round made stone")
+            g.breakBlock(1, y, 0)
+            t = 0f
+            while (t < 3f) { g.update(1 / 20f); g.dirtyChunks.clear(); t += 1 / 20f }
+        }
+        assertEquals(3, g.inventory.count(Blocks.COBBLESTONE), "stones in hand; drops=" + g.drops.list.map { "${it.stack.id}@${it.x},${it.y},${it.z}" })
+    }
+}
+
+class StackConvertTest {
+    @Test fun singleBlocksBecomeFullStacksInSurvivalButToolsStaySingle() {
+        val dir = kotlin.io.path.createTempDirectory("stk").toFile()
+        val level = LevelData.create(85L, "t", GameMode.CREATIVE)
+        val g = Game(World(level.seed, dir, Dimension.OVERWORLD, flat = true), level, GameInput(), dir)
+        g.inventory.slots[0] = ItemStack(Blocks.COBBLESTONE, 1)
+        g.inventory.slots[1] = ItemStack(Items.find("Iron Pickaxe"), 1)
+        g.switchMode()
+        assertEquals(64, g.inventory.slots[0]!!.count)
+        assertEquals(1, g.inventory.slots[1]!!.count)
+    }
+}
