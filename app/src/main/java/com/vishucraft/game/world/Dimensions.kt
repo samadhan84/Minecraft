@@ -189,6 +189,115 @@ class Structures(private val seed: Long, private val gen: WorldGenerator, privat
                 if (gen.surfaceHeight(x, z) - 10 < y) continue
                 mine(p, x, y, z, rnd)
             }
+        // Underground forts (a hall with four corner towers and loot) and woodland mansions, each on a big grid.
+        val fortCell = 128
+        for (rz in (p.z0 - 24).floorDiv(fortCell)..(p.z0 + 40).floorDiv(fortCell))
+            for (rx in (p.x0 - 24).floorDiv(fortCell)..(p.x0 + 40).floorDiv(fortCell)) {
+                val rnd = Random(seed xor (rx * 91238477L) xor (rz * 37159823L) xor 0xF0A7)
+                if (rnd.nextInt(3) == 0) continue
+                val x = rx * fortCell + 24 + rnd.nextInt(fortCell - 48); val z = rz * fortCell + 24 + rnd.nextInt(fortCell - 48)
+                val y = 12 + rnd.nextInt(10)
+                if (gen.surfaceHeight(x, z) - 12 < y) continue
+                fort(p, x, y, z, rnd)
+            }
+        val mansionCell = 192
+        for (rz in (p.z0 - 24).floorDiv(mansionCell)..(p.z0 + 40).floorDiv(mansionCell))
+            for (rx in (p.x0 - 24).floorDiv(mansionCell)..(p.x0 + 40).floorDiv(mansionCell)) {
+                val rnd = Random(seed xor (rx * 51239471L) xor (rz * 77100221L) xor 0x3A5)
+                val x = rx * mansionCell + 32 + rnd.nextInt(mansionCell - 64); val z = rz * mansionCell + 32 + rnd.nextInt(mansionCell - 64)
+                val h = gen.surfaceHeight(x, z)
+                if (h <= TerrainGenerator.SEA_LEVEL + 1 || h > 80) continue
+                if (gen.biomeAt(x, z) != Biome.FOREST && gen.biomeAt(x, z) != Biome.PLAINS) continue
+                mansion(p, x, h, z, rnd)
+            }
+    }
+
+    // ---------------------------------------------------------------- underground fort
+
+    /** A stone-brick keep 21 x 21 under the hills: a central hall, four corner towers, crossing corridors and loot. */
+    private fun fort(p: Put, x: Int, y: Int, z: Int, rnd: Random) {
+        for (dx in -10..10) for (dz in -10..10) for (dy in -1..6) {
+            val edge = abs(dx) == 10 || abs(dz) == 10 || dy == -1 || dy == 6
+            val id = if (!edge) Blocks.AIR else if (rnd.nextInt(4) == 0) Blocks.MOSSY_STONE_BRICKS else Blocks.STONE_BRICKS
+            set(p, x + dx, y + dy, z + dz, id)
+        }
+        // Inner walls make a cross of corridors and four rooms.
+        for (d in -9..9) for (dy in 0..4) {
+            if (abs(d) > 1) { set(p, x + d, y + dy, z - 3, Blocks.STONE_BRICKS); set(p, x + d, y + dy, z + 3, Blocks.STONE_BRICKS) }
+            if (abs(d) > 1) { set(p, x - 3, y + dy, z + d, Blocks.STONE_BRICKS); set(p, x + 3, y + dy, z + d, Blocks.STONE_BRICKS) }
+        }
+        for (dy in 0..4) for (dx in -3..3) for (dz in -3..3) if (abs(dx) == 3 || abs(dz) == 3) { if (abs(dx) > 1 && abs(dz) > 1 || (abs(dx) == 3 && abs(dz) == 3)) set(p, x + dx, y + dy, z + dz, Blocks.STONE_BRICKS) }
+        // Towers at the four corners are taller.
+        for (sx in intArrayOf(-1, 1)) for (sz in intArrayOf(-1, 1)) {
+            for (dx in -2..2) for (dz in -2..2) for (dy in 0..5) {
+                val wall = abs(dx) == 2 || abs(dz) == 2
+                set(p, x + sx * 7 + dx, y + dy, z + sz * 7 + dz, if (wall) Blocks.STONE_BRICKS else Blocks.AIR)
+            }
+            set(p, x + sx * 7, y + 1, z + sz * 7, Blocks.TORCH)
+            for (dx in -1..1) set(p, x + sx * 7 + dx, y + 2, z + sz * 5, Blocks.AIR)
+        }
+        // The great hall's torches and a grave of bookshelves.
+        for (d in intArrayOf(-8, 8)) { set(p, x + d, y + 2, z, Blocks.TORCH); set(p, x, y + 2, z + d, Blocks.TORCH) }
+        set(p, x, y, z, Blocks.BOOKSHELF); set(p, x, y + 1, z, Blocks.BOOKSHELF)
+        // The way out is a doorway in the middle of one wall, with iron bars across it.
+        for (dy in 0..2) { set(p, x, y + dy, z - 10, Blocks.IRON_BARS) }
+        val loot = listOf(
+            Items.find("Iron Ingot") to 1..6, Items.find("Gold Ingot") to 0..5, Items.find("Diamond") to (if (rnd.nextInt(2) == 0) 1..3 else 0..0),
+            Items.find("Emerald") to 0..3, Items.find("Golden Apple") to (if (rnd.nextInt(3) == 0) 1..1 else 0..0),
+            Items.find("Enchanted Diamond Sword") to (if (rnd.nextInt(8) == 0) 1..1 else 0..0),
+            Items.find("Bread") to 1..4, Items.find("Bone") to 0..4,
+        )
+        lootChest(p, x - 6, y, z - 6, rnd, loot, 3); lootChest(p, x + 6, y, z - 6, rnd, loot, 3)
+        lootChest(p, x - 6, y, z + 6, rnd, loot, 2); lootChest(p, x + 6, y, z + 6, rnd, loot, 2)
+    }
+
+    // ---------------------------------------------------------------- mansion
+
+    /** A big dark-oak house on the surface: 3 floors, windows, a stone-brick base, rooms with carpet, bookshelves and chests. */
+    private fun mansion(p: Put, cx: Int, h: Int, cz: Int, rnd: Random) {
+        val w = 14; val d = 10
+        // Foundation down to the ground.
+        for (dx in -w..w) for (dz in -d..d) for (y in h - 5 until h) set(p, cx + dx, y, cz + dz, Blocks.STONE_BRICKS)
+        for (floor in 0..2) {
+            val y0 = h + floor * 5
+            for (dx in -w..w) for (dz in -d..d) {
+                val edge = abs(dx) == w || abs(dz) == d
+                val corner = abs(dx) == w && abs(dz) == d
+                set(p, cx + dx, y0, cz + dz, Blocks.DARK_OAK_PLANKS)   // floor
+                for (dy in 1..4) {
+                    val id = when {
+                        corner -> Blocks.DARK_OAK_LOG
+                        edge && dy in 2..3 && (abs(dx) + abs(dz)) % 3 == 0 -> Blocks.GLASS_PANE
+                        edge -> if (dy == 4) Blocks.STONE_BRICKS else Blocks.DARK_OAK_PLANKS
+                        else -> Blocks.AIR
+                    }
+                    set(p, cx + dx, y0 + dy, cz + dz, id)
+                }
+            }
+            // Inner partition walls with doorways, making rooms.
+            for (dz in -d + 1 until d) if (abs(dz) > 1) for (dy in 1..4) { set(p, cx - 5, y0 + dy, cz + dz, Blocks.DARK_OAK_PLANKS); set(p, cx + 5, y0 + dy, cz + dz, Blocks.DARK_OAK_PLANKS) }
+            // Carpet and bookshelves and a chest in the side rooms; a torch in each room.
+            for (side in intArrayOf(-1, 1)) {
+                set(p, cx + side * 9, y0 + 3, cz, Blocks.TORCH)
+                for (dz in -3..3 step 2) set(p, cx + side * 12, y0 + 1, cz + dz, Blocks.BOOKSHELF)
+                if (rnd.nextInt(3) != 0) {
+                    val loot = listOf(
+                        Items.find("Gold Ingot") to 0..4, Items.find("Iron Ingot") to 0..5, Items.find("Bread") to 1..4,
+                        Items.find("Diamond") to (if (rnd.nextInt(4) == 0) 1..2 else 0..0), Items.find("Emerald") to 0..2,
+                        Items.find("Enchanted Diamond Pickaxe") to (if (rnd.nextInt(14) == 0) 1..1 else 0..0),
+                    )
+                    lootChest(p, cx + side * 12, y0 + 1, cz + 6, rnd, loot, if (side < 0) 5 else 4)
+                }
+            }
+            set(p, cx, y0 + 3, cz - d + 1, Blocks.TORCH); set(p, cx, y0 + 3, cz + d - 1, Blocks.TORCH)
+        }
+        // The roof: a flat top and a front doorway.
+        val top = h + 15
+        for (dx in -w - 1..w + 1) for (dz in -d - 1..d + 1) set(p, cx + dx, top, cz + dz, Blocks.DARK_OAK_PLANKS)
+        for (dx in -1..1) for (dy in 1..3) set(p, cx + dx, h + dy, cz - d, Blocks.AIR)
+        // A ladder-like stair of planks up the middle so every floor can be reached.
+        for (floor in 0..1) for (i in 0..4) set(p, cx + 1, h + floor * 5 + i + 1, cz + 3 + (if (i % 2 == 0) 0 else 1), Blocks.PLANKS)
+        for (floor in 0..1) for (dz in 3..4) for (dx in 1..1) set(p, cx + dx, h + floor * 5 + 5, cz + dz, Blocks.AIR)
     }
 
     // ---------------------------------------------------------------- abandoned mine

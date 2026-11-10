@@ -718,3 +718,18 @@ class StackConvertTest {
         assertEquals(1, g.inventory.slots[1]!!.count)
     }
 }
+
+class BigStructuresTest {
+    @Test fun fortsAndMansionsAreGenerated() {
+        val dir = kotlin.io.path.createTempDirectory("big").toFile()
+        val world = World(21L, dir, Dimension.OVERWORLD)
+        for (cx in -24..24) for (cz in -24..24) world.ensureLoaded(cx, cz)
+        var mansion = 0; var fort = 0
+        for (x in -384..384) for (z in -384..384) {
+            for (y in 60..100) if (world.getBlock(x, y, z) == Blocks.DARK_OAK_LOG) mansion++
+            for (y in 8..30) if (world.getBlock(x, y, z) == Blocks.IRON_BARS) fort++
+        }
+        assertTrue(mansion > 0 || fort > 0, "found mansion logs=$mansion fort bars=$fort")
+        println("STRUCTS mansion=$mansion fort=$fort")
+    }
+}
