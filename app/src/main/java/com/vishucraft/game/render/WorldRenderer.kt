@@ -274,6 +274,7 @@ class WorldRenderer(private val game: Game) {
         game.net?.let { n -> mobRenderer.draw(blockShader, n.players.values.map { it.proxy }, ex, ez, far) }
         dropRenderer.draw(blockShader, game.drops, ex, ez, far, game.timeOfDay, game.carts, game.projectiles, game.boats, game.aircraft, game.vehicles, game.world, game.fireworks, game.coasters)
         if (underwater) glUniform3f(blockShader.u("uTint"), 0.55f, 0.7f, 1f)
+        if (fancy) drawShadows(ex, ez)
 
         drawSelection()
         if (dim == com.vishucraft.game.world.Dimension.OVERWORLD) {
@@ -488,6 +489,49 @@ class WorldRenderer(private val game: Game) {
         glDepthMask(true)
         glEnable(GL_CULL_FACE)
         glDisable(GL_BLEND)
+    }
+
+    /** Soft round shadows on the ground under creatures. */
+    private fun drawShadows(ex: Float, ez: Float) {
+        dyn.size = 0
+        val u = ChunkMesher.tileU(Tiles.SHADOW); val v = ChunkMesher.tileV(Tiles.SHADOW); val tu = ChunkMesher.TILE_UV
+        val world = game.world
+        for (m in game.mobs.list) {
+            if (m.dead) continue
+            val dx = m.x - ex; val dz = m.z - ez
+            if (dx * dx + dz * dz > 40f * 40f) continue
+            val bx = floor(m.x).toInt(); val bz = floor(m.z).toInt()
+            var gy = floor(m.y + 0.01f).toInt()
+            var found = false
+            for (k in 0 until 5) {
+                val b = world.getBlock(bx, gy - 1, bz)
+                if (Blocks.solid[b] || Blocks.isLiquid(b)) { found = true; break }
+                gy--
+            }
+            if (!found) continue
+            val top = gy - 1 + (if (Blocks.isLiquid(world.getBlock(bx, gy - 1, bz))) 0.9f else Blocks.height[world.getBlock(bx, gy - 1, bz)]) + 0.02f
+            val fade = (1f - (m.y - top) / 4f).coerceIn(0f, 1f)
+            if (fade <= 0f) continue
+            val s = m.halfWidth * 1.4f + 0.1f
+            val al = 2f + 0.8f * fade
+            dyn.ensure(4 * FLOATS_PER_VERTEX)
+            dyn.put(m.x - s, top, m.z + s, u, v + tu, al); dyn.put(m.x + s, top, m.z + s, u + tu, v + tu, al)
+            dyn.put(m.x + s, top, m.z - s, u + tu, v, al); dyn.put(m.x - s, top, m.z - s, u, v, al)
+        }
+        if (dyn.size == 0) return
+        dynamic.upload(dyn.data, dyn.size)
+        simpleUniforms(floatArrayOf(1f, 1f, 1f, 1f), ex, ez, 0f, 0f)
+        glEnable(GL_BLEND)
+        glDisable(GL_CULL_FACE)
+        glDepthMask(false)
+        glEnable(GL_POLYGON_OFFSET_FILL)
+        glPolygonOffset(-2f, -2f)
+        dynamic.draw()
+        glDisable(GL_POLYGON_OFFSET_FILL)
+        glDepthMask(true)
+        glEnable(GL_CULL_FACE)
+        glDisable(GL_BLEND)
+        blockShader.use()
     }
 
     private fun drawClouds(ex: Float, ez: Float, daylight: Float, far: Float) {

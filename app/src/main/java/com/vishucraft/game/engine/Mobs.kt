@@ -1363,15 +1363,10 @@ class Mobs(private val world: World) {
                 if (y > 0) list.add(Mob(MobType.GLIDER, x + 0.5f, y + 12f, z + 0.5f))
                 return
             }
-            if (game.daylight < 0.3f) {
-                // Night: anywhere on the surface.
-                val y = surfaceY(x, z)
-                if (y > 0 && roomAt(x, y + 1, z, 2)) list.add(Mob(type, x + 0.5f, y + 1f, z + 0.5f))
-            } else {
-                // Day: only in dark caves.
-                val y = 6 + rnd.nextInt(50)
-                if (roomAt(x, y, z, 2) && !skyExposed(x, y, z)) list.add(Mob(type, x + 0.5f, y.toFloat(), z + 0.5f))
-            }
+            // Monsters only appear in the shade: caves, under roofs and thick trees, never in the open sky (night or day).
+            val surface = rnd.nextInt(3) == 0
+            val y = if (surface) surfaceY(x, z) + 1 else 6 + rnd.nextInt(50)
+            if (y > 0 && roomAt(x, y, z, 2) && !skyExposed(x, y, z)) list.add(Mob(type, x + 0.5f, y.toFloat(), z + 0.5f))
         }
     }
 

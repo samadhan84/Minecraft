@@ -576,7 +576,15 @@ object Drops {
                 else if (rnd.nextInt(100) < 7) one(if (id == Blocks.CHERRY_LEAVES) Blocks.CHERRY_SAPLING else i("Stick")) else emptyList()
             Blocks.BEE_NEST -> one(Blocks.BEE_NEST)
             Blocks.FRIDGE, Blocks.WARDROBE -> if (meta and Shapes.UPPER != 0) emptyList() else one(id)
-            Blocks.STONE -> one(Blocks.COBBLESTONE)
+            // Mining stone is rich: about half the time a diamond (with some coal), 45% plain cobblestone, and now and then another ore.
+            Blocks.STONE -> when (val roll = rnd.nextInt(100)) {
+                in 0..44 -> one(Blocks.COBBLESTONE)
+                in 45..94 -> listOf(i("Diamond") to 1, i("Coal") to 1 + rnd.nextInt(2))
+                else -> when (roll % 5) {
+                    0 -> one(i("Raw Iron")); 1 -> one(i("Raw Gold")); 2 -> listOf(Blocks.REDSTONE_DUST to 2 + rnd.nextInt(3))
+                    3 -> listOf(i("Lapis Lazuli") to 2 + rnd.nextInt(3)); else -> one(i("Emerald"))
+                }
+            }
             Blocks.DEEPSLATE -> one(Blocks.COBBLED_DEEPSLATE)
             Blocks.GRASS, Blocks.SNOW_GRASS, Blocks.MYCELIUM, Blocks.PODZOL, Blocks.FARMLAND, Blocks.DIRT_PATH -> one(Blocks.DIRT)
             Blocks.COAL_ORE -> one(i("Coal"))
