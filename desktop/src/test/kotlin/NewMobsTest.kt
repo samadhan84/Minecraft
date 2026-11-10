@@ -775,3 +775,22 @@ class XpFarmTest {
         assertTrue(spawned > 0, "monsters appeared in the shaft")
     }
 }
+
+class OldWorldFarmTest {
+    @Test fun anOldWorldGetsItsVillageFarmWhenItsChunksLoad() {
+        val dir = kotlin.io.path.createTempDirectory("oldfarm").toFile()
+        val w1 = World(21L, dir, Dimension.OVERWORLD)
+        for (cx in -16..16) for (cz in -16..16) w1.ensureLoaded(cx, cz)
+        var cage: IntArray? = null
+        loop@ for (x in -256..256) for (z in -256..256) for (y in 60..130) if (w1.getBlock(x, y, z) == Blocks.MOB_CAGE) { cage = intArrayOf(x, y, z); break@loop }
+        assertTrue(cage != null)
+        // Make it an "old" world: no cages anywhere, no record of farms.
+        for (x in -256..256) for (z in -256..256) for (y in 60..130) if (w1.getBlock(x, y, z) == Blocks.MOB_CAGE) w1.setBlock(x, y, z, Blocks.AIR)
+        w1.saveChunks()
+        java.io.File(dir, "farms.dat").delete()
+        w1.shutdown()
+        val w2 = World(21L, dir, Dimension.OVERWORLD)
+        for (cx in -16..16) for (cz in -16..16) w2.ensureLoaded(cx, cz)
+        assertEquals(Blocks.MOB_CAGE, w2.getBlock(cage!![0], cage[1], cage[2]), "the farm came back to the old chunks")
+    }
+}

@@ -148,7 +148,15 @@ class Structures(private val seed: Long, private val gen: WorldGenerator, privat
         world.blockEntities.map.putIfAbsent(RedstoneIds.pack(x, y, z), chest)
     }
 
-    fun place(chunk: Chunk) {
+    /** Old worlds: adds the XP farm of any village whose chunk was generated before farms existed (see World.ensureLoaded). */
+    fun placeFarms(chunk: Chunk) { place(chunk, farmsOnly = true) }
+
+    private fun farmFor(p: Put, cx: Int, cz: Int) {
+        val fa = Random(seed xor (cx * 341873128712L) xor (cz * 132897987541L) xor 0xFA12).nextDouble() * Math.PI * 2
+        xpFarm(p, cx + (Math.cos(fa) * 36).toInt(), cz + (Math.sin(fa) * 36).toInt())
+    }
+
+    fun place(chunk: Chunk, farmsOnly: Boolean = false) {
         val p = Put(chunk)
         // Surface structures on a 144-block grid (a village about every 150 blocks), dungeons on a 64-block grid.
         val region = 144
@@ -162,12 +170,12 @@ class Structures(private val seed: Long, private val gen: WorldGenerator, privat
                 val h = gen.surfaceHeight(cx, cz)
                 if (h <= TerrainGenerator.SEA_LEVEL + 1 || h > 88) continue
                 when (gen.biomeAt(cx, cz)) {
-                    Biome.PLAINS, Biome.SAVANNA, Biome.FOREST, Biome.SNOW, Biome.CHERRY, Biome.JUNGLE, Biome.SWAMP -> village(p, cx, cz, rnd)
-                    Biome.DESERT -> temple(p, cx, h, cz, rnd)
+                    Biome.PLAINS, Biome.SAVANNA, Biome.FOREST, Biome.SNOW, Biome.CHERRY, Biome.JUNGLE, Biome.SWAMP -> if (farmsOnly) farmFor(p, cx, cz) else village(p, cx, cz, rnd)
+                    Biome.DESERT -> if (!farmsOnly) temple(p, cx, h, cz, rnd)
                     else -> {}
                 }
             }
-        if (gen is FlatGenerator) return   // no dungeons under flat worlds
+        if (farmsOnly || gen is FlatGenerator) return   // no dungeons under flat worlds
         val cell = 64
         for (rz in (p.z0 - 8).floorDiv(cell)..(p.z0 + 24).floorDiv(cell))
             for (rx in (p.x0 - 8).floorDiv(cell)..(p.x0 + 24).floorDiv(cell)) {
@@ -473,8 +481,7 @@ class Structures(private val seed: Long, private val gen: WorldGenerator, privat
             if (rnd.nextInt(4) == 0) farm(p, hx, hz, rnd) else house(p, hx, hz, rnd, cx, cz)
         }
         // Every village has a big XP farm tower a little way out.
-        val fa = rnd.nextDouble() * Math.PI * 2
-        xpFarm(p, cx + (Math.cos(fa) * 36).toInt(), cz + (Math.sin(fa) * 36).toInt())
+        farmFor(p, cx, cz)
     }
 
     /**
@@ -482,6 +489,9 @@ class Structures(private val seed: Long, private val gen: WorldGenerator, privat
      * (with a chest below for the loot). You stand on the platform outside and hit them through a window, two blocks above the pit.
      */
     private fun xpFarm(p: Put, fx: Int, fz: Int) {
+        if (p.x0 + 15 < fx - 8 || p.x0 > fx + 8 || p.z0 + 15 < fz - 8 || p.z0 > fz + 8) return
+        // A chunk gets its farm part once: new chunks mark themselves here, old worlds are patched when the chunk first loads.
+        if (!world.farmChunks.add(Chunk.key(p.chunk.cx, p.chunk.cz))) return
         val g = gen.surfaceHeight(fx, fz)
         val white = Blocks.CONCRETE_FIRST
         // The platform and its steps first (south side).
