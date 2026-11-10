@@ -45,6 +45,10 @@ class World(val seed: Long, private val saveDir: File?, val dimension: Dimension
     val farmChunks: MutableSet<Long> = java.util.concurrent.ConcurrentHashMap.newKeySet<Long>().also { set ->
         saveDir?.let { try { File(it, "farms.dat").takeIf { f -> f.exists() }?.readLines()?.forEach { l -> l.trim().toLongOrNull()?.let { v -> set.add(v) } } } catch (_: Exception) {} }
     }
+    /** Which big structures (forts, gate rooms, mansions) already built their part into which chunk. */
+    val bigDone: MutableSet<Long> = java.util.concurrent.ConcurrentHashMap.newKeySet<Long>().also { set ->
+        saveDir?.let { try { File(it, "bigs.dat").takeIf { f -> f.exists() }?.readLines()?.forEach { l -> l.trim().toLongOrNull()?.let { v -> set.add(v) } } } catch (_: Exception) {} }
+    }
     val blockEntities = BlockEntities().also { be -> saveDir?.let { be.read(File(it, "blockentities.dat")) } }
 
     fun getChunk(cx: Int, cz: Int): Chunk? = chunks[Chunk.key(cx, cz)]
@@ -170,8 +174,12 @@ class World(val seed: Long, private val saveDir: File?, val dimension: Dimension
             val c = Chunk(cx, cz)
             c.fromBytes(GZIPInputStream(f.inputStream().buffered()).use { it.readBytes() })
             // Worlds made before the village XP farms get theirs when the chunk first loads.
-            if (!flat && dimension == Dimension.OVERWORLD && !farmChunks.contains(Chunk.key(cx, cz))) {
-                try { Structures(seed, generator, this).placeFarms(c) } catch (e: Exception) { e.printStackTrace() }
+            if (!flat && dimension == Dimension.OVERWORLD) {
+                try {
+                    val st = Structures(seed, generator, this)
+                    if (!farmChunks.contains(Chunk.key(cx, cz))) st.placeFarms(c)
+                    st.placeBig(c)
+                } catch (e: Exception) { e.printStackTrace() }
             }
             c
         } catch (e: Exception) {
@@ -192,7 +200,7 @@ class World(val seed: Long, private val saveDir: File?, val dimension: Dimension
     /** Synchronously writes all modified chunks and the chest / furnace contents. */
     fun saveChunks() {
         saveDir?.let { try { blockEntities.write(File(it, "blockentities.dat")) } catch (_: Exception) {} }
-        saveDir?.let { try { File(it, "farms.dat").writeText(farmChunks.joinToString("\n")) } catch (_: Exception) {} }
+        saveDir?.let { try { File(it, "farms.dat").writeText(farmChunks.joinToString("\n")); File(it, "bigs.dat").writeText(bigDone.joinToString("\n")) } catch (_: Exception) {} }
         for (c in chunks.values) {
             if (c.modified) {
                 c.modified = false

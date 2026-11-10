@@ -149,18 +149,27 @@ class Structures(private val seed: Long, private val gen: WorldGenerator, privat
     }
 
     /** Old worlds: adds the XP farm of any village whose chunk was generated before farms existed (see World.ensureLoaded). */
-    fun placeFarms(chunk: Chunk) { place(chunk, farmsOnly = true) }
+    fun placeFarms(chunk: Chunk) { place(chunk, 1) }
+
+    /** Old worlds: adds forts, sky-gate rooms and mansions that belong in this chunk. */
+    fun placeBig(chunk: Chunk) { place(chunk, 2) }
+
+    /** A structure part is built into a chunk once: this records (chunk, structure) and says whether it is new. */
+    private fun firstTime(p: Put, kind: Int, x: Int, z: Int): Boolean =
+        p.x0 + 15 >= x - 16 && p.x0 <= x + 16 && p.z0 + 15 >= z - 16 && p.z0 <= z + 16 &&
+        world.bigDone.add(Chunk.key(p.chunk.cx, p.chunk.cz) * 31L + ((x * 73856093L) xor (z * 19349663L) xor kind.toLong()))
 
     private fun farmFor(p: Put, cx: Int, cz: Int) {
         val fa = Random(seed xor (cx * 341873128712L) xor (cz * 132897987541L) xor 0xFA12).nextDouble() * Math.PI * 2
         xpFarm(p, cx + (Math.cos(fa) * 36).toInt(), cz + (Math.sin(fa) * 36).toInt())
     }
 
-    fun place(chunk: Chunk, farmsOnly: Boolean = false) {
+    fun place(chunk: Chunk, mode: Int = 0) {
         val p = Put(chunk)
+        val farmsOnly = mode == 1
         // Surface structures on a 144-block grid (a village about every 150 blocks), dungeons on a 64-block grid.
         val region = 144
-        for (rz in (p.z0 - 64).floorDiv(region)..(p.z0 + 80).floorDiv(region))
+        if (mode != 2) for (rz in (p.z0 - 64).floorDiv(region)..(p.z0 + 80).floorDiv(region))
             for (rx in (p.x0 - 64).floorDiv(region)..(p.x0 + 80).floorDiv(region)) {
                 val rnd = Random(seed xor (rx * 341873128712L) xor (rz * 132897987541L) xor 0x5EED)
                 val cx = rx * region + 48 + rnd.nextInt(region - 96)
@@ -176,6 +185,7 @@ class Structures(private val seed: Long, private val gen: WorldGenerator, privat
                 }
             }
         if (farmsOnly || gen is FlatGenerator) return   // no dungeons under flat worlds
+        if (mode != 2) {
         val cell = 64
         for (rz in (p.z0 - 8).floorDiv(cell)..(p.z0 + 24).floorDiv(cell))
             for (rx in (p.x0 - 8).floorDiv(cell)..(p.x0 + 24).floorDiv(cell)) {
@@ -197,6 +207,7 @@ class Structures(private val seed: Long, private val gen: WorldGenerator, privat
                 if (gen.surfaceHeight(x, z) - 10 < y) continue
                 mine(p, x, y, z, rnd)
             }
+        }
         // Underground forts (a hall with four corner towers and loot) and woodland mansions, each on a big grid.
         val fortCell = 128
         for (rz in (p.z0 - 24).floorDiv(fortCell)..(p.z0 + 40).floorDiv(fortCell))
@@ -206,7 +217,7 @@ class Structures(private val seed: Long, private val gen: WorldGenerator, privat
                 val x = rx * fortCell + 24 + rnd.nextInt(fortCell - 48); val z = rz * fortCell + 24 + rnd.nextInt(fortCell - 48)
                 val y = 12 + rnd.nextInt(10)
                 if (gen.surfaceHeight(x, z) - 12 < y) continue
-                fort(p, x, y, z, rnd)
+                if (firstTime(p, 1, x, z)) fort(p, x, y, z, rnd)
             }
         // Sky gate rooms deep under the hills, one in a while.
         val gateCell = 256
@@ -216,7 +227,7 @@ class Structures(private val seed: Long, private val gen: WorldGenerator, privat
                 val x = rx * gateCell + 24 + rnd.nextInt(gateCell - 48); val z = rz * gateCell + 24 + rnd.nextInt(gateCell - 48)
                 val y = 10 + rnd.nextInt(6)
                 if (gen.surfaceHeight(x, z) - 12 < y) continue
-                skyGateRoom(p, x, y, z, rnd)
+                if (firstTime(p, 2, x, z)) skyGateRoom(p, x, y, z, rnd)
             }
         val mansionCell = 192
         for (rz in (p.z0 - 24).floorDiv(mansionCell)..(p.z0 + 40).floorDiv(mansionCell))
@@ -226,7 +237,7 @@ class Structures(private val seed: Long, private val gen: WorldGenerator, privat
                 val h = gen.surfaceHeight(x, z)
                 if (h <= TerrainGenerator.SEA_LEVEL + 1 || h > 80) continue
                 if (gen.biomeAt(x, z) != Biome.FOREST && gen.biomeAt(x, z) != Biome.PLAINS) continue
-                mansion(p, x, h, z, rnd)
+                if (firstTime(p, 3, x, z)) mansion(p, x, h, z, rnd)
             }
     }
 

@@ -794,3 +794,21 @@ class OldWorldFarmTest {
         assertEquals(Blocks.MOB_CAGE, w2.getBlock(cage!![0], cage[1], cage[2]), "the farm came back to the old chunks")
     }
 }
+
+class OldWorldBigTest {
+    @Test fun anOldWorldGetsFortsAndMansionsWhenItsChunksLoad() {
+        val dir = kotlin.io.path.createTempDirectory("oldbig").toFile()
+        val w1 = World(21L, dir, Dimension.OVERWORLD)
+        for (cx in -24..24) for (cz in -24..24) w1.ensureLoaded(cx, cz)
+        fun count(w: World): Int { var n = 0; for (x in -384..384) for (z in -384..384) { for (y in 60..100) if (w.getBlock(x, y, z) == Blocks.DARK_OAK_LOG) n++; for (y in 8..30) if (w.getBlock(x, y, z) == Blocks.IRON_BARS) n++ }; return n }
+        val before = count(w1)
+        assertTrue(before > 0)
+        for (x in -384..384) for (z in -384..384) { for (y in 60..100) if (w1.getBlock(x, y, z) == Blocks.DARK_OAK_LOG) w1.setBlock(x, y, z, Blocks.AIR); for (y in 8..30) if (w1.getBlock(x, y, z) == Blocks.IRON_BARS) w1.setBlock(x, y, z, Blocks.AIR) }
+        w1.saveChunks()
+        java.io.File(dir, "bigs.dat").delete()
+        w1.shutdown()
+        val w2 = World(21L, dir, Dimension.OVERWORLD)
+        for (cx in -24..24) for (cz in -24..24) w2.ensureLoaded(cx, cz)
+        assertTrue(count(w2) > 0, "the old chunks got their forts and mansions")
+    }
+}
