@@ -200,6 +200,16 @@ class Structures(private val seed: Long, private val gen: WorldGenerator, privat
                 if (gen.surfaceHeight(x, z) - 12 < y) continue
                 fort(p, x, y, z, rnd)
             }
+        // Sky gate rooms deep under the hills, one in a while.
+        val gateCell = 256
+        for (rz in (p.z0 - 16).floorDiv(gateCell)..(p.z0 + 32).floorDiv(gateCell))
+            for (rx in (p.x0 - 16).floorDiv(gateCell)..(p.x0 + 32).floorDiv(gateCell)) {
+                val rnd = Random(seed xor (rx * 60493L) xor (rz * 94781L) xor 0x6A7E)
+                val x = rx * gateCell + 24 + rnd.nextInt(gateCell - 48); val z = rz * gateCell + 24 + rnd.nextInt(gateCell - 48)
+                val y = 10 + rnd.nextInt(6)
+                if (gen.surfaceHeight(x, z) - 12 < y) continue
+                skyGateRoom(p, x, y, z, rnd)
+            }
         val mansionCell = 192
         for (rz in (p.z0 - 24).floorDiv(mansionCell)..(p.z0 + 40).floorDiv(mansionCell))
             for (rx in (p.x0 - 24).floorDiv(mansionCell)..(p.x0 + 40).floorDiv(mansionCell)) {
@@ -249,6 +259,21 @@ class Structures(private val seed: Long, private val gen: WorldGenerator, privat
         )
         lootChest(p, x - 6, y, z - 6, rnd, loot, 3); lootChest(p, x + 6, y, z - 6, rnd, loot, 3)
         lootChest(p, x - 6, y, z + 6, rnd, loot, 2); lootChest(p, x + 6, y, z + 6, rnd, loot, 2)
+    }
+
+    // ---------------------------------------------------------------- sky gate room
+
+    /** A 13 x 13 stone-brick room with twelve gate stones around a lava pool-free 3 x 3 floor, and a chest. */
+    private fun skyGateRoom(p: Put, x: Int, y: Int, z: Int, rnd: Random) {
+        for (dx in -6..6) for (dz in -6..6) for (dy in -1..6) {
+            val edge = abs(dx) == 6 || abs(dz) == 6 || dy == -1 || dy == 6
+            set(p, x + dx, y + dy, z + dz, if (!edge) Blocks.AIR else if (rnd.nextInt(4) == 0) Blocks.MOSSY_STONE_BRICKS else Blocks.STONE_BRICKS)
+        }
+        for (dx in -1..1) for (dz in -1..1) set(p, x + dx, y - 1, z + dz, Blocks.STONE_BRICKS)
+        for (d in -1..1) for (e in intArrayOf(-2, 2)) { set(p, x + e, y, z + d, Blocks.SKY_GATE); set(p, x + d, y, z + e, Blocks.SKY_GATE) }
+        for (sx in intArrayOf(-5, 5)) for (sz in intArrayOf(-5, 5)) set(p, x + sx, y + 1, z + sz, Blocks.TORCH)
+        val loot = listOf(Items.find("Ender Pearl") to 1..3, Items.find("Blaze Powder") to 0..2, Items.find("Iron Ingot") to 1..4, Items.find("Bread") to 1..3)
+        lootChest(p, x, y, z - 5, rnd, loot, 3)
     }
 
     // ---------------------------------------------------------------- mansion

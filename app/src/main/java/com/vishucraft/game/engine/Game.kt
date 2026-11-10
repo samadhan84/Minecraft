@@ -1722,6 +1722,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
             Blocks.SIGN -> { uiEvents.add("signedit:${t.x},${t.y},${t.z}"); return }
             // Tap a billboard to write on it (holding a billboard adds one next to it instead).
             Blocks.BILLBOARD -> if (sel != Blocks.BILLBOARD) { uiEvents.add("signedit:${t.x},${t.y},${t.z}"); return }
+            Blocks.SKY_GATE -> { putEye(t.x, t.y, t.z, item); return }
             Blocks.ITEM_FRAME -> { useFrame(t.x, t.y, t.z); return }
             Blocks.JUKEBOX -> { useJukebox(t.x, t.y, t.z); return }
             Blocks.CAMPFIRE -> if (item != null && campfireCooks(item.name) != null) { cookOnCampfire(t.x, t.y, t.z, item); return }
@@ -1819,6 +1820,28 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
             if (!ok) continue
             for (i in 0 until w) for (j in 0 until h) setBlock(lx + ax * i, by + j, lz + az * i, portal, 0)
             sound("fuse", x + 0.5f, y + 0.5f, z + 0.5f)
+            return true
+        }
+        return false
+    }
+
+    /** A Warp Eye goes into a gate stone; the twelfth opens the gate. */
+    internal fun putEye(x: Int, y: Int, z: Int, item: ItemDef?) {
+        if (item == null || item.name != "Eye of Ender") { uiEvents.add("toast:Put a Warp Eye in each of the twelve stones"); return }
+        setBlock(x, y, z, Blocks.SKY_GATE_EYE); consumeHeld(); sound("hit_stone", x + 0.5f, y + 0.5f, z + 0.5f, 0.7f)
+        uiEvents.add(if (openSkyGate(x, y, z)) "toast:The sky gate opens! Step in to travel" else "toast:The frame holds the eye")
+    }
+
+    /** Opens the 3 x 3 gate if the twelve stones around some centre near (x, y, z) all hold an eye. */
+    private fun openSkyGate(x: Int, y: Int, z: Int): Boolean {
+        for (cx in x - 3..x + 3) for (cz in z - 3..z + 3) {
+            var ok = true
+            for (d in -1..1) for (e in intArrayOf(-2, 2)) {
+                if (world.getBlock(cx + e, y, cz + d) != Blocks.SKY_GATE_EYE || world.getBlock(cx + d, y, cz + e) != Blocks.SKY_GATE_EYE) ok = false
+            }
+            if (!ok) continue
+            for (dx in -1..1) for (dz in -1..1) setBlock(cx + dx, y, cz + dz, Blocks.SKY_PORTAL, 0)
+            sound("fuse", cx + 0.5f, y + 0.5f, cz + 0.5f)
             return true
         }
         return false

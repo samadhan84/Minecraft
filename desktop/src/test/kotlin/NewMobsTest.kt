@@ -733,3 +733,25 @@ class BigStructuresTest {
         println("STRUCTS mansion=$mansion fort=$fort")
     }
 }
+
+class SkyGateTest {
+    @Test fun twelveEyesOpenTheGate() {
+        val dir = kotlin.io.path.createTempDirectory("gate").toFile()
+        val level = LevelData.create(87L, "t", GameMode.SURVIVAL)
+        val g = Game(World(level.seed, dir, Dimension.OVERWORLD, flat = true), level, GameInput(), dir)
+        for (cx in -2..2) for (cz in -2..2) g.world.ensureLoaded(cx, cz)
+        val y = g.world.generator.surfaceHeight(0, 0) + 6
+        val spots = ArrayList<IntArray>()
+        for (d in -1..1) for (e in intArrayOf(-2, 2)) { spots.add(intArrayOf(e, d)); spots.add(intArrayOf(d, e)) }
+        for (s in spots) g.setBlock(s[0], y, s[1], Blocks.SKY_GATE)
+        val eye = Items.find("Eye of Ender")
+        for ((i, s) in spots.withIndex()) {
+            g.inventory.slots[0] = ItemStack(eye, 1); g.input.selectedSlot = 0
+            g.player.x = s[0] * 1.5f + 0.5f; g.player.z = s[1] * 1.5f + 0.5f; g.player.y = y + 1f
+            g.setBlock(s[0], y, s[1], Blocks.SKY_GATE)
+            g.putEye(s[0], y, s[1], Items.get(eye))
+            assertEquals(Blocks.SKY_GATE_EYE, g.world.getBlock(s[0], y, s[1]), "eye $i placed")
+        }
+        assertEquals(Blocks.SKY_PORTAL, g.world.getBlock(0, y, 0), "the gate is open")
+    }
+}

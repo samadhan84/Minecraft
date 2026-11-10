@@ -446,7 +446,10 @@ object Blocks {
     const val TRAPPED_CHEST = 453
     /** A chest that keeps its things when you pick it up: the contents travel with the item (see LevelData.boxes). */
     const val SHELL_BOX = 454
-    const val COUNT = 455
+    /** The twelve stones of a sky gate: put a Warp Eye (Eye of Ender) in each and the gate opens. */
+    const val SKY_GATE = 455
+    const val SKY_GATE_EYE = 456
+    const val COUNT = 457
 
     /** The newer crops' texture names, in id order from RICE_CROP. */
     val NEW_CROPS = listOf("rice", "tomato", "lentil", "beetroot")
@@ -824,6 +827,9 @@ object Blocks {
         reg(BlockDef(TRAPPED_CHEST, "Trapped Chest", t("p4_trap_top"), t("p4_trap_side"), t("p4_trap_top"), hardness = 0.8f, tool = A, facing = Facing.HORIZONTAL,
             front = t("p4_trap_front"), category = Category.REDSTONE, render = RenderType.BOX, opaque = false, blocksLight = false,
             box = floatArrayOf(0.0625f, 0f, 0.0625f, 0.9375f, 0.875f, 0.9375f)))
+        reg(BlockDef(SKY_GATE, "Sky Gate Frame", t("p4_gate_top"), t("p4_gate_side"), t("p4_gate_side"), hardness = 30f, tool = P, movable = false))
+        reg(BlockDef(SKY_GATE_EYE, "Sky Gate Frame (eye)", t("p4_gate_eye"), t("p4_gate_side"), t("p4_gate_side"), hardness = 30f, tool = P, movable = false, inInventory = false))
+        extraLight[SKY_GATE_EYE] = 6
         extraLight[ENDER_CHEST] = 7
         shape(ANVIL, "Anvil", "anvil_top", "anvil", "anvil", hardness = 3f, tool = P, blocksLight = false)
         shape(COMPOSTER, "Composter", "composter_top", "composter_side", "composter_side", hardness = 0.6f, tool = A, facing = Facing.NONE)

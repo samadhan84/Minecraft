@@ -2523,6 +2523,14 @@ object TextureAtlas {
                 for ((x, y) in listOf(3 to 3, 11 to 4, 6 to 9, 12 to 12, 2 to 12, 9 to 14, 14 to 8)) { t[x, y] = rgb(60, 220, 230); if (x + 1 < 16) t[x + 1, y] = rgb(30, 130, 150) }
                 return true
             }
+            "p4_gate_top", "p4_gate_side", "p4_gate_eye" -> {
+                t.fill { x, y -> scale(rgb(96, 104, 92), t.jitter(0.06f) * (if (y % 8 == 0 || (x + (y / 8) * 4) % 8 == 0) 0.8f else 1f)) }
+                if (name != "p4_gate_side") {
+                    for (i in 2..13) { t[i, 2] = rgb(30, 60, 50); t[i, 13] = rgb(30, 60, 50); t[2, i] = rgb(30, 60, 50); t[13, i] = rgb(30, 60, 50) }
+                    if (name == "p4_gate_eye") for (y in 5..10) for (x in 5..10) t[x, y] = if (x in 7..8 && y in 7..8) rgb(20, 20, 30) else rgb(80, 220, 150)
+                } else for (x in 3..12) t[x, 3] = rgb(30, 60, 50)
+                return true
+            }
             "p4_trap_top", "p4_trap_side", "p4_trap_front" -> {
                 val wood = rgb(150, 100, 44); val face = name.removePrefix("p4_trap_")
                 t.fill { x, y ->
