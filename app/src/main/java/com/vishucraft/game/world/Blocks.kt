@@ -449,7 +449,9 @@ object Blocks {
     /** The twelve stones of a sky gate: put a Warp Eye (Eye of Ender) in each and the gate opens. */
     const val SKY_GATE = 455
     const val SKY_GATE_EYE = 456
-    const val COUNT = 457
+    /** The roof block of a village XP farm: it keeps dropping monsters into the shaft below while you are near. */
+    const val MOB_CAGE = 457
+    const val COUNT = 458
 
     /** The newer crops' texture names, in id order from RICE_CROP. */
     val NEW_CROPS = listOf("rice", "tomato", "lentil", "beetroot")
@@ -829,6 +831,7 @@ object Blocks {
             box = floatArrayOf(0.0625f, 0f, 0.0625f, 0.9375f, 0.875f, 0.9375f)))
         reg(BlockDef(SKY_GATE, "Sky Gate Frame", t("p4_gate_top"), t("p4_gate_side"), t("p4_gate_side"), hardness = 30f, tool = P, movable = false))
         reg(BlockDef(SKY_GATE_EYE, "Sky Gate Frame (eye)", t("p4_gate_eye"), t("p4_gate_side"), t("p4_gate_side"), hardness = 30f, tool = P, movable = false, inInventory = false))
+        reg(BlockDef(MOB_CAGE, "Spawn Cage", t("p4_cage"), hardness = 3f, tool = P, movable = false))
         extraLight[SKY_GATE_EYE] = 6
         extraLight[ENDER_CHEST] = 7
         shape(ANVIL, "Anvil", "anvil_top", "anvil", "anvil", hardness = 3f, tool = P, blocksLight = false)

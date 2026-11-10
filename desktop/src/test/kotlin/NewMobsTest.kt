@@ -755,3 +755,23 @@ class SkyGateTest {
         assertEquals(Blocks.SKY_PORTAL, g.world.getBlock(0, y, 0), "the gate is open")
     }
 }
+
+class XpFarmTest {
+    @Test fun villagesHaveAnXpFarmWhoseCagesSpawnMonsters() {
+        val dir = kotlin.io.path.createTempDirectory("xpf").toFile()
+        val level = LevelData.create(21L, "t", GameMode.SURVIVAL)
+        val g = Game(World(level.seed, dir, Dimension.OVERWORLD), level, GameInput(), dir)
+        for (cx in -16..16) for (cz in -16..16) g.world.ensureLoaded(cx, cz)
+        var cage: IntArray? = null
+        loop@ for (x in -256..256) for (z in -256..256) for (y in 60..130) if (g.world.getBlock(x, y, z) == Blocks.MOB_CAGE) { cage = intArrayOf(x, y, z); break@loop }
+        assertTrue(cage != null, "an XP farm was generated")
+        val (x, y, z) = cage!!
+        g.player.x = x + 0.5f; g.player.z = z + 6.5f; g.player.y = (y - 25).toFloat()
+        g.mobs.list.clear()
+        var t = 0f; var seen = 0
+        while (t < 12f) { g.update(1 / 20f); g.dirtyChunks.clear(); t += 1 / 20f; g.player.x = x + 0.5f; g.player.z = z + 6.5f; g.player.y = (y - 25).toFloat(); seen = maxOf(seen, g.mobs.list.count { it.type.hostile }) }
+        val spawned = seen
+        println("XPFARM cage=$x,$y,$z hostile=$spawned")
+        assertTrue(spawned > 0, "monsters appeared in the shaft")
+    }
+}

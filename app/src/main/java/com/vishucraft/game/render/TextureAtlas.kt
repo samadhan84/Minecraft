@@ -2523,6 +2523,11 @@ object TextureAtlas {
                 for ((x, y) in listOf(3 to 3, 11 to 4, 6 to 9, 12 to 12, 2 to 12, 9 to 14, 14 to 8)) { t[x, y] = rgb(60, 220, 230); if (x + 1 < 16) t[x + 1, y] = rgb(30, 130, 150) }
                 return true
             }
+            "p4_cage" -> {
+                t.fill { x, y -> if (x % 4 == 0 || y % 4 == 0) rgb(30, 30, 36) else scale(rgb(150, 40, 50), t.jitter(0.1f)) }
+                for ((x, y) in listOf(6 to 6, 9 to 9)) for (i in 0..1) for (j in 0..1) t[x + i, y + j] = rgb(255, 200, 80)
+                return true
+            }
             "p4_gate_top", "p4_gate_side", "p4_gate_eye" -> {
                 t.fill { x, y -> scale(rgb(96, 104, 92), t.jitter(0.06f) * (if (y % 8 == 0 || (x + (y / 8) * 4) % 8 == 0) 0.8f else 1f)) }
                 if (name != "p4_gate_side") {

@@ -472,6 +472,46 @@ class Structures(private val seed: Long, private val gen: WorldGenerator, privat
             path(p, cx, cz, hx, hz)
             if (rnd.nextInt(4) == 0) farm(p, hx, hz, rnd) else house(p, hx, hz, rnd, cx, cz)
         }
+        // Every village has a big XP farm tower a little way out.
+        val fa = rnd.nextDouble() * Math.PI * 2
+        xpFarm(p, cx + (Math.cos(fa) * 36).toInt(), cz + (Math.sin(fa) * 36).toInt())
+    }
+
+    /**
+     * A village XP farm: a 5 x 5 tower. Spawn Cages in the roof drop monsters down the 3 x 3 shaft into a pit of hoppers
+     * (with a chest below for the loot). You stand on the platform outside and hit them through a window, two blocks above the pit.
+     */
+    private fun xpFarm(p: Put, fx: Int, fz: Int) {
+        val g = gen.surfaceHeight(fx, fz)
+        val white = Blocks.CONCRETE_FIRST
+        // The platform and its steps first (south side).
+        for (dx in -1..1) {
+            for (y in g - 3 until g + 1) for (dz in 3..5) set(p, fx + dx, y, fz + dz, Blocks.STONE)
+            set(p, fx + dx, g + 1, fz + 5, Blocks.SMOOTH_STONE)
+            for (dz in 3..4) { set(p, fx + dx, g + 1, fz + dz, Blocks.SMOOTH_STONE); set(p, fx + dx, g + 2, fz + dz, Blocks.SMOOTH_STONE) }
+            for (y in g + 3..g + 6) for (dz in 3..5) set(p, fx + dx, y, fz + dz, Blocks.AIR)
+        }
+        // The tower: solid base, walls with glowing bands, an open shaft, and a roof.
+        for (dx in -2..2) for (dz in -2..2) {
+            val wall = abs(dx) == 2 || abs(dz) == 2
+            for (y in g - 3..g - 1) set(p, fx + dx, y, fz + dz, Blocks.STONE)
+            for (y in g + 1..g + 28) set(p, fx + dx, y, fz + dz, if (!wall) Blocks.AIR else if (y % 6 == 0) Blocks.SEA_LANTERN else white)
+            set(p, fx + dx, g + 29, fz + dz, Blocks.QUARTZ_BLOCK)
+        }
+        // The window you hit through, two blocks above the pit floor.
+        for (dx in -1..1) for (y in g + 3..g + 4) set(p, fx + dx, y, fz + 2, Blocks.AIR)
+        // The pit floor: hoppers that point to the middle one, which empties into a chest underneath.
+        for (dx in -1..1) for (dz in -1..1) {
+            val meta = when { dx == 0 && dz == 0 -> 0; dx != 0 -> if (dx > 0) 5 else 4; dz > 0 -> 3; else -> 2 }
+            set(p, fx + dx, g, fz + dz, Blocks.HOPPER, meta)
+            world.blockEntities.map.putIfAbsent(RedstoneIds.pack(fx + dx, g, fz + dz), HopperEntity())
+        }
+        set(p, fx, g - 1, fz, Blocks.CHEST, 2)
+        world.blockEntities.map.putIfAbsent(RedstoneIds.pack(fx, g - 1, fz), ChestEntity())
+        // Cages in the roof, at the corners of the shaft and in the middle.
+        for ((dx, dz) in listOf(-1 to -1, 1 to -1, -1 to 1, 1 to 1, 0 to 0)) set(p, fx + dx, g + 28, fz + dz, Blocks.MOB_CAGE)
+        // Lamps around the foot.
+        for ((dx, dz) in listOf(-3 to -3, 3 to -3, -3 to 3, 3 to 3)) if (p.inside(fx + dx, fz + dz)) lamp(p, fx + dx, gen.surfaceHeight(fx + dx, fz + dz) + 1, fz + dz)
     }
 
     /** A street lamp: a pole two blocks high with the lamp on top. */

@@ -239,12 +239,36 @@ class Mobs(private val world: World) {
     private val rnd = Random()
     private var spawnTimer = 0f
 
+    private var cageTimer = 0f
+
+    /** Spawn Cages (the village XP farms) keep dropping monsters into their shaft while you are near. */
+    private fun cageSpawns(game: Game, dt: Float) {
+        cageTimer -= dt
+        if (cageTimer > 0f) return
+        cageTimer = 1.5f
+        if (!hostileEnabled || !game.survival || game.dimension != com.vishucraft.game.world.Dimension.OVERWORLD) return
+        val px = floorInt(game.player.x); val py = floorInt(game.player.y); val pz = floorInt(game.player.z)
+        for (x in px - 16..px + 16) for (z in pz - 16..pz + 16) {
+            if (!world.isLoaded(x, z)) continue
+            for (y in maxOf(1, py - 4)..py + 36) {
+                if (world.getBlock(x, y, z) != Blocks.MOB_CAGE) continue
+                val near = list.count { it.type.hostile && abs(it.x - x) < 4f && abs(it.z - z) < 4f && abs(it.y - y) < 4f }
+                if (near >= 6) continue
+                val sx = x + rnd.nextInt(3) - 1; val sz = z + rnd.nextInt(3) - 1
+                if (Blocks.solid[world.getBlock(sx, y - 1, sz)] || Blocks.solid[world.getBlock(sx, y - 2, sz)]) continue
+                val type = when (rnd.nextInt(5)) { 0, 1, 2 -> MobType.ZOMBIE; else -> MobType.RATTLER }
+                list.add(Mob(type, sx + 0.5f, y - 1.0f, sz + 0.5f))
+            }
+        }
+    }
+
     fun update(dt: Float, game: Game) {
         spawnTimer -= dt
         if (spawnTimer <= 0f) {
             spawnTimer = 1f
             trySpawn(game)
         }
+        cageSpawns(game, dt)
         breed(dt)
         val p = game.player
         updateRaid(dt, game)
