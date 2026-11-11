@@ -167,6 +167,27 @@ class Structures(private val seed: Long, private val gen: WorldGenerator, privat
         val sx = cx + (Math.cos(sa) * 28).toInt(); val sz = cz + (Math.sin(sa) * 28).toInt()
         if (p.x0 + 15 >= sx - 8 && p.x0 <= sx + 8 && p.z0 + 15 >= sz - 8 && p.z0 <= sz + 8 && world.bigDone.add(Chunk.key(p.chunk.cx, p.chunk.cz) * 31L + ((sx * 73856093L) xor (sz * 19349663L) xor 4L)))
             smithy(p, sx, sz, cx, cz)
+        // And an open End-style (sky) portal shrine, on the side between the farm and the smithy.
+        val ea = fa + Math.PI * 0.5
+        val ex = cx + (Math.cos(ea) * 40).toInt(); val ez = cz + (Math.sin(ea) * 40).toInt()
+        if (p.x0 + 15 >= ex - 7 && p.x0 <= ex + 7 && p.z0 + 15 >= ez - 7 && p.z0 <= ez + 7 && world.bigDone.add(Chunk.key(p.chunk.cx, p.chunk.cz) * 31L + ((ex * 73856093L) xor (ez * 19349663L) xor 5L)))
+            skyShrine(p, ex, ez)
+    }
+
+    /** A village's sky portal: a stone-brick platform with the twelve gate stones, each holding an eye, and the 3 x 3 portal open. */
+    private fun skyShrine(p: Put, x: Int, z: Int) {
+        val g = gen.surfaceHeight(x, z)
+        for (dx in -4..4) for (dz in -4..4) {
+            for (y in g - 3 until g) set(p, x + dx, y, z + dz, Blocks.STONE_BRICKS)
+            set(p, x + dx, g, z + dz, if (abs(dx) == 4 || abs(dz) == 4) Blocks.MOSSY_STONE_BRICKS else Blocks.STONE_BRICKS)
+            for (y in g + 1..g + 4) set(p, x + dx, y, z + dz, Blocks.AIR)
+        }
+        for (d in -1..1) for (e in intArrayOf(-2, 2)) { set(p, x + e, g + 1, z + d, Blocks.SKY_GATE_EYE); set(p, x + d, g + 1, z + e, Blocks.SKY_GATE_EYE) }
+        for (dx in -1..1) for (dz in -1..1) set(p, x + dx, g + 1, z + dz, Blocks.SKY_PORTAL)
+        for ((dx, dz) in listOf(-3 to -3, 3 to -3, -3 to 3, 3 to 3)) {
+            for (y in g + 1..g + 3) set(p, x + dx, y, z + dz, Blocks.STONE_BRICKS)
+            set(p, x + dx, g + 4, z + dz, Blocks.TORCH)
+        }
     }
 
     /** The blacksmith's home: a stone-brick forge house 11 x 9 with furnaces, anvil, grindstone, a lava forge pit, loot chests and a villager. */

@@ -862,3 +862,18 @@ class WallTorchTest {
         assertTrue(g.drops.list.any { it.stack.id == Blocks.TORCH }, "and drops as a torch")
     }
 }
+
+class VillageSkyPortalTest {
+    @Test fun villagesHaveAnOpenSkyPortalAlsoInOldWorlds() {
+        val dir = kotlin.io.path.createTempDirectory("vsp").toFile()
+        val w1 = World(21L, dir, Dimension.OVERWORLD)
+        for (cx in -16..16) for (cz in -16..16) w1.ensureLoaded(cx, cz)
+        fun portals(w: World): Int { var n = 0; for (x in -256..256) for (z in -256..256) for (y in 50..110) if (w.getBlock(x, y, z) == Blocks.SKY_PORTAL) n++; return n }
+        assertTrue(portals(w1) >= 9, "a village sky portal was built")
+        for (x in -256..256) for (z in -256..256) for (y in 50..110) if (w1.getBlock(x, y, z) == Blocks.SKY_PORTAL) w1.setBlock(x, y, z, Blocks.AIR)
+        w1.saveChunks(); java.io.File(dir, "bigs.dat").delete(); w1.shutdown()
+        val w2 = World(21L, dir, Dimension.OVERWORLD)
+        for (cx in -16..16) for (cz in -16..16) w2.ensureLoaded(cx, cz)
+        assertTrue(portals(w2) >= 9, "an old world got its village portal")
+    }
+}
