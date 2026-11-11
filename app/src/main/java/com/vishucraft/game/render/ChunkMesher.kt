@@ -263,7 +263,12 @@ class ChunkMesher {
                 RenderType.CROSS -> {
                     // Waving plants move at the top; stacked ones (cane, bamboo, kelp) move at the bottom too.
                     val w = if (Blocks.waves[id] == 1) 4f else 0f
-                    emitCross(opaqueOut, px, y, pz, Blocks.tile(id, meta, 0), emissive, w, if (block(px, y - 1, pz) == id) w else 0f)
+                    if (id == Blocks.WALL_TORCH) {
+                        // Leans out from the wall it is stuck to.
+                        val n = NORMALS[com.vishucraft.game.world.Shapes.supportFace(meta).coerceIn(2, 5)]
+                        emitCross(opaqueOut, px, y, pz, Blocks.tile(id, meta, 0), emissive, 0f, 0f,
+                            n[0] * 0.38f, n[2] * 0.38f, n[0] * 0.14f, n[2] * 0.14f, 0.2f)
+                    } else emitCross(opaqueOut, px, y, pz, Blocks.tile(id, meta, 0), emissive, w, if (block(px, y - 1, pz) == id) w else 0f)
                 }
                 RenderType.FLAT -> emitFlat(opaqueOut, px, y, pz, Blocks.tile(id, meta, 0))
                 RenderType.BOX -> emitBox(opaqueOut, px, y, pz, def.box!!, id, meta, emissive)
@@ -361,21 +366,22 @@ class ChunkMesher {
         }
     }
 
-    private fun emitCross(out: FloatBuilder, px: Int, y: Int, pz: Int, tile: Int, emissive: Boolean, topWave: Float = 0f, bottomWave: Float = 0f) {
+    private fun emitCross(out: FloatBuilder, px: Int, y: Int, pz: Int, tile: Int, emissive: Boolean, topWave: Float = 0f, bottomWave: Float = 0f,
+                          bx: Float = 0f, bz: Float = 0f, tx: Float = 0f, tz: Float = 0f, lift: Float = 0f) {
         val l = if (emissive) 2f else 0.9f * (CAVE + (1f - CAVE) * sky(px, y, pz))
         val b0 = 0.9f * lightCurve(blockLight(px, y, pz).toFloat())
         val b = b0 + topWave; val bb = b0 + bottomWave
         val x0 = (px - 1) + 0.15f; val x1 = (px - 1) + 0.85f
         val z0 = (pz - 1) + 0.15f; val z1 = (pz - 1) + 0.85f
-        val y0 = y.toFloat(); val y1 = y + 1f
+        val y0 = y.toFloat() + lift; val y1 = y + 1f + lift
         val u0 = tileU(tile); val v0 = tileV(tile)
         val u1 = u0 + TILE_UV; val v1 = v0 + TILE_UV
         out.ensure(16 * FLOATS_PER_VERTEX)
-        // Two diagonal planes, each emitted with both windings.
-        out.put(x0, y0, z0, u0, v1, l, bb); out.put(x1, y0, z1, u1, v1, l, bb); out.put(x1, y1, z1, u1, v0, l, b); out.put(x0, y1, z0, u0, v0, l, b)
-        out.put(x1, y0, z1, u1, v1, l, bb); out.put(x0, y0, z0, u0, v1, l, bb); out.put(x0, y1, z0, u0, v0, l, b); out.put(x1, y1, z1, u1, v0, l, b)
-        out.put(x0, y0, z1, u0, v1, l, bb); out.put(x1, y0, z0, u1, v1, l, bb); out.put(x1, y1, z0, u1, v0, l, b); out.put(x0, y1, z1, u0, v0, l, b)
-        out.put(x1, y0, z0, u1, v1, l, bb); out.put(x0, y0, z1, u0, v1, l, bb); out.put(x0, y1, z1, u0, v0, l, b); out.put(x1, y1, z0, u1, v0, l, b)
+        // Two diagonal planes, each emitted with both windings; the foot and the top can be moved sideways (wall torches lean).
+        out.put(x0 + bx, y0, z0 + bz, u0, v1, l, bb); out.put(x1 + bx, y0, z1 + bz, u1, v1, l, bb); out.put(x1 + tx, y1, z1 + tz, u1, v0, l, b); out.put(x0 + tx, y1, z0 + tz, u0, v0, l, b)
+        out.put(x1 + bx, y0, z1 + bz, u1, v1, l, bb); out.put(x0 + bx, y0, z0 + bz, u0, v1, l, bb); out.put(x0 + tx, y1, z0 + tz, u0, v0, l, b); out.put(x1 + tx, y1, z1 + tz, u1, v0, l, b)
+        out.put(x0 + bx, y0, z1 + bz, u0, v1, l, bb); out.put(x1 + bx, y0, z0 + bz, u1, v1, l, bb); out.put(x1 + tx, y1, z0 + tz, u1, v0, l, b); out.put(x0 + tx, y1, z1 + tz, u0, v0, l, b)
+        out.put(x1 + bx, y0, z0 + bz, u1, v1, l, bb); out.put(x0 + bx, y0, z1 + bz, u0, v1, l, bb); out.put(x0 + tx, y1, z1 + tz, u0, v0, l, b); out.put(x1 + tx, y1, z0 + tz, u1, v0, l, b)
     }
 
     /** A flat decal lying on top of the block below (redstone dust). */

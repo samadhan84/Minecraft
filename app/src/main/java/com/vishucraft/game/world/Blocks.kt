@@ -451,7 +451,9 @@ object Blocks {
     const val SKY_GATE_EYE = 456
     /** The roof block of a village XP farm: it keeps dropping monsters into the shaft below while you are near. */
     const val MOB_CAGE = 457
-    const val COUNT = 458
+    /** A torch stuck to the side of a wall (meta = which wall, like levers); the game makes it when you tap a wall with a torch. */
+    const val WALL_TORCH = 458
+    const val COUNT = 459
 
     /** The newer crops' texture names, in id order from RICE_CROP. */
     val NEW_CROPS = listOf("rice", "tomato", "lentil", "beetroot")
@@ -832,6 +834,8 @@ object Blocks {
         reg(BlockDef(SKY_GATE, "Sky Gate Frame", t("p4_gate_top"), t("p4_gate_side"), t("p4_gate_side"), hardness = 30f, tool = P, movable = false))
         reg(BlockDef(SKY_GATE_EYE, "Sky Gate Frame (eye)", t("p4_gate_eye"), t("p4_gate_side"), t("p4_gate_side"), hardness = 30f, tool = P, movable = false, inInventory = false))
         reg(BlockDef(MOB_CAGE, "Spawn Cage", t("p4_cage"), hardness = 3f, tool = P, movable = false))
+        reg(BlockDef(WALL_TORCH, "Torch", t("torch"), render = RenderType.CROSS, opaque = false, solid = false, hardness = 0f,
+            category = Category.BUILDING, needsSupport = false, emissive = true, movable = false, inInventory = false))
         extraLight[SKY_GATE_EYE] = 6
         extraLight[ENDER_CHEST] = 7
         shape(ANVIL, "Anvil", "anvil_top", "anvil", "anvil", hardness = 3f, tool = P, blocksLight = false)
@@ -1071,7 +1075,7 @@ object Blocks {
             waves[d.id] = when {
                 d.id == WATER -> 3
                 d.render == RenderType.CUBE && d.name.endsWith("Leaves") -> 2
-                d.render == RenderType.CROSS && d.id != TORCH && d.id != REDSTONE_TORCH && d.id != LEVER && d.id != COBWEB &&
+                d.render == RenderType.CROSS && d.id != TORCH && d.id != WALL_TORCH && d.id != REDSTONE_TORCH && d.id != LEVER && d.id != COBWEB &&
                     d.id != BROWN_MUSHROOM && d.id != RED_MUSHROOM -> 1
                 else -> 0
             }
@@ -1087,7 +1091,7 @@ object Blocks {
     /** Block light emitted (0..15). */
     fun lightLevel(id: Int, meta: Int): Int = when (id) {
         GLOWSTONE, SEA_LANTERN, JACK_O_LANTERN, REDSTONE_LAMP_ON -> 15
-        TORCH -> 14
+        TORCH, WALL_TORCH -> 14
         CANDLE -> if (meta and 4 != 0) minOf(12, 3 * ((meta and 3) + 1)) else 0
         FURNACE, SMOKER, BLAST_FURNACE -> if (meta and 8 != 0) 13 else 0
         CRYING_OBSIDIAN -> 10

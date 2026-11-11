@@ -843,3 +843,22 @@ class SmithyTest {
         assertTrue(anvils(w2) > 0, "an old world got its smithy")
     }
 }
+
+class WallTorchTest {
+    @Test fun aTorchSticksToAWallAndComesOffWithIt() {
+        val dir = kotlin.io.path.createTempDirectory("wt").toFile()
+        val level = LevelData.create(93L, "t", GameMode.SURVIVAL)
+        val g = Game(World(level.seed, dir, Dimension.OVERWORLD, flat = true), level, GameInput(), dir)
+        for (cx in -2..2) for (cz in -2..2) g.world.ensureLoaded(cx, cz)
+        val y = g.world.generator.surfaceHeight(0, 0) + 5
+        g.setBlock(0, y, 0, Blocks.STONE)
+        g.inventory.slots[0] = ItemStack(Blocks.TORCH, 4); g.input.selectedSlot = 0
+        g.player.x = 5.5f; g.player.y = y.toFloat(); g.player.z = 5.5f
+        g.place(com.vishucraft.game.engine.RayHit(0, y, 0, 1, 0, 0, Blocks.STONE), Blocks.TORCH)
+        assertEquals(Blocks.WALL_TORCH, g.world.getBlock(1, y, 0), "the torch hangs on the wall")
+        assertEquals(3, g.inventory.count(Blocks.TORCH))
+        g.breakBlock(0, y, 0)
+        assertEquals(Blocks.AIR, g.world.getBlock(1, y, 0), "it falls off with the wall")
+        assertTrue(g.drops.list.any { it.stack.id == Blocks.TORCH }, "and drops as a torch")
+    }
+}

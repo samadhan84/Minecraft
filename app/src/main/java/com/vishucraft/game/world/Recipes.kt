@@ -577,6 +577,7 @@ object Drops {
             Blocks.BEE_NEST -> one(Blocks.BEE_NEST)
             Blocks.FRIDGE, Blocks.WARDROBE -> if (meta and Shapes.UPPER != 0) emptyList() else one(id)
             // Mining stone is very rich: 67% diamond (with some coal), 28% cobblestone, and 5% every other kind of ore.
+            Blocks.WALL_TORCH -> one(Blocks.TORCH)
             Blocks.STONE -> when (val roll = rnd.nextInt(100)) {
                 in 0..27 -> one(Blocks.COBBLESTONE)
                 in 28..94 -> listOf(i("Diamond") to 1, i("Coal") to 1 + rnd.nextInt(2))

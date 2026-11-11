@@ -169,7 +169,7 @@ object Shapes {
     /** Meta for something stuck to the block on [face] of its cell. */
     fun attachMeta(face: Int) = (when (face) { 1 -> 0; 0 -> 1; else -> face }) shl 1
 
-    fun isAttached(id: Int) = Blocks.isButton(id) || id == Blocks.LEVER
+    fun isAttached(id: Int) = Blocks.isButton(id) || id == Blocks.LEVER || id == Blocks.WALL_TORCH
 
     /**
      * Turns a box drawn for the floor (y = distance from the holding block) so it sits against [face] instead.
