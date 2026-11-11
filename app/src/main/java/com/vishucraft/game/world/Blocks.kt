@@ -791,9 +791,9 @@ object Blocks {
             hardness = 0.4f, tool = P, category = R2, needsSupport = true, movable = false))
         t("powered_rail_on")
         reg(BlockDef(EMBER_PORTAL, "Ember Portal", t("ember_portal"), render = RenderType.PORTAL, opaque = false, solid = false,
-            translucent = true, blocksLight = false, breakable = false, emissive = true, inInventory = false, movable = false))
+            translucent = true, blocksLight = false, breakable = true, emissive = true, inInventory = true, movable = false))
         reg(BlockDef(SKY_PORTAL, "Sky Portal", t("sky_portal"), render = RenderType.PORTAL, opaque = false, solid = false,
-            translucent = true, blocksLight = false, breakable = false, emissive = true, inInventory = false, movable = false))
+            translucent = true, blocksLight = false, breakable = true, emissive = true, inInventory = true, movable = false))
         for ((i, w) in EXTRA_WOODS.withIndex()) {
             val nice = pretty(w)
             shape(WOOD_DOOR_FIRST + i, "$nice Door", "${w}_door_bottom", hardness = 0.8f, tool = A)

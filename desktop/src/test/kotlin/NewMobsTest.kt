@@ -812,3 +812,19 @@ class OldWorldBigTest {
         assertTrue(count(w2) > 0, "the old chunks got their forts and mansions")
     }
 }
+
+class PortalItemsTest {
+    @Test fun bothPortalsCanBeTakenFromTheCreativeMenuAndPlaced() {
+        assertTrue(Items.isValidSlot(Blocks.EMBER_PORTAL))
+        assertTrue(Items.isValidSlot(Blocks.SKY_PORTAL))
+        val dir = kotlin.io.path.createTempDirectory("portal").toFile()
+        val level = LevelData.create(89L, "t", GameMode.CREATIVE)
+        val g = Game(World(level.seed, dir, Dimension.OVERWORLD, flat = true), level, GameInput(), dir)
+        for (cx in -2..2) for (cz in -2..2) g.world.ensureLoaded(cx, cz)
+        val y = g.world.generator.surfaceHeight(0, 0) + 3
+        g.setBlock(0, y, 0, Blocks.EMBER_PORTAL)
+        assertEquals(Blocks.EMBER_PORTAL, g.world.getBlock(0, y, 0))
+        g.breakBlock(0, y, 0)
+        assertEquals(Blocks.AIR, g.world.getBlock(0, y, 0))
+    }
+}
