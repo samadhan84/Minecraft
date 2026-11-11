@@ -177,7 +177,7 @@ class World(val seed: Long, private val saveDir: File?, val dimension: Dimension
             if (!flat && dimension == Dimension.OVERWORLD) {
                 try {
                     val st = Structures(seed, generator, this)
-                    if (!farmChunks.contains(Chunk.key(cx, cz))) st.placeFarms(c)
+                    st.placeFarms(c)
                     st.placeBig(c)
                 } catch (e: Exception) { e.printStackTrace() }
             }

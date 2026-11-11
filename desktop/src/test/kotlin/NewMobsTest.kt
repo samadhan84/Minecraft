@@ -828,3 +828,18 @@ class PortalItemsTest {
         assertEquals(Blocks.AIR, g.world.getBlock(0, y, 0))
     }
 }
+
+class SmithyTest {
+    @Test fun villagesHaveABlacksmithHomeAlsoInOldWorlds() {
+        val dir = kotlin.io.path.createTempDirectory("smith").toFile()
+        val w1 = World(21L, dir, Dimension.OVERWORLD)
+        for (cx in -16..16) for (cz in -16..16) w1.ensureLoaded(cx, cz)
+        fun anvils(w: World): Int { var n = 0; for (x in -256..256) for (z in -256..256) for (y in 50..110) if (w.getBlock(x, y, z) == Blocks.ANVIL) n++; return n }
+        assertTrue(anvils(w1) > 0, "a smithy was built")
+        for (x in -256..256) for (z in -256..256) for (y in 50..110) if (w1.getBlock(x, y, z) == Blocks.ANVIL) w1.setBlock(x, y, z, Blocks.AIR)
+        w1.saveChunks(); java.io.File(dir, "bigs.dat").delete(); java.io.File(dir, "farms.dat").delete(); w1.shutdown()
+        val w2 = World(21L, dir, Dimension.OVERWORLD)
+        for (cx in -16..16) for (cz in -16..16) w2.ensureLoaded(cx, cz)
+        assertTrue(anvils(w2) > 0, "an old world got its smithy")
+    }
+}

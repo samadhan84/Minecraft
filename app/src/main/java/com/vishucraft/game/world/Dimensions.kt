@@ -162,6 +162,61 @@ class Structures(private val seed: Long, private val gen: WorldGenerator, privat
     private fun farmFor(p: Put, cx: Int, cz: Int) {
         val fa = Random(seed xor (cx * 341873128712L) xor (cz * 132897987541L) xor 0xFA12).nextDouble() * Math.PI * 2
         xpFarm(p, cx + (Math.cos(fa) * 36).toInt(), cz + (Math.sin(fa) * 36).toInt())
+        // The blacksmith's home, on its own side of the village (kept clear of the farm's side).
+        val sa = fa + Math.PI * (0.6 + Random(seed xor (cx * 91L) xor (cz * 7919L)).nextDouble() * 0.8)
+        val sx = cx + (Math.cos(sa) * 28).toInt(); val sz = cz + (Math.sin(sa) * 28).toInt()
+        if (p.x0 + 15 >= sx - 8 && p.x0 <= sx + 8 && p.z0 + 15 >= sz - 8 && p.z0 <= sz + 8 && world.bigDone.add(Chunk.key(p.chunk.cx, p.chunk.cz) * 31L + ((sx * 73856093L) xor (sz * 19349663L) xor 4L)))
+            smithy(p, sx, sz, cx, cz)
+    }
+
+    /** The blacksmith's home: a stone-brick forge house 11 x 9 with furnaces, anvil, grindstone, a lava forge pit, loot chests and a villager. */
+    private fun smithy(p: Put, sx: Int, sz: Int, vx: Int, vz: Int) {
+        val y0 = gen.surfaceHeight(sx, sz)
+        val rnd = Random(seed xor (sx * 31L) xor (sz * 17L))
+        val doorOnX = abs(vx - sx) > abs(vz - sz)
+        val doorX = if (doorOnX) (if (vx > sx) 5 else -5) else 0
+        val doorZ = if (doorOnX) 0 else (if (vz > sz) 4 else -4)
+        for (dx in -5..5) for (dz in -4..4) {
+            val edge = abs(dx) == 5 || abs(dz) == 4
+            val corner = abs(dx) == 5 && abs(dz) == 4
+            for (y in y0 - 3 until y0) set(p, sx + dx, y, sz + dz, Blocks.STONE_BRICKS)
+            set(p, sx + dx, y0, sz + dz, Blocks.STONE_BRICKS)
+            for (y in y0 + 1..y0 + 4) {
+                val id = when {
+                    corner -> Blocks.LOG
+                    edge && y == y0 + 2 && (dx + dz) % 2 == 0 && !(dx == doorX && dz == doorZ) -> Blocks.GLASS_PANE
+                    edge -> if (rnd.nextInt(5) == 0) Blocks.MOSSY_STONE_BRICKS else Blocks.STONE_BRICKS
+                    else -> Blocks.AIR
+                }
+                set(p, sx + dx, y, sz + dz, id)
+            }
+            set(p, sx + dx, y0 + 5, sz + dz, Blocks.COBBLESTONE_SLAB)
+        }
+        // The doorway.
+        for (y in y0 + 1..y0 + 2) set(p, sx + doorX, y, sz + doorZ, Blocks.AIR)
+        // The forge along the back wall: furnaces, a blast furnace, an anvil and a grindstone; a chimney above.
+        val bx = if (doorOnX) -(doorX / 5) * 4 else 0; val bz = if (doorOnX) 0 else -(doorZ / 4) * 3
+        val ax = if (doorOnX) 0 else 1; val az = if (doorOnX) 1 else 0
+        set(p, sx + bx + ax * -2, y0 + 1, sz + bz + az * -2, Blocks.FURNACE)
+        set(p, sx + bx + ax * -1, y0 + 1, sz + bz + az * -1, Blocks.BLAST_FURNACE)
+        set(p, sx + bx, y0 + 1, sz + bz, Blocks.FURNACE)
+        set(p, sx + bx + ax * 1, y0 + 1, sz + bz + az * 1, Blocks.ANVIL)
+        set(p, sx + bx + ax * 2, y0 + 1, sz + bz + az * 2, Blocks.GRINDSTONE)
+        for (y in y0 + 5..y0 + 7) { set(p, sx + bx + ax * -2, y, sz + bz + az * -2, Blocks.COBBLESTONE); set(p, sx + bx, y, sz + bz, Blocks.COBBLESTONE) }
+        // A lava forge pit in the middle, with a rim.
+        set(p, sx, y0, sz, Blocks.LAVA, 0)
+        for ((dx, dz) in listOf(1 to 0, -1 to 0, 0 to 1, 0 to -1)) set(p, sx + dx, y0, sz + dz, Blocks.STONE_BRICKS)
+        set(p, sx, y0 - 1, sz, Blocks.STONE_BRICKS)
+        // Torches and loot.
+        for ((dx, dz) in listOf(-4 to -3, 4 to -3, -4 to 3, 4 to 3)) set(p, sx + dx, y0 + 3, sz + dz, Blocks.TORCH)
+        val loot = listOf(
+            Items.find("Iron Ingot") to 2..7, Items.find("Coal") to 3..9, Items.find("Iron Pickaxe") to (if (rnd.nextInt(2) == 0) 1..1 else 0..0),
+            Items.find("Iron Sword") to (if (rnd.nextInt(2) == 0) 1..1 else 0..0), Items.find("Diamond") to (if (rnd.nextInt(4) == 0) 1..2 else 0..0),
+            Items.find("Bread") to 1..3, Items.find("Gold Ingot") to 0..3,
+        )
+        lootChest(p, sx - 4 * (if (doorOnX) 0 else 1) + (if (doorOnX) 0 else 0), y0 + 1, sz + (if (doorOnX) 3 else 0) - (if (doorOnX) 0 else 0), rnd, loot, 2)
+        lootChest(p, sx + (if (doorOnX) 0 else 3), y0 + 1, sz - (if (doorOnX) 3 else 0), rnd, loot, 2)
+        if (p.inside(sx + 2, sz + 2)) world.pendingVillagers.add(Triple(sx + 2, y0 + 1, sz + 2))
     }
 
     fun place(chunk: Chunk, mode: Int = 0) {
