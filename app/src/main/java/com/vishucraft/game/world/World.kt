@@ -278,11 +278,15 @@ class LevelData(
     /** What the Shell Boxes you carry hold: box number (kept in the item's damage) to its 27 slots. */
     val boxes = HashMap<Int, Array<ItemStack?>>()
     var nextBox = 1
-    /** Which outfit the player wears (see Outfits). */
-    var outfit = 0
+    /** How the player looks (see Appearance). */
+    var appearance: IntArray = Appearance.default()
+    /** A hardcore world: one life. */
+    var hardcore = false
+    /** The hardcore player died: the world is over. */
+    var hardcoreOver = false
 
     companion object {
-        private const val VERSION = 13
+        private const val VERSION = 14
 
         /** Creative worlds start with a useful hotbar; survival starts empty-handed. */
         /**
@@ -350,7 +354,12 @@ class LevelData(
                             l.nextBox = d.readInt()
                             repeat(d.readInt()) { val key = d.readInt(); l.boxes[key] = Array(27) { Inventory.readStack(d) } }
                         }
-                        if (version >= 13) l.outfit = d.readInt().coerceIn(0, 63)
+                        if (version == 13) d.readInt()   // the old outfit number
+                        if (version >= 14) {
+                            val n = d.readInt()
+                            for (i in 0 until n) { val v = d.readInt(); if (i < Appearance.SIZE) l.appearance[i] = v }
+                            l.hardcore = d.readBoolean(); l.hardcoreOver = d.readBoolean()
+                        }
                     }
                     l.hasPlayer = true
                     l
@@ -394,7 +403,8 @@ class LevelData(
             d.writeInt(nextBox)
             d.writeInt(boxes.size)
             for ((key, slots) in boxes) { d.writeInt(key); for (s in slots) Inventory.writeStack(d, s) }
-            d.writeInt(outfit)
+            d.writeInt(appearance.size); for (v in appearance) d.writeInt(v)
+            d.writeBoolean(hardcore); d.writeBoolean(hardcoreOver)
         }
         tmp.renameTo(f)
     }

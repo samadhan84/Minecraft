@@ -879,22 +879,52 @@ class VillageSkyPortalTest {
 }
 
 class OutfitTest {
-    @Test fun outfitsCycleAndArmorShowsOnTheBody() {
+    @Test fun everyPartOfTheLookChangesAndArmorShowsOnTheBody() {
         val dir = kotlin.io.path.createTempDirectory("fit").toFile()
         val level = LevelData.create(95L, "t", GameMode.SURVIVAL)
         val g = Game(World(level.seed, dir, Dimension.OVERWORLD, flat = true), level, GameInput(), dir)
+        val A = com.vishucraft.game.world.Appearance
         assertEquals(0, g.viewMode)
         g.cycleView(); assertEquals(1, g.viewMode); g.cycleView(); assertEquals(2, g.viewMode); g.cycleView(); assertEquals(0, g.viewMode)
-        val before = g.outfit
-        g.cycleOutfit()
-        assertTrue(g.outfit != before)
-        for (i in 1..8) g.cycleOutfit()
-        assertEquals(g.outfit, g.level.outfit)
-        // A helmet and leggings add parts to the body model; no armor adds none.
-        val bare = com.vishucraft.game.render.MobModels.playerModel(2, intArrayOf(-1, -1, -1, -1)).size
-        val dressed = com.vishucraft.game.render.MobModels.playerModel(2, intArrayOf(3, -1, 2, -1)).size
-        assertEquals(6, bare)
-        assertEquals(9, dressed)
-        assertEquals(3, com.vishucraft.game.world.Outfits.armorColor("Enchanted Diamond Helmet"))
+        for (c in 0 until A.SIZE) {
+            val before = A.value(g.appearance, c)
+            g.changeLook(c)
+            assertTrue(A.value(g.appearance, c) != before, "${A.categories[c].title} changed")
+        }
+        val bare = com.vishucraft.game.render.MobModels.playerModel(A.default(), intArrayOf(-1, -1, -1, -1)).size
+        val dressed = com.vishucraft.game.render.MobModels.playerModel(A.default(), intArrayOf(3, 2, 2, 1)).size
+        assertTrue(dressed > bare + 4, "armor adds parts to the body ($bare -> $dressed)")
+        // Every combination of the options builds a model.
+        val rnd = java.util.Random(5)
+        repeat(200) { val a = A.default(); A.randomize(a, rnd); assertTrue(com.vishucraft.game.render.MobModels.playerModel(a, intArrayOf(-1, -1, -1, -1)).size > 6) }
+        assertEquals(3, A.armorColor("Enchanted Diamond Helmet"))
+    }
+}
+
+class HardcoreTest {
+    @Test fun aHardcoreWorldEndsWhenYouDieAndStaysOver() {
+        val dir = kotlin.io.path.createTempDirectory("hc").toFile()
+        val level = LevelData.create(97L, "t", GameMode.CREATIVE)
+        val g = Game(World(level.seed, dir, Dimension.OVERWORLD, flat = true), level, GameInput(), dir)
+        assertEquals("Creative", g.modeName())
+        g.switchMode(); assertEquals("Survival", g.modeName())
+        g.switchMode(); assertEquals("Hardcore", g.modeName())
+        g.hurtPlayer(100f, 0f, 0f)
+        assertTrue(level.hardcoreOver, "the hardcore world is over")
+        assertFalse(g.playerAlive, "no respawn")
+        assertTrue(g.uiEvents.contains("hardcore_over"))
+        assertTrue(g.switchMode().contains("over"), "the mode cannot be changed to escape it")
+        assertEquals("Hardcore", g.modeName())
+        // Saved: the world is still over when it is opened again.
+        g.save()
+        val g2Level = LevelData.read(dir)
+        assertTrue(g2Level != null && g2Level.hardcoreOver && g2Level.hardcore)
+        val g2 = Game(World(level.seed, dir, Dimension.OVERWORLD, flat = true), g2Level!!, GameInput(), dir)
+        assertFalse(g2.playerAlive)
+        // Normal survival still respawns.
+        val l3 = LevelData.create(98L, "t", GameMode.SURVIVAL)
+        val g3 = Game(World(l3.seed, dir, Dimension.OVERWORLD, flat = true), l3, GameInput(), dir)
+        g3.hurtPlayer(100f, 0f, 0f)
+        assertTrue(g3.playerAlive)
     }
 }

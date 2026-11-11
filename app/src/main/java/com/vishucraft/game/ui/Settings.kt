@@ -62,13 +62,13 @@ class Settings(context: Context) {
 }
 
 /** Builds a focusable list of settings buttons (works with touch and TV remotes). */
-fun settingsDialog(ctx: android.app.Activity, onChanged: () -> Unit = {}) {
+fun settingsDialog(ctx: android.app.Activity, extraRows: List<Pair<() -> String, () -> Unit>> = emptyList(), onChanged: () -> Unit = {}) {
     val s = Settings(ctx)
     val col = android.widget.LinearLayout(ctx).apply {
         orientation = android.widget.LinearLayout.VERTICAL
         setPadding(ctx.dpi(16f), ctx.dpi(12f), ctx.dpi(16f), ctx.dpi(4f))
     }
-    for ((label, action) in Settings.rows(s)) {
+    for ((label, action) in Settings.rows(s) + extraRows) {
         lateinit var b: android.widget.TextView
         b = menuButton(ctx, label()) { action(); b.text = label(); onChanged() }
         col.addView(b, android.widget.LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = ctx.dpi(8f) })

@@ -66,7 +66,7 @@ interface NetSupport {
  */
 abstract class ClientApp(protected val demo: File?) {
     protected enum class Menu { TITLE, WORLDS, CREATE, JOIN, SETTINGS, CONTROLS, CONFIRM_DELETE, PASSWORD }
-    protected enum class Overlay { NONE, PAUSE, CREATIVE, CONTAINER, SETTINGS, CONTROLS, NAME_MOB, TRADE, ACHIEVEMENTS, SIGN, ENDING, INTERNET, FLIGHTS, FLOORS, METRO, CALL_TRAIN, ROBOT, PASSWORD_ASK, PASSWORD_SET, PASSWORD_REMOVE }
+    protected enum class Overlay { NONE, PAUSE, CREATIVE, CONTAINER, SETTINGS, CONTROLS, NAME_MOB, TRADE, ACHIEVEMENTS, SIGN, ENDING, INTERNET, FLIGHTS, FLOORS, METRO, CALL_TRAIN, ROBOT, PASSWORD_ASK, PASSWORD_SET, PASSWORD_REMOVE, LOOK, HARDCORE_OVER }
 
     // ---------------------------------------------------------------- platform parts
     protected abstract val prefs: ClientPrefs
@@ -112,6 +112,7 @@ abstract class ClientApp(protected val demo: File?) {
     private var passwordStored = ""
     protected val seedField = Ui.Field("", "Seed (leave empty for random)")
     protected var survival = true
+    protected var hardcoreWorld = false
     /** A new creative world on a flat world (false: normal land with hills, trees and water). */
     protected var flatWorld = false
     protected var deleteTarget: File? = null
@@ -188,6 +189,8 @@ abstract class ClientApp(protected val demo: File?) {
             Overlay.PASSWORD_REMOVE -> passwordRemoveScreen(s)
             Overlay.FLOORS -> floorsScreen(s)
             Overlay.ENDING -> endingScreen()
+            Overlay.LOOK -> lookScreen(s)
+            Overlay.HARDCORE_OVER -> hardcoreOverScreen(s)
             Overlay.INTERNET -> internetScreen()
         }
         ui.end()
@@ -208,6 +211,7 @@ abstract class ClientApp(protected val demo: File?) {
         when {
             e == "hurt" -> hud.hurt = 1f
             e == "died" -> hud.toast("You died! Respawning…")
+            e == "hardcore_over" -> { overlay = Overlay.HARDCORE_OVER; setCapture(false) }
             e == "sleep" -> hud.sleep = 3f
             e.startsWith("toast:") -> hud.toast(e.removePrefix("toast:"), 3f)
             e == "craft" -> audio.play("craft")
@@ -522,11 +526,13 @@ abstract class ClientApp(protected val demo: File?) {
         ui.text("Seed", cx - w / 2, y - 24, 16f, rgba(220, 220, 220))
         ui.field(seedField, cx - w / 2, y, w)
         y += 64
-        if (ui.button("Game mode: " + when { survival -> "Survival"; flatWorld -> "Creative (flat world)"; else -> "Creative (normal world)" }, cx - w / 2, y, w, 42f)) {
-            // Survival, creative on normal land (hills, trees, water), or creative on a flat world.
-            if (survival) { survival = false; flatWorld = false } else if (!flatWorld) flatWorld = true else survival = true
+        if (ui.button("Game mode: " + when { survival && hardcoreWorld -> "Hardcore"; survival -> "Survival"; flatWorld -> "Creative (flat world)"; else -> "Creative (normal world)" }, cx - w / 2, y, w, 42f)) {
+            // Survival, hardcore, creative on normal land (hills, trees, water), or creative on a flat world.
+            if (survival && !hardcoreWorld) hardcoreWorld = true
+            else if (survival) { survival = false; hardcoreWorld = false; flatWorld = false }
+            else if (!flatWorld) flatWorld = true else survival = true
         }
-        ui.text(if (survival) "Collect resources, craft tools, watch your health and hunger." else "Unlimited blocks, flying, no damage.",
+        ui.text(if (survival && hardcoreWorld) "Survival with one life: if you die you cannot respawn." else if (survival) "Collect resources, craft tools, watch your health and hunger." else "Unlimited blocks, flying, no damage.",
             cx, y + 50, 16f, rgba(200, 200, 200), 1)
         y += 100
         if (ui.button("Create", cx - w / 2, y, w / 2 - 5, 44f) || (demo != null && demoCreate)) {
@@ -539,6 +545,7 @@ abstract class ClientApp(protected val demo: File?) {
             ui.focus = null
             val dir = File(worldsDir, "world$n"); val sv = survival; val fl = flatWorld
             startSession(GameSession.create(dir, name, seed, sv, fl)); menu = Menu.WORLDS
+            if (sv && hardcoreWorld) session?.game?.level?.hardcore = true
             return
         }
         if (ui.button("Cancel", cx + 5, y, w / 2 - 5, 44f)) { ui.focus = null; menu = Menu.WORLDS }
@@ -836,7 +843,40 @@ abstract class ClientApp(protected val demo: File?) {
             }
             y += 48
         }
+        session?.let { se ->
+            if (ui.button("Camera: " + se.game.viewName(), cx - 220, y, 440f, 40f)) se.game.cycleView()
+            y += 48
+        }
         if (ui.button("Done", cx - 220, y + 16, 440f, 44f)) back()
+    }
+
+    protected var lookBefore = 0
+
+    /** The character customizer: every part of how you look. The game shows you from the front behind the buttons. */
+    protected fun lookScreen(s: GameSession) {
+        val game = s.game
+        val A = com.vishucraft.game.world.Appearance
+        title("Customize your character", 20f)
+        val w = 300f; val gap = 10f
+        val left = ui.width / 2 - w - gap / 2
+        var y = 80f
+        // Two columns of buttons at the sides, so the character in the middle stays visible.
+        val colX = floatArrayOf(20f, ui.width - w - 20f)
+        for (i in 0 until A.SIZE) {
+            val col = i % 2; val row = i / 2
+            if (ui.button(A.categories[i].title + ": " + A.optionName(game.appearance, i), colX[col], y + row * 46, w, 40f)) game.changeLook(i)
+        }
+        val by = ui.height - 60f
+        if (ui.button("Random look", ui.width / 2 - 215, by, 140f, 40f)) game.randomLook()
+        if (ui.button("Turn around", ui.width / 2 - 65, by, 130f, 40f)) game.viewMode = if (game.viewMode == 2) 1 else 2
+        if (ui.button("Done", ui.width / 2 + 75, by, 140f, 40f)) { game.viewMode = lookBefore; overlay = Overlay.PAUSE }
+    }
+
+    protected fun hardcoreOverScreen(s: GameSession) {
+        ui.rect(0f, 0f, ui.width, ui.height, rgba(80, 0, 0, 170))
+        title("You died", ui.height * 0.25f)
+        ui.text("This was a hardcore world: you cannot respawn.", ui.width / 2, ui.height * 0.25f + 70, 22f, -1, 1)
+        if (ui.button("Back to title", ui.width / 2 - 150, ui.height * 0.25f + 130, 300f, 46f)) leaveToTitle()
     }
 
     protected fun controlsScreen(back: () -> Unit) {
@@ -870,12 +910,12 @@ abstract class ClientApp(protected val demo: File?) {
         b("Save and quit to title") { saveAndQuit(s) }
         y += 10
         twoColumns = true
-        b(if (game.survival) "Mode: Survival (switch to Creative)" else "Mode: Creative (switch to Survival)") {
+        b("Mode: " + game.modeName() + " (change: Creative / Survival / Hardcore)") {
             if (game.isClient) hud?.toast("The host picks the game mode")
             else { hud?.toast(game.switchMode(), 4f); overlay = Overlay.NONE }
         }
-        b(when (game.viewMode) { 0 -> "View: First person"; 1 -> "View: Behind you"; else -> "View: In front of you" }) { hud?.toast(game.cycleView(), 3f); overlay = Overlay.NONE }
-        b("Outfit: " + com.vishucraft.game.world.Outfits.name(game.outfit) + " (change)") { hud?.toast(game.cycleOutfit(), 3f) }
+        b("Camera: " + game.viewName()) { hud?.toast(game.cycleView(), 3f); overlay = Overlay.NONE }
+        b("Customize character (skin, face, clothes)") { lookBefore = game.viewMode; game.viewMode = 2; overlay = Overlay.LOOK }
         b("Skip to next morning / night") { game.timeOfDay = if (game.daylight > 0.5f) 0.52f else 0.0f }
         b(if (game.mobs.hostileEnabled) "Mobs: Normal" else "Mobs: Peaceful (no monsters)") { game.mobs.hostileEnabled = !game.mobs.hostileEnabled }
         b(if (prefs.weather) "Weather: On" else "Weather: Off") { prefs.weather = !prefs.weather; applySettings() }

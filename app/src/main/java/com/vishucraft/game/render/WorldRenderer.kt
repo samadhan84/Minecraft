@@ -291,7 +291,7 @@ class WorldRenderer(private val game: Game) {
             me.x = p.x; me.y = p.y; me.z = p.z; me.yaw = p.yaw
             me.moving = p.vx * p.vx + p.vz * p.vz > 0.2f
             me.walkPhase = p.walkDist * 3.2f
-            mobRenderer.drawPlayer(blockShader, me, game.outfit, game.inventory.armor)
+            mobRenderer.drawPlayer(blockShader, me, game.level.appearance, game.inventory.armor)
         }
         dropRenderer.draw(blockShader, game.drops, ex, ez, far, game.timeOfDay, game.carts, game.projectiles, game.boats, game.aircraft, game.vehicles, game.world, game.fireworks, game.coasters)
         if (underwater) glUniform3f(blockShader.u("uTint"), 0.55f, 0.7f, 1f)

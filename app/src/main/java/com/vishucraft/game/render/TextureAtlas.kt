@@ -2422,19 +2422,14 @@ object TextureAtlas {
 
     /** Skins for the Flame Spinner, Tear Drifter and Raider. */
     private fun pack4Tile(name: String, t: Tile): Boolean {
-        val fitKind = listOf("p4_fit_shirt_", "p4_fit_pants_", "p4_fit_hair_", "p4_armor_").firstOrNull { name.startsWith(it) }
-        if (fitKind != null) {
-            val n = name.removePrefix(fitKind).toIntOrNull() ?: 0
-            val c = when (fitKind) {
-                "p4_fit_shirt_" -> com.vishucraft.game.world.Outfits.all[n.coerceIn(0, com.vishucraft.game.world.Outfits.all.size - 1)].shirt
-                "p4_fit_pants_" -> com.vishucraft.game.world.Outfits.all[n.coerceIn(0, com.vishucraft.game.world.Outfits.all.size - 1)].pants
-                "p4_fit_hair_" -> com.vishucraft.game.world.Outfits.all[n.coerceIn(0, com.vishucraft.game.world.Outfits.all.size - 1)].hair
-                else -> com.vishucraft.game.world.Outfits.armorRgb[n.coerceIn(0, com.vishucraft.game.world.Outfits.armorRgb.size - 1)]
-            }
-            val armor = fitKind == "p4_armor_"
+        if (name.startsWith("p4_c_") || name.startsWith("p4_armor_")) {
+            val armor = name.startsWith("p4_armor_")
+            val n = name.substringAfterLast('_').toIntOrNull() ?: 0
+            val c = if (armor) com.vishucraft.game.world.Appearance.armorRgb[n.coerceIn(0, com.vishucraft.game.world.Appearance.armorRgb.size - 1)]
+                else com.vishucraft.game.world.Appearance.palette[n.coerceIn(0, com.vishucraft.game.world.Appearance.palette.size - 1)]
             t.fill { x, y ->
                 val edge = armor && (x == 0 || y == 0 || x == 15 || y == 15)
-                scale(rgb(c[0], c[1], c[2]), t.jitter(0.05f) * (if (edge) 0.75f else if (armor && (x + y) % 5 == 0) 1.08f else 1f))
+                scale(rgb(c[0], c[1], c[2]), t.jitter(if (armor) 0.05f else 0.025f) * (if (edge) 0.75f else if (armor && (x + y) % 5 == 0) 1.08f else 1f))
             }
             return true
         }

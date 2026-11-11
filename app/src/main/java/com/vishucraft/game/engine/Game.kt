@@ -125,34 +125,43 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
     /** The player's own body, drawn in the third-person views (moved by the renderer). */
     val selfBody = Mob(MobType.EXPLORER, 0f, 0f, 0f)
 
-    fun cycleView(): String {
-        viewMode = (viewMode + 1) % 3
-        return when (viewMode) { 0 -> "View: first person"; 1 -> "View: from behind (you and your outfit)"; else -> "View: from the front (you and your outfit)" }
-    }
+    fun viewName() = when (viewMode) { 0 -> "First person view"; 1 -> "Third person view (behind you)"; else -> "Second person view (in front of you)" }
+    fun cycleView(): String { viewMode = (viewMode + 1) % 3; return "Camera: " + viewName() }
 
-    val outfit get() = level.outfit
-    fun cycleOutfit(): String {
-        level.outfit = com.vishucraft.game.world.Outfits.next(level.outfit)
-        return "Outfit: " + com.vishucraft.game.world.Outfits.name(level.outfit) + (if (viewMode == 0) " (press the view button to see yourself)" else "")
+    /** The look of the player: one number per Appearance category. */
+    val appearance get() = level.appearance
+    /** Changes one part of the look ([category] in Appearance.categories) to its next (or previous) choice. */
+    fun changeLook(category: Int, delta: Int = 1): String {
+        com.vishucraft.game.world.Appearance.cycle(level.appearance, category, delta)
+        val c = com.vishucraft.game.world.Appearance.categories[category]
+        return c.title + ": " + com.vishucraft.game.world.Appearance.optionName(level.appearance, category)
     }
+    fun randomLook(): String { com.vishucraft.game.world.Appearance.randomize(level.appearance, java.util.Random()); return "A new random look" }
 
     /** Switches this world between creative and survival (from the game menu); returns the message to show. */
     fun switchMode(): String {
         if (isShowcase) return "The showcase world is creative only"
-        level.mode = if (survival) GameMode.CREATIVE else GameMode.SURVIVAL
+        if (level.hardcoreOver) return "This hardcore world is over: you died and cannot come back"
+        // Creative -> Survival -> Hardcore -> Creative.
+        when {
+            !survival -> { level.mode = GameMode.SURVIVAL; level.hardcore = false }
+            !level.hardcore -> level.hardcore = true
+            else -> { level.mode = GameMode.CREATIVE; level.hardcore = false }
+        }
         // A fresh start either way: full health and food, and no flying in survival.
         health = 20f; food = 20f; air = 10f
-        if (survival) {
-            player.flying = false
-            // A single block, bed or other stackable thing taken in creative becomes a full stack; tools, swords and boxes stay single.
-            for (st in inventory.slots) if (st != null && st.count == 1) {
-                val max = Items.maxStack(st.id)
-                if (max > 1) st.count = max
-            }
-            return "Survival mode: collect, craft and survive. Single blocks and items became full stacks"
+        if (!survival) return "Creative mode: every block, flying (double-jump or FLY) and no damage"
+        player.flying = false
+        // A single block, bed or other stackable thing taken in creative becomes a full stack; tools, swords and boxes stay single.
+        for (st in inventory.slots) if (st != null && st.count == 1) {
+            val max = Items.maxStack(st.id)
+            if (max > 1) st.count = max
         }
-        return "Creative mode: every block, flying (double-jump or FLY) and no damage"
+        return if (level.hardcore) "Hardcore mode: one life. If you die you cannot respawn" else "Survival mode: collect, craft and survive. Single blocks and items became full stacks"
     }
+
+    val hardcore get() = level.hardcore && level.mode == GameMode.SURVIVAL
+    fun modeName() = when { !survival -> "Creative"; level.hardcore -> "Hardcore"; else -> "Survival" }
 
     /** Player health in half-hearts (20 = ten hearts). */
     var health = level.health.coerceIn(1f, 20f)
@@ -376,6 +385,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
     internal var hornCooldown = 0f
 
     init {
+        if (level.hardcoreOver) { health = 0f; uiEvents.add("hardcore_over") }
         if (level.hasPlayer) {
             player.x = level.x; player.y = level.y; player.z = level.z
             player.yaw = level.yaw; player.pitch = level.pitch
@@ -592,7 +602,10 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
             player.speedMul = (if (input.sprint && !player.flying) 1.3f else 1f) * (if (hasEffect("swiftness")) 1.4f else 1f)
             player.jumpMul = if (hasEffect("leaping")) 1.22f else 1f
             if (coasters.riding == null && carts.riding == null && mount == null && boats.riding == null && aircraft.riding == null && vehicles.riding == null && !sitting && !lift.riding &&
-                !rideEscalator(dt)) player.update(dt, world, input.moveForward, input.moveStrafe, input.jumpHeld, input.descendHeld)
+                !rideEscalator(dt)) {
+                if (level.hardcoreOver) player.update(dt, world, 0f, 0f, false, false)   // a hardcore death: you cannot move any more
+                else player.update(dt, world, input.moveForward, input.moveStrafe, input.jumpHeld, input.descendHeld)
+            }
             updateFlight(dt)
             // Fall damage when landing hard (not while flying or in water).
             if (player.onGround && !wasOnGround && !player.flying && !player.inWater && lastVy < -14f && !hasEffect("slow_falling")) {
@@ -726,6 +739,17 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
     }
 
     private fun respawn() {
+        if (level.hardcore) {
+            // One life: everything is dropped, and the world is over.
+            for (st in inventory.slots) if (st != null) drops.spawn(st, player.x, player.y + 1f, player.z)
+            for (st in inventory.armor) if (st != null) drops.spawn(st, player.x, player.y + 1f, player.z)
+            inventory.clear()
+            level.hardcoreOver = true
+            health = 0f
+            uiEvents.add("hardcore_over")
+            if (!isClient) save()
+            return
+        }
         // Survival: everything you carried is dropped where you died.
         for (s in inventory.slots) if (s != null) drops.spawn(s, player.x, player.y + 1f, player.z)
         for (s in inventory.armor) if (s != null) drops.spawn(s, player.x, player.y + 1f, player.z)

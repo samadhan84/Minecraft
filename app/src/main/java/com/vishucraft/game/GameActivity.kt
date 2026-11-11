@@ -327,12 +327,10 @@ class GameActivity : Activity() {
                 runOnUiThread { applyMode(); b.text = modeLabel(); showToast(msg); showPause(false) }
             }
         }
-        addMenu("View: first person / behind / in front") {
+        addMenu("Camera view: first / third / second person") {
             glView.queueEvent { val msg = game.cycleView(); runOnUiThread { showToast(msg); showPause(false) } }
         }
-        addMenu("Outfit: change what you wear") {
-            glView.queueEvent { val msg = game.cycleOutfit(); runOnUiThread { showToast(msg) } }
-        }
+        addMenu("Customize character (skin, face, clothes)") { lookDialog() }
         addMenu("Skip to next morning / night") {
             glView.queueEvent { game.timeOfDay = if (game.daylight > 0.5f) 0.52f else 0.0f }
             showPause(false)
@@ -370,7 +368,11 @@ class GameActivity : Activity() {
             }.start()
         }
         addMenu("Achievements") { showAchievements() }
-        addMenu("Settings") { settingsDialog(this) { applySettings() } }
+        addMenu("Settings") {
+            settingsDialog(this, extraRows = listOf(
+                { "Camera: " + game.viewName() } to { glView.queueEvent { game.cycleView() } },
+            )) { applySettings() }
+        }
         addMenu("Controls") { showControls() }
         root.addView(pauseMenu, FrameLayout.LayoutParams(-1, -1))
         if (!touch) handler.postDelayed({ showToast("Press MENU / Y for controls help in the pause menu (Back)") }, 800)
@@ -468,7 +470,36 @@ class GameActivity : Activity() {
         if (::stats.isInitialized) stats.visibility = if (settings.showDebug) View.VISIBLE else View.GONE
     }
 
-    private fun modeLabel() = "Game mode: " + if (game.survival) "Survival  →  switch to Creative" else "Creative  →  switch to Survival"
+    /** The character customizer: tap a part to change it; the game shows you from the front while this is open. */
+    private fun lookDialog() {
+        val before = game.viewMode
+        showPause(false)
+        glView.queueEvent { game.viewMode = 2 }
+        val A = com.vishucraft.game.world.Appearance
+        val col = android.widget.LinearLayout(this).apply {
+            orientation = android.widget.LinearLayout.VERTICAL
+            setPadding(dpi(16f), dpi(12f), dpi(16f), dpi(4f))
+        }
+        for (i in 0 until A.SIZE) {
+            lateinit var b: android.widget.TextView
+            b = menuButton(this, A.categories[i].title + ": " + A.optionName(game.appearance, i)) {
+                glView.queueEvent { game.changeLook(i); runOnUiThread { b.text = A.categories[i].title + ": " + A.optionName(game.appearance, i) } }
+            }
+            col.addView(b, android.widget.LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dpi(6f) })
+        }
+        val random = menuButton(this, "Random look") {
+            glView.queueEvent { game.randomLook(); runOnUiThread { for (i in 0 until A.SIZE) (col.getChildAt(i) as? android.widget.TextView)?.text = A.categories[i].title + ": " + A.optionName(game.appearance, i) } }
+        }
+        col.addView(random, android.widget.LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dpi(6f) })
+        val turn = menuButton(this, "Turn around") { glView.queueEvent { game.viewMode = if (game.viewMode == 2) 1 else 2 } }
+        col.addView(turn, android.widget.LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dpi(6f) })
+        android.app.AlertDialog.Builder(this).setTitle("Customize your character")
+            .setView(android.widget.ScrollView(this).apply { addView(col) })
+            .setPositiveButton("Done") { _, _ -> glView.queueEvent { game.viewMode = before } }
+            .setOnCancelListener { glView.queueEvent { game.viewMode = before } }.show()
+    }
+
+    private fun modeLabel() = "Game mode: " + game.modeName() + "  →  change (Creative / Survival / Hardcore)"
 
     /** Shows the buttons and bars that belong to the current game mode. */
     private fun applyMode() {
@@ -635,6 +666,9 @@ class GameActivity : Activity() {
                 hurtFlash.animate().alpha(0f).setDuration(350).start()
             }
             e == "died" -> showToast("You died! Respawning…")
+            e == "hardcore_over" -> android.app.AlertDialog.Builder(this).setTitle("You died")
+                .setMessage("This was a hardcore world: you cannot respawn.").setCancelable(false)
+                .setPositiveButton("Back to title") { _, _ -> finish() }.show()
             e == "sleep" -> {
                 // Fade to black and back while the night passes.
                 hurtFlash.animate().cancel()

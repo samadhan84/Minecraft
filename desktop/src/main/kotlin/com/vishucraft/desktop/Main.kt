@@ -254,6 +254,8 @@ class App(demo: File?) : ClientApp(demo) {
             Overlay.TRADE -> if (key == GLFW_KEY_ESCAPE || key == GLFW_KEY_E) overlay = Overlay.NONE
             Overlay.SIGN, Overlay.FLIGHTS, Overlay.FLOORS, Overlay.METRO, Overlay.CALL_TRAIN, Overlay.ROBOT -> if (key == GLFW_KEY_ESCAPE) { ui.focus = null; overlay = Overlay.NONE }
             Overlay.ENDING -> if (key == GLFW_KEY_ESCAPE) overlay = Overlay.NONE
+            Overlay.LOOK -> if (key == GLFW_KEY_ESCAPE) { s.game.viewMode = lookBefore; overlay = Overlay.PAUSE }
+            Overlay.HARDCORE_OVER -> {}
             Overlay.INTERNET -> if (key == GLFW_KEY_ESCAPE) overlay = Overlay.PAUSE
             Overlay.SETTINGS, Overlay.CONTROLS, Overlay.NAME_MOB, Overlay.ACHIEVEMENTS -> if (key == GLFW_KEY_ESCAPE) { ui.focus = null; overlay = Overlay.PAUSE }
             Overlay.PASSWORD_ASK, Overlay.PASSWORD_SET, Overlay.PASSWORD_REMOVE -> if (key == GLFW_KEY_ESCAPE) { ui.focus = null; overlay = Overlay.PAUSE }
@@ -407,14 +409,23 @@ class App(demo: File?) : ClientApp(demo) {
             f == 414 -> session?.game?.let { g ->
                 // The player's own body in third person, in an outfit with some armor on.
                 g.carts.list.clear()
-                g.level.outfit = 2; g.viewMode = 1
+                com.vishucraft.game.world.Appearance.randomize(g.level.appearance, java.util.Random(7)); g.viewMode = 1
                 g.inventory.armor[0] = com.vishucraft.game.world.ItemStack(com.vishucraft.game.world.Items.find("Diamond Helmet"), 1)
                 g.inventory.armor[1] = com.vishucraft.game.world.ItemStack(com.vishucraft.game.world.Items.find("Iron Chestplate"), 1)
                 g.inventory.armor[3] = com.vishucraft.game.world.ItemStack(com.vishucraft.game.world.Items.find("Golden Boots"), 1)
                 g.player.pitch = -0.2f
             }
             f == 425 -> { shot("04c2-outfit-behind"); session?.game?.let { it.viewMode = 2; it.player.pitch = -0.05f } }
-            f == 430 -> { shot("04c3-outfit-front"); session?.game?.viewMode = 0 }
+            f == 430 -> { shot("04c3-outfit-front"); session?.game?.let { g ->
+                val a = g.level.appearance
+                // Long dark hair, green eyes, glasses, a purple hoodie, shorts, a top hat, broad build.
+                a[com.vishucraft.game.world.Appearance.SKIN] = 4; a[com.vishucraft.game.world.Appearance.HAIR_STYLE] = 1; a[com.vishucraft.game.world.Appearance.HAIR_COLOR] = 0
+                a[com.vishucraft.game.world.Appearance.EYES] = 2; a[com.vishucraft.game.world.Appearance.FACE_EXTRA] = 3; a[com.vishucraft.game.world.Appearance.SHIRT_STYLE] = 3
+                a[com.vishucraft.game.world.Appearance.SHIRT_COLOR] = 5; a[com.vishucraft.game.world.Appearance.PANTS_STYLE] = 1; a[com.vishucraft.game.world.Appearance.HAT] = 3
+                a[com.vishucraft.game.world.Appearance.BUILD] = 2; a[com.vishucraft.game.world.Appearance.MOUTH] = 2
+                g.inventory.armor.fill(null); g.viewMode = 2; lookBefore = 0; overlay = Overlay.LOOK
+            } }
+            f == 434 -> { shot("04c4-customize-character"); overlay = Overlay.NONE; session?.game?.viewMode = 0 }
             f == 440 -> shot("04d-minecart")
             f == 441 -> session?.game?.let { g ->
                 // A line-up of the new creatures in front of the player.

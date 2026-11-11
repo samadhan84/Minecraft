@@ -36,32 +36,102 @@ object MobModels {
 
     private fun grow(b: FloatArray, k: Float) = floatArrayOf(b[0] - k, b[1] - k, b[2] - k, b[3] + k, b[4] + k, b[5] + k)
 
-    /** The player's body in the chosen outfit; [armor] holds the armor colour index (or -1) for helmet, chestplate, leggings, boots. */
-    fun playerModel(outfit: Int, armor: IntArray): List<Part> {
-        val o = outfit.coerceIn(0, 7)
-        val shirt = "p4_fit_shirt_$o"; val pants = "p4_fit_pants_$o"; val hair = "p4_fit_hair_$o"
-        val parts = arrayListOf(
-            box(-0.25f, 0f, -0.125f, 0f, 0.75f, 0.125f, tiles(pants), 1),
-            box(0f, 0f, -0.125f, 0.25f, 0.75f, 0.125f, tiles(pants), -1),
-            box(-0.25f, 0.75f, -0.14f, 0.25f, 1.45f, 0.14f, tiles(shirt)),
-            box(-0.25f, 1.45f, -0.25f, 0.25f, 1.95f, 0.25f, tiles(hair, front = "explorer_face")),
-            box(-0.45f, 0.75f, -0.11f, -0.25f, 1.45f, 0.11f, tiles(shirt), -1, pivotY = 1.4f),
-            box(0.25f, 0.75f, -0.11f, 0.45f, 1.45f, 0.11f, tiles(shirt), 1, pivotY = 1.4f),
-        )
+    /**
+     * The player's body from the chosen look ([app] = Appearance numbers). Every layer is a small coloured box, so any mix of
+     * skin, hair, eyes, mouth, clothes, shoes, hat and build works. [armor] holds the armor colour index (or -1) for helmet,
+     * chestplate, leggings, boots.
+     */
+    fun playerModel(app: IntArray, armor: IntArray): List<Part> {
+        val A = com.vishucraft.game.world.Appearance
+        val skin = "p4_c_${A.skin(app)}"; val hair = "p4_c_${A.hair(app)}"
+        val shirt = "p4_c_${A.shirt(app)}"; val pants = "p4_c_${A.pants(app)}"; val shoes = "p4_c_${A.shoes(app)}"
+        val dark = "p4_c_${A.C_BLACK}"; val white = "p4_c_${A.C_WHITE}"; val eye = "p4_c_${A.eyes(app)}"; val mouth = "p4_c_${A.C_MOUTH}"
+        val build = A.value(app, A.BUILD)
+        val tw = floatArrayOf(0.21f, 0.25f, 0.29f)[build]            // torso half width
+        val aw = floatArrayOf(0.15f, 0.2f, 0.24f)[build]             // arm thickness
+        val parts = ArrayList<Part>()
+        fun add(x0: Float, y0: Float, z0: Float, x1: Float, y1: Float, z1: Float, tile: String, swing: Int = 0, pivotY: Float = y1) {
+            parts.add(Part(floatArrayOf(x0, y0, z0, x1, y1, z1), pivotY, (z0 + z1) / 2, swing, tiles(tile)))
+        }
+        // Legs (long trousers or shorts), and shoes.
+        val shorts = A.value(app, A.PANTS_STYLE) == 1
+        for (side in intArrayOf(-1, 1)) {
+            val x0 = if (side < 0) -tw else 0f; val x1 = if (side < 0) 0f else tw
+            val sw = if (side < 0) 1 else -1
+            add(x0, if (shorts) 0.4f else 0.12f, -0.125f, x1, 0.75f, 0.125f, pants, sw, 0.75f)
+            if (shorts) add(x0 + 0.01f, 0.12f, -0.115f, x1 - 0.01f, 0.4f, 0.115f, skin, sw, 0.75f)
+            add(x0 - 0.005f, 0f, -0.17f, x1 + 0.005f, 0.12f, 0.13f, shoes, sw, 0.75f)
+        }
+        // Torso and arms.
+        add(-tw, 0.75f, -0.14f, tw, 1.45f, 0.14f, shirt)
+        val style = A.value(app, A.SHIRT_STYLE)
+        if (style == 2) for (y in listOf(0.85f, 1.05f, 1.25f)) add(-tw - 0.005f, y, -0.145f, tw + 0.005f, y + 0.07f, 0.145f, white)
+        if (style == 3) { add(-0.2f, 1.36f, 0.1f, 0.2f, 1.52f, 0.24f, shirt); add(-0.08f, 0.78f, -0.146f, 0.08f, 0.95f, -0.14f, dark) }
+        val longSleeve = style != 0
+        for (side in intArrayOf(-1, 1)) {
+            val x0 = if (side < 0) -tw - aw else tw; val x1 = if (side < 0) -tw else tw + aw
+            val sw = if (side < 0) -1 else 1
+            add(x0, 0.75f, -0.11f, x1, 1.45f, 0.11f, skin, sw, 1.4f)
+            add(x0 - 0.005f, if (longSleeve) 0.75f else 1.1f, -0.115f, x1 + 0.005f, 1.45f, 0.115f, shirt, sw, 1.4f)
+        }
+        // Head, hair, eyes, mouth, extras.
+        add(-0.25f, 1.45f, -0.25f, 0.25f, 1.95f, 0.25f, skin)
+        when (A.value(app, A.HAIR_STYLE)) {
+            0 -> { add(-0.27f, 1.84f, -0.27f, 0.27f, 1.98f, 0.27f, hair); add(-0.27f, 1.55f, 0.2f, 0.27f, 1.98f, 0.28f, hair); add(-0.28f, 1.7f, -0.1f, -0.25f, 1.9f, 0.28f, hair); add(0.25f, 1.7f, -0.1f, 0.28f, 1.9f, 0.28f, hair) }
+            1 -> { add(-0.27f, 1.84f, -0.27f, 0.27f, 1.98f, 0.27f, hair); add(-0.27f, 1.2f, 0.2f, 0.27f, 1.98f, 0.29f, hair); add(-0.29f, 1.3f, -0.1f, -0.25f, 1.9f, 0.29f, hair); add(0.25f, 1.3f, -0.1f, 0.29f, 1.9f, 0.29f, hair) }
+            2 -> { add(-0.26f, 1.9f, -0.26f, 0.26f, 1.98f, 0.26f, hair); for (x in listOf(-0.2f, -0.07f, 0.07f)) add(x, 1.98f, -0.05f, x + 0.13f, 2.16f, 0.08f, hair) }
+            3 -> { add(-0.27f, 1.84f, -0.27f, 0.27f, 1.98f, 0.27f, hair); add(-0.27f, 1.55f, 0.2f, 0.27f, 1.98f, 0.28f, hair); add(-0.1f, 1.98f, 0.05f, 0.1f, 2.18f, 0.25f, hair) }
+            4 -> add(-0.05f, 1.95f, -0.27f, 0.05f, 2.14f, 0.27f, hair)
+            else -> {}
+        }
+        // Eyes: white, with the coloured iris; brows in the hair colour.
+        for (side in intArrayOf(-1, 1)) {
+            val x0 = if (side < 0) -0.17f else 0.05f
+            add(x0, 1.72f, -0.262f, x0 + 0.12f, 1.8f, -0.25f, white)
+            add(x0 + 0.04f, 1.72f, -0.268f, x0 + 0.09f, 1.79f, -0.262f, eye)
+            add(x0 + 0.05f, 1.74f, -0.274f, x0 + 0.075f, 1.77f, -0.268f, dark)
+            add(x0 - 0.01f, 1.83f, -0.262f, x0 + 0.13f, 1.855f, -0.25f, hair)
+        }
+        when (A.value(app, A.MOUTH)) {
+            0 -> { add(-0.07f, 1.56f, -0.262f, 0.07f, 1.585f, -0.25f, mouth); add(-0.1f, 1.585f, -0.262f, -0.07f, 1.61f, -0.25f, mouth); add(0.07f, 1.585f, -0.262f, 0.1f, 1.61f, -0.25f, mouth) }
+            1 -> add(-0.07f, 1.56f, -0.262f, 0.07f, 1.58f, -0.25f, mouth)
+            2 -> { add(-0.1f, 1.54f, -0.262f, 0.1f, 1.6f, -0.25f, mouth); add(-0.085f, 1.56f, -0.268f, 0.085f, 1.59f, -0.262f, white) }
+            else -> add(-0.04f, 1.52f, -0.262f, 0.04f, 1.6f, -0.25f, mouth)
+        }
+        when (A.value(app, A.FACE_EXTRA)) {
+            1 -> for ((x, y) in listOf(-0.17f to 1.66f, -0.1f to 1.64f, 0.08f to 1.64f, 0.14f to 1.66f, -0.13f to 1.62f, 0.11f to 1.62f)) add(x, y, -0.258f, x + 0.03f, y + 0.025f, -0.25f, "p4_c_${A.C_BROWN}")
+            2 -> { add(-0.26f, 1.45f, -0.26f, 0.26f, 1.55f, -0.2f, hair); add(-0.26f, 1.45f, -0.26f, -0.2f, 1.7f, 0.2f, hair); add(0.2f, 1.45f, -0.26f, 0.26f, 1.7f, 0.2f, hair); add(-0.1f, 1.585f, -0.266f, 0.1f, 1.62f, -0.26f, hair) }
+            3 -> {
+                for (side in intArrayOf(-1, 1)) { val x0 = if (side < 0) -0.2f else 0.06f
+                    add(x0, 1.7f, -0.272f, x0 + 0.14f, 1.72f, -0.262f, dark); add(x0, 1.82f, -0.272f, x0 + 0.14f, 1.84f, -0.262f, dark)
+                    add(x0, 1.7f, -0.272f, x0 + 0.02f, 1.84f, -0.262f, dark); add(x0 + 0.12f, 1.7f, -0.272f, x0 + 0.14f, 1.84f, -0.262f, dark) }
+                add(-0.06f, 1.77f, -0.272f, 0.06f, 1.79f, -0.262f, dark)
+            }
+            else -> {}
+        }
+        // Hat.
+        when (A.value(app, A.HAT)) {
+            1 -> { add(-0.28f, 1.88f, -0.28f, 0.28f, 2.02f, 0.28f, "p4_c_${A.C_RED}"); add(-0.2f, 1.9f, -0.4f, 0.2f, 1.94f, -0.26f, "p4_c_${A.C_RED}") }
+            2 -> { add(-0.28f, 1.86f, -0.28f, 0.28f, 2.06f, 0.28f, "p4_c_${A.C_AQUA}"); add(-0.08f, 2.06f, -0.08f, 0.08f, 2.14f, 0.08f, white) }
+            3 -> { add(-0.4f, 1.92f, -0.4f, 0.4f, 1.97f, 0.4f, dark); add(-0.26f, 1.97f, -0.26f, 0.26f, 2.3f, 0.26f, dark); add(-0.27f, 1.99f, -0.27f, 0.27f, 2.04f, 0.27f, "p4_c_${A.C_RED}") }
+            4 -> { add(-0.28f, 1.9f, -0.28f, 0.28f, 2.0f, 0.28f, "p4_c_${A.C_GOLD}"); for (x in listOf(-0.26f, -0.09f, 0.1f)) for (z in listOf(-0.26f, 0.1f)) add(x, 2.0f, z, x + 0.16f, 2.14f, z + 0.16f, "p4_c_${A.C_GOLD}") }
+            else -> {}
+        }
+        // Worn armor on top of all that.
         fun worn(i: Int) = if (armor[i] >= 0) tiles("p4_armor_${armor[i]}") else null
         worn(0)?.let { parts.add(Part(grow(floatArrayOf(-0.25f, 1.72f, -0.25f, 0.25f, 1.95f, 0.25f), 0.04f), 1.95f, 0f, 0, it)) }   // a cap: the face stays visible
         worn(1)?.let {
-            parts.add(Part(grow(floatArrayOf(-0.25f, 0.75f, -0.14f, 0.25f, 1.45f, 0.14f), 0.04f), 1.45f, 0f, 0, it))
-            parts.add(Part(grow(floatArrayOf(-0.45f, 0.75f, -0.11f, -0.25f, 1.45f, 0.11f), 0.04f), 1.4f, 0f, -1, it))
-            parts.add(Part(grow(floatArrayOf(0.25f, 0.75f, -0.11f, 0.45f, 1.45f, 0.11f), 0.04f), 1.4f, 0f, 1, it))
+            parts.add(Part(grow(floatArrayOf(-tw, 0.75f, -0.14f, tw, 1.45f, 0.14f), 0.04f), 1.45f, 0f, 0, it))
+            parts.add(Part(grow(floatArrayOf(-tw - aw, 0.75f, -0.11f, -tw, 1.45f, 0.11f), 0.04f), 1.4f, 0f, -1, it))
+            parts.add(Part(grow(floatArrayOf(tw, 0.75f, -0.11f, tw + aw, 1.45f, 0.11f), 0.04f), 1.4f, 0f, 1, it))
         }
         worn(2)?.let {
-            parts.add(Part(grow(floatArrayOf(-0.25f, 0.28f, -0.125f, 0f, 0.75f, 0.125f), 0.04f), 0.75f, 0f, 1, it))
-            parts.add(Part(grow(floatArrayOf(0f, 0.28f, -0.125f, 0.25f, 0.75f, 0.125f), 0.04f), 0.75f, 0f, -1, it))
+            parts.add(Part(grow(floatArrayOf(-tw, 0.28f, -0.125f, 0f, 0.75f, 0.125f), 0.04f), 0.75f, 0f, 1, it))
+            parts.add(Part(grow(floatArrayOf(0f, 0.28f, -0.125f, tw, 0.75f, 0.125f), 0.04f), 0.75f, 0f, -1, it))
         }
         worn(3)?.let {
-            parts.add(Part(grow(floatArrayOf(-0.25f, 0f, -0.125f, 0f, 0.28f, 0.125f), 0.06f), 0.75f, 0f, 1, it))
-            parts.add(Part(grow(floatArrayOf(0f, 0f, -0.125f, 0.25f, 0.28f, 0.125f), 0.06f), 0.75f, 0f, -1, it))
+            parts.add(Part(grow(floatArrayOf(-tw, 0f, -0.14f, 0f, 0.28f, 0.125f), 0.06f), 0.75f, 0f, 1, it))
+            parts.add(Part(grow(floatArrayOf(0f, 0f, -0.14f, tw, 0.28f, 0.125f), 0.06f), 0.75f, 0f, -1, it))
         }
         return parts
     }
@@ -533,12 +603,13 @@ class MobRenderer {
     private var playerParts: List<MobModels.Part> = emptyList()
 
     /** Draws the player's own body (third-person view): the chosen outfit with the armor that is really worn. */
-    fun drawPlayer(shader: Shader, me: Mob, outfit: Int, armor: Array<com.vishucraft.game.world.ItemStack?>) {
-        // Cache the model until the outfit or an armor piece changes.
-        var key = outfit
-        val mats = IntArray(4) { i -> armor.getOrNull(i)?.let { com.vishucraft.game.world.Outfits.armorColor(com.vishucraft.game.world.Items[it.id]?.name ?: "") } ?: -1 }
+    fun drawPlayer(shader: Shader, me: Mob, look: IntArray, armor: Array<com.vishucraft.game.world.ItemStack?>) {
+        // Cache the model until the look or an armor piece changes.
+        var key = 17
+        for (v in look) key = key * 31 + v
+        val mats = IntArray(4) { i -> armor.getOrNull(i)?.let { com.vishucraft.game.world.Appearance.armorColor(com.vishucraft.game.world.Items[it.id]?.name ?: "") } ?: -1 }
         for (m in mats) key = key * 11 + (m + 1)
-        if (key != playerKey) { playerKey = key; playerParts = MobModels.playerModel(outfit, mats) }
+        if (key != playerKey) { playerKey = key; playerParts = MobModels.playerModel(look, mats) }
         glUniform3f(shader.u("uOffset"), 0f, 0f, 0f)
         buf.size = 0
         build(me, playerParts)
