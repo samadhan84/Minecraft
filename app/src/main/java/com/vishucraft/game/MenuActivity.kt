@@ -52,6 +52,7 @@ class MenuActivity : Activity() {
         playButton = add("Play") { if (hasWorld()) showWorlds() else newWorld() }
         add("Join online game") { joinOnline() }
         add("Join Wi-Fi game") { joinGame() }
+        add("Customize character") { lookMenu() }
         add("Settings") { settingsDialog(this) }
         add("Back up / restore") { backupMenu() }
         if (Updater.enabled(this)) add("Check for updates") { Updater.check(this, manual = true) }
@@ -318,6 +319,28 @@ class MenuActivity : Activity() {
     }
 
     /** Joins a friend's game anywhere with the room code they see. */
+    /** The character customizer on the home screen: a picture of you and every choice (skin, hair, eyes, clothes, hat, build). */
+    private fun lookMenu() {
+        val A = com.vishucraft.game.world.Appearance
+        val file = A.fileFor(GameActivity.worldsRoot(this))
+        val look = A.load(file) ?: A.default()
+        val preview = com.vishucraft.game.ui.LookPreview(this, look)
+        val col = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dpi(16f), dpi(8f), dpi(16f), dpi(4f)) }
+        col.addView(preview, LinearLayout.LayoutParams(-1, dpi(220f)))
+        val buttons = ArrayList<TextView>()
+        fun refresh() { for (i in 0 until A.SIZE) buttons[i].text = A.categories[i].title + ": " + A.optionName(look, i); preview.invalidate() }
+        for (i in 0 until A.SIZE) {
+            val b = com.vishucraft.game.ui.menuButton(this, A.categories[i].title + ": " + A.optionName(look, i)) { A.cycle(look, i); A.save(file, look); refresh() }
+            buttons.add(b)
+            col.addView(b, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dpi(6f) })
+        }
+        col.addView(com.vishucraft.game.ui.menuButton(this, "Random look") { A.randomize(look, java.util.Random()); A.save(file, look); refresh() },
+            LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dpi(6f) })
+        android.app.AlertDialog.Builder(this).setTitle("Customize your character")
+            .setView(android.widget.ScrollView(this).apply { addView(col) })
+            .setPositiveButton("Done", null).show()
+    }
+
     private fun joinOnline() {
         if (limitOver()) return
         val input = EditText(this).apply { hint = "Room code (6 numbers)"; inputType = InputType.TYPE_CLASS_NUMBER }

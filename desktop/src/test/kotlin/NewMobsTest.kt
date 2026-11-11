@@ -928,3 +928,27 @@ class HardcoreTest {
         assertTrue(g3.playerAlive)
     }
 }
+
+class LookSharedTest {
+    @Test fun yourLookIsRememberedForEveryWorld() {
+        val root = kotlin.io.path.createTempDirectory("lk").toFile()
+        val worlds = java.io.File(root, "worlds").apply { mkdirs() }
+        fun game(n: Int): Game {
+            val dir = java.io.File(worlds, "world$n").apply { mkdirs() }
+            val level = LevelData.create(100L + n, "w$n", GameMode.CREATIVE)
+            return Game(World(level.seed, dir, Dimension.OVERWORLD, flat = true), level, GameInput(), dir)
+        }
+        val a = game(1)
+        a.changeLook(com.vishucraft.game.world.Appearance.HAIR_STYLE)
+        val hair = a.appearance[com.vishucraft.game.world.Appearance.HAIR_STYLE]
+        val b = game(2)
+        assertEquals(hair, b.appearance[com.vishucraft.game.world.Appearance.HAIR_STYLE], "a second world uses the same look")
+        // The home screen reads and writes the same file.
+        val file = com.vishucraft.game.world.Appearance.fileFor(worlds)
+        val home = com.vishucraft.game.world.Appearance.load(file)!!
+        home[com.vishucraft.game.world.Appearance.SKIN] = 5
+        com.vishucraft.game.world.Appearance.save(file, home)
+        assertEquals(5, game(3).appearance[com.vishucraft.game.world.Appearance.SKIN])
+        assertTrue(com.vishucraft.game.world.Appearance.flat(home).size > 15)
+    }
+}

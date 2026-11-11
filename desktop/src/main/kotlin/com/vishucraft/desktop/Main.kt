@@ -378,6 +378,8 @@ class App(demo: File?) : ClientApp(demo) {
         fun shot(name: String) { screenshot(File(dir, "$name.png")); println("screenshot $name") }
         val f = demoFrame
         when {
+            f == 6 -> { homeLook = com.vishucraft.game.world.Appearance.default().also { com.vishucraft.game.world.Appearance.randomize(it, java.util.Random(11)) }; menu = Menu.LOOK }
+            f == 8 -> { shot("00-home-customize"); menu = Menu.TITLE }
             f == 10 -> shot("01-title")
             f == 12 -> { menu = Menu.CREATE; nameField.text = "Demo creative"; seedField.text = "12345"; survival = false; flatWorld = true }
             f == 16 -> shot("02-create")

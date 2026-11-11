@@ -130,13 +130,18 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
 
     /** The look of the player: one number per Appearance category. */
     val appearance get() = level.appearance
+    /** The file that keeps your look for all worlds (next to the worlds folder); null when this world is not in one. */
+    private val lookFile: File? = saveDir?.parentFile?.takeIf { it.name == "worlds" }?.let { com.vishucraft.game.world.Appearance.fileFor(it) }
+    init { com.vishucraft.game.world.Appearance.load(lookFile)?.let { level.appearance = it } }
+    private fun saveLook() = com.vishucraft.game.world.Appearance.save(lookFile, level.appearance)
+
     /** Changes one part of the look ([category] in Appearance.categories) to its next (or previous) choice. */
     fun changeLook(category: Int, delta: Int = 1): String {
-        com.vishucraft.game.world.Appearance.cycle(level.appearance, category, delta)
+        com.vishucraft.game.world.Appearance.cycle(level.appearance, category, delta); saveLook()
         val c = com.vishucraft.game.world.Appearance.categories[category]
         return c.title + ": " + com.vishucraft.game.world.Appearance.optionName(level.appearance, category)
     }
-    fun randomLook(): String { com.vishucraft.game.world.Appearance.randomize(level.appearance, java.util.Random()); return "A new random look" }
+    fun randomLook(): String { com.vishucraft.game.world.Appearance.randomize(level.appearance, java.util.Random()); saveLook(); return "A new random look" }
 
     /** Switches this world between creative and survival (from the game menu); returns the message to show. */
     fun switchMode(): String {

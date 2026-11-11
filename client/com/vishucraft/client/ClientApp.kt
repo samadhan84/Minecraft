@@ -65,7 +65,7 @@ interface NetSupport {
  * platform adds its window, input and sound, and calls [frame] every frame.
  */
 abstract class ClientApp(protected val demo: File?) {
-    protected enum class Menu { TITLE, WORLDS, CREATE, JOIN, SETTINGS, CONTROLS, CONFIRM_DELETE, PASSWORD }
+    protected enum class Menu { TITLE, WORLDS, CREATE, JOIN, SETTINGS, CONTROLS, CONFIRM_DELETE, PASSWORD, LOOK }
     protected enum class Overlay { NONE, PAUSE, CREATIVE, CONTAINER, SETTINGS, CONTROLS, NAME_MOB, TRADE, ACHIEVEMENTS, SIGN, ENDING, INTERNET, FLIGHTS, FLOORS, METRO, CALL_TRAIN, ROBOT, PASSWORD_ASK, PASSWORD_SET, PASSWORD_REMOVE, LOOK, HARDCORE_OVER }
 
     // ---------------------------------------------------------------- platform parts
@@ -349,6 +349,11 @@ abstract class ClientApp(protected val demo: File?) {
                     if (ui.button("Join a game (online or Wi-Fi)", cx - bw / 2, y, bw, 44f)) { menu = Menu.JOIN; scan() }
                     y += 54
                 }
+                if (ui.button("Customize character (outfit, skin, face)", cx - bw / 2, y, bw, 44f)) {
+                    homeLook = com.vishucraft.game.world.Appearance.load(com.vishucraft.game.world.Appearance.fileFor(worldsDir)) ?: com.vishucraft.game.world.Appearance.default()
+                    menu = Menu.LOOK
+                }
+                y += 54
                 if (ui.button("Settings", cx - bw / 2, y, bw / 2 - 5, 44f)) menu = Menu.SETTINGS
                 if (ui.button("Controls", cx + 5, y, bw / 2 - 5, 44f)) menu = Menu.CONTROLS
                 y += 54
@@ -357,6 +362,7 @@ abstract class ClientApp(protected val demo: File?) {
                 val version = "Version $version"
                 ui.text(version, ui.width - ui.textWidth(version, 16f) - 14, 12f, 16f, rgba(230, 230, 230))
             }
+            Menu.LOOK -> homeLookScreen()
             Menu.WORLDS -> worldsScreen()
             Menu.PASSWORD -> passwordScreen()
             Menu.CREATE -> createScreen()
@@ -870,6 +876,36 @@ abstract class ClientApp(protected val demo: File?) {
         if (ui.button("Random look", ui.width / 2 - 215, by, 140f, 40f)) game.randomLook()
         if (ui.button("Turn around", ui.width / 2 - 65, by, 130f, 40f)) game.viewMode = if (game.viewMode == 2) 1 else 2
         if (ui.button("Done", ui.width / 2 + 75, by, 140f, 40f)) { game.viewMode = lookBefore; overlay = Overlay.PAUSE }
+    }
+
+    protected var homeLook: IntArray = com.vishucraft.game.world.Appearance.default()
+
+    /** Draws the character from the front as coloured blocks ([scale] pixels per grid cell), with its feet at the bottom of the picture. */
+    protected fun drawLookPreview(look: IntArray, x: Float, y: Float, scale: Float) {
+        val A = com.vishucraft.game.world.Appearance
+        for (r in A.flat(look)) {
+            val c = A.palette[r[4].coerceIn(0, A.palette.size - 1)]
+            ui.rect(x + r[0] * scale, y + r[1] * scale, r[2] * scale, r[3] * scale, rgba(c[0], c[1], c[2]))
+        }
+    }
+
+    /** The home-screen customizer: the same choices as in the game, with a picture of you. Your look is kept for every world. */
+    protected fun homeLookScreen() {
+        val A = com.vishucraft.game.world.Appearance
+        title("Customize your character", 20f)
+        val w = 300f
+        val colX = floatArrayOf(20f, ui.width - w - 20f)
+        for (i in 0 until A.SIZE) {
+            val col = i % 2; val row = i / 2
+            if (ui.button(A.categories[i].title + ": " + A.optionName(homeLook, i), colX[col], 80f + row * 46, w, 40f)) {
+                A.cycle(homeLook, i); A.save(A.fileFor(worldsDir), homeLook)
+            }
+        }
+        val scale = ((ui.height - 190f) / 36f).coerceAtMost(11f)
+        drawLookPreview(homeLook, ui.width / 2 - 8 * scale, 90f, scale)
+        val by = ui.height - 60f
+        if (ui.button("Random look", ui.width / 2 - 215, by, 140f, 40f)) { A.randomize(homeLook, java.util.Random()); A.save(A.fileFor(worldsDir), homeLook) }
+        if (ui.button("Done", ui.width / 2 + 75, by, 140f, 40f)) menu = Menu.TITLE
     }
 
     protected fun hardcoreOverScreen(s: GameSession) {
