@@ -116,7 +116,24 @@ internal fun Game.pack3Block(t: RayHit, item: ItemDef?, sel: Int): Boolean {
             world.blockEntities.chest(x, y, z); net?.openContainer(x, y, z, 0); uiEvents.add("open:chest:$x,$y,$z"); return true
         }
         Blocks.NOTE_BLOCK -> {
+            val holder = world.blockEntities.holder(x, y, z)
+            val disc = holder?.stack
+            // A music disc goes into the note block; power it (a lever, button or redstone) and it plays the song.
+            if (item != null && item.name.startsWith("Music Disc") && holder != null) {
+                if (disc != null) { toast("This note block already holds a disc"); return true }
+                holder.stack = ItemStack(heldId(), 1)
+                consumeHeld()
+                toast("Disc inside. Turn the note block on (redstone power) and it plays the song")
+                return true
+            }
             if (item != null) return false
+            // Tapping with an empty hand takes the disc back out.
+            if (disc != null && holder != null) {
+                if (inventory.add(disc.id, 1) > 0) drops.spawn(disc, x + 0.5f, y + 1f, z + 0.5f)
+                holder.stack = null
+                toast("Took out ${Items.displayName(disc.id)}")
+                return true
+            }
             val pitch = ((meta and 31) + 1) % 25
             setBlock(x, y, z, Blocks.NOTE_BLOCK, (meta and 31.inv()) or pitch)
             playNote(x, y, z)
@@ -249,7 +266,17 @@ internal fun Game.checkGolem(x: Int, y: Int, z: Int) {
 
 /** A dispenser or dropper got a redstone pulse, or a note block. */
 internal fun Game.activated(x: Int, y: Int, z: Int, id: Int) {
-    if (id == Blocks.NOTE_BLOCK) { playNote(x, y, z); return }
+    if (id == Blocks.NOTE_BLOCK) {
+        // A note block with a disc in it plays the song when it is turned on.
+        val disc = (world.blockEntities.get(x, y, z) as? com.vishucraft.game.world.ItemHolderEntity)?.stack
+        val name = disc?.let { Items[it.id]?.name }
+        if (name != null && name.startsWith("Music Disc")) {
+            val tune = name.substringAfter("(").removeSuffix(")").lowercase()
+            sound("disc_$tune", x + 0.5f, y + 1f, z + 0.5f, 1.2f)
+            toast("Now playing: ${name.substringAfter("(").removeSuffix(")")}")
+        } else playNote(x, y, z)
+        return
+    }
     val e = world.blockEntities.chest(x, y, z) ?: return
     val slot = e.slots.indices.filter { e.slots[it] != null }.let { if (it.isEmpty()) -1 else it[rnd.nextInt(it.size)] }
     sound("click", x + 0.5f, y + 0.5f, z + 0.5f)

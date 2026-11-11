@@ -952,3 +952,30 @@ class LookSharedTest {
         assertTrue(com.vishucraft.game.world.Appearance.flat(home).size > 15)
     }
 }
+
+class NoteBlockDiscTest {
+    @Test fun aDiscInANoteBlockPlaysWhenItIsTurnedOn() {
+        val dir = kotlin.io.path.createTempDirectory("nb").toFile()
+        val level = LevelData.create(99L, "t", GameMode.SURVIVAL)
+        val g = Game(World(level.seed, dir, Dimension.OVERWORLD, flat = true), level, GameInput(), dir)
+        for (cx in -2..2) for (cz in -2..2) g.world.ensureLoaded(cx, cz)
+        val y = g.world.generator.surfaceHeight(0, 0) + 4
+        g.setBlock(0, y, 0, Blocks.NOTE_BLOCK)
+        val disc = Items.all.firstOrNull { it.name.startsWith("Music Disc") }
+        assertTrue(disc != null, "there is a music disc")
+        g.inventory.slots[0] = ItemStack(Items.find(disc!!.name), 1); g.input.selectedSlot = 0
+        g.player.x = 3.5f; g.player.y = y.toFloat(); g.player.z = 3.5f
+        val hit = com.vishucraft.game.engine.RayHit(0, y, 0, 0, 1, 0, Blocks.NOTE_BLOCK)
+        assertTrue(g.pack3Block(hit, disc, Items.find(disc.name)), "the disc goes in")
+        assertEquals(0, g.inventory.count(Items.find(disc.name)), "the disc left the hand")
+        val inside = (g.world.blockEntities.get(0, y, 0) as? com.vishucraft.game.world.ItemHolderEntity)?.stack
+        assertTrue(inside != null, "the note block holds it")
+        g.uiEvents.clear()
+        g.activated(0, y, 0, Blocks.NOTE_BLOCK)
+        assertTrue(g.uiEvents.any { it.startsWith("toast:Now playing") }, "turning it on plays the song: " + g.uiEvents)
+        // Tapping with an empty hand takes the disc out again.
+        g.inventory.slots[0] = null
+        assertTrue(g.pack3Block(hit, null, 0))
+        assertEquals(1, g.inventory.count(Items.find(disc.name)))
+    }
+}
