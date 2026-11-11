@@ -227,6 +227,7 @@ class App(demo: File?) : ClientApp(demo) {
         if (!first) return
         when (key) {
             GLFW_KEY_F11 -> { prefs.fullscreen = !prefs.fullscreen; setFullscreen(prefs.fullscreen); return }
+            GLFW_KEY_F5 -> { session?.let { se -> hud?.toast(se.game.cycleView(), 3f) }; return }
             GLFW_KEY_F3 -> { prefs.showDebug = !prefs.showDebug; return }
             GLFW_KEY_F2 -> { screenshot(File(Paths.home, "screenshots/${java.time.LocalDateTime.now().toString().replace(':', '-')}.png")); session?.let { hud?.toast("Screenshot saved in ${File(Paths.home, "screenshots")}") }; return }
         }
@@ -403,6 +404,17 @@ class App(demo: File?) : ClientApp(demo) {
                     g.carts.list.add(com.vishucraft.game.engine.Cart(com.vishucraft.game.world.floorInt(p.x) + sx * 3 + 0.5f, y.toFloat(), com.vishucraft.game.world.floorInt(p.z) + sz * 3 + 0.5f))
                 }
             }
+            f == 414 -> session?.game?.let { g ->
+                // The player's own body in third person, in an outfit with some armor on.
+                g.carts.list.clear()
+                g.level.outfit = 2; g.viewMode = 1
+                g.inventory.armor[0] = com.vishucraft.game.world.ItemStack(com.vishucraft.game.world.Items.find("Diamond Helmet"), 1)
+                g.inventory.armor[1] = com.vishucraft.game.world.ItemStack(com.vishucraft.game.world.Items.find("Iron Chestplate"), 1)
+                g.inventory.armor[3] = com.vishucraft.game.world.ItemStack(com.vishucraft.game.world.Items.find("Golden Boots"), 1)
+                g.player.pitch = -0.2f
+            }
+            f == 425 -> { shot("04c2-outfit-behind"); session?.game?.let { it.viewMode = 2; it.player.pitch = -0.05f } }
+            f == 430 -> { shot("04c3-outfit-front"); session?.game?.viewMode = 0 }
             f == 440 -> shot("04d-minecart")
             f == 441 -> session?.game?.let { g ->
                 // A line-up of the new creatures in front of the player.

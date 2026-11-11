@@ -327,6 +327,12 @@ class GameActivity : Activity() {
                 runOnUiThread { applyMode(); b.text = modeLabel(); showToast(msg); showPause(false) }
             }
         }
+        addMenu("View: first person / behind / in front") {
+            glView.queueEvent { val msg = game.cycleView(); runOnUiThread { showToast(msg); showPause(false) } }
+        }
+        addMenu("Outfit: change what you wear") {
+            glView.queueEvent { val msg = game.cycleOutfit(); runOnUiThread { showToast(msg) } }
+        }
         addMenu("Skip to next morning / night") {
             glView.queueEvent { game.timeOfDay = if (game.daylight > 0.5f) 0.52f else 0.0f }
             showPause(false)

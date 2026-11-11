@@ -218,10 +218,24 @@ class WorldRenderer(private val game: Game) {
         p.lookDir(dir)
         val bobY = sin(bobbing * 2f) * 0.04f
         val shake = game.shake * 0.25f
-        val ex = p.x + (Math.random().toFloat() - 0.5f) * shake
-        val ey = p.eyeY + bobY + (Math.random().toFloat() - 0.5f) * shake
-        val ez = p.z + (Math.random().toFloat() - 0.5f) * shake
-        Matrix.setLookAtM(view, 0, ex, ey, ez, ex + dir[0], ey + dir[1], ez + dir[2], 0f, 1f, 0f)
+        var ex = p.x + (Math.random().toFloat() - 0.5f) * shake
+        var ey = p.eyeY + bobY + (Math.random().toFloat() - 0.5f) * shake
+        var ez = p.z + (Math.random().toFloat() - 0.5f) * shake
+        var lookSign = 1f
+        if (game.viewMode != 0) {
+            // Third person: the camera floats behind (or in front of) you, and stops at walls.
+            val sgn = if (game.viewMode == 1) -1f else 1f
+            var d = 0.3f
+            while (d < 4f) {
+                val b = game.world.getBlock(kotlin.math.floor(ex + sgn * dir[0] * d).toInt(), kotlin.math.floor(ey + sgn * dir[1] * d).toInt(), kotlin.math.floor(ez + sgn * dir[2] * d).toInt())
+                if (Blocks.solid[b]) break
+                d += 0.2f
+            }
+            d = maxOf(0.2f, d - 0.3f)
+            ex += sgn * dir[0] * d; ey += sgn * dir[1] * d; ez += sgn * dir[2] * d
+            lookSign = if (game.viewMode == 1) 1f else -1f
+        }
+        Matrix.setLookAtM(view, 0, ex, ey, ez, ex + lookSign * dir[0], ey + lookSign * dir[1], ez + lookSign * dir[2], 0f, 1f, 0f)
         Matrix.multiplyMM(viewProj, 0, proj, 0, view, 0)
         extractFrustum()
 
@@ -272,6 +286,13 @@ class WorldRenderer(private val game: Game) {
         glUniform1f(blockShader.u("uCutout"), 0.5f)
         mobRenderer.draw(blockShader, game.mobs.list, ex, ez, far)
         game.net?.let { n -> mobRenderer.draw(blockShader, n.players.values.map { it.proxy }, ex, ez, far) }
+        if (game.viewMode != 0 && game.playerAlive) {
+            val me = game.selfBody
+            me.x = p.x; me.y = p.y; me.z = p.z; me.yaw = p.yaw
+            me.moving = p.vx * p.vx + p.vz * p.vz > 0.2f
+            me.walkPhase = p.walkDist * 3.2f
+            mobRenderer.drawPlayer(blockShader, me, game.outfit, game.inventory.armor)
+        }
         dropRenderer.draw(blockShader, game.drops, ex, ez, far, game.timeOfDay, game.carts, game.projectiles, game.boats, game.aircraft, game.vehicles, game.world, game.fireworks, game.coasters)
         if (underwater) glUniform3f(blockShader.u("uTint"), 0.55f, 0.7f, 1f)
         if (fancy) drawShadows(ex, ez)

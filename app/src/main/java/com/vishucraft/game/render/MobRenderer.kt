@@ -34,6 +34,38 @@ object MobModels {
         return out
     }
 
+    private fun grow(b: FloatArray, k: Float) = floatArrayOf(b[0] - k, b[1] - k, b[2] - k, b[3] + k, b[4] + k, b[5] + k)
+
+    /** The player's body in the chosen outfit; [armor] holds the armor colour index (or -1) for helmet, chestplate, leggings, boots. */
+    fun playerModel(outfit: Int, armor: IntArray): List<Part> {
+        val o = outfit.coerceIn(0, 7)
+        val shirt = "p4_fit_shirt_$o"; val pants = "p4_fit_pants_$o"; val hair = "p4_fit_hair_$o"
+        val parts = arrayListOf(
+            box(-0.25f, 0f, -0.125f, 0f, 0.75f, 0.125f, tiles(pants), 1),
+            box(0f, 0f, -0.125f, 0.25f, 0.75f, 0.125f, tiles(pants), -1),
+            box(-0.25f, 0.75f, -0.14f, 0.25f, 1.45f, 0.14f, tiles(shirt)),
+            box(-0.25f, 1.45f, -0.25f, 0.25f, 1.95f, 0.25f, tiles(hair, front = "explorer_face")),
+            box(-0.45f, 0.75f, -0.11f, -0.25f, 1.45f, 0.11f, tiles(shirt), -1, pivotY = 1.4f),
+            box(0.25f, 0.75f, -0.11f, 0.45f, 1.45f, 0.11f, tiles(shirt), 1, pivotY = 1.4f),
+        )
+        fun worn(i: Int) = if (armor[i] >= 0) tiles("p4_armor_${armor[i]}") else null
+        worn(0)?.let { parts.add(Part(grow(floatArrayOf(-0.25f, 1.72f, -0.25f, 0.25f, 1.95f, 0.25f), 0.04f), 1.95f, 0f, 0, it)) }   // a cap: the face stays visible
+        worn(1)?.let {
+            parts.add(Part(grow(floatArrayOf(-0.25f, 0.75f, -0.14f, 0.25f, 1.45f, 0.14f), 0.04f), 1.45f, 0f, 0, it))
+            parts.add(Part(grow(floatArrayOf(-0.45f, 0.75f, -0.11f, -0.25f, 1.45f, 0.11f), 0.04f), 1.4f, 0f, -1, it))
+            parts.add(Part(grow(floatArrayOf(0.25f, 0.75f, -0.11f, 0.45f, 1.45f, 0.11f), 0.04f), 1.4f, 0f, 1, it))
+        }
+        worn(2)?.let {
+            parts.add(Part(grow(floatArrayOf(-0.25f, 0.28f, -0.125f, 0f, 0.75f, 0.125f), 0.04f), 0.75f, 0f, 1, it))
+            parts.add(Part(grow(floatArrayOf(0f, 0.28f, -0.125f, 0.25f, 0.75f, 0.125f), 0.04f), 0.75f, 0f, -1, it))
+        }
+        worn(3)?.let {
+            parts.add(Part(grow(floatArrayOf(-0.25f, 0f, -0.125f, 0f, 0.28f, 0.125f), 0.06f), 0.75f, 0f, 1, it))
+            parts.add(Part(grow(floatArrayOf(0f, 0f, -0.125f, 0.25f, 0.28f, 0.125f), 0.06f), 0.75f, 0f, -1, it))
+        }
+        return parts
+    }
+
     private fun scaled(parts: List<Part>, k: Float) = parts.map { p -> Part(FloatArray(6) { p.b[it] * k }, p.pivotY * k, p.pivotZ * k, p.swing, p.tiles) }
 
     /** A zombie 1.8 times as big. */
@@ -497,6 +529,26 @@ class MobRenderer {
         glUniform3f(shader.u("uTint"), 1f, 1f, 1f)
     }
 
+    private var playerKey = Int.MIN_VALUE
+    private var playerParts: List<MobModels.Part> = emptyList()
+
+    /** Draws the player's own body (third-person view): the chosen outfit with the armor that is really worn. */
+    fun drawPlayer(shader: Shader, me: Mob, outfit: Int, armor: Array<com.vishucraft.game.world.ItemStack?>) {
+        // Cache the model until the outfit or an armor piece changes.
+        var key = outfit
+        val mats = IntArray(4) { i -> armor.getOrNull(i)?.let { com.vishucraft.game.world.Outfits.armorColor(com.vishucraft.game.world.Items[it.id]?.name ?: "") } ?: -1 }
+        for (m in mats) key = key * 11 + (m + 1)
+        if (key != playerKey) { playerKey = key; playerParts = MobModels.playerModel(outfit, mats) }
+        glUniform3f(shader.u("uOffset"), 0f, 0f, 0f)
+        buf.size = 0
+        build(me, playerParts)
+        mesh.upload(buf.data, buf.size)
+        val (r, g, b) = tint(me)
+        glUniform3f(shader.u("uTint"), r, g, b)
+        mesh.draw()
+        glUniform3f(shader.u("uTint"), 1f, 1f, 1f)
+    }
+
     private fun tint(m: Mob): Triple<Float, Float, Float> = when {
         m.hurtTime > 0f || m.dead -> Triple(1.6f, 0.45f, 0.45f)
         m.fuse >= 0f && sin(m.fuse * 22f) > 0f -> Triple(2.4f, 2.4f, 2.4f)
@@ -505,8 +557,7 @@ class MobRenderer {
         else -> Triple(1f, 1f, 1f)
     }
 
-    private fun build(m: Mob) {
-        val parts = MobModels.models.getValue(m.type)
+    private fun build(m: Mob, parts: List<MobModels.Part> = MobModels.models.getValue(m.type)) {
         val swingAmt = if (m.moving) sin(m.walkPhase) * 0.7f else 0f
         val roll = if (m.dead) min(m.deathTime / 0.4f, 1f) * 1.5708f else 0f
         val scale = (if (m.fuse >= 0f) 1f + m.fuse * 0.12f else 1f) * m.scale

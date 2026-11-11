@@ -19,6 +19,11 @@ object Tiles {
     val CART_FLOOR = id("cart_floor")
     val SHADOW = id("shadow")
     val STAR = id("star")
+    // The player's outfits and armor colours (painted by name in TextureAtlas.pack4Tile).
+    init {
+        for (n in 0 until 8) { id("p4_fit_shirt_$n"); id("p4_fit_pants_$n"); id("p4_fit_hair_$n") }
+        for (n in 0 until 7) id("p4_armor_$n")
+    }
 }
 
 enum class RenderType { NONE, CUBE, CROSS, LIQUID, FLAT, BOX, PISTON_HEAD, SHAPE, RAIL, PORTAL }

@@ -874,6 +874,8 @@ abstract class ClientApp(protected val demo: File?) {
             if (game.isClient) hud?.toast("The host picks the game mode")
             else { hud?.toast(game.switchMode(), 4f); overlay = Overlay.NONE }
         }
+        b(when (game.viewMode) { 0 -> "View: First person"; 1 -> "View: Behind you"; else -> "View: In front of you" }) { hud?.toast(game.cycleView(), 3f); overlay = Overlay.NONE }
+        b("Outfit: " + com.vishucraft.game.world.Outfits.name(game.outfit) + " (change)") { hud?.toast(game.cycleOutfit(), 3f) }
         b("Skip to next morning / night") { game.timeOfDay = if (game.daylight > 0.5f) 0.52f else 0.0f }
         b(if (game.mobs.hostileEnabled) "Mobs: Normal" else "Mobs: Peaceful (no monsters)") { game.mobs.hostileEnabled = !game.mobs.hostileEnabled }
         b(if (prefs.weather) "Weather: On" else "Weather: Off") { prefs.weather = !prefs.weather; applySettings() }

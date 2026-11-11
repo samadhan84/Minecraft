@@ -120,6 +120,22 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
     val mode get() = level.mode
     val survival get() = level.mode == GameMode.SURVIVAL
 
+    /** 0 = first person, 1 = looking at yourself from behind, 2 = from the front. */
+    var viewMode = 0
+    /** The player's own body, drawn in the third-person views (moved by the renderer). */
+    val selfBody = Mob(MobType.EXPLORER, 0f, 0f, 0f)
+
+    fun cycleView(): String {
+        viewMode = (viewMode + 1) % 3
+        return when (viewMode) { 0 -> "View: first person"; 1 -> "View: from behind (you and your outfit)"; else -> "View: from the front (you and your outfit)" }
+    }
+
+    val outfit get() = level.outfit
+    fun cycleOutfit(): String {
+        level.outfit = com.vishucraft.game.world.Outfits.next(level.outfit)
+        return "Outfit: " + com.vishucraft.game.world.Outfits.name(level.outfit) + (if (viewMode == 0) " (press the view button to see yourself)" else "")
+    }
+
     /** Switches this world between creative and survival (from the game menu); returns the message to show. */
     fun switchMode(): String {
         if (isShowcase) return "The showcase world is creative only"

@@ -278,9 +278,11 @@ class LevelData(
     /** What the Shell Boxes you carry hold: box number (kept in the item's damage) to its 27 slots. */
     val boxes = HashMap<Int, Array<ItemStack?>>()
     var nextBox = 1
+    /** Which outfit the player wears (see Outfits). */
+    var outfit = 0
 
     companion object {
-        private const val VERSION = 12
+        private const val VERSION = 13
 
         /** Creative worlds start with a useful hotbar; survival starts empty-handed. */
         /**
@@ -348,6 +350,7 @@ class LevelData(
                             l.nextBox = d.readInt()
                             repeat(d.readInt()) { val key = d.readInt(); l.boxes[key] = Array(27) { Inventory.readStack(d) } }
                         }
+                        if (version >= 13) l.outfit = d.readInt().coerceIn(0, 63)
                     }
                     l.hasPlayer = true
                     l
@@ -391,6 +394,7 @@ class LevelData(
             d.writeInt(nextBox)
             d.writeInt(boxes.size)
             for ((key, slots) in boxes) { d.writeInt(key); for (s in slots) Inventory.writeStack(d, s) }
+            d.writeInt(outfit)
         }
         tmp.renameTo(f)
     }

@@ -877,3 +877,24 @@ class VillageSkyPortalTest {
         assertTrue(portals(w2) >= 9, "an old world got its village portal")
     }
 }
+
+class OutfitTest {
+    @Test fun outfitsCycleAndArmorShowsOnTheBody() {
+        val dir = kotlin.io.path.createTempDirectory("fit").toFile()
+        val level = LevelData.create(95L, "t", GameMode.SURVIVAL)
+        val g = Game(World(level.seed, dir, Dimension.OVERWORLD, flat = true), level, GameInput(), dir)
+        assertEquals(0, g.viewMode)
+        g.cycleView(); assertEquals(1, g.viewMode); g.cycleView(); assertEquals(2, g.viewMode); g.cycleView(); assertEquals(0, g.viewMode)
+        val before = g.outfit
+        g.cycleOutfit()
+        assertTrue(g.outfit != before)
+        for (i in 1..8) g.cycleOutfit()
+        assertEquals(g.outfit, g.level.outfit)
+        // A helmet and leggings add parts to the body model; no armor adds none.
+        val bare = com.vishucraft.game.render.MobModels.playerModel(2, intArrayOf(-1, -1, -1, -1)).size
+        val dressed = com.vishucraft.game.render.MobModels.playerModel(2, intArrayOf(3, -1, 2, -1)).size
+        assertEquals(6, bare)
+        assertEquals(9, dressed)
+        assertEquals(3, com.vishucraft.game.world.Outfits.armorColor("Enchanted Diamond Helmet"))
+    }
+}
