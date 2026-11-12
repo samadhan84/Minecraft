@@ -979,3 +979,41 @@ class NoteBlockDiscTest {
         assertEquals(1, g.inventory.count(Items.find(disc.name)))
     }
 }
+
+class SmithyPortalTest {
+    @Test fun everySmithyHasAWorkingSkyPortalInside() {
+        val dir = kotlin.io.path.createTempDirectory("sp").toFile()
+        val w1 = World(21L, dir, Dimension.OVERWORLD)
+        for (cx in -16..16) for (cz in -16..16) w1.ensureLoaded(cx, cz)
+        fun anvils(w: World): List<IntArray> { val l = ArrayList<IntArray>(); for (x in -256..256) for (z in -256..256) for (y in 50..110) if (w.getBlock(x, y, z) == Blocks.ANVIL) l.add(intArrayOf(x, y, z)); return l }
+        // The portal stands within a few blocks of the anvil, at floor level: 3 x 3 portal with 12 stones around it.
+        fun portalNear(w: World, a: IntArray): Boolean {
+            for (dx in -5..5) for (dz in -5..5) {
+                val cx = a[0] + dx; val cz = a[2] + dz; val y = a[1]
+                var ok = true
+                for (i in -1..1) for (j in -1..1) if (w.getBlock(cx + i, y, cz + j) != Blocks.SKY_PORTAL) ok = false
+                for (d in -1..1) for (e in intArrayOf(-2, 2)) if (w.getBlock(cx + e, y, cz + d) != Blocks.SKY_GATE_EYE || w.getBlock(cx + d, y, cz + e) != Blocks.SKY_GATE_EYE) ok = false
+                if (ok) return true
+            }
+            return false
+        }
+        val smiths = anvils(w1)
+        assertTrue(smiths.isNotEmpty())
+        for (a in smiths) assertTrue(portalNear(w1, a), "a new smithy at ${a.toList()} has its sky portal")
+        // An old smithy (built before the portals): take every portal out, forget only the "portal built" marks, load again.
+        val centers = ArrayList<IntArray>()
+        for (a in smiths) for (dx in -5..5) for (dz in -5..5) {
+            val cx = a[0] + dx; val cz = a[2] + dz
+            if ((-1..1).all { i -> (-1..1).all { j -> w1.getBlock(cx + i, a[1], cz + j) == Blocks.SKY_PORTAL } }) centers.add(intArrayOf(cx, a[1], cz))
+        }
+        assertTrue(centers.isNotEmpty())
+        for (c in centers) for (dx in -2..2) for (dz in -2..2) w1.setBlock(c[0] + dx, c[1], c[2] + dz, Blocks.STONE_BRICKS)
+        w1.saveChunks()
+        w1.shutdown()
+        val w2 = World(21L, dir, Dimension.OVERWORLD)
+        for (c in centers) for (cx in ((c[0] - 8) shr 4)..((c[0] + 8) shr 4)) for (cz in ((c[2] - 8) shr 4)..((c[2] + 8) shr 4))
+            w2.bigDone.remove(Chunk.key(cx, cz) * 31L + ((c[0] * 73856093L) xor (c[2] * 19349663L) xor 6L))
+        for (cx in -16..16) for (cz in -16..16) w2.ensureLoaded(cx, cz)
+        for (c in centers) assertTrue(portalNear(w2, intArrayOf(c[0], c[1], c[2])), "an old smithy at ${c.toList()} got its sky portal")
+    }
+}

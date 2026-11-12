@@ -836,8 +836,10 @@ object Blocks {
         reg(BlockDef(TRAPPED_CHEST, "Trapped Chest", t("p4_trap_top"), t("p4_trap_side"), t("p4_trap_top"), hardness = 0.8f, tool = A, facing = Facing.HORIZONTAL,
             front = t("p4_trap_front"), category = Category.REDSTONE, render = RenderType.BOX, opaque = false, blocksLight = false,
             box = floatArrayOf(0.0625f, 0f, 0.0625f, 0.9375f, 0.875f, 0.9375f)))
-        reg(BlockDef(SKY_GATE, "Sky Gate Frame", t("p4_gate_top"), t("p4_gate_side"), t("p4_gate_side"), hardness = 30f, tool = P, movable = false))
-        reg(BlockDef(SKY_GATE_EYE, "Sky Gate Frame (eye)", t("p4_gate_eye"), t("p4_gate_side"), t("p4_gate_side"), hardness = 30f, tool = P, movable = false, inInventory = false))
+        reg(BlockDef(SKY_GATE, "Sky Gate Frame", t("p4_gate_top"), t("p4_gate_side"), t("p4_gate_side"), hardness = 30f, tool = P, movable = false,
+            render = RenderType.BOX, opaque = false, blocksLight = false, box = floatArrayOf(0f, 0f, 0f, 1f, 0.8125f, 1f)))
+        reg(BlockDef(SKY_GATE_EYE, "Sky Gate Frame (eye)", t("p4_gate_eye"), t("p4_gate_side"), t("p4_gate_side"), hardness = 30f, tool = P, movable = false, inInventory = false,
+            render = RenderType.BOX, opaque = false, blocksLight = false, box = floatArrayOf(0f, 0f, 0f, 1f, 0.8125f, 1f)))
         reg(BlockDef(MOB_CAGE, "Spawn Cage", t("p4_cage"), hardness = 3f, tool = P, movable = false))
         reg(BlockDef(WALL_TORCH, "Torch", t("torch"), render = RenderType.CROSS, opaque = false, solid = false, hardness = 0f,
             category = Category.BUILDING, needsSupport = false, emissive = true, movable = false, inInventory = false))
