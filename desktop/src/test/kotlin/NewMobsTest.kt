@@ -1060,3 +1060,25 @@ class DragonFightTest {
         assertTrue(g.uiEvents.contains("ending"))
     }
 }
+
+class SettingsModesTest {
+    @Test fun modesAndTimeCanBeChosenDirectly() {
+        val dir = kotlin.io.path.createTempDirectory("sm").toFile()
+        val level = LevelData.create(103L, "t", GameMode.CREATIVE)
+        val g = Game(World(level.seed, dir, Dimension.OVERWORLD, flat = true), level, GameInput(), dir)
+        assertEquals(0, g.modeIndex())
+        g.setMode(2); assertEquals("Hardcore", g.modeName())
+        g.setMode(1); assertEquals("Survival", g.modeName())
+        g.setMode(0); assertEquals("Creative", g.modeName())
+        // Time: always day / always night hold the clock still, normal moves it.
+        g.setTimeMode(1); repeat(100) { g.update(0.5f) }
+        assertTrue(g.daylight > 0.9f, "always day (${g.daylight})")
+        g.setTimeMode(2); repeat(100) { g.update(0.5f) }
+        assertTrue(g.daylight < 0.3f, "always night (${g.daylight})")
+        g.setTimeMode(0); val t0 = g.timeOfDay; repeat(20) { g.update(0.5f) }
+        assertTrue(g.timeOfDay != t0, "normal time moves")
+        // Saved with the world.
+        g.setTimeMode(2); g.save()
+        assertEquals(2, LevelData.read(dir)!!.timeMode)
+    }
+}

@@ -369,8 +369,29 @@ class GameActivity : Activity() {
         }
         addMenu("Achievements") { showAchievements() }
         addMenu("Settings") {
-            settingsDialog(this, extraRows = listOf(
-                { "Camera: " + game.viewName() } to { glView.queueEvent { game.cycleView() } },
+            settingsDialog(this, listOf(
+                "Game" to { col: android.widget.LinearLayout ->
+                    col.addView(com.vishucraft.game.ui.modeRow(this, listOf("Creative", "Survival", "Hardcore"), { game.modeIndex() }) { i ->
+                        glView.queueEvent { val msg = game.setMode(i); runOnUiThread { applyMode(); showToast(msg) } }
+                    })
+                    col.addView(android.widget.TextView(this).apply { text = "Hardcore: survival with one life. If you die you cannot respawn."; setPadding(0, dpi(6f), 0, dpi(10f)) })
+                    col.addView(com.vishucraft.game.ui.modeRow(this, listOf("Monsters: normal", "Peaceful"), { if (game.mobs.hostileEnabled) 0 else 1 }) { i -> game.mobs.hostileEnabled = i == 0 })
+                },
+                "Day & Night" to { col: android.widget.LinearLayout ->
+                    col.addView(com.vishucraft.game.ui.modeRow(this, listOf("Normal cycle", "Always day", "Always night"), { game.timeMode }) { i ->
+                        glView.queueEvent { val msg = game.setTimeMode(i); runOnUiThread { showToast(msg) } }
+                    })
+                    col.addView(com.vishucraft.game.ui.modeRow(this, listOf("Set to morning", "Set to night"), { if (game.daylight > 0.5f) 0 else 1 }) { i ->
+                        glView.queueEvent { game.timeOfDay = if (i == 0) 0.02f else 0.6f }
+                    })
+                },
+                "Camera" to { col: android.widget.LinearLayout ->
+                    col.addView(com.vishucraft.game.ui.modeRow(this, listOf("First person", "Third (behind)", "Second (in front)"), { game.viewMode }) { i ->
+                        glView.queueEvent { game.viewMode = i }
+                    })
+                    col.addView(menuButton(this, "Customize character (skin, face, clothes)") { lookDialog() },
+                        android.widget.LinearLayout.LayoutParams(-1, -2).apply { topMargin = dpi(8f) })
+                },
             )) { applySettings() }
         }
         addMenu("Controls") { showControls() }

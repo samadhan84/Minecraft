@@ -62,18 +62,69 @@ class Settings(context: Context) {
 }
 
 /** Builds a focusable list of settings buttons (works with touch and TV remotes). */
-fun settingsDialog(ctx: android.app.Activity, extraRows: List<Pair<() -> String, () -> Unit>> = emptyList(), onChanged: () -> Unit = {}) {
+/** A row of choices where exactly one is chosen (gold, with a dot); tapping another picks it. */
+fun modeRow(ctx: android.app.Activity, labels: List<String>, chosen: () -> Int, pick: (Int) -> Unit): android.widget.LinearLayout {
+    val row = android.widget.LinearLayout(ctx).apply { orientation = android.widget.LinearLayout.HORIZONTAL }
+    val buttons = ArrayList<android.widget.TextView>()
+    fun refresh() {
+        for ((i, b) in buttons.withIndex()) {
+            val on = i == chosen()
+            b.text = (if (on) "● " else "") + labels[i]
+            b.alpha = if (on) 1f else 0.7f
+            b.setTextColor(if (on) android.graphics.Color.rgb(255, 224, 110) else android.graphics.Color.WHITE)
+            b.background = android.graphics.drawable.GradientDrawable().apply {
+                setColor(if (on) android.graphics.Color.rgb(150, 112, 20) else android.graphics.Color.rgb(112, 112, 112))
+                setStroke(ctx.dpi(3f), if (on) android.graphics.Color.rgb(255, 224, 110) else android.graphics.Color.rgb(30, 30, 30))
+            }
+        }
+    }
+    for ((i, l) in labels.withIndex()) {
+        val b = menuButton(ctx, l) { pick(i); refresh() }
+        b.textSize = 14f
+        b.setPadding(ctx.dpi(6f), ctx.dpi(10f), ctx.dpi(6f), ctx.dpi(10f))
+        buttons.add(b)
+        row.addView(b, android.widget.LinearLayout.LayoutParams(0, -2, 1f).apply { rightMargin = ctx.dpi(6f) })
+    }
+    refresh()
+    return row
+}
+
+/**
+ * The settings, in sections with a gold heading each: whatever sections the game passes (Game, Day & Night, Camera...),
+ * then Graphics, Sound and Controls. Choices that have a few modes show them side by side.
+ */
+fun settingsDialog(ctx: android.app.Activity, extraSections: List<Pair<String, (android.widget.LinearLayout) -> Unit>> = emptyList(), onChanged: () -> Unit = {}) {
     val s = Settings(ctx)
     val col = android.widget.LinearLayout(ctx).apply {
         orientation = android.widget.LinearLayout.VERTICAL
         setPadding(ctx.dpi(16f), ctx.dpi(12f), ctx.dpi(16f), ctx.dpi(4f))
     }
-    for ((label, action) in Settings.rows(s) + extraRows) {
-        lateinit var b: android.widget.TextView
-        b = menuButton(ctx, label()) { action(); b.text = label(); onChanged() }
-        col.addView(b, android.widget.LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = ctx.dpi(8f) })
+    fun header(title: String) {
+        col.addView(android.widget.TextView(ctx).apply {
+            text = title; textSize = 20f; typeface = android.graphics.Typeface.DEFAULT_BOLD
+            setTextColor(android.graphics.Color.rgb(255, 214, 80))
+            setPadding(0, ctx.dpi(14f), 0, ctx.dpi(2f))
+        })
+        col.addView(android.view.View(ctx).apply { setBackgroundColor(android.graphics.Color.rgb(214, 170, 40)) },
+            android.widget.LinearLayout.LayoutParams(-1, ctx.dpi(2f)).apply { bottomMargin = ctx.dpi(8f) })
     }
+    for ((title, build) in extraSections) { header(title); build(col) }
+    val rows = Settings.rows(s)
+    fun section(title: String, pick: (String) -> Boolean) {
+        val mine = rows.filter { pick(it.first()) }
+        if (mine.isEmpty()) return
+        header(title)
+        for ((label, action) in mine) {
+            lateinit var b: android.widget.TextView
+            b = menuButton(ctx, label()) { action(); b.text = label(); onChanged() }
+            col.addView(b, android.widget.LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = ctx.dpi(8f) })
+        }
+    }
+    section("Graphics") { it.startsWith("Field of view") || it.startsWith("Render distance") || it.startsWith("Fancy") || it.startsWith("Weather") }
+    section("Sound") { it.startsWith("Sound") || it.startsWith("Music") }
+    section("Controls") { it.contains("ensitivity") || it.startsWith("Touch") || it.startsWith("Show FPS") }
     // Player name (shown to others in Wi-Fi games).
+    header("Player")
     val nameInput = android.widget.EditText(ctx).apply {
         setText(s.playerName); hint = "Player name"
         inputType = android.text.InputType.TYPE_CLASS_TEXT
@@ -84,5 +135,5 @@ fun settingsDialog(ctx: android.app.Activity, extraRows: List<Pair<() -> String,
     val scroll = android.widget.ScrollView(ctx).apply { addView(col) }
     android.app.AlertDialog.Builder(ctx).setTitle("Settings").setView(scroll)
         .setPositiveButton("Done") { _, _ -> s.playerName = nameInput.text.toString().trim().ifEmpty { s.playerName } }.show()
-    col.getChildAt(0)?.requestFocus()
+    col.getChildAt(1)?.requestFocus()
 }

@@ -165,6 +165,27 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
         return if (level.hardcore) "Hardcore mode: one life. If you die you cannot respawn" else "Survival mode: collect, craft and survive. Single blocks and items became full stacks"
     }
 
+    /** Jumps straight to a game mode: 0 Creative, 1 Survival, 2 Hardcore. Returns the message to show. */
+    fun setMode(target: Int): String {
+        if (isShowcase) return "The showcase world is creative only"
+        if (level.hardcoreOver) return "This hardcore world is over: you died and cannot come back"
+        var guard = 0
+        val current = if (!survival) 0 else if (level.hardcore) 2 else 1
+        if (current == target) return "Already in " + modeName() + " mode"
+        while (guard++ < 3 && (if (!survival) 0 else if (level.hardcore) 2 else 1) != target) switchMode()
+        return when (target) { 0 -> "Creative mode"; 1 -> "Survival mode"; else -> "Hardcore mode: one life" }
+    }
+    fun modeIndex() = if (!survival) 0 else if (level.hardcore) 2 else 1
+
+    /** How time passes: 0 normal day and night, 1 always day, 2 always night. */
+    val timeMode get() = level.timeMode
+    fun setTimeMode(m: Int): String {
+        level.timeMode = m.coerceIn(0, 2)
+        if (level.timeMode == 1) timeOfDay = 0.25f else if (level.timeMode == 2) timeOfDay = 0.75f
+        return when (level.timeMode) { 1 -> "Always day"; 2 -> "Always night"; else -> "Normal day and night" }
+    }
+    fun timeModeName() = when (level.timeMode) { 1 -> "Always day"; 2 -> "Always night"; else -> "Normal day and night" }
+
     val hardcore get() = level.hardcore && level.mode == GameMode.SURVIVAL
     fun modeName() = when { !survival -> "Creative"; level.hardcore -> "Hardcore"; else -> "Survival" }
 
@@ -716,7 +737,11 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
         }
         if (shake > 0f) shake = max(0f, shake - dt)
 
-        timeOfDay = (timeOfDay + dt / DAY_LENGTH_SECONDS) % 1f
+        timeOfDay = when (level.timeMode) {
+            1 -> 0.25f      // always day (noon)
+            2 -> 0.75f      // always night (midnight)
+            else -> (timeOfDay + dt / DAY_LENGTH_SECONDS) % 1f
+        }
         // Autosave every minute so a crash or a closed app never loses much.
         autosaveTimer += dt
         if (autosaveTimer >= 60f && spawned) { autosaveTimer = 0f; if (!isClient) save() }

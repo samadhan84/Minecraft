@@ -836,24 +836,106 @@ abstract class ClientApp(protected val demo: File?) {
         if (ui.button("Back", cx + 5, ui.height - 70, w / 2 - 5, 44f)) { ui.focus = null; message = null; menu = Menu.TITLE }
     }
 
+    protected var settingsTab = 0
+
+    /** A button that shows whether it is the chosen one (gold) or not (grey). Returns true when clicked. */
+    private fun modeButton(label: String, x: Float, y: Float, w: Float, h: Float, chosen: Boolean): Boolean {
+        if (!chosen) return ui.button(label, x, y, w, h)
+        val over = ui.hover(x, y, w, h)
+        ui.rect(x, y, w, h, rgba(214, 170, 40))
+        ui.frame(x, y, w, h, if (over) rgba(255, 255, 255) else rgba(255, 235, 140), 3f)
+        ui.text(label, x + w / 2, y + h / 2 - 9f, 18f, rgba(40, 28, 4), 1, shadow = false)
+        return over && ui.clicked
+    }
+
+    /** The settings, in sections: Game (modes), Day & Night, Character & Camera, Graphics, Sound and Controls. */
     protected fun settingsScreen(back: () -> Unit) {
+        val se = session
+        val game = se?.game
+        ui.rect(0f, 0f, ui.width, ui.height, if (se != null) rgba(0, 0, 0, 190) else rgba(0, 0, 0, 110))
         val cx = ui.width / 2
-        if (session != null) ui.rect(0f, 0f, ui.width, ui.height, rgba(0, 0, 0, 170))
-        title("Settings")
-        var y = 110f
-        for ((label, change) in prefs.rows()) {
-            if (ui.button(label(), cx - 220, y, 440f, 40f)) {
-                change()
-                applySettings()
-                settingChanged(label())
+        ui.text("Settings", cx, 18f, 40f, rgba(255, 220, 90), 1)
+        ui.rect(cx - 90f, 66f, 180f, 4f, rgba(255, 220, 90))
+        val tabs = if (game != null) listOf("Game", "Day & Night", "Character & Camera", "Graphics", "Sound", "Controls")
+            else listOf("Character & Camera", "Graphics", "Sound", "Controls")
+        if (settingsTab >= tabs.size) settingsTab = 0
+        // The sections down the left side.
+        val sx = 30f; val sw = 230f
+        var ty = 96f
+        for ((i, name) in tabs.withIndex()) {
+            if (modeButton(name, sx, ty, sw, 46f, i == settingsTab)) settingsTab = i
+            ty += 54f
+        }
+        // The card with this section's settings.
+        val px = sx + sw + 24f; val pw = ui.width - px - 30f
+        val ph = ui.height - 96f - 80f
+        ui.rect(px, 96f, pw, ph, rgba(18, 18, 26, 225))
+        ui.frame(px, 96f, pw, ph, rgba(214, 170, 40), 3f)
+        val ix = px + 28f; val iw = pw - 56f
+        var y = 116f
+        val name = tabs[settingsTab]
+        ui.text(name, ix, y, 28f, rgba(255, 220, 90)); y += 40f
+        fun note(t: String) { ui.text(t, ix, y, 16f, rgba(200, 200, 210)); y += 28f }
+        fun modes(labels: List<String>, chosen: Int, pick: (Int) -> Unit) {
+            val n = labels.size; val gap = 10f; val w = (iw - gap * (n - 1)) / n
+            for ((i, l) in labels.withIndex()) if (modeButton(l, ix + i * (w + gap), y, w, 48f, i == chosen)) pick(i)
+            y += 60f
+        }
+        fun row(label: String, action: () -> Unit) { if (ui.button(label, ix, y, iw, 44f)) action(); y += 52f }
+        val rows = prefs.rows()
+        fun prefRows(pick: (String) -> Boolean) {
+            for ((label, change) in rows) if (pick(label())) row(label()) { change(); applySettings(); settingChanged(label()) }
+        }
+        when (name) {
+            "Game" -> {
+                val g = game!!
+                note("Pick how this world is played. You can change it any time.")
+                modes(listOf("Creative", "Survival", "Hardcore"), g.modeIndex()) { hud?.toast(g.setMode(it), 4f) }
+                note(when (g.modeIndex()) {
+                    0 -> "Creative: every block, flying, no damage."
+                    1 -> "Survival: collect, craft, watch health and hunger. You respawn."
+                    else -> "Hardcore: survival with ONE life. If you die you cannot respawn."
+                })
+                y += 8f
+                ui.text("Monsters", ix, y, 20f, rgba(255, 220, 90)); y += 30f
+                modes(listOf("Normal", "Peaceful (no monsters)"), if (g.mobs.hostileEnabled) 0 else 1) { g.mobs.hostileEnabled = it == 0 }
+                ui.text("Weather", ix, y, 20f, rgba(255, 220, 90)); y += 30f
+                modes(listOf("On (rain, snow, storms)", "Off"), if (prefs.weather) 0 else 1) { prefs.weather = it == 0; applySettings() }
             }
-            y += 48
+            "Day & Night" -> {
+                val g = game!!
+                note("Choose how time passes in this world.")
+                modes(listOf("Normal cycle", "Always day", "Always night"), g.timeMode) { hud?.toast(g.setTimeMode(it), 3f) }
+                y += 8f
+                ui.text("Change the time now", ix, y, 20f, rgba(255, 220, 90)); y += 30f
+                modes(listOf("Set to morning", "Set to night"), if (g.daylight > 0.5f) 0 else 1) { g.timeOfDay = if (it == 0) 0.02f else 0.6f }
+            }
+            "Character & Camera" -> {
+                note("How you see the game, and how you look.")
+                val g = game
+                if (g != null) {
+                    ui.text("Camera", ix, y, 20f, rgba(255, 220, 90)); y += 30f
+                    modes(listOf("First person", "Third person (behind)", "Second person (in front)"), g.viewMode) { g.viewMode = it }
+                }
+                row("Customize character (skin, face, clothes)") {
+                    if (g != null) { lookBefore = g.viewMode; g.viewMode = 2; overlay = Overlay.LOOK }
+                    else { homeLook = com.vishucraft.game.world.Appearance.load(com.vishucraft.game.world.Appearance.fileFor(worldsDir)) ?: com.vishucraft.game.world.Appearance.default(); menu = Menu.LOOK }
+                }
+            }
+            "Graphics" -> {
+                note("Make the game look better, or run faster.")
+                prefRows { it.startsWith("Field of view") || it.startsWith("Render distance") || it.startsWith("Fancy") || it.startsWith("Fullscreen") }
+            }
+            "Sound" -> {
+                note("Volume of effects and music.")
+                prefRows { it.startsWith("Sound") || it.startsWith("Music") }
+            }
+            else -> {
+                note("How the game reacts to you.")
+                prefRows { it.contains("ensitivity") || it.startsWith("Touch") || it.startsWith("FPS") || it.startsWith("Show FPS") }
+            }
         }
-        session?.let { se ->
-            if (ui.button("Camera: " + se.game.viewName(), cx - 220, y, 440f, 40f)) se.game.cycleView()
-            y += 48
-        }
-        if (ui.button("Done", cx - 220, y + 16, 440f, 44f)) back()
+        if (ui.button("Done", cx - 120f, ui.height - 64f, 240f, 44f)) back()
     }
 
     protected var lookBefore = 0
