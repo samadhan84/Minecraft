@@ -413,14 +413,22 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
             if (survival) for ((id, n) in mobDrops(m)) drops.spawn(ItemStack(id, n), m.x, m.y + 0.5f, m.z)
             val near = (m.x - player.x) * (m.x - player.x) + (m.z - player.z) * (m.z - player.z) < 24f * 24f
             if (near) {
-                addXp(if (m.type == MobType.WARDEN) 500 else if (m.type == MobType.DUSK_WITHER) 400 else if (m.type.hostile) 5 else 1 + java.util.Random().nextInt(3))
+                addXp(if (m.type == MobType.WARDEN || m.type == MobType.SKY_DRAKE) 500 else if (m.type == MobType.DUSK_WITHER) 400 else if (m.type.hostile) 5 else 1 + java.util.Random().nextInt(3))
                 if (m.type.hostile) award("kill")
             }
             if (m.type == MobType.DUSK_WITHER) {
                 if (!survival) for ((id, n) in mobDrops(m)) drops.spawn(ItemStack(id, n), m.x, m.y + 0.5f, m.z)
                 uiEvents.add("toast:You beat the Dusk Wither!")
             }
-            if (m.type == MobType.WARDEN) {
+            if (m.type == MobType.SKY_CRYSTAL) {
+                // A crystal bursts: it blows up a little (and hurts anyone close), and the drake loses one healer.
+                val idx = mobs.crystalIndex(m)
+                level.crystalMask = level.crystalMask and (1 shl idx).inv()
+                redstone.explodeAt(m.x, m.y, m.z, 2f)
+                val left = Integer.bitCount(level.crystalMask)
+                uiEvents.add(if (left > 0) "toast:Sky Crystal broken: $left left" else "toast:All Sky Crystals are broken! The Sky Drake cannot heal any more")
+            }
+            if (m.type == MobType.WARDEN || m.type == MobType.SKY_DRAKE) {
                 // The boss drops its loot even in creative, and the game shows the ending.
                 if (!survival) for ((id, n) in mobDrops(m)) drops.spawn(ItemStack(id, n), m.x, m.y + 0.5f, m.z)
                 level.bossDefeated = true
@@ -879,7 +887,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
             MobType.RAIDER -> listOf(i("Arrow") to r.nextInt(3), i("Emerald") to (if (r.nextInt(4) == 0) 1 else 0))
             MobType.TUSK_BOAR -> listOf(i("Raw Porkchop") to 2 + r.nextInt(3), i("Leather") to r.nextInt(2))
             MobType.DUSK_WITHER -> listOf(i("Nether Star") to 1, i("Diamond") to 4, i("Gold Ingot") to 6, i("Netherite Scrap") to 2)
-            MobType.WARDEN -> listOf(i("Nether Star") to 1, i("Elytra") to 1, i("Diamond") to 6, i("Totem of Undying") to 1)
+            MobType.WARDEN, MobType.SKY_DRAKE -> listOf(i("Nether Star") to 1, i("Elytra") to 1, i("Diamond") to 6, i("Totem of Undying") to 1)
             MobType.CHICKEN -> listOf(i("Feather") to r.nextInt(3), i("Raw Chicken") to 1)
             MobType.RABBIT -> listOf(i("Rabbit Hide") to r.nextInt(2), i("Raw Rabbit") to 1, i("Rabbit's Foot") to (if (r.nextInt(10) == 0) 1 else 0))
             MobType.CAT -> listOf(i("String") to r.nextInt(3))
@@ -1477,8 +1485,9 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
     }
 
     /** The boss bar: name and health 0..1 while the Sky Warden is around. */
-    fun bossBar(): Pair<String, Float>? = mobs.list.firstOrNull { (it.type == MobType.WARDEN || it.type == MobType.DUSK_WITHER) && !it.dead }?.let {
-        it.type.displayName to (it.health / it.type.maxHealth).coerceIn(0f, 1f)
+    fun bossBar(): Pair<String, Float>? = mobs.list.firstOrNull { (it.type == MobType.WARDEN || it.type == MobType.DUSK_WITHER || it.type == MobType.SKY_DRAKE) && !it.dead }?.let {
+        val extra = if (it.type == MobType.SKY_DRAKE) mobs.list.count { c -> c.type == MobType.SKY_CRYSTAL && !c.dead }.let { n -> if (n > 0) "  (heals: $n crystal" + (if (n == 1) "" else "s") + " left)" else "  (no crystals: it cannot heal)" } else ""
+        (it.type.displayName + extra) to (it.health / it.type.maxHealth).coerceIn(0f, 1f)
     }
 
     /** What the crosshair is on: a named or tamed mob's label for the HUD. */
@@ -1895,6 +1904,15 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
     /** After travelling: stand somewhere safe and build a portal home right here. */
     private fun arrive() {
         level.arriving = false
+        if (dimension == com.vishucraft.game.world.Dimension.SKY) {
+            // You arrive in the room by the portal at the edge of the arena, facing the platform.
+            for (dx in -1..1) for (dz in -2..0) world.ensureLoaded((dx shr 4), (com.vishucraft.game.world.SkyGenerator.ROOM_Z + dz) shr 4)
+            player.x = 0.5f; player.z = (com.vishucraft.game.world.SkyGenerator.ROOM_Z + 1).toFloat() + 0.5f; player.y = 65f
+            player.yaw = 3.1416f; player.pitch = 0f
+            player.vx = 0f; player.vy = 0f; player.vz = 0f
+            portalTime = -5f
+            return
+        }
         val x = player.blockX(); val z = player.blockZ()
         val y = world.generator.surfaceHeight(x, z).coerceIn(8, Chunk.HEIGHT - 12) + 1
         val (frame, portal) = when (dimension) {

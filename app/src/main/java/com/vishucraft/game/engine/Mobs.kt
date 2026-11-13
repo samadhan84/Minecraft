@@ -122,7 +122,11 @@ enum class MobType(
     /** A zombie struck by lightning: as big and strong as an iron golem. */
     MUTANT_ZOMBIE("Mutant Zombie", 0.8f, 3.2f, 100, true, 1.9f),
     /** A Boomling struck by lightning: it blows up with the force of a thousand TNT. */
-    MUTANT_BOOMLING("Mutant Boomling", 0.9f, 3.4f, 60, true, 1.6f);
+    MUTANT_BOOMLING("Mutant Boomling", 0.9f, 3.4f, 60, true, 1.6f),
+    /** The dragon of the Sky Isles: it circles the arena, dives and breathes fire, and heals while any Sky Crystal is left. */
+    SKY_DRAKE("Sky Drake", 1.6f, 2.2f, 300, true, 9f),
+    /** A glowing crystal on a tall pillar: it heals the Sky Drake until it is broken. */
+    SKY_CRYSTAL("Sky Crystal", 0.5f, 1.0f, 1, false, 0f);
 
     val isRaider get() = this == RAIDER || this == SPELL_RAIDER || this == RAMPAGE_BEAST
     val isCitizen get() = this == CITIZEN || this == CITIZEN_WOMAN || this == CITIZEN_KID
@@ -605,6 +609,8 @@ class Mobs(private val world: World) {
                 return
             }
             MobType.WARDEN, MobType.DUSK_WITHER -> { boss(m, dt, game); return }
+            MobType.SKY_DRAKE -> { drake(m, dt, game); return }
+            MobType.SKY_CRYSTAL -> { m.moving = false; m.vx = 0f; m.vz = 0f; m.vy = 0f; m.yaw += dt * 0.8f; return }
             MobType.IRON_GOLEM, MobType.SNOW_GOLEM -> {
                 golem(m, dt, game).let { wantX = it.first; wantZ = it.second }
                 if (m.type == MobType.IRON_GOLEM) speed *= if (wantX != 0f || wantZ != 0f) 1.4f else 0.5f
@@ -701,6 +707,61 @@ class Mobs(private val world: World) {
     }
 
     /** The Sky Warden: circles high above, throws fireballs and dives at the player. */
+    /** The middle of the arena (the island under the portal room). */
+    private fun arenaY(): Float = (world.generator.surfaceHeight(0, 0) + 1).toFloat()
+
+    /**
+     * The Sky Drake: it circles over the arena, now and then dives at you, breathes fireballs, and heals itself
+     * (1 half-heart a second for every Sky Crystal still standing) until every crystal is broken.
+     */
+    private fun drake(m: Mob, dt: Float, game: Game) {
+        val p = game.nearestTarget(m.x, m.z)
+        m.moving = true
+        m.walkPhase += dt * 2.2f
+        val crystals = list.count { it.type == MobType.SKY_CRYSTAL && !it.dead }
+        // Healing from the crystals.
+        if (crystals > 0 && m.health < m.type.maxHealth) {
+            m.health = minOf(m.type.maxHealth.toFloat(), m.health + crystals * 1f * dt)
+        }
+        game.level.drakeHealth = m.health
+        val angry = m.health < m.type.maxHealth / 2f || crystals == 0
+        val cy = arenaY()
+        val dx = p.x - m.x; val dz = p.z - m.z
+        val dist = sqrt(dx * dx + dz * dz)
+        var tx: Float; var ty: Float; var tz: Float
+        if (m.swoopTime > 0f) {
+            m.swoopTime -= dt
+            tx = p.x; ty = p.y + 1f; tz = p.z
+        } else {
+            val a = m.walkPhase * 0.22f
+            tx = cos(a) * 26f; tz = sin(a) * 26f; ty = cy + 20f + sin(a * 2f) * 4f
+            if (game.playerAlive && rnd.nextFloat() < dt / (if (angry) 6f else 10f)) m.swoopTime = 3f
+        }
+        // Fire breath.
+        m.shootTimer -= dt
+        if (m.shootTimer <= 0f && dist < 48f && game.playerAlive) {
+            m.shootTimer = if (angry) 2.2f else 4f
+            val sx = m.x; val sy = m.y + 0.8f; val sz = m.z
+            val vx = p.x - sx; val vy = p.eyeY - sy; val vz = p.z - sz
+            val len = sqrt(vx * vx + vy * vy + vz * vz).coerceAtLeast(0.1f)
+            game.projectiles.shoot(sx, sy, sz, vx / len * 16f, vy / len * 16f + len * 0.3f, vz / len * 16f, false, if (angry) 6f else 4f, Projectile.FIREBALL)
+            game.sound("bow", sx, sy, sz, 1f)
+        }
+        val ex = tx - m.x; val ey = ty - m.y; val ez = tz - m.z
+        val len = sqrt(ex * ex + ey * ey + ez * ez).coerceAtLeast(0.1f)
+        val sp = m.type.speed * (if (angry) 1.3f else 1f)
+        m.vx = approach(m.vx, ex / len * sp, 6f * dt); m.vy = approach(m.vy, ey / len * sp, 6f * dt); m.vz = approach(m.vz, ez / len * sp, 6f * dt)
+        m.yaw = atan2(m.vx, -m.vz)
+        m.x += m.vx * dt; m.y += m.vy * dt; m.z += m.vz * dt
+        m.attackCooldown -= dt
+        val py = p.y + 1f - m.y
+        if (sqrt(dx * dx + dz * dz + py * py) < 3.6f && m.attackCooldown <= 0f && game.playerAlive) {
+            m.attackCooldown = 1.6f
+            game.hurtTarget(p, if (angry) 10f else 7f, m.x, m.z)
+            m.swoopTime = 0f
+        }
+    }
+
     private fun boss(m: Mob, dt: Float, game: Game) {
         val p = game.nearestTarget(m.x, m.z)
         m.moving = true
@@ -1177,7 +1238,8 @@ class Mobs(private val world: World) {
     }
 
     fun voice(t: MobType) = when (t) {
-        MobType.WARDEN, MobType.TEAR_DRIFTER -> "enderman"
+        MobType.WARDEN, MobType.TEAR_DRIFTER, MobType.SKY_DRAKE -> "enderman"
+        MobType.SKY_CRYSTAL -> "none"
         MobType.FLAME_SPINNER, MobType.SEA_SENTINEL, MobType.MILKMAN -> "none"; MobType.MUTANT_ZOMBIE -> "zombie"; MobType.MUTANT_BOOMLING -> "boomling"; MobType.RAIDER -> "zombie"; MobType.GOLD_HOG, MobType.TUSK_BOAR, MobType.RAMPAGE_BEAST, MobType.SNIFFER, MobType.HUSK_HOG -> "pig"; MobType.FROST_ARCHER, MobType.ASH_SKELETON -> "skeleton"; MobType.SPINY_PUFFER, MobType.SHELL_GUARD, MobType.LAVA_STRIDER -> "none"; MobType.VOID_MITE -> "spider"; MobType.GLIMMER -> "none"; MobType.CAMEL -> "horse"; MobType.DUSK_WITHER -> "enderman"; MobType.SPELL_RAIDER -> "witch"
         MobType.DROWNED -> "zombie"; MobType.RABBIT, MobType.SQUID, MobType.COD -> "none"
         MobType.IRON_GOLEM, MobType.SNOW_GOLEM, MobType.TURTLE, MobType.AXOLOTL, MobType.ROBOT -> "none"
@@ -1295,13 +1357,7 @@ class Mobs(private val world: World) {
             if (++villagersSeen % 4 == 0) list.add(Mob(MobType.IRON_GOLEM, x + 1.5f, y.toFloat(), z + 0.5f))
         }
 
-        if (game.dimension == com.vishucraft.game.world.Dimension.SKY && hostileEnabled && !game.level.bossDefeated &&
-            list.none { it.type == MobType.WARDEN } && parked.none { it.type == MobType.WARDEN }) {
-            // The Sky Warden guards the Sky Isles until it is defeated.
-            list.add(Mob(MobType.WARDEN, p.x + 20f, p.y + 14f, p.z + 20f))
-            game.uiEvents.add("toast:The Sky Warden has noticed you!")
-            game.sound("enderman", p.x, p.y + 10f, p.z, 1.5f)
-        }
+        if (game.dimension == com.vishucraft.game.world.Dimension.SKY && hostileEnabled && !game.level.bossDefeated) arena(game)
         if (game.dimension == com.vishucraft.game.world.Dimension.EMBER && list.count { it.type == MobType.LAVA_STRIDER } < 3 && rnd.nextInt(3) == 0) {
             // Lava Striders stroll over the lava sea.
             val (lx, lz) = ringPoint(p.x, p.z, 10f, 40f)
@@ -1312,7 +1368,7 @@ class Mobs(private val world: World) {
             val (x, z) = ringPoint(p.x, p.z, 14f, 40f)
             if (!world.isLoaded(x, z)) return
             val ember = game.dimension == com.vishucraft.game.world.Dimension.EMBER
-            val type = if (!ember) (if (rnd.nextInt(4) == 0) MobType.SHELL_GUARD else MobType.WISP)
+            val type = if (!ember) (when (rnd.nextInt(8)) { 0 -> MobType.SHELL_GUARD; 1, 2 -> MobType.WISP; else -> MobType.ENDERMAN })
                 else when (rnd.nextInt(12)) { 0, 1 -> MobType.FLAME_SPINNER; 2 -> MobType.TEAR_DRIFTER; 3, 4 -> MobType.GOLD_HOG; 5, 6 -> MobType.TUSK_BOAR; 7 -> MobType.ASH_SKELETON; 8 -> MobType.HUSK_HOG; else -> MobType.CINDER }
             val y = surfaceY(x, z)
             val lift = if (type == MobType.FLAME_SPINNER) 3 else if (type == MobType.TEAR_DRIFTER) 5 else 1
@@ -1368,6 +1424,41 @@ class Mobs(private val world: World) {
             val y = if (surface) surfaceY(x, z) + 1 else 6 + rnd.nextInt(50)
             if (y > 0 && roomAt(x, y, z, 2) && !skyExposed(x, y, z)) list.add(Mob(type, x + 0.5f, y.toFloat(), z + 0.5f))
         }
+    }
+
+    /** Where Sky Crystal number [i] (0..9) stands: on top of pillar i of the arena. */
+    private fun crystalSpot(i: Int): Triple<Float, Float, Float> {
+        val a = i * 2.0 * Math.PI / 10.0
+        val x = (cos(a) * 26.0).toInt(); val z = (sin(a) * 26.0).toInt()
+        return Triple(x + 0.5f, (world.generator.surfaceHeight(x, z) + com.vishucraft.game.world.SkyGenerator.pillarHeight(i) + 1).toFloat(), z + 0.5f)
+    }
+
+    /** The dragon fight: the first time you are here the drake, ten crystals and some Shadow Walkers appear; later visits bring back what is left. */
+    private fun arena(game: Game) {
+        val lv = game.level
+        if (!lv.arenaStarted) {
+            lv.arenaStarted = true; lv.crystalMask = 1023; lv.drakeHealth = MobType.SKY_DRAKE.maxHealth.toFloat()
+            game.uiEvents.add("toast:The Sky Drake wakes! Break all ten Sky Crystals so it cannot heal, then defeat it")
+            // Shadow Walkers wander the platform.
+            repeat(7) {
+                val a = rnd.nextFloat() * 6.2832f; val r = 6f + rnd.nextFloat() * 24f
+                val x = (cos(a) * r).toInt(); val z = (sin(a) * r).toInt()
+                list.add(Mob(MobType.ENDERMAN, x + 0.5f, (world.generator.surfaceHeight(x, z) + 1).toFloat(), z + 0.5f))
+            }
+        }
+        if (list.none { it.type == MobType.SKY_DRAKE && !it.dead }) {
+            val d = Mob(MobType.SKY_DRAKE, 0f, arenaY() + 22f, -20f); d.health = lv.drakeHealth.coerceIn(1f, MobType.SKY_DRAKE.maxHealth.toFloat()); list.add(d)
+        }
+        for (i in 0 until 10) if (lv.crystalMask and (1 shl i) != 0 && list.none { it.type == MobType.SKY_CRYSTAL && !it.dead && crystalIndex(it) == i }) {
+            val (x, y, z) = crystalSpot(i)
+            list.add(Mob(MobType.SKY_CRYSTAL, x, y, z))
+        }
+    }
+
+    /** Which pillar a crystal stands on (from where it is). */
+    fun crystalIndex(m: Mob): Int {
+        val a = atan2(m.z, m.x).toDouble().let { if (it < 0) it + 2 * Math.PI else it }
+        return Math.round(a / (2 * Math.PI / 10)).toInt() % 10
     }
 
     private fun ringPoint(cx: Float, cz: Float, minR: Float, maxR: Float): Pair<Int, Int> {

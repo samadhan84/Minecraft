@@ -428,6 +428,18 @@ class App(demo: File?) : ClientApp(demo) {
                 g.inventory.armor.fill(null); g.viewMode = 2; lookBefore = 0; overlay = Overlay.LOOK
             } }
             f == 434 -> { shot("04c4-customize-character"); overlay = Overlay.NONE; session?.game?.viewMode = 0 }
+            f == 436 -> session?.game?.let { g ->
+                // The Sky Drake and a Sky Crystal, for a look at the models.
+                val p = g.player
+                p.pitch = -0.2f
+                val fx = kotlin.math.sin(p.yaw); val fz = -kotlin.math.cos(p.yaw)
+                g.mobs.list.clear(); g.mobs.hostileEnabled = true
+                val d = com.vishucraft.game.engine.Mob(com.vishucraft.game.engine.MobType.SKY_DRAKE, p.x + fx * 12f, p.y + 2f, p.z + fz * 12f)
+                d.yaw = p.yaw + 3.14159f; d.swoopTime = 1000f; g.mobs.list.add(d)
+                val c = com.vishucraft.game.engine.Mob(com.vishucraft.game.engine.MobType.SKY_CRYSTAL, p.x + fx * 6f + 2f, p.y, p.z + fz * 6f)
+                g.mobs.list.add(c)
+            }
+            f == 437 -> { shot("04c5-sky-drake"); session?.game?.mobs?.list?.clear() }
             f == 440 -> shot("04d-minecart")
             f == 441 -> session?.game?.let { g ->
                 // A line-up of the new creatures in front of the player.

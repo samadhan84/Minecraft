@@ -111,7 +111,9 @@ object Festivals {
         return era * 146097L + doe - 719468
     }
 
-    private fun today() = PlayLimit.today()
+    /** Tests pin the date with this so they do not depend on when they are run. */
+    internal var todayOverride: String? = null
+    private fun today() = todayOverride ?: PlayLimit.today()
 
     /** The festival whose update is on today (the earliest to start if two overlap), or null. */
     fun active(today: String = today()): ActiveFestival? {

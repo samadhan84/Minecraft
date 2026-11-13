@@ -284,9 +284,13 @@ class LevelData(
     var hardcore = false
     /** The hardcore player died: the world is over. */
     var hardcoreOver = false
+    /** The dragon fight in the Sky: started, which of the ten crystals are left (bits) and the drake's health. */
+    var arenaStarted = false
+    var crystalMask = 0
+    var drakeHealth = 300f
 
     companion object {
-        private const val VERSION = 14
+        private const val VERSION = 15
 
         /** Creative worlds start with a useful hotbar; survival starts empty-handed. */
         /**
@@ -360,6 +364,7 @@ class LevelData(
                             for (i in 0 until n) { val v = d.readInt(); if (i < Appearance.SIZE) l.appearance[i] = v }
                             l.hardcore = d.readBoolean(); l.hardcoreOver = d.readBoolean()
                         }
+                        if (version >= 15) { l.arenaStarted = d.readBoolean(); l.crystalMask = d.readInt(); l.drakeHealth = d.readFloat() }
                     }
                     l.hasPlayer = true
                     l
@@ -405,6 +410,7 @@ class LevelData(
             for ((key, slots) in boxes) { d.writeInt(key); for (s in slots) Inventory.writeStack(d, s) }
             d.writeInt(appearance.size); for (v in appearance) d.writeInt(v)
             d.writeBoolean(hardcore); d.writeBoolean(hardcoreOver)
+            d.writeBoolean(arenaStarted); d.writeInt(crystalMask); d.writeFloat(drakeHealth)
         }
         tmp.renameTo(f)
     }

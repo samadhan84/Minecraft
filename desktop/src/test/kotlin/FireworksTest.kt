@@ -37,6 +37,12 @@ class FireworksTest {
     }
 
     @Test fun robotPutsOnAFireworksShow() {
+        // The Diwali update only works around Diwali (until 13 November), so pin the date to a day inside it.
+        Festivals.todayOverride = "2026-11-10"
+        try { robotShow() } finally { Festivals.todayOverride = null }
+    }
+
+    private fun robotShow() {
         val g = game()
         g.world.ensureLoaded(0, 0)
         g.player.y = g.world.generator.surfaceHeight(0, 0) + 1f

@@ -68,8 +68,47 @@ class EmberGenerator(private val seed: Long) : WorldGenerator {
     }
 }
 
-/** The Sky Isles: floating islands of pale stone over an endless void, with sky stone towers. */
+/** The Sky Isles: floating islands of pale stone over an endless void, with sky stone towers; the dragon arena is in the middle. */
 class SkyGenerator(private val seed: Long) : WorldGenerator {
+    companion object {
+        /** Height of obsidian pillar [i] (0..9) above the platform; each crystal stands on top of one. */
+        fun pillarHeight(i: Int) = 12 + (i * 7 % 5) * 3
+        const val ROOM_Z = -34
+    }
+
+    /** Ten obsidian pillars around the middle, and the room (with the way home) at the edge of the platform. */
+    private fun arena(chunk: Chunk) {
+        fun put(wx: Int, y: Int, wz: Int, id: Int) {
+            val x = wx - chunk.cx * 16; val z = wz - chunk.cz * 16
+            if (x in 0..15 && z in 0..15 && y in 1 until Chunk.BASE) chunk.set(x, y, z, id)
+        }
+        val top = 64
+        for (i in 0 until 10) {
+            val a = i * 2.0 * Math.PI / 10.0
+            val px = Math.round(Math.cos(a) * 26.0).toInt(); val pz = Math.round(Math.sin(a) * 26.0).toInt()
+            if (abs(px - chunk.cx * 16 - 8) > 12 || abs(pz - chunk.cz * 16 - 8) > 12) continue
+            val h = pillarHeight(i)
+            for (dx in -2..2) for (dz in -2..2) if (dx * dx + dz * dz <= 5) for (y in top + 1..top + h) put(px + dx, y, pz + dz, Blocks.OBSIDIAN)
+        }
+        // The room: 11 x 9 inside, purpur walls, a roof, torches, a wide doorway to the arena and the portal home in the back wall.
+        val rz = ROOM_Z
+        for (dx in -5..5) for (dz in -4..4) {
+            val wall = abs(dx) == 5 || abs(dz) == 4
+            put(dx, top, rz + dz, Blocks.PURPUR)
+            for (y in top + 1..top + 5) put(dx, y, rz + dz, if (wall) Blocks.PURPUR else Blocks.AIR)
+            put(dx, top + 6, rz + dz, Blocks.PURPUR)
+        }
+        for (dx in -1..1) for (y in top + 1..top + 3) put(dx, y, rz + 4, Blocks.AIR)          // the doorway towards the arena (+z)
+        // The portal in the back wall (-z): a quartz frame around a 3 x 3 opening, open.
+        val bz = rz - 4
+        for (dx in -2..2) for (y in top + 1..top + 4) {
+            val edge = abs(dx) == 2 || y == top + 4
+            put(dx, y, bz, if (edge) Blocks.QUARTZ_BLOCK else Blocks.SKY_PORTAL)
+        }
+        for ((dx, dz) in listOf(-4 to -3, 4 to -3, -4 to 3, 4 to 3, -4 to 0, 4 to 0)) put(dx, top + 3, rz + dz, Blocks.TORCH)
+        for (dx in -1..1) put(dx, top + 1, rz + 2, Blocks.END_STONE)   // a little step inside, nothing else: the room is for arriving
+    }
+
     private val mask = Noise(seed + 201)
     private val detail = Noise(seed + 202)
     override fun biomeAt(x: Int, z: Int) = Biome.SKY
@@ -77,6 +116,8 @@ class SkyGenerator(private val seed: Long) : WorldGenerator {
     /** Island top height at (x, z), or -1 over the void. */
     private fun island(x: Int, z: Int): Pair<Int, Int> {
         val d = sqrt((x * x + z * z).toDouble())
+        // The arena: a round platform 40 blocks wide in every direction, flat, where the dragon fight happens.
+        if (d <= 40.0) return 64 to (4 + ((40.0 - d) * 0.35).toInt())
         val centre = max(0.0, 1.0 - d / 40.0) // a guaranteed island at the origin
         val m = mask.fbm2(x * 0.012, z * 0.012, 3) + centre * 0.9
         if (m < 0.22) return -1 to 0
@@ -94,8 +135,9 @@ class SkyGenerator(private val seed: Long) : WorldGenerator {
             if (top < 0) continue
             for (y in top - thick..top) chunk.set(x, y, z, Blocks.END_STONE)
         }
-        // Occasional sky stone towers topped with a lantern.
-        if (rnd.nextInt(6) == 0) {
+        arena(chunk)
+        // Occasional sky stone towers topped with a lantern (not on the arena).
+        if (abs(chunk.cx) > 3 || abs(chunk.cz) > 3) if (rnd.nextInt(6) == 0) {
             val x = 3 + rnd.nextInt(10); val z = 3 + rnd.nextInt(10)
             val (top, _) = island(chunk.cx * 16 + x, chunk.cz * 16 + z)
             if (top > 0) {

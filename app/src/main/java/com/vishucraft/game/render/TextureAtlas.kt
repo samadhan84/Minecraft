@@ -2534,6 +2534,20 @@ object TextureAtlas {
                 for ((x, y) in listOf(3 to 3, 11 to 4, 6 to 9, 12 to 12, 2 to 12, 9 to 14, 14 to 8)) { t[x, y] = rgb(60, 220, 230); if (x + 1 < 16) t[x + 1, y] = rgb(30, 130, 150) }
                 return true
             }
+            "p4_drake_skin" -> { t.fill { x, y -> scale(rgb(36, 20, 52), t.jitter(0.08f) * (if ((x + y) % 4 == 0) 1.25f else 1f)) }; return true }
+            "p4_drake_face" -> {
+                t.fill { x, y -> scale(rgb(36, 20, 52), t.jitter(0.06f)) }
+                for (y in 5..6) for (x in listOf(2, 3, 4, 11, 12, 13)) t[x, y] = rgb(230, 90, 255)
+                for (x in 4..11) t[x, 11] = if (x % 2 == 0) rgb(210, 200, 220) else rgb(60, 40, 80)
+                return true
+            }
+            "p4_drake_wing" -> { t.fill { x, y -> if (x % 5 == 0 || y == 0) rgb(20, 10, 30) else scale(rgb(88, 46, 120), t.jitter(0.1f)) }; return true }
+            "p4_crystal" -> {
+                t.fill { x, y -> scale(rgb(255, 120, 230), t.jitter(0.06f) * (if (x < 6 && y < 8) 1.3f else if (x > 9) 0.8f else 1f)) }
+                for (i in 3..12) { t[i, 7] = rgb(255, 230, 255); t[7, i] = rgb(255, 230, 255) }
+                return true
+            }
+            "p4_crystal_base" -> { t.fill { x, y -> if (x == 0 || y == 0 || x == 15 || y == 15) rgb(14, 10, 20) else scale(rgb(38, 30, 52), t.jitter(0.1f)) }; return true }
             "p4_cage" -> {
                 t.fill { x, y -> if (x % 4 == 0 || y % 4 == 0) rgb(30, 30, 36) else scale(rgb(150, 40, 50), t.jitter(0.1f)) }
                 for ((x, y) in listOf(6 to 6, 9 to 9)) for (i in 0..1) for (j in 0..1) t[x + i, y + j] = rgb(255, 200, 80)

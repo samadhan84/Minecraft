@@ -155,7 +155,31 @@ object MobModels {
         box(-0.05f, 1.2f, -0.05f, 0.05f, 1.45f, 0.05f, tiles("boomling_fuse")),
     ) + legs(0.22f, 0.22f, 0.25f, 0.35f, "boomling_leg"), 2.6f)
 
+    /** The Sky Drake: a long dark body, neck and horned head, a tail and two wide wings. */
+    private fun skyDrake() = listOf(
+        box(-0.9f, 0.4f, -1.2f, 0.9f, 1.6f, 1.4f, tiles("p4_drake_skin")),
+        box(-0.4f, 1.0f, -2.0f, 0.4f, 1.7f, -1.2f, tiles("p4_drake_skin")),
+        box(-0.55f, 1.1f, -3.1f, 0.55f, 1.95f, -2.0f, tiles("p4_drake_skin", front = "p4_drake_face")),
+        box(-0.5f, 1.95f, -2.8f, -0.35f, 2.35f, -2.55f, tiles("p4_drake_wing")), box(0.35f, 1.95f, -2.8f, 0.5f, 2.35f, -2.55f, tiles("p4_drake_wing")),
+        box(-0.45f, 0.6f, 1.4f, 0.45f, 1.3f, 3.0f, tiles("p4_drake_skin")),
+        box(-0.3f, 0.7f, 3.0f, 0.3f, 1.15f, 4.4f, tiles("p4_drake_skin")),
+        box(-4.6f, 1.35f, -0.9f, -0.9f, 1.5f, 1.1f, tiles("p4_drake_wing")),
+        box(0.9f, 1.35f, -0.9f, 4.6f, 1.5f, 1.1f, tiles("p4_drake_wing")),
+        box(-0.7f, 0.0f, -0.7f, -0.3f, 0.45f, -0.2f, tiles("p4_drake_skin")), box(0.3f, 0.0f, -0.7f, 0.7f, 0.45f, -0.2f, tiles("p4_drake_skin")),
+        box(-0.7f, 0.0f, 0.5f, -0.3f, 0.45f, 1.0f, tiles("p4_drake_skin")), box(0.3f, 0.0f, 0.5f, 0.7f, 0.45f, 1.0f, tiles("p4_drake_skin")),
+    )
+
+    /** A Sky Crystal: a spinning glowing gem on a dark base. */
+    private fun skyCrystal() = listOf(
+        box(-0.5f, 0f, -0.5f, 0.5f, 0.15f, 0.5f, tiles("p4_crystal_base")),
+        box(-0.3f, 0.3f, -0.3f, 0.3f, 0.9f, 0.3f, tiles("p4_crystal")),
+        box(-0.15f, 0.9f, -0.15f, 0.15f, 1.15f, 0.15f, tiles("p4_crystal")),
+        box(-0.15f, 0.1f, -0.15f, 0.15f, 0.3f, 0.15f, tiles("p4_crystal")),
+    )
+
     val models: Map<MobType, List<Part>> = mapOf(
+        MobType.SKY_DRAKE to skyDrake(),
+        MobType.SKY_CRYSTAL to skyCrystal(),
         MobType.MUTANT_ZOMBIE to mutantZombie(),
         MobType.MUTANT_BOOMLING to mutantBoomling(),
         MobType.COW to listOf(

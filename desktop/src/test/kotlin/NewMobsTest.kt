@@ -1017,3 +1017,46 @@ class SmithyPortalTest {
         for (c in centers) assertTrue(portalNear(w2, intArrayOf(c[0], c[1], c[2])), "an old smithy at ${c.toList()} got its sky portal")
     }
 }
+
+class DragonFightTest {
+    private fun sky(): Game {
+        val dir = kotlin.io.path.createTempDirectory("drake").toFile()
+        val level = LevelData.create(101L, "t", GameMode.SURVIVAL, false).apply { dimension = Dimension.SKY; hasPlayer = true; x = 0.5f; y = 65f; z = -32.5f }
+        return Game(World(level.seed, dir, Dimension.SKY), level, GameInput(), dir)
+    }
+    private fun run(g: Game, seconds: Float) { var t = 0f; while (t < seconds) { g.update(0.05f); g.dirtyChunks.clear(); t += 0.05f; g.player.x = 0.5f; g.player.z = -32.5f; g.player.y = 65f } }
+
+    @Test fun theArenaHasADrakeTenCrystalsAndShadowWalkers() {
+        val g = sky()
+        for (cx in -4..4) for (cz in -5..4) g.world.ensureLoaded(cx, cz)
+        run(g, 3f)
+        assertEquals(1, g.mobs.list.count { it.type == MobType.SKY_DRAKE && !it.dead }, "one Sky Drake")
+        assertEquals(10, g.mobs.list.count { it.type == MobType.SKY_CRYSTAL && !it.dead }, "ten Sky Crystals")
+        assertTrue(g.mobs.list.count { it.type == MobType.ENDERMAN } >= 5, "Shadow Walkers on the platform")
+        // The room by the portal home exists, with the portal in its back wall.
+        assertEquals(Blocks.SKY_PORTAL, g.world.getBlock(0, 65, SkyGenerator.ROOM_Z - 4))
+        assertEquals(Blocks.PURPUR, g.world.getBlock(5, 65, SkyGenerator.ROOM_Z))
+        // Every crystal stands on top of an obsidian pillar.
+        for (c in g.mobs.list.filter { it.type == MobType.SKY_CRYSTAL }) assertEquals(Blocks.OBSIDIAN, g.world.getBlock(Math.floor(c.x.toDouble()).toInt(), Math.floor(c.y.toDouble()).toInt() - 1, Math.floor(c.z.toDouble()).toInt()), "pillar under crystal")
+    }
+
+    @Test fun crystalsHealTheDrakeUntilTheyAreAllBroken() {
+        val g = sky()
+        for (cx in -4..4) for (cz in -5..4) g.world.ensureLoaded(cx, cz)
+        run(g, 2f)
+        val drake = g.mobs.list.first { it.type == MobType.SKY_DRAKE }
+        drake.health = 100f
+        run(g, 5f)
+        assertTrue(drake.health > 120f, "ten crystals heal it (${drake.health})")
+        // Break the crystals one by one.
+        for (c in g.mobs.list.filter { it.type == MobType.SKY_CRYSTAL }) g.mobs.damage(c, 5f, 0f, 0f)
+        assertEquals(0, g.level.crystalMask, "all ten are gone")
+        drake.health = 100f
+        run(g, 5f)
+        assertTrue(drake.health <= 100f, "no crystals: it cannot heal (${drake.health})")
+        // Killing it ends the fight.
+        g.mobs.damage(drake, 1000f, 0f, 0f)
+        assertTrue(g.level.bossDefeated, "the drake is defeated")
+        assertTrue(g.uiEvents.contains("ending"))
+    }
+}
