@@ -94,6 +94,15 @@ fun modeRow(ctx: android.app.Activity, labels: List<String>, chosen: () -> Int, 
  * then Graphics, Sound and Controls. Choices that have a few modes show them side by side.
  */
 fun settingsDialog(ctx: android.app.Activity, extraSections: List<Pair<String, (android.widget.LinearLayout) -> Unit>> = emptyList(), onChanged: () -> Unit = {}) {
+    val (content, commit) = settingsContent(ctx, extraSections, onChanged)
+    val scroll = android.widget.ScrollView(ctx).apply { addView(content) }
+    android.app.AlertDialog.Builder(ctx).setTitle("Settings").setView(scroll)
+        .setPositiveButton("Done") { _, _ -> commit() }.show()
+    (content as? android.widget.LinearLayout)?.getChildAt(1)?.requestFocus()
+}
+
+/** The settings controls (sections with headings and cards) as a view, plus an action that saves the typed player name. */
+fun settingsContent(ctx: android.app.Activity, extraSections: List<Pair<String, (android.widget.LinearLayout) -> Unit>> = emptyList(), onChanged: () -> Unit = {}): Pair<android.view.View, () -> Unit> {
     val s = Settings(ctx)
     val col = android.widget.LinearLayout(ctx).apply {
         orientation = android.widget.LinearLayout.VERTICAL
@@ -141,8 +150,5 @@ fun settingsDialog(ctx: android.app.Activity, extraSections: List<Pair<String, (
     }
     playerCard.addView(android.widget.TextView(ctx).apply { text = "Player name (for Wi-Fi games)"; setTextColor(android.graphics.Color.WHITE) })
     playerCard.addView(nameInput)
-    val scroll = android.widget.ScrollView(ctx).apply { addView(col) }
-    android.app.AlertDialog.Builder(ctx).setTitle("Settings").setView(scroll)
-        .setPositiveButton("Done") { _, _ -> s.playerName = nameInput.text.toString().trim().ifEmpty { s.playerName } }.show()
-    col.getChildAt(1)?.requestFocus()
+    return col to { s.playerName = nameInput.text.toString().trim().ifEmpty { s.playerName } }
 }

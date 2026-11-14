@@ -63,6 +63,18 @@ class Hud(private val game: Game) {
     var timeLeft: String? = null
     var timeLow = false
 
+    /** The toast alone (drawn over the full-screen settings, which hide the rest of the HUD). */
+    fun drawToastOnly(ui: Ui, dt: Float) {
+        if (toastTime <= 0f) return
+        toastTime -= dt
+        val a = (toastTime / 0.5f).coerceIn(0f, 1f)
+        var y = ui.height - 130f
+        for (line in toast.split('\n').reversed()) {
+            ui.text(line, ui.width / 2, y, 20f, rgba(255, 255, 255, (255 * a).toInt()), 1)
+            y -= 24f
+        }
+    }
+
     fun toast(s: String, seconds: Float = 2f) { toast = com.vishucraft.game.world.Names.show(s); toastTime = seconds }
 
     /** Seconds since the world opened (the game's name shows big at first). */

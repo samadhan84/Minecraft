@@ -299,106 +299,12 @@ class GameActivity : Activity() {
             setPadding(0, dpi(16f), 0, dpi(16f))
         }
         pauseMenu = android.widget.ScrollView(this).apply {
-            setBackgroundColor(Color.argb(160, 0, 0, 0))
+            setBackgroundColor(Color.rgb(16, 14, 22))   // opaque: the game is not shown behind the settings
             isClickable = true
             isFillViewport = true
             visibility = View.GONE
-            addView(FrameLayout(this@GameActivity).apply {
-                addView(pauseList, FrameLayout.LayoutParams(-2, -2, Gravity.CENTER))
-            }, FrameLayout.LayoutParams(-1, -2))
+            addView(pauseList, FrameLayout.LayoutParams(-1, -2))
         }
-        val title = TextView(this).apply {
-            text = "Game menu"; setTextColor(Color.WHITE); textSize = 24f
-            setShadowLayer(2f, 3f, 3f, Color.DKGRAY); gravity = Gravity.CENTER
-        }
-        pauseList.addView(title, LinearLayout.LayoutParams(-2, -2).apply { bottomMargin = dpi(16f) })
-        fun addMenu(label: String, action: (TextView) -> Unit) {
-            lateinit var b: TextView
-            b = menuButton(this, label) { action(b) }
-            pauseList.addView(b, LinearLayout.LayoutParams(dpi(300f), -2).apply { bottomMargin = dpi(10f) })
-        }
-        addMenu("Back to game") { showPause(false) }
-        addMenu("Save game") {
-            if (game.isClient) { showToast("The host saves this world"); return@addMenu }
-            glView.queueEvent { game.save(); runOnUiThread { showToast("Game saved") } }
-        }
-        addMenu("World password") { worldPasswordMenu() }
-        addMenu("Save and quit") { saveAndQuit() }
-        addMenu(modeLabel()) { b ->
-            if (game.isClient) { showToast("The host picks the game mode"); return@addMenu }
-            glView.queueEvent {
-                val msg = game.switchMode()
-                runOnUiThread { applyMode(); b.text = modeLabel(); showToast(msg); showPause(false) }
-            }
-        }
-        addMenu("Camera view: first / third / second person") {
-            glView.queueEvent { val msg = game.cycleView(); runOnUiThread { showToast(msg); showPause(false) } }
-        }
-        addMenu("Customize character (skin, face, clothes)") { lookDialog() }
-        addMenu("Skip to next morning / night") {
-            glView.queueEvent { game.timeOfDay = if (game.daylight > 0.5f) 0.52f else 0.0f }
-            showPause(false)
-        }
-        addMenu("Mobs: Normal") { b ->
-            val hostile = !game.mobs.hostileEnabled
-            glView.queueEvent { game.mobs.hostileEnabled = hostile }
-            b.text = if (hostile) "Mobs: Normal" else "Mobs: Peaceful (no monsters)"
-        }
-        addMenu(if (settings.weather) "Weather: On" else "Weather: Off") { b ->
-            settings.weather = !settings.weather
-            applySettings()
-            b.text = if (settings.weather) "Weather: On" else "Weather: Off"
-        }
-        addMenu(if (game.isClient) "Wi-Fi: joined" else "Open to Wi-Fi") { b ->
-            if (game.net != null) { showToast(game.net!!.status); return@addMenu }
-            val name = settings.playerName
-            glView.queueEvent {
-                val result = try {
-                    game.net = com.vishucraft.game.net.HostSession(game, level.name, name)
-                    "Open! Friends on the same Wi-Fi can join from the title screen.\nYour address: ${com.vishucraft.game.net.Net.localAddress()}"
-                } catch (e: Exception) { "Could not open the game: ${e.message}" }
-                runOnUiThread { showToast(result); b.text = if (game.net != null) "Wi-Fi: open" else "Open to Wi-Fi" }
-            }
-        }
-        addMenu("Play online (room code)") { playOnline() }
-        addMenu("Other ways to play online") {
-            showToast("Checking your internet address…")
-            Thread {
-                val help = com.vishucraft.game.net.Net.internetHelp(com.vishucraft.game.net.Net.internetAddress())
-                runOnUiThread {
-                    android.app.AlertDialog.Builder(this).setTitle("Play over the internet").setMessage(help)
-                        .setPositiveButton("OK", null).show()
-                }
-            }.start()
-        }
-        addMenu("Achievements") { showAchievements() }
-        addMenu("Settings") {
-            settingsDialog(this, listOf(
-                "Game" to { col: android.widget.LinearLayout ->
-                    col.addView(com.vishucraft.game.ui.modeRow(this, listOf("Creative", "Survival", "Hardcore"), { game.modeIndex() }) { i ->
-                        glView.queueEvent { val msg = game.setMode(i); runOnUiThread { applyMode(); showToast(msg) } }
-                    })
-                    col.addView(android.widget.TextView(this).apply { text = "Hardcore: survival with one life. If you die you cannot respawn."; setPadding(0, dpi(6f), 0, dpi(10f)) })
-                    col.addView(com.vishucraft.game.ui.modeRow(this, listOf("Monsters: normal", "Peaceful"), { if (game.mobs.hostileEnabled) 0 else 1 }) { i -> game.mobs.hostileEnabled = i == 0 })
-                },
-                "Day & Night" to { col: android.widget.LinearLayout ->
-                    col.addView(com.vishucraft.game.ui.modeRow(this, listOf("Normal cycle", "Always day", "Always night"), { game.timeMode }) { i ->
-                        glView.queueEvent { val msg = game.setTimeMode(i); runOnUiThread { showToast(msg) } }
-                    })
-                    col.addView(com.vishucraft.game.ui.modeRow(this, listOf("Set to morning", "Set to night"), { if (game.daylight > 0.5f) 0 else 1 }) { i ->
-                        glView.queueEvent { game.timeOfDay = if (i == 0) 0.02f else 0.6f }
-                    })
-                },
-                "Camera" to { col: android.widget.LinearLayout ->
-                    col.addView(com.vishucraft.game.ui.modeRow(this, listOf("First person", "Third (behind)", "Second (in front)"), { game.viewMode }) { i ->
-                        glView.queueEvent { game.viewMode = i }
-                    })
-                    col.addView(menuButton(this, "Customize character (skin, face, clothes)") { lookDialog() },
-                        android.widget.LinearLayout.LayoutParams(-1, -2).apply { topMargin = dpi(8f) })
-                },
-            )) { applySettings() }
-        }
-        addMenu("Controls") { showControls() }
         root.addView(pauseMenu, FrameLayout.LayoutParams(-1, -1))
         if (!touch) handler.postDelayed({ showToast("Press MENU / Y for controls help in the pause menu (Back)") }, 800)
         if (com.vishucraft.game.engine.PlayLimit.ENABLED) handler.postDelayed({ showToast("Play time left today: ${settings.playLimit().minutesLeft()} minutes") }, 3600)
@@ -533,10 +439,87 @@ class GameActivity : Activity() {
         hotbar.showCounts = game.survival
     }
 
+    /**
+     * Pause (the pause button, Back on a TV) opens the settings straight away, covering the game:
+     * Back to game, then World (save, quit, password), Friends, Game, Day & Night, Camera, Graphics, Sound, Controls.
+     */
+    private fun fillSettingsPage() {
+        pauseList.removeAllViews()
+        pauseList.setPadding(dpi(16f), dpi(16f), dpi(16f), dpi(16f))
+        pauseList.addView(TextView(this).apply {
+            text = "Settings"; setTextColor(Color.rgb(255, 214, 80)); textSize = 28f
+            typeface = android.graphics.Typeface.DEFAULT_BOLD; gravity = Gravity.CENTER
+        }, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dpi(8f) })
+        pauseList.addView(menuButton(this, "Back to game") { showPause(false) }, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dpi(8f) })
+        fun button(label: String, onClick: () -> Unit) = menuButton(this, label, onClick)
+        val sections = ArrayList<Pair<String, (LinearLayout) -> Unit>>()
+        sections.add("World" to { col: LinearLayout ->
+            fun add(label: String, onClick: () -> Unit) = col.addView(button(label, onClick), LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dpi(8f) })
+            add("Save game") {
+                if (game.isClient) showToast("The host saves this world")
+                else glView.queueEvent { game.save(); runOnUiThread { showToast("Game saved") } }
+            }
+            add("Save and quit") { saveAndQuit() }
+            add("World password") { worldPasswordMenu() }
+            add("Achievements") { showAchievements() }
+        })
+        sections.add("Friends" to { col: LinearLayout ->
+            fun add(label: String, onClick: () -> Unit) = col.addView(button(label, onClick), LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dpi(8f) })
+            add(if (game.isClient) "Wi-Fi: joined" else "Open to Wi-Fi (friends on the same Wi-Fi)") {
+                if (game.net != null) { showToast(game.net!!.status); return@add }
+                val name = settings.playerName
+                glView.queueEvent {
+                    val result = try {
+                        game.net = com.vishucraft.game.net.HostSession(game, level.name, name)
+                        "Open! Friends on the same Wi-Fi can join from the title screen.\nYour address: ${com.vishucraft.game.net.Net.localAddress()}"
+                    } catch (e: Exception) { "Could not open the game: ${e.message}" }
+                    runOnUiThread { showToast(result) }
+                }
+            }
+            add("Play online (room code)") { playOnline() }
+            add("Other ways to play online") {
+                showToast("Checking your internet address…")
+                Thread {
+                    val help = com.vishucraft.game.net.Net.internetHelp(com.vishucraft.game.net.Net.internetAddress())
+                    runOnUiThread { android.app.AlertDialog.Builder(this).setTitle("Play over the internet").setMessage(help).setPositiveButton("OK", null).show() }
+                }.start()
+            }
+        })
+        sections.add("Game" to { col: LinearLayout ->
+            col.addView(com.vishucraft.game.ui.modeRow(this, listOf("Creative", "Survival", "Hardcore"), { game.modeIndex() }) { i ->
+                if (game.isClient) { showToast("The host picks the game mode"); return@modeRow }
+                glView.queueEvent { val msg = game.setMode(i); runOnUiThread { applyMode(); showToast(msg) } }
+            })
+            col.addView(TextView(this).apply { text = "Hardcore: survival with one life. If you die you cannot respawn."; setTextColor(Color.WHITE); setPadding(0, dpi(6f), 0, dpi(10f)) })
+            col.addView(com.vishucraft.game.ui.modeRow(this, listOf("Monsters: normal", "Peaceful"), { if (game.mobs.hostileEnabled) 0 else 1 }) { i -> game.mobs.hostileEnabled = i == 0 })
+        })
+        sections.add("Day & Night" to { col: LinearLayout ->
+            col.addView(com.vishucraft.game.ui.modeRow(this, listOf("Normal cycle", "Always day", "Always night"), { game.timeMode }) { i ->
+                glView.queueEvent { val msg = game.setTimeMode(i); runOnUiThread { showToast(msg) } }
+            })
+            col.addView(com.vishucraft.game.ui.modeRow(this, listOf("Set to morning", "Set to night"), { if (game.daylight > 0.5f) 0 else 1 }) { i ->
+                glView.queueEvent { game.timeOfDay = if (i == 0) 0.02f else 0.6f }
+            })
+        })
+        sections.add("Camera & Character" to { col: LinearLayout ->
+            col.addView(com.vishucraft.game.ui.modeRow(this, listOf("First person", "Third (behind)", "Second (in front)"), { game.viewMode }) { i ->
+                glView.queueEvent { game.viewMode = i }
+            })
+            col.addView(button("Customize character (skin, face, clothes)") { lookDialog() }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dpi(8f); bottomMargin = dpi(8f) })
+        })
+        sections.add("Help" to { col: LinearLayout ->
+            col.addView(button("Controls help") { showControls() }, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dpi(8f) })
+        })
+        val (content, _) = com.vishucraft.game.ui.settingsContent(this, sections) { applySettings() }
+        pauseList.addView(content, LinearLayout.LayoutParams(-1, -2))
+        pauseList.addView(menuButton(this, "Back to game") { showPause(false) }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dpi(12f) })
+    }
+
     private fun showPause(show: Boolean) {
         pauseMenu.visibility = if (show) View.VISIBLE else View.GONE
         if (show) {
             releaseInputs()
+            fillSettingsPage()
             pauseMenu.scrollTo(0, 0)
             pauseList.getChildAt(1)?.requestFocus()
         }

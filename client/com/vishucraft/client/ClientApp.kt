@@ -165,14 +165,16 @@ abstract class ClientApp(protected val demo: File?) {
                 "\n" + game.world.generator.biomeAt(p.blockX(), p.blockZ()).name.lowercase().replaceFirstChar { it.uppercase() } +
                 "  mobs ${game.mobs.list.size}" + (game.net?.let { "\n" + it.status } ?: "")
         } else null
-        hud!!.draw(ui, dt, debug, overlay == Overlay.NONE || overlay == Overlay.PAUSE)
+        // Pause (Esc, Back, the pause button) opens the settings straight away, and they cover the whole game.
+        val inSettings = overlay == Overlay.PAUSE || overlay == Overlay.SETTINGS
+        if (!inSettings) hud!!.draw(ui, dt, debug, overlay == Overlay.NONE)
         if (overlay == Overlay.NONE) drawControls(s)
         when (overlay) {
             Overlay.NONE -> {}
-            Overlay.PAUSE -> pauseMenu(s)
+            Overlay.PAUSE -> { settingsScreen { overlay = Overlay.NONE }; hud?.drawToastOnly(ui, dt) }
             Overlay.CREATIVE -> if (!creative!!.draw(ui)) closeOverlay()
             Overlay.CONTAINER -> if (!container!!.draw(ui)) closeOverlay()
-            Overlay.SETTINGS -> settingsScreen { overlay = Overlay.PAUSE }
+            Overlay.SETTINGS -> { settingsScreen { overlay = Overlay.NONE }; hud?.drawToastOnly(ui, dt) }
             Overlay.CONTROLS -> controlsScreen { overlay = Overlay.PAUSE }
             Overlay.NAME_MOB -> nameMobScreen(s)
             Overlay.TRADE -> tradeScreen(s)
@@ -892,6 +894,8 @@ abstract class ClientApp(protected val demo: File?) {
         "Character & Camera" -> com.vishucraft.game.world.Blocks.PUMPKIN
         "Graphics" -> com.vishucraft.game.world.Blocks.GLASS
         "Sound" -> com.vishucraft.game.world.Blocks.NOTE_BLOCK
+        "World" -> com.vishucraft.game.world.Blocks.CHEST
+        "Friends" -> com.vishucraft.game.world.Blocks.JUKEBOX
         else -> com.vishucraft.game.world.Blocks.LEVER
     }
 
@@ -942,21 +946,23 @@ abstract class ClientApp(protected val demo: File?) {
     protected fun settingsScreen(back: () -> Unit) {
         val se = session
         val game = se?.game
-        ui.rect(0f, 0f, ui.width, ui.height, if (se != null) rgba(0, 0, 0, 190) else rgba(0, 0, 0, 110))
+        ui.rect(0f, 0f, ui.width, ui.height, if (se != null) rgba(16, 14, 22, 255) else rgba(0, 0, 0, 110))
         val cx = ui.width / 2
         ui.text("Settings", cx, 18f, 40f, rgba(255, 220, 90), 1)
         ui.rect(cx - 90f, 66f, 180f, 4f, rgba(255, 220, 90))
-        val tabs = if (game != null) listOf("Game", "Day & Night", "Character & Camera", "Graphics", "Sound", "Controls")
+        val tabs = if (game != null) listOf("Game", "Day & Night", "Character & Camera", "World") + (if (net != null) listOf("Friends") else emptyList()) + listOf("Graphics", "Sound", "Controls")
             else listOf("Character & Camera", "Graphics", "Sound", "Controls")
         if (settingsTab >= tabs.size) settingsTab = 0
         // The sections down the left side.
         val sx = 30f; val sw = 230f
         var ty = 96f
+        val step = if (tabs.size > 6) 46f else 54f
+        val th = step - 8f
         for ((i, name) in tabs.withIndex()) {
-            if (modeButton(name, sx + 24f, ty, sw - 24f, 46f, i == settingsTab)) settingsTab = i
-            ui.rect(sx, ty + 4f, 40f, 38f, rgba(10, 10, 16))
-            ui.icon(tabIcon(name), sx + 4f, ty + 5f, 32f)
-            ty += 54f
+            if (modeButton(name, sx + 24f, ty, sw - 24f, th, i == settingsTab)) settingsTab = i
+            ui.rect(sx, ty + 2f, 40f, th - 4f, rgba(10, 10, 16))
+            ui.icon(tabIcon(name), sx + 4f, ty + (th - 32f) / 2f, 32f)
+            ty += step
         }
         // The card with this section's settings.
         val px = sx + sw + 24f; val pw = ui.width - px - 30f
@@ -1017,6 +1023,46 @@ abstract class ClientApp(protected val demo: File?) {
                     else { homeLook = com.vishucraft.game.world.Appearance.load(com.vishucraft.game.world.Appearance.fileFor(worldsDir)) ?: com.vishucraft.game.world.Appearance.default(); menu = Menu.LOOK }
                 }
             }
+            "World" -> {
+                val g = game!!; val sess = se!!
+                note("Save your world, add a password, see your achievements.")
+                row("Save game") { if (g.isClient) hud?.toast("The host saves this world") else { sess.save(); hud?.toast("Game saved") } }
+                row("Save and quit to title") { saveAndQuit(sess) }
+                if (!g.isClient) row(if (sess.level.password.isEmpty()) "World password: Off (tap to add)" else "World password: On (tap to take away)") {
+                    if (sess.level.password.isEmpty()) startSetPassword(false)
+                    else { removeField.text = ""; passProblem = null; ui.focus = removeField; overlay = Overlay.PASSWORD_REMOVE }
+                }
+                row("Achievements") { overlay = Overlay.ACHIEVEMENTS }
+            }
+            "Friends" -> {
+                val g = game!!; val sess = se!!; val n = net!!
+                note("Play with friends on the same Wi-Fi, or online with a room code.")
+                row(when { g.isClient -> "Wi-Fi: joined"; g.net != null -> "Wi-Fi: open (${n.localAddress()})"; else -> "Open to Wi-Fi" }) {
+                    if (g.net != null) hud?.toast(g.net!!.status)
+                    else {
+                        try {
+                            n.host(g, sess.level.name, prefs.playerName)
+                            hud?.toast("Open! Friends on the same Wi-Fi can join from the title screen.\nYour address: ${n.localAddress()}", 5f)
+                        } catch (e: Exception) { hud?.toast("Could not open the game: ${e.message}", 4f) }
+                    }
+                }
+                row(n.roomCode()?.let { "Online: room $it" } ?: "Play online (room code)") {
+                    if (g.isClient) { hud?.toast("Only the host can invite more friends"); return@row }
+                    internetTitle = "Play online"
+                    internetText = ""; overlay = Overlay.INTERNET
+                    val code = n.roomCode()
+                    if (code != null) internetText = roomText(code)
+                    else {
+                        if (g.net == null) try { n.host(g, sess.level.name, prefs.playerName) } catch (e: Exception) { internetText = "Could not open the game: ${e.message}"; return@row }
+                        Thread { internetText = try { roomText(n.openRoom()) } catch (e: Exception) { "Couldn't open online: ${e.message}" } }.start()
+                    }
+                }
+                row("Other ways to play online") {
+                    internetTitle = "Play over the internet"
+                    internetText = ""; overlay = Overlay.INTERNET
+                    Thread { internetText = n.internetHelp() }.start()
+                }
+            }
             "Graphics" -> {
                 note("Make the game look better, or run faster.")
                 prefRows { it.startsWith("Field of view") || it.startsWith("Render distance") || it.startsWith("Fancy") || it.startsWith("Fullscreen") }
@@ -1027,6 +1073,7 @@ abstract class ClientApp(protected val demo: File?) {
             }
             else -> {
                 note("How the game reacts to you.")
+                row("Controls help (keys and touch)") { if (se != null) overlay = Overlay.CONTROLS else menu = Menu.CONTROLS }
                 prefRows { it.contains("ensitivity") || it.startsWith("Touch") || it.startsWith("FPS") || it.startsWith("Show FPS") }
             }
         }
@@ -1101,73 +1148,4 @@ abstract class ClientApp(protected val demo: File?) {
         if (ui.button("Done", cx - 200, y + 20, 400f, 44f)) back()
     }
 
-    protected fun pauseMenu(s: GameSession) {
-        val game = s.game
-        val cx = ui.width / 2
-        ui.rect(0f, 0f, ui.width, ui.height, rgba(0, 0, 0, 150))
-        title("Game menu", ui.height * 0.12f)
-        val bw = 420f
-        var y = ui.height * 0.12f + 60
-        // The main three are full width; the rest go in two columns so everything fits on a 720p screen.
-        var twoColumns = false
-        var column = 0
-        fun b(label: String, action: () -> Unit) {
-            if (!twoColumns) { if (ui.button(label, cx - bw / 2, y, bw, 38f)) action(); y += 44; return }
-            val w = 330f
-            if (ui.button(label, if (column == 0) cx - w - 5 else cx + 5, y, w, 38f)) action()
-            if (column == 1) y += 44
-            column = 1 - column
-        }
-        b("Back to game") { overlay = Overlay.NONE }
-        b("Save game") { if (game.isClient) hud?.toast("The host saves this world") else { s.save(); hud?.toast("Game saved") } }
-        b("Save and quit to title") { saveAndQuit(s) }
-        y += 10
-        twoColumns = true
-        b("Mode: " + game.modeName() + " (change: Creative / Survival / Hardcore)") {
-            if (game.isClient) hud?.toast("The host picks the game mode")
-            else { hud?.toast(game.switchMode(), 4f); overlay = Overlay.NONE }
-        }
-        b("Camera: " + game.viewName()) { hud?.toast(game.cycleView(), 3f); overlay = Overlay.NONE }
-        b("Customize character (skin, face, clothes)") { lookBefore = game.viewMode; game.viewMode = 2; overlay = Overlay.LOOK }
-        b("Skip to next morning / night") { game.timeOfDay = if (game.daylight > 0.5f) 0.52f else 0.0f }
-        b(if (game.mobs.hostileEnabled) "Mobs: Normal" else "Mobs: Peaceful (no monsters)") { game.mobs.hostileEnabled = !game.mobs.hostileEnabled }
-        b(if (prefs.weather) "Weather: On" else "Weather: Off") { prefs.weather = !prefs.weather; applySettings() }
-        val n = net
-        if (n != null) {
-            b(when { game.isClient -> "Wi-Fi: joined"; game.net != null -> "Wi-Fi: open (${n.localAddress()})"; else -> "Open to Wi-Fi" }) {
-                if (game.net != null) hud?.toast(game.net!!.status)
-                else {
-                    try {
-                        n.host(game, s.level.name, prefs.playerName)
-                        hud?.toast("Open! Friends on the same Wi-Fi can join from the title screen.\nYour address: ${n.localAddress()}", 5f)
-                    } catch (e: Exception) { hud?.toast("Could not open the game: ${e.message}", 4f) }
-                }
-            }
-            b(n.roomCode()?.let { "Online: room $it" } ?: "Play online (room code)") {
-                if (game.isClient) { hud?.toast("Only the host can invite more friends"); return@b }
-                internetTitle = "Play online"
-                internetText = ""; overlay = Overlay.INTERNET
-                val code = n.roomCode()
-                if (code != null) internetText = roomText(code)
-                else {
-                    if (game.net == null) try { n.host(game, s.level.name, prefs.playerName) } catch (e: Exception) { internetText = "Could not open the game: ${e.message}"; return@b }
-                    Thread {
-                        internetText = try { roomText(n.openRoom()) } catch (e: Exception) { "Couldn't open online: ${e.message}" }
-                    }.start()
-                }
-            }
-            b("Other ways to play online") {
-                internetTitle = "Play over the internet"
-                internetText = ""; overlay = Overlay.INTERNET
-                Thread { internetText = n.internetHelp() }.start()
-            }
-        }
-        if (!game.isClient) b(if (s.level.password.isEmpty()) "World password: Off (tap to add)" else "World password: On (tap to take away)") {
-            if (s.level.password.isEmpty()) startSetPassword(false)
-            else { removeField.text = ""; passProblem = null; ui.focus = removeField; overlay = Overlay.PASSWORD_REMOVE }
-        }
-        b("Achievements") { overlay = Overlay.ACHIEVEMENTS }
-        b("Settings") { overlay = Overlay.SETTINGS }
-        b("Controls") { overlay = Overlay.CONTROLS }
-    }
 }
