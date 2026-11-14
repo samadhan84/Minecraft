@@ -886,6 +886,58 @@ abstract class ClientApp(protected val demo: File?) {
         return over && ui.clicked
     }
 
+    private fun tabIcon(name: String) = when (name) {
+        "Game" -> com.vishucraft.game.world.Blocks.GRASS
+        "Day & Night" -> com.vishucraft.game.world.Blocks.GLOWSTONE
+        "Character & Camera" -> com.vishucraft.game.world.Blocks.PUMPKIN
+        "Graphics" -> com.vishucraft.game.world.Blocks.GLASS
+        "Sound" -> com.vishucraft.game.world.Blocks.NOTE_BLOCK
+        else -> com.vishucraft.game.world.Blocks.LEVER
+    }
+
+    /**
+     * One setting as a row: its name on the left and its value on the right, as a switch (On / Off), a bar (percent)
+     * or a pill with the value. Tapping the row changes it. Returns true when tapped.
+     */
+    private fun settingRow(label: String, x: Float, y: Float, w: Float, h: Float): Boolean {
+        val over = ui.hover(x, y, w, h)
+        ui.rect(x, y, w, h, if (over) rgba(46, 50, 80, 240) else rgba(32, 32, 44, 235))
+        ui.frame(x, y, w, h, if (over) rgba(255, 235, 90) else rgba(80, 66, 28), if (over) 3f else 2f)
+        val cut = label.lastIndexOf(": ")
+        val name = if (cut > 0) label.substring(0, cut) else label
+        val value = if (cut > 0) label.substring(cut + 2) else ""
+        ui.text(name, x + 16f, y + h / 2 - 10f, 19f)
+        val vx = x + w - 16f
+        val isOn = value.startsWith("On"); val isOff = value.startsWith("Off")
+        val pct = value.removeSuffix("%").toIntOrNull().takeIf { value.endsWith("%") }
+        when {
+            isOn || isOff -> {
+                // A switch.
+                val sw = 56f; val sh = 26f; val sx0 = vx - sw; val sy0 = y + h / 2 - sh / 2
+                ui.rect(sx0, sy0, sw, sh, if (isOn) rgba(70, 170, 80) else rgba(90, 90, 98))
+                ui.frame(sx0, sy0, sw, sh, rgba(20, 20, 24), 2f)
+                val kx = if (isOn) sx0 + sw - 24f else sx0 + 2f
+                ui.rect(kx, sy0 + 2f, 22f, sh - 4f, rgba(245, 245, 250))
+                ui.text(if (isOn) "On" else "Off", sx0 - 12f, y + h / 2 - 10f, 17f, if (isOn) rgba(150, 230, 150) else rgba(170, 170, 180), 2)
+            }
+            pct != null -> {
+                // A bar that shows how much.
+                val bw = 170f; val bx = vx - bw
+                ui.rect(bx, y + h / 2 - 8f, bw, 16f, rgba(14, 14, 20))
+                ui.rect(bx + 2f, y + h / 2 - 6f, (bw - 4f) * pct.coerceIn(0, 100) / 100f, 12f, rgba(240, 190, 50))
+                ui.frame(bx, y + h / 2 - 8f, bw, 16f, rgba(120, 100, 40), 2f)
+                ui.text(value, bx - 12f, y + h / 2 - 10f, 17f, rgba(255, 224, 110), 2)
+            }
+            value.isNotEmpty() -> {
+                val tw = ui.textWidth(value, 18f) + 28f
+                ui.rect(vx - tw, y + h / 2 - 15f, tw, 30f, rgba(70, 56, 14))
+                ui.frame(vx - tw, y + h / 2 - 15f, tw, 30f, rgba(214, 170, 40), 2f)
+                ui.text(value, vx - tw / 2, y + h / 2 - 10f, 18f, rgba(255, 224, 110), 1)
+            }
+        }
+        return over && ui.clicked
+    }
+
     /** The settings, in sections: Game (modes), Day & Night, Character & Camera, Graphics, Sound and Controls. */
     protected fun settingsScreen(back: () -> Unit) {
         val se = session
@@ -901,7 +953,9 @@ abstract class ClientApp(protected val demo: File?) {
         val sx = 30f; val sw = 230f
         var ty = 96f
         for ((i, name) in tabs.withIndex()) {
-            if (modeButton(name, sx, ty, sw, 46f, i == settingsTab)) settingsTab = i
+            if (modeButton(name, sx + 24f, ty, sw - 24f, 46f, i == settingsTab)) settingsTab = i
+            ui.rect(sx, ty + 4f, 40f, 38f, rgba(10, 10, 16))
+            ui.icon(tabIcon(name), sx + 4f, ty + 5f, 32f)
             ty += 54f
         }
         // The card with this section's settings.
@@ -912,14 +966,17 @@ abstract class ClientApp(protected val demo: File?) {
         val ix = px + 28f; val iw = pw - 56f
         var y = 116f
         val name = tabs[settingsTab]
-        ui.text(name, ix, y, 28f, rgba(255, 220, 90)); y += 40f
+        ui.rect(px + 3f, 99f, pw - 6f, 54f, rgba(50, 40, 10, 235))
+        ui.rect(px + 3f, 151f, pw - 6f, 3f, rgba(214, 170, 40))
+        ui.icon(tabIcon(name), px + 14f, 106f, 40f)
+        ui.text(name, px + 64f, 112f, 28f, rgba(255, 220, 90)); y += 56f
         fun note(t: String) { ui.text(t, ix, y, 16f, rgba(200, 200, 210)); y += 28f }
         fun modes(labels: List<String>, chosen: Int, pick: (Int) -> Unit) {
             val n = labels.size; val gap = 10f; val w = (iw - gap * (n - 1)) / n
-            for ((i, l) in labels.withIndex()) if (modeButton(l, ix + i * (w + gap), y, w, 48f, i == chosen)) pick(i)
-            y += 60f
+            for ((i, l) in labels.withIndex()) if (modeButton(l, ix + i * (w + gap), y, w, 42f, i == chosen)) pick(i)
+            y += 50f
         }
-        fun row(label: String, action: () -> Unit) { if (ui.button(label, ix, y, iw, 44f)) action(); y += 52f }
+        fun row(label: String, action: () -> Unit) { if (settingRow(label, ix, y, iw, 46f)) action(); y += 54f }
         val rows = prefs.rows()
         fun prefRows(pick: (String) -> Boolean) {
             for ((label, change) in rows) if (pick(label())) row(label()) { change(); applySettings(); settingChanged(label()) }
@@ -934,10 +991,10 @@ abstract class ClientApp(protected val demo: File?) {
                     1 -> "Survival: collect, craft, watch health and hunger. You respawn."
                     else -> "Hardcore: survival with ONE life. If you die you cannot respawn."
                 })
-                y += 8f
-                ui.text("Monsters", ix, y, 20f, rgba(255, 220, 90)); y += 30f
+                y += 2f
+                ui.text("Monsters", ix, y, 20f, rgba(255, 220, 90)); y += 26f
                 modes(listOf("Normal", "Peaceful (no monsters)"), if (g.mobs.hostileEnabled) 0 else 1) { g.mobs.hostileEnabled = it == 0 }
-                ui.text("Weather", ix, y, 20f, rgba(255, 220, 90)); y += 30f
+                ui.text("Weather", ix, y, 20f, rgba(255, 220, 90)); y += 26f
                 modes(listOf("On (rain, snow, storms)", "Off"), if (prefs.weather) 0 else 1) { prefs.weather = it == 0; applySettings() }
             }
             "Day & Night" -> {

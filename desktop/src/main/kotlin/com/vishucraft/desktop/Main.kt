@@ -382,9 +382,10 @@ class App(demo: File?) : ClientApp(demo) {
                 GameSession.create(File(worldsDir, "extra$k"), "My " + t.title, 100L + k, t).close()
             }
             f == 3 -> { settingsTab = 1; menu = Menu.SETTINGS }
-            f == 5 -> { shot("00-settings-home") }
-            f == 6 -> { homeLook = com.vishucraft.game.world.Appearance.default().also { com.vishucraft.game.world.Appearance.randomize(it, java.util.Random(11)) }; menu = Menu.LOOK }
-            f == 8 -> { shot("00-home-customize"); menu = Menu.TITLE }
+            f == 5 -> { shot("00-settings-home"); settingsTab = 2 }
+            f == 6 -> { shot("00-settings-home2") }
+            f == 7 -> { homeLook = com.vishucraft.game.world.Appearance.default().also { com.vishucraft.game.world.Appearance.randomize(it, java.util.Random(11)) }; menu = Menu.LOOK }
+            f == 9 -> { shot("00-home-customize"); menu = Menu.TITLE }
             f == 10 -> shot("01-title")
             f == 12 -> { menu = Menu.CREATE; nameField.text = "Demo creative"; seedField.text = "12345"; worldType = com.vishucraft.game.world.WorldType.FLAT }
             f == 15 -> worldType = com.vishucraft.game.world.WorldType.ONEBLOCK

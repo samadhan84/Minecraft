@@ -99,39 +99,48 @@ fun settingsDialog(ctx: android.app.Activity, extraSections: List<Pair<String, (
         orientation = android.widget.LinearLayout.VERTICAL
         setPadding(ctx.dpi(16f), ctx.dpi(12f), ctx.dpi(16f), ctx.dpi(4f))
     }
-    fun header(title: String) {
+    /** A gold heading and a dark rounded card under it; the section's controls go into the card. */
+    fun card(title: String): android.widget.LinearLayout {
         col.addView(android.widget.TextView(ctx).apply {
             text = title; textSize = 20f; typeface = android.graphics.Typeface.DEFAULT_BOLD
             setTextColor(android.graphics.Color.rgb(255, 214, 80))
-            setPadding(0, ctx.dpi(14f), 0, ctx.dpi(2f))
+            setPadding(ctx.dpi(4f), ctx.dpi(14f), 0, ctx.dpi(4f))
         })
-        col.addView(android.view.View(ctx).apply { setBackgroundColor(android.graphics.Color.rgb(214, 170, 40)) },
-            android.widget.LinearLayout.LayoutParams(-1, ctx.dpi(2f)).apply { bottomMargin = ctx.dpi(8f) })
+        val c = android.widget.LinearLayout(ctx).apply {
+            orientation = android.widget.LinearLayout.VERTICAL
+            setPadding(ctx.dpi(10f), ctx.dpi(10f), ctx.dpi(10f), ctx.dpi(4f))
+            background = android.graphics.drawable.GradientDrawable().apply {
+                setColor(android.graphics.Color.argb(235, 24, 24, 34)); cornerRadius = ctx.dpi(8f).toFloat()
+                setStroke(ctx.dpi(2f), android.graphics.Color.rgb(160, 126, 30))
+            }
+        }
+        col.addView(c, android.widget.LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = ctx.dpi(4f) })
+        return c
     }
-    for ((title, build) in extraSections) { header(title); build(col) }
+    for ((title, build) in extraSections) build(card(title))
     val rows = Settings.rows(s)
     fun section(title: String, pick: (String) -> Boolean) {
         val mine = rows.filter { pick(it.first()) }
         if (mine.isEmpty()) return
-        header(title)
+        val c = card(title)
         for ((label, action) in mine) {
             lateinit var b: android.widget.TextView
             b = menuButton(ctx, label()) { action(); b.text = label(); onChanged() }
-            col.addView(b, android.widget.LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = ctx.dpi(8f) })
+            c.addView(b, android.widget.LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = ctx.dpi(8f) })
         }
     }
     section("Graphics") { it.startsWith("Field of view") || it.startsWith("Render distance") || it.startsWith("Fancy") || it.startsWith("Weather") }
     section("Sound") { it.startsWith("Sound") || it.startsWith("Music") }
     section("Controls") { it.contains("ensitivity") || it.startsWith("Touch") || it.startsWith("Show FPS") }
     // Player name (shown to others in Wi-Fi games).
-    header("Player")
+    val playerCard = card("Player")
     val nameInput = android.widget.EditText(ctx).apply {
         setText(s.playerName); hint = "Player name"
         inputType = android.text.InputType.TYPE_CLASS_TEXT
         setOnFocusChangeListener { _, has -> if (!has) s.playerName = text.toString().trim().ifEmpty { s.playerName } }
     }
-    col.addView(android.widget.TextView(ctx).apply { text = "Player name (for Wi-Fi games)" })
-    col.addView(nameInput)
+    playerCard.addView(android.widget.TextView(ctx).apply { text = "Player name (for Wi-Fi games)"; setTextColor(android.graphics.Color.WHITE) })
+    playerCard.addView(nameInput)
     val scroll = android.widget.ScrollView(ctx).apply { addView(col) }
     android.app.AlertDialog.Builder(ctx).setTitle("Settings").setView(scroll)
         .setPositiveButton("Done") { _, _ -> s.playerName = nameInput.text.toString().trim().ifEmpty { s.playerName } }.show()
