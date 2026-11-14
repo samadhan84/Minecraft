@@ -378,13 +378,18 @@ class App(demo: File?) : ClientApp(demo) {
         fun shot(name: String) { screenshot(File(dir, "$name.png")); println("screenshot $name") }
         val f = demoFrame
         when {
+            f == 2 -> for ((k, t) in listOf(com.vishucraft.game.world.WorldType.SKYBLOCK, com.vishucraft.game.world.WorldType.ONEBLOCK, com.vishucraft.game.world.WorldType.HARDCORE).withIndex()) {
+                GameSession.create(File(worldsDir, "extra$k"), "My " + t.title, 100L + k, t).close()
+            }
             f == 3 -> { settingsTab = 1; menu = Menu.SETTINGS }
             f == 5 -> { shot("00-settings-home") }
             f == 6 -> { homeLook = com.vishucraft.game.world.Appearance.default().also { com.vishucraft.game.world.Appearance.randomize(it, java.util.Random(11)) }; menu = Menu.LOOK }
             f == 8 -> { shot("00-home-customize"); menu = Menu.TITLE }
             f == 10 -> shot("01-title")
-            f == 12 -> { menu = Menu.CREATE; nameField.text = "Demo creative"; seedField.text = "12345"; survival = false; flatWorld = true }
+            f == 12 -> { menu = Menu.CREATE; nameField.text = "Demo creative"; seedField.text = "12345"; worldType = com.vishucraft.game.world.WorldType.FLAT }
+            f == 15 -> worldType = com.vishucraft.game.world.WorldType.ONEBLOCK
             f == 16 -> shot("02-create")
+            f == 17 -> worldType = com.vishucraft.game.world.WorldType.FLAT
             f == 18 -> demoCreate = true
             f == 400 -> shot("03-creative-world")
             f == 402 -> overlay = Overlay.CREATIVE
@@ -707,7 +712,7 @@ class App(demo: File?) : ClientApp(demo) {
             f == 1360 -> shot("04y-railway-station")
             f == 1361 -> overlay = Overlay.PAUSE
             f == 1363 -> shot("05-pause")
-            f == 1367 -> { overlay = Overlay.NONE; leaveWorld(); menu = Menu.CREATE; nameField.text = "Demo survival"; seedField.text = "777"; survival = true }
+            f == 1367 -> { overlay = Overlay.NONE; leaveWorld(); menu = Menu.CREATE; nameField.text = "Demo survival"; seedField.text = "777"; worldType = com.vishucraft.game.world.WorldType.SURVIVAL }
             f == 1369 -> demoCreate = true
             f == 1600 -> shot("06-survival-world")
             f == 1602 -> session?.let {

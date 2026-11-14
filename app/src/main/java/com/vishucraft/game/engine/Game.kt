@@ -1157,6 +1157,41 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
             setBlock(x, above, z, Blocks.AIR)
             above++
         }
+        if (level.worldKind == 3 && x == com.vishucraft.game.world.OneBlock.X && y == com.vishucraft.game.world.OneBlock.Y && z == com.vishucraft.game.world.OneBlock.Z) oneBlockBroken()
+    }
+
+    /** The One Block was broken: it turns into another random block at once, and every 50 breaks it levels up. */
+    private val oneRnd = java.util.Random()
+    private fun oneBlockBroken() {
+        val ob = com.vishucraft.game.world.OneBlock
+        val before = ob.level(level.oneBreaks)
+        level.oneBreaks++
+        val lv = ob.level(level.oneBreaks)
+        if (lv > before) {
+            sound("level_up", ob.X + 0.5f, ob.Y + 1f, ob.Z + 0.5f)
+            uiEvents.add("toast:One Block level $lv! ${ob.pool(lv).distinct().size} different blocks can appear now")
+        }
+        val block = ob.pick(lv, oneRnd)
+        setBlock(ob.X, ob.Y, ob.Z, block)
+        if (block == Blocks.CHEST) {
+            val chest = world.blockEntities.chest(ob.X, ob.Y, ob.Z)
+            val loot = listOf("Bread", "Iron Ingot", "Gold Ingot", "Diamond", "Coal", "Apple", "Arrow", "Emerald", "Bone", "String")
+            if (chest != null) repeat(3 + lv / 2) { chest.insert(Items.find(loot[oneRnd.nextInt(loot.size)]), 1 + oneRnd.nextInt(3)) }
+        }
+        // From level 2 a creature sometimes appears on the block, and from level 4 sometimes a monster.
+        if (oneRnd.nextFloat() < ob.creatureChance(lv) && !isClient) {
+            val passive = listOf(MobType.CHICKEN, MobType.COW, MobType.PIG, MobType.SHEEP)
+            val hostile = listOf(MobType.ZOMBIE, MobType.SKELETON, MobType.CRAWLER)
+            val type = if (lv >= 4 && mobs.hostileEnabled && oneRnd.nextInt(3) == 0) hostile[oneRnd.nextInt(hostile.size)] else passive[oneRnd.nextInt(passive.size)]
+            mobs.list.add(Mob(type, ob.X + 0.5f, ob.Y + 1.2f, ob.Z + 0.5f))
+        }
+    }
+
+    /** One Block world: the level and how many breaks until the next one. */
+    fun oneBlockInfo(): String {
+        val ob = com.vishucraft.game.world.OneBlock
+        val lv = ob.level(level.oneBreaks)
+        return if (lv >= ob.MAX_LEVEL) "One Block: top level $lv" else "One Block: level $lv, ${ob.BREAKS_PER_LEVEL - level.oneBreaks % ob.BREAKS_PER_LEVEL} breaks to level ${lv + 1}"
     }
 
     /** Tap: interact with levers/buttons, use the held item, or place the held block. */
@@ -1481,7 +1516,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
             Blocks.ITEM_FRAME -> (world.blockEntities.get(t.x, t.y, t.z) as? com.vishucraft.game.world.ItemHolderEntity)?.stack?.let { Items.displayName(it.id) }
             Blocks.JUKEBOX -> (world.blockEntities.get(t.x, t.y, t.z) as? com.vishucraft.game.world.ItemHolderEntity)?.stack?.let { "Playing: " + Items.displayName(it.id) }
             Blocks.COMPOSTER -> "Composter ${world.getMeta(t.x, t.y, t.z).coerceAtMost(7)}/7"
-            else -> null
+            else -> if (level.worldKind == 3 && t.x == com.vishucraft.game.world.OneBlock.X && t.y == com.vishucraft.game.world.OneBlock.Y && t.z == com.vishucraft.game.world.OneBlock.Z) oneBlockInfo() else null
         }
     }
 

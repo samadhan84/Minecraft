@@ -28,7 +28,7 @@ class GameSession(
             Dimension.EMBER -> dir?.let { File(it, "ember") }
             Dimension.SKY -> dir?.let { File(it, "sky") }
         }
-        world = World(level.seed, if (remote != null) null else dimDir, level.dimension, level.flat, level.flatSea)
+        world = World(level.seed, if (remote != null) null else dimDir, level.dimension, level.flat, level.flatSea, level.worldKind)
         game = Game(world, level, input, if (remote != null) null else dir)
         remote?.invoke(world, game)
         renderer = WorldRenderer(game)
@@ -62,6 +62,13 @@ class GameSession(
 
     companion object {
         fun open(dir: File): GameSession = GameSession(dir, LevelData.read(dir) ?: LevelData.create(System.nanoTime(), dir.name, GameMode.CREATIVE))
+
+        /** A new world of one of the kinds on the Create screen (normal, creative, flat, Sky Block, One Block, hardcore). */
+        fun create(dir: File, name: String, seed: Long, type: com.vishucraft.game.world.WorldType): GameSession {
+            val level = LevelData.create(seed, name, if (type.survival) GameMode.SURVIVAL else GameMode.CREATIVE, type.flat, type.kind, type.hardcore)
+            level.write(dir)
+            return GameSession(dir, level)
+        }
 
         fun create(dir: File, name: String, seed: Long, survival: Boolean, flat: Boolean = true): GameSession {
             val level = LevelData.create(seed, name, if (survival) GameMode.SURVIVAL else GameMode.CREATIVE, flat)

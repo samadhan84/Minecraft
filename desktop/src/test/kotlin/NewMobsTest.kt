@@ -1082,3 +1082,55 @@ class SettingsModesTest {
         assertEquals(2, LevelData.read(dir)!!.timeMode)
     }
 }
+
+class WorldTypesTest {
+    private fun game(type: WorldType, seed: Long): Game {
+        val dir = kotlin.io.path.createTempDirectory("wt").toFile()
+        val level = LevelData.create(seed, "t", if (type.survival) GameMode.SURVIVAL else GameMode.CREATIVE, type.flat, type.kind, type.hardcore)
+        return Game(World(level.seed, dir, Dimension.OVERWORLD, level.flat, level.flatSea, level.worldKind), level, GameInput(), dir)
+    }
+
+    @Test fun skyBlockAndOneBlockStartOnATinyIslandOverTheVoid() {
+        val one = game(WorldType.ONEBLOCK, 5L)
+        for (cx in -2..2) for (cz in -2..2) one.world.ensureLoaded(cx, cz)
+        assertEquals(Blocks.GRASS, one.world.getBlock(0, OneBlock.Y, 0), "the one block")
+        var others = 0
+        for (x in -20..20) for (z in -20..20) for (y in 40..100) if ((x != 0 || z != 0 || y != OneBlock.Y) && one.world.getBlock(x, y, z) != Blocks.AIR) others++
+        assertEquals(0, others, "nothing else in the sky")
+        val sky = game(WorldType.SKYBLOCK, 6L)
+        for (cx in -2..2) for (cz in -2..2) sky.world.ensureLoaded(cx, cz)
+        assertEquals(Blocks.GRASS, sky.world.getBlock(0, OneBlock.Y, 0))
+        assertEquals(Blocks.GRASS, sky.world.getBlock(-2, OneBlock.Y, -2))
+        assertTrue((1..4).any { sky.world.getBlock(2, OneBlock.Y + it, 2) == Blocks.LOG }, "a tree")
+        assertEquals(WorldType.SKYBLOCK, WorldType.of(sky.level))
+        assertEquals(WorldType.ONEBLOCK, WorldType.of(one.level))
+        assertEquals(WorldType.HARDCORE, WorldType.of(game(WorldType.HARDCORE, 7L).level))
+    }
+
+    @Test fun theOneBlockTurnsIntoAnotherAtOnceAndLevelsUpEveryFiftyBreaks() {
+        val g = game(WorldType.ONEBLOCK, 8L)
+        for (cx in -2..2) for (cz in -2..2) g.world.ensureLoaded(cx, cz)
+        g.inventory.slots[0] = ItemStack(Items.find("Enchanted Diamond Pickaxe"), 1); g.input.selectedSlot = 0
+        g.mobs.hostileEnabled = false
+        val seen = HashSet<Int>()
+        for (i in 1..49) {
+            g.breakBlock(0, OneBlock.Y, 0)
+            val b = g.world.getBlock(0, OneBlock.Y, 0)
+            assertTrue(b != Blocks.AIR, "it turned into a block at once (break $i)")
+            assertTrue(b in OneBlock.pool(0), "level 0 only gives level 0 blocks (got $b)")
+            seen.add(b)
+        }
+        assertTrue(seen.size >= 3, "different blocks appear (${seen.size})")
+        g.breakBlock(0, OneBlock.Y, 0)
+        assertEquals(1, OneBlock.level(g.level.oneBreaks), "level 1 after 50 breaks")
+        assertTrue(g.uiEvents.any { it.startsWith("toast:One Block level 1") })
+        val more = OneBlock.pool(1).toSet() - OneBlock.pool(0).toSet()
+        assertTrue(more.isNotEmpty() && more.contains(Blocks.STONE), "level 1 brings new blocks")
+        // The block can be reached from above again and again.
+        repeat(300) { g.breakBlock(0, OneBlock.Y, 0); assertTrue(g.world.getBlock(0, OneBlock.Y, 0) != Blocks.AIR) }
+        assertEquals(OneBlock.level(350), OneBlock.level(g.level.oneBreaks))
+        // It is remembered when the world is saved.
+        g.save()
+        assertEquals(g.level.oneBreaks, LevelData.read(g.world.dataDir!!)!!.oneBreaks)
+    }
+}

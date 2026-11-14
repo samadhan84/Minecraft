@@ -59,6 +59,8 @@ class GameActivity : Activity() {
         const val EXTRA_NAME = "name"
         const val EXTRA_MODE = "mode"
         const val EXTRA_FLAT = "flat"
+        const val EXTRA_KIND = "kind"
+        const val EXTRA_HARDCORE = "hardcore"
         const val EXTRA_JOIN = "join"
 
         fun worldsRoot(activity: Activity) = File(activity.filesDir, "worlds").apply { mkdirs() }
@@ -127,6 +129,8 @@ class GameActivity : Activity() {
             intent.getStringExtra(EXTRA_NAME) ?: "My World",
             if (intent.getBooleanExtra(EXTRA_MODE, false)) GameMode.SURVIVAL else GameMode.CREATIVE,
             intent.getBooleanExtra(EXTRA_FLAT, true),
+            intent.getIntExtra(EXTRA_KIND, 0),
+            intent.getBooleanExtra(EXTRA_HARDCORE, false),
         )
         // Each dimension keeps its own chunks in a sub-folder of the world.
         val dimDir = when (level.dimension) {
@@ -134,7 +138,7 @@ class GameActivity : Activity() {
             com.vishucraft.game.world.Dimension.EMBER -> File(dir, "ember")
             com.vishucraft.game.world.Dimension.SKY -> File(dir, "sky")
         }
-        world = World(level.seed, if (client != null) null else dimDir, level.dimension, level.flat, level.flatSea)
+        world = World(level.seed, if (client != null) null else dimDir, level.dimension, level.flat, level.flatSea, level.worldKind)
         if (client != null) world.remoteLoader = { cx, cz -> client.requestChunk(cx, cz) }
         game = Game(world, level, input, if (client != null) null else dir)
         worldDirForDim = dir

@@ -238,20 +238,22 @@ class MenuActivity : Activity() {
         dialog.show()
     }
 
-    private fun startGame(dirName: String, seed: Long? = null, name: String? = null, survival: Boolean = false, flat: Boolean = true) {
+    private fun startGame(dirName: String, seed: Long? = null, name: String? = null, survival: Boolean = false, flat: Boolean = true, kind: Int = 0, hardcore: Boolean = false) {
         if (limitOver()) return
         // A world that already exists may have a password (a new one never does).
         val stored = if (seed == null) com.vishucraft.game.world.LevelData.read(File(GameActivity.worldsRoot(this), dirName))?.password ?: "" else ""
-        askPassword(stored) { launchGame(dirName, seed, name, survival, flat) }
+        askPassword(stored) { launchGame(dirName, seed, name, survival, flat, kind, hardcore) }
     }
 
-    private fun launchGame(dirName: String, seed: Long?, name: String?, survival: Boolean, flat: Boolean) {
+    private fun launchGame(dirName: String, seed: Long?, name: String?, survival: Boolean, flat: Boolean, kind: Int = 0, hardcore: Boolean = false) {
         val i = Intent(this, GameActivity::class.java)
         i.putExtra(GameActivity.EXTRA_WORLD, dirName)
         if (seed != null) i.putExtra(GameActivity.EXTRA_SEED, seed)
         if (name != null) i.putExtra(GameActivity.EXTRA_NAME, name)
         i.putExtra(GameActivity.EXTRA_MODE, survival)
         i.putExtra(GameActivity.EXTRA_FLAT, flat)
+        i.putExtra(GameActivity.EXTRA_KIND, kind)
+        i.putExtra(GameActivity.EXTRA_HARDCORE, hardcore)
         startActivity(i)
     }
 
@@ -279,8 +281,9 @@ class MenuActivity : Activity() {
         val buttons = ArrayList<Pair<String, () -> Unit>>()
         buttons.add("+  Create new world" to { newWorld() })
         for (w in list) {
-            val mode = if (w.level.mode == com.vishucraft.game.world.GameMode.SURVIVAL) "Survival" else "Creative"
-            buttons.add("${w.level.name}  ·  $mode" to { startGame(w.dir.name) })
+            val type = com.vishucraft.game.world.WorldType.of(w.level)
+            val extra = if (type == com.vishucraft.game.world.WorldType.ONEBLOCK) "  ·  level ${com.vishucraft.game.world.OneBlock.level(w.level.oneBreaks)}" else if (type == com.vishucraft.game.world.WorldType.HARDCORE && w.level.hardcoreOver) "  ·  you died" else ""
+            buttons.add("${w.level.name}\n${type.title}$extra" to { startGame(w.dir.name) })
         }
         if (list.isNotEmpty()) buttons.add("Delete a world…" to { deleteWorld() })
         buttonDialog("Select world", buttons)
@@ -419,19 +422,33 @@ class MenuActivity : Activity() {
             hint = "Seed (leave empty for random)"
             inputType = InputType.TYPE_CLASS_TEXT
         }
-        // Survival, creative on normal land (hills, trees, water), or creative on a flat world.
-        var survival = true
-        var flat = false
-        lateinit var modeButton: TextView
-        modeButton = menuButton(this, "Game mode: Survival") {
-            if (survival) { survival = false; flat = false } else if (!flat) flat = true else survival = true
-            modeButton.text = when { survival -> "Game mode: Survival"; flat -> "Game mode: Creative (flat world)"; else -> "Game mode: Creative (normal world)" }
+        // The kinds of world, as a list of big buttons with the chosen one in gold.
+        var type = com.vishucraft.game.world.WorldType.SURVIVAL
+        val types = com.vishucraft.game.world.WorldType.values()
+        val typeButtons = ArrayList<TextView>()
+        fun refreshTypes() {
+            for ((i, t) in types.withIndex()) {
+                val on = t == type
+                typeButtons[i].text = (if (on) "● " else "") + t.title + "\n" + t.blurb
+                typeButtons[i].textSize = 14f
+                typeButtons[i].setTextColor(if (on) Color.rgb(255, 224, 110) else Color.WHITE)
+                typeButtons[i].background = android.graphics.drawable.GradientDrawable().apply {
+                    setColor(if (on) Color.rgb(110, 84, 16) else Color.rgb(70, 70, 78))
+                    setStroke(dpi(3f), if (on) Color.rgb(255, 224, 110) else Color.rgb(30, 30, 30))
+                }
+            }
         }
         col.addView(nameInput); col.addView(seedInput)
-        col.addView(modeButton, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dpi(8f) })
+        col.addView(TextView(this).apply { text = "Choose the kind of world"; textSize = 18f; setTextColor(Color.rgb(255, 214, 80)); setPadding(0, dpi(12f), 0, dpi(6f)) })
+        for (t in types) {
+            val b = menuButton(this, t.title) { type = t; refreshTypes() }
+            typeButtons.add(b)
+            col.addView(b, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dpi(6f) })
+        }
+        refreshTypes()
         AlertDialog.Builder(this)
             .setTitle("Create new world")
-            .setView(col)
+            .setView(android.widget.ScrollView(this).apply { addView(col) })
             .setPositiveButton("Create") { _, _ ->
                 val text = seedInput.text.toString().trim()
                 val seed = when {
@@ -441,11 +458,11 @@ class MenuActivity : Activity() {
                 var n = 1
                 while (File(GameActivity.worldsRoot(this), "world$n").exists()) n++
                 val name = nameInput.text.toString().trim().ifEmpty { "World $n" }
-                startGame("world$n", seed, name, survival, flat)
+                startGame("world$n", seed, name, type.survival, type.flat, type.kind, type.hardcore)
             }
             .setNegativeButton("Cancel", null)
             .show()
-        modeButton.requestFocus()
+        typeButtons.firstOrNull()?.requestFocus()
     }
 
     private fun help() {

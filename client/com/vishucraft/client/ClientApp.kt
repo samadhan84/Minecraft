@@ -111,10 +111,8 @@ abstract class ClientApp(protected val demo: File?) {
     private var wrongPassword = false
     private var passwordStored = ""
     protected val seedField = Ui.Field("", "Seed (leave empty for random)")
-    protected var survival = true
-    protected var hardcoreWorld = false
+    protected var worldType = com.vishucraft.game.world.WorldType.SURVIVAL
     /** A new creative world on a flat world (false: normal land with hills, trees and water). */
-    protected var flatWorld = false
     protected var deleteTarget: File? = null
 
     // Join form
@@ -493,55 +491,96 @@ abstract class ClientApp(protected val demo: File?) {
         if (ui.button("Cancel", cx + 5, y, w / 2 - 5, 44f)) { removeField.text = ""; passProblem = null; ui.focus = null; overlay = Overlay.PAUSE }
     }
 
+    /** Cuts [text] into lines that fit [width] pixels at text size [size]. */
+    private fun wrapText(text: String, size: Float, width: Float): List<String> {
+        val lines = ArrayList<String>(); var line = ""
+        for (word in text.split(' ')) {
+            val t = if (line.isEmpty()) word else "$line $word"
+            if (ui.textWidth(t, size) > width && line.isNotEmpty()) { lines.add(line); line = word } else line = t
+        }
+        if (line.isNotEmpty()) lines.add(line)
+        return lines
+    }
+
     protected fun worldsScreen() {
         val cx = ui.width / 2
-        title("Select world")
+        ui.text("Select world", cx, 18f, 40f, rgba(255, 220, 90), 1)
+        ui.rect(cx - 90f, 66f, 180f, 4f, rgba(255, 220, 90))
         val list = worlds()
-        val w = 560f; val rowH = 50f
-        val top = 120f; val bottom = ui.height - 90
+        val w = minOf(700f, ui.width - 60f); val rowH = 78f
+        val top = 92f; val bottom = ui.height - 90
         val maxScroll = maxOf(0f, list.size * rowH - (bottom - top))
         worldScroll = (worldScroll - ui.wheel * rowH).coerceIn(0f, maxScroll)
-        if (list.isEmpty()) ui.text("No worlds yet. Create one!", cx, top + 20, 20f, rgba(220, 220, 220), 1)
+        if (list.isEmpty()) ui.text("No worlds yet. Create one!", cx, top + 30, 22f, rgba(220, 220, 220), 1)
         for ((i, wi) in list.withIndex()) {
             val y = top + i * rowH - worldScroll
             if (y < top - 1 || y + rowH > bottom + 1) continue
-            val mode = if (wi.level.mode == GameMode.SURVIVAL) "Survival" else "Creative"
-            if (ui.button("${wi.level.name}  ·  $mode", cx - w / 2, y, w - 110, 42f)) {
+            val x = cx - w / 2
+            val type = com.vishucraft.game.world.WorldType.of(wi.level)
+            val over = ui.hover(x, y, w - 120f, rowH - 10f)
+            ui.rect(x, y, w, rowH - 10f, if (over) rgba(40, 44, 70, 235) else rgba(22, 22, 32, 225))
+            ui.frame(x, y, w, rowH - 10f, if (over) rgba(255, 235, 90) else rgba(120, 96, 30), if (over) 3f else 2f)
+            ui.rect(x, y, 8f, rowH - 10f, when (type) {
+                com.vishucraft.game.world.WorldType.SURVIVAL -> rgba(80, 170, 80); com.vishucraft.game.world.WorldType.HARDCORE -> rgba(200, 50, 50)
+                com.vishucraft.game.world.WorldType.SKYBLOCK -> rgba(100, 170, 255); com.vishucraft.game.world.WorldType.ONEBLOCK -> rgba(255, 190, 60)
+                else -> rgba(190, 120, 255) })
+            ui.rect(x + 18f, y + 8f, 52f, 52f, rgba(10, 10, 16))
+            ui.icon(type.icon, x + 21f, y + 11f, 46f)
+            ui.text(wi.level.name, x + 84f, y + 6f, 22f, rgba(255, 224, 110))
+            val extra = when (type) {
+                com.vishucraft.game.world.WorldType.ONEBLOCK -> "  ·  level ${com.vishucraft.game.world.OneBlock.level(wi.level.oneBreaks)}"
+                com.vishucraft.game.world.WorldType.HARDCORE -> if (wi.level.hardcoreOver) "  ·  you died" else ""
+                else -> ""
+            }
+            ui.text(type.title + extra, x + 84f, y + 36f, 15f, rgba(205, 205, 215))
+            if (over && ui.clicked) {
                 message = null
                 needPassword(Menu.WORLDS, wi.level.password) { startSession(GameSession(wi.dir, wi.level)) }
                 return
             }
-            if (ui.button("Delete", cx + w / 2 - 100, y, 100f, 42f)) { deleteTarget = wi.dir; menu = Menu.CONFIRM_DELETE }
+            if (ui.button("Delete", x + w - 108f, y + 14f, 96f, 36f)) { deleteTarget = wi.dir; menu = Menu.CONFIRM_DELETE }
         }
-        if (ui.button("Create new world", cx - w / 2, ui.height - 70, w / 2 - 5, 44f)) {
+        if (ui.button("Create new world", cx - minOf(w, 640f) / 2, ui.height - 70, minOf(w, 640f) / 2 - 5, 44f)) {
             if (list.size >= com.vishucraft.game.engine.MAX_WORLDS) { message = com.vishucraft.game.engine.MAX_WORLDS_MESSAGE; return }
-            nameField.text = "World ${list.size + 1}"; seedField.text = ""; survival = true
+            nameField.text = "World ${list.size + 1}"; seedField.text = ""; worldType = com.vishucraft.game.world.WorldType.SURVIVAL
             menu = Menu.CREATE
         }
-        if (ui.button("Back", cx + 5, ui.height - 70, w / 2 - 5, 44f)) menu = Menu.TITLE
+        if (ui.button("Back", cx + 5, ui.height - 70, minOf(w, 640f) / 2 - 5, 44f)) menu = Menu.TITLE
     }
 
     protected fun createScreen() {
         val cx = ui.width / 2
-        val w = 460f
-        title("Create new world")
-        var y = 150f
-        ui.text("World name", cx - w / 2, y - 24, 16f, rgba(220, 220, 220))
-        ui.field(nameField, cx - w / 2, y, w)
-        y += 80
-        ui.text("Seed", cx - w / 2, y - 24, 16f, rgba(220, 220, 220))
-        ui.field(seedField, cx - w / 2, y, w)
-        y += 64
-        if (ui.button("Game mode: " + when { survival && hardcoreWorld -> "Hardcore"; survival -> "Survival"; flatWorld -> "Creative (flat world)"; else -> "Creative (normal world)" }, cx - w / 2, y, w, 42f)) {
-            // Survival, hardcore, creative on normal land (hills, trees, water), or creative on a flat world.
-            if (survival && !hardcoreWorld) hardcoreWorld = true
-            else if (survival) { survival = false; hardcoreWorld = false; flatWorld = false }
-            else if (!flatWorld) flatWorld = true else survival = true
+        ui.text("Create new world", cx, 14f, 38f, rgba(255, 220, 90), 1)
+        ui.rect(cx - 100f, 60f, 200f, 4f, rgba(255, 220, 90))
+        val fw = minOf(520f, ui.width / 2 - 40f)
+        ui.text("World name", cx - fw - 10f, 76f, 15f, rgba(220, 220, 220))
+        ui.field(nameField, cx - fw - 10f, 98f, fw)
+        ui.text("Seed (empty = random)", cx + 10f, 76f, 15f, rgba(220, 220, 220))
+        ui.field(seedField, cx + 10f, 98f, fw)
+        ui.text("Choose the kind of world", cx, 148f, 22f, rgba(255, 220, 90), 1)
+        // The kinds, as cards: three across, two down.
+        val types = com.vishucraft.game.world.WorldType.values()
+        val gap = 14f
+        val total = minOf(ui.width - 60f, 1000f)
+        val cw = (total - gap * 2) / 3; val ch = ((ui.height - 76f - 182f - gap) / 2f).coerceIn(100f, 150f)
+        val x0 = cx - total / 2
+        for ((i, t) in types.withIndex()) {
+            val col = i % 3; val row = i / 3
+            val x = x0 + col * (cw + gap); val y = 182f + row * (ch + gap)
+            val chosen = t == worldType
+            val over = ui.hover(x, y, cw, ch)
+            ui.rect(x, y, cw, ch, if (chosen) rgba(70, 56, 14, 240) else if (over) rgba(40, 44, 70, 235) else rgba(22, 22, 32, 225))
+            ui.frame(x, y, cw, ch, if (chosen) rgba(255, 224, 110) else if (over) rgba(255, 235, 90) else rgba(120, 96, 30), if (chosen) 4f else 2f)
+            ui.rect(x + 12f, y + 12f, 54f, 54f, rgba(10, 10, 16))
+            ui.icon(t.icon, x + 15f, y + 15f, 48f)
+            ui.text(t.title, x + 76f, y + 14f, 19f, if (chosen) rgba(255, 224, 110) else -1)
+            val badge = when { t == com.vishucraft.game.world.WorldType.HARDCORE -> "ONE LIFE"; t.survival -> "SURVIVAL"; else -> "CREATIVE" }
+            ui.text(badge, x + 76f, y + 42f, 13f, rgba(170, 190, 255))
+            for ((li, line) in wrapText(t.blurb, 14f, cw - 24f).take(3).withIndex()) ui.text(line, x + 12f, y + 76f + li * 20f, 14f, rgba(210, 210, 220))
+            if (over && ui.clicked) worldType = t
         }
-        ui.text(if (survival && hardcoreWorld) "Survival with one life: if you die you cannot respawn." else if (survival) "Collect resources, craft tools, watch your health and hunger." else "Unlimited blocks, flying, no damage.",
-            cx, y + 50, 16f, rgba(200, 200, 200), 1)
-        y += 100
-        if (ui.button("Create", cx - w / 2, y, w / 2 - 5, 44f) || (demo != null && demoCreate)) {
+        val by = ui.height - 64f
+        if (ui.button("Create", cx - 250f, by, 240f, 44f) || (demo != null && demoCreate)) {
             demoCreate = false
             val text = seedField.text.trim()
             val seed = if (text.isEmpty()) System.nanoTime() else text.toLongOrNull() ?: text.hashCode().toLong()
@@ -549,12 +588,11 @@ abstract class ClientApp(protected val demo: File?) {
             while (File(worldsDir, "world$n").exists()) n++
             val name = nameField.text.trim().ifEmpty { "World $n" }
             ui.focus = null
-            val dir = File(worldsDir, "world$n"); val sv = survival; val fl = flatWorld
-            startSession(GameSession.create(dir, name, seed, sv, fl)); menu = Menu.WORLDS
-            if (sv && hardcoreWorld) session?.game?.level?.hardcore = true
+            val dir = File(worldsDir, "world$n")
+            startSession(GameSession.create(dir, name, seed, worldType)); menu = Menu.WORLDS
             return
         }
-        if (ui.button("Cancel", cx + 5, y, w / 2 - 5, 44f)) { ui.focus = null; menu = Menu.WORLDS }
+        if (ui.button("Cancel", cx + 10f, by, 240f, 44f)) { ui.focus = null; menu = Menu.WORLDS }
     }
 
     protected fun scan() {

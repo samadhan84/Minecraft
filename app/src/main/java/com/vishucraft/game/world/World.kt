@@ -16,7 +16,7 @@ import kotlin.math.floor
  */
 enum class Dimension { OVERWORLD, EMBER, SKY }
 
-class World(val seed: Long, private val saveDir: File?, val dimension: Dimension = Dimension.OVERWORLD, val flat: Boolean = false, val flatSea: Boolean = false) {
+class World(val seed: Long, private val saveDir: File?, val dimension: Dimension = Dimension.OVERWORLD, val flat: Boolean = false, val flatSea: Boolean = false, val kind: Int = 0) {
     /** Villagers placed by structure generation, waiting to be spawned on the game thread. */
     val pendingVillagers = java.util.concurrent.ConcurrentLinkedQueue<Triple<Int, Int, Int>>()
     /** Village plazas (x, y, z) from world generation, where survival worlds open a theme park. */
@@ -28,7 +28,7 @@ class World(val seed: Long, private val saveDir: File?, val dimension: Dimension
     /** Positions (see [RedstoneIds.pack]) of every redstone component in loaded chunks. */
     val components: MutableSet<Long> = java.util.Collections.newSetFromMap(ConcurrentHashMap())
     val generator: WorldGenerator = when (dimension) {
-        Dimension.OVERWORLD -> if (flat) FlatGenerator(seed, flatSea, this) else TerrainGenerator(seed, this)
+        Dimension.OVERWORLD -> if (kind == 2 || kind == 3) VoidGenerator(kind) else if (flat) FlatGenerator(seed, flatSea, this) else TerrainGenerator(seed, this)
         Dimension.EMBER -> EmberGenerator(seed)
         Dimension.SKY -> SkyGenerator(seed)
     }
@@ -288,19 +288,24 @@ class LevelData(
     var arenaStarted = false
     /** 0 normal day and night, 1 always day, 2 always night. */
     var timeMode = 0
+    /** 0 normal land, 2 Sky Block, 3 One Block (see WorldType). */
+    var worldKind = 0
+    /** How many times the One Block was broken (it levels up every 50). */
+    var oneBreaks = 0
     var crystalMask = 0
     var drakeHealth = 300f
 
     companion object {
-        private const val VERSION = 16
+        private const val VERSION = 17
 
         /** Creative worlds start with a useful hotbar; survival starts empty-handed. */
         /**
          * Creative worlds are flat unless [flat] is false (normal land with hills, trees and water, as in survival).
          * The showcase world (engine/Showcase.kt) is always normal land.
          */
-        fun create(seed: Long, name: String, mode: GameMode, flat: Boolean = true): LevelData {
+        fun create(seed: Long, name: String, mode: GameMode, flat: Boolean = true, kind: Int = 0, hardcore: Boolean = false): LevelData {
             val l = LevelData(seed, mode = mode, name = name)
+            l.worldKind = kind; l.hardcore = hardcore && mode == GameMode.SURVIVAL
             if (mode == GameMode.CREATIVE) {
                 l.flat = flat && name != "Showcase World"
                 l.flatSea = l.flat
@@ -368,6 +373,7 @@ class LevelData(
                         }
                         if (version >= 15) { l.arenaStarted = d.readBoolean(); l.crystalMask = d.readInt(); l.drakeHealth = d.readFloat() }
                         if (version >= 16) l.timeMode = d.readInt().coerceIn(0, 2)
+                        if (version >= 17) { l.worldKind = d.readInt(); l.oneBreaks = d.readInt() }
                     }
                     l.hasPlayer = true
                     l
@@ -415,6 +421,7 @@ class LevelData(
             d.writeBoolean(hardcore); d.writeBoolean(hardcoreOver)
             d.writeBoolean(arenaStarted); d.writeInt(crystalMask); d.writeFloat(drakeHealth)
             d.writeInt(timeMode)
+            d.writeInt(worldKind); d.writeInt(oneBreaks)
         }
         tmp.renameTo(f)
     }
