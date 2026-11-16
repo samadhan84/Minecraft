@@ -296,7 +296,7 @@ class LevelData(
     var drakeHealth = 300f
 
     companion object {
-        private const val VERSION = 17
+        private const val VERSION = 18
 
         /** Creative worlds start with a useful hotbar; survival starts empty-handed. */
         /**
@@ -374,6 +374,7 @@ class LevelData(
                         if (version >= 15) { l.arenaStarted = d.readBoolean(); l.crystalMask = d.readInt(); l.drakeHealth = d.readFloat() }
                         if (version >= 16) l.timeMode = d.readInt().coerceIn(0, 2)
                         if (version >= 17) { l.worldKind = d.readInt(); l.oneBreaks = d.readInt() }
+                        if (version >= 18) l.inventory.offhand = Inventory.readStack(d)
                     }
                     l.hasPlayer = true
                     l
@@ -422,6 +423,7 @@ class LevelData(
             d.writeBoolean(arenaStarted); d.writeInt(crystalMask); d.writeFloat(drakeHealth)
             d.writeInt(timeMode)
             d.writeInt(worldKind); d.writeInt(oneBreaks)
+            Inventory.writeStack(d, inventory.offhand)
         }
         tmp.renameTo(f)
     }

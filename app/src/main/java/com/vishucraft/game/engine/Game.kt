@@ -601,6 +601,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
                 GameInput.Action.PLACE -> use()
                 GameInput.Action.ATTACK -> if (eatInsteadOfDig()) use() else attack()
                 GameInput.Action.DROP, GameInput.Action.DROP_STACK -> dropHeld(action == GameInput.Action.DROP_STACK)
+                GameInput.Action.SWAP_HANDS -> swapHands()
                 GameInput.Action.TOGGLE_FLY -> if (!survival) { player.flying = !player.flying; player.vy = 0f }
             }
         }
@@ -752,7 +753,11 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
         val armor = if (ignoreArmor) 0 else inventory.armorPoints().coerceAtMost(20)
         var dmg = amount * (1f - armor * 0.04f)
         // Holding a shield blocks half of the damage from hits.
-        if (knockback && heldItem()?.name == "Shield") { dmg *= 0.5f; damageHeld(1) }
+        if (knockback) {
+            val off = inventory.offhand
+            if (off != null && Items[off.id]?.name == "Shield") { dmg *= 0.5f; damageStack(off, 1) { inventory.offhand = null } }
+            else if (heldItem()?.name == "Shield") { dmg *= 0.5f; damageHeld(1) }
+        }
         health -= dmg
         if (knockback) {
             val dx = player.x - fromX; val dz = player.z - fromZ
@@ -781,6 +786,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
             // One life: everything is dropped, and the world is over.
             for (st in inventory.slots) if (st != null) drops.spawn(st, player.x, player.y + 1f, player.z)
             for (st in inventory.armor) if (st != null) drops.spawn(st, player.x, player.y + 1f, player.z)
+            inventory.offhand?.let { drops.spawn(it, player.x, player.y + 1f, player.z) }
             inventory.clear()
             level.hardcoreOver = true
             health = 0f
@@ -791,6 +797,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
         // Survival: everything you carried is dropped where you died.
         for (s in inventory.slots) if (s != null) drops.spawn(s, player.x, player.y + 1f, player.z)
         for (s in inventory.armor) if (s != null) drops.spawn(s, player.x, player.y + 1f, player.z)
+        inventory.offhand?.let { drops.spawn(it, player.x, player.y + 1f, player.z) }
         inventory.clear()
         food = 20f; saturation = 5f; exhaustion = 0f
         level.xp = 0; air = 10f; effects.clear()
@@ -860,6 +867,29 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
     }
 
     /** Wears the held tool; it breaks when worn out. */
+    /** Swaps the held item with the left hand (the shield goes in the left hand, and back). */
+    fun swapHands() {
+        val sel = input.selectedSlot
+        val held = inventory.slots[sel]
+        inventory.slots[sel] = inventory.offhand
+        inventory.offhand = held
+        sound("click", player.x, player.y + 1f, player.z, 0.5f)
+        uiEvents.add("toast:" + (inventory.offhand?.let { "Left hand: " + Items.displayName(it.id) } ?: "Left hand is empty"))
+    }
+
+    /** Wears down an item that is not in the hand (the shield in the left hand); [broken] runs when it breaks. */
+    private fun damageStack(s: ItemStack, amount: Int, broken: () -> Unit) {
+        if (!survival) return
+        val def = Items[s.id] ?: return
+        if (def.durability <= 0) return
+        s.damage += amount
+        if (s.damage >= def.durability) {
+            broken()
+            uiEvents.add("toast:Your ${def.name} broke!")
+            sound("break_tool", player.x, player.y + 1f, player.z)
+        }
+    }
+
     internal fun damageHeld(amount: Int) {
         if (!survival) return
         val s = heldStack() ?: return

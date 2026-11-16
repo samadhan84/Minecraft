@@ -120,6 +120,11 @@ class Hud(private val game: Game) {
             }
             val sel = game.input.selectedSlot
             ui.frame(x0 + sel * cell - 2, y0 - 2, cell + 4, cell + 4, -1, 3f)
+            // The left hand, beside the hotbar (H swaps it with the item you hold).
+            ui.rect(x0 - cell - 14, y0 - 3, cell + 6, cell + 6, rgba(20, 20, 20, 150))
+            ui.frame(x0 - cell - 11, y0 + 1, cell - 2, cell - 2, rgba(110, 110, 110, 200), 2f)
+            if (game.inventory.offhand == null) ui.text("LH", x0 - cell / 2 - 11, y0 + cell / 2 - 9, 14f, rgba(120, 120, 120), 1)
+            ui.stack(game.inventory.offhand, x0 - cell - 12, y0, cell, game.survival)
 
             if (game.survival) {
                 val y = y0 - 28
@@ -312,7 +317,7 @@ class ContainerScreen(private val game: Game) {
         GRID -> game.craftGrid[i]
         OUTPUT -> gridResult()
         INV -> game.inventory.slots[i]
-        ARMOR -> game.inventory.armor[i]
+        ARMOR -> if (i == 4) game.inventory.offhand else game.inventory.armor[i]
         CHEST_SLOT -> chest?.slots?.get(i)
         FURNACE_SLOT -> furnace?.let { f -> when (i) { 0 -> f.input; 1 -> f.fuel; else -> f.output } }
         else -> null
@@ -323,7 +328,7 @@ class ContainerScreen(private val game: Game) {
         when (kind) {
             GRID -> game.craftGrid[i] = v
             INV -> game.inventory.slots[i] = v
-            ARMOR -> game.inventory.armor[i] = v
+            ARMOR -> if (i == 4) game.inventory.offhand = v else game.inventory.armor[i] = v
             CHEST_SLOT -> chest?.slots?.set(i, v)
             FURNACE_SLOT -> furnace?.let { f -> when (i) { 0 -> f.input = v; 1 -> f.fuel = v; else -> f.output = v } }
         }
@@ -331,7 +336,7 @@ class ContainerScreen(private val game: Game) {
 
     private fun accepts(kind: Int, i: Int, s: ItemStack): Boolean = when (kind) {
         OUTPUT -> false
-        ARMOR -> Items[s.id]?.armorSlot == i
+        ARMOR -> i == 4 || Items[s.id]?.armorSlot == i
         FURNACE_SLOT -> when (i) { 0 -> Recipes.smelting.containsKey(s.id); 1 -> Items.fuel(s.id) > 0f; else -> false }
         else -> true
     }
@@ -488,6 +493,7 @@ class ContainerScreen(private val game: Game) {
         when (mode) {
             Mode.INVENTORY -> {
                 for (i in 0 until 4) { val (x, y) = at(8, 8 + i * 18); cells.add(Cell(ARMOR, i, x, y, cell)) }
+                run { val (x, y) = at(77, 62); cells.add(Cell(ARMOR, 4, x, y, cell)) }   // the left hand: shield, torch...
                 val (fx, fy) = at(26, 8); figure(ui, fx, fy, 49 * u, 70 * u)
                 for (i in 0 until 4) { val (x, y) = at(98 + (i % 2) * 18, 18 + (i / 2) * 18); cells.add(Cell(GRID, i, x, y, cell)) }
                 val (ax, ay) = at(134, 28); ui.text("→", ax, ay, 26f, INK, shadow = false)
@@ -529,7 +535,7 @@ class ContainerScreen(private val game: Game) {
             val big = c.size > cell
             slotBox(ui, c.x, c.y, c.size, u)
             if (c.kind == ARMOR && get(c.kind, c.index) == null) {
-                ui.text(listOf("H", "B", "L", "F")[c.index], c.x + c.size / 2, c.y + c.size / 2 - 7, 14f, rgba(95, 95, 95), 1, shadow = false)
+                ui.text(listOf("H", "B", "L", "F", "LH")[c.index], c.x + c.size / 2, c.y + c.size / 2 - 7, 14f, rgba(95, 95, 95), 1, shadow = false)
             }
             ui.stack(get(c.kind, c.index), c.x + (if (big) 4 * u else 0f), c.y + (if (big) 4 * u else 0f), cell)
             if (ui.hover(c.x, c.y, c.size, c.size)) {

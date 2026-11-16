@@ -245,6 +245,7 @@ class WebApp : ClientApp(null) {
                 "Escape" -> overlay = Overlay.PAUSE
                 "KeyE", "KeyI" -> openInventory()
                 "KeyF" -> input.actions.add(GameInput.Action.TOGGLE_FLY)
+                "KeyH" -> input.actions.add(GameInput.Action.SWAP_HANDS)
                 "KeyQ" -> input.actions.add(GameInput.Action.DROP)
                 "Space" -> {
                     val t = now()

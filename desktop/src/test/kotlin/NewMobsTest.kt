@@ -1134,3 +1134,37 @@ class WorldTypesTest {
         assertEquals(g.level.oneBreaks, LevelData.read(g.world.dataDir!!)!!.oneBreaks)
     }
 }
+
+class LeftHandTest {
+    @Test fun aShieldInTheLeftHandBlocksHitsAndIsSaved() {
+        val dir = kotlin.io.path.createTempDirectory("lh").toFile()
+        val level = LevelData.create(105L, "t", GameMode.SURVIVAL)
+        val g = Game(World(level.seed, dir, Dimension.OVERWORLD, flat = true), level, GameInput(), dir)
+        val shield = Items.find("Shield")
+        // Plain hit: full damage.
+        g.hurtPlayer(10f, 0f, 0f, knockback = true)
+        val plain = 20f - g.health
+        g.heal(20f)
+        // The shield in the left hand halves it, and wears.
+        g.inventory.offhand = ItemStack(shield, 1)
+        g.hurtPlayer(10f, 0f, 0f, knockback = true)
+        val shielded = 20f - g.health
+        assertTrue(shielded < plain * 0.7f, "the shield blocks ($shielded vs $plain)")
+        assertEquals(1, g.inventory.offhand!!.damage, "the shield wears")
+        // H swaps the hand: the held item goes to the left hand and the left-hand item comes back.
+        g.inventory.slots[0] = ItemStack(Blocks.TORCH, 5); g.input.selectedSlot = 0
+        g.swapHands()
+        assertEquals(Blocks.TORCH, g.inventory.offhand!!.id)
+        assertEquals(shield, g.inventory.slots[0]!!.id)
+        // Saved and loaded.
+        g.save()
+        assertEquals(Blocks.TORCH, LevelData.read(dir)!!.inventory.offhand!!.id)
+        // It is dropped when you die in survival.
+        g.hurtPlayer(500f, 0f, 0f)
+        assertEquals(null, g.inventory.offhand)
+        assertTrue(g.drops.list.any { it.stack.id == Blocks.TORCH }, "the left hand item dropped")
+        // And the body shows the shield.
+        val bare = com.vishucraft.game.render.MobModels.playerModel(Appearance.default(), intArrayOf(-1, -1, -1, -1), false).size
+        assertEquals(bare + 1, com.vishucraft.game.render.MobModels.playerModel(Appearance.default(), intArrayOf(-1, -1, -1, -1), true).size)
+    }
+}

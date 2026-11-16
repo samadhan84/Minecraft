@@ -41,7 +41,7 @@ object MobModels {
      * skin, hair, eyes, mouth, clothes, shoes, hat and build works. [armor] holds the armor colour index (or -1) for helmet,
      * chestplate, leggings, boots.
      */
-    fun playerModel(app: IntArray, armor: IntArray): List<Part> {
+    fun playerModel(app: IntArray, armor: IntArray, shield: Boolean = false): List<Part> {
         val A = com.vishucraft.game.world.Appearance
         val skin = "p4_c_${A.skin(app)}"; val hair = "p4_c_${A.hair(app)}"
         val shirt = "p4_c_${A.shirt(app)}"; val pants = "p4_c_${A.pants(app)}"; val shoes = "p4_c_${A.shoes(app)}"
@@ -117,6 +117,8 @@ object MobModels {
             4 -> { add(-0.28f, 1.9f, -0.28f, 0.28f, 2.0f, 0.28f, "p4_c_${A.C_GOLD}"); for (x in listOf(-0.26f, -0.09f, 0.1f)) for (z in listOf(-0.26f, 0.1f)) add(x, 2.0f, z, x + 0.16f, 2.14f, z + 0.16f, "p4_c_${A.C_GOLD}") }
             else -> {}
         }
+        // A shield in the left hand, held out at the side.
+        if (shield) add(-tw - aw - 0.14f, 0.7f, -0.34f, -tw - aw - 0.02f, 1.4f, 0.34f, "p4_shield", -1, 1.4f)
         // Worn armor on top of all that.
         fun worn(i: Int) = if (armor[i] >= 0) tiles("p4_armor_${armor[i]}") else null
         worn(0)?.let { parts.add(Part(grow(floatArrayOf(-0.25f, 1.72f, -0.25f, 0.25f, 1.95f, 0.25f), 0.04f), 1.95f, 0f, 0, it)) }   // a cap: the face stays visible
@@ -627,13 +629,15 @@ class MobRenderer {
     private var playerParts: List<MobModels.Part> = emptyList()
 
     /** Draws the player's own body (third-person view): the chosen outfit with the armor that is really worn. */
-    fun drawPlayer(shader: Shader, me: Mob, look: IntArray, armor: Array<com.vishucraft.game.world.ItemStack?>) {
+    fun drawPlayer(shader: Shader, me: Mob, look: IntArray, armor: Array<com.vishucraft.game.world.ItemStack?>, offhand: com.vishucraft.game.world.ItemStack? = null) {
         // Cache the model until the look or an armor piece changes.
         var key = 17
         for (v in look) key = key * 31 + v
         val mats = IntArray(4) { i -> armor.getOrNull(i)?.let { com.vishucraft.game.world.Appearance.armorColor(com.vishucraft.game.world.Items[it.id]?.name ?: "") } ?: -1 }
         for (m in mats) key = key * 11 + (m + 1)
-        if (key != playerKey) { playerKey = key; playerParts = MobModels.playerModel(look, mats) }
+        val shield = offhand != null && com.vishucraft.game.world.Items[offhand.id]?.name == "Shield"
+        key = key * 2 + (if (shield) 1 else 0)
+        if (key != playerKey) { playerKey = key; playerParts = MobModels.playerModel(look, mats, shield) }
         glUniform3f(shader.u("uOffset"), 0f, 0f, 0f)
         buf.size = 0
         build(me, playerParts)

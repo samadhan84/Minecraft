@@ -153,6 +153,7 @@ class ContainerScreen(
             Mode.FURNACE -> { slot(FURNACE_SLOT, 0, 56f, 17f); slot(FURNACE_SLOT, 1, 56f, 53f); slot(FURNACE_SLOT, 2, 112f, 31f, big = true) }
             Mode.INVENTORY -> {
                 for (i in 0 until 4) slot(ARMOR, i, 8f, 8f + i * 18)
+                slot(ARMOR, 4, 77f, 62f)   // the left hand: shield, torch...
                 for (i in 0 until 4) slot(GRID, i, 98f + (i % 2) * 18, 18f + (i / 2) * 18)
                 slot(OUTPUT, 0, 150f, 24f, big = true)
                 arrowRect.set(left + 136 * u, top + 31 * u, left + 148 * u, top + 41 * u)
@@ -189,7 +190,7 @@ class ContainerScreen(
         GRID -> g.craftGrid[i]
         OUTPUT -> gridResult(g)
         INV -> g.inventory.slots[i]
-        ARMOR -> g.inventory.armor[i]
+        ARMOR -> if (i == 4) g.inventory.offhand else g.inventory.armor[i]
         CHEST_SLOT -> chest?.slots?.get(i)
         FURNACE_SLOT -> furnace?.let { f -> when (i) { 0 -> f.input; 1 -> f.fuel; else -> f.output } }
         else -> null
@@ -200,7 +201,7 @@ class ContainerScreen(
         when (kind) {
             GRID -> g.craftGrid[i] = v
             INV -> g.inventory.slots[i] = v
-            ARMOR -> g.inventory.armor[i] = v
+            ARMOR -> if (i == 4) g.inventory.offhand = v else g.inventory.armor[i] = v
             CHEST_SLOT -> chest?.slots?.set(i, v)
             FURNACE_SLOT -> furnace?.let { f -> when (i) { 0 -> f.input = v; 1 -> f.fuel = v; else -> f.output = v } }
         }
@@ -210,7 +211,7 @@ class ContainerScreen(
         if (s == null) return true
         return when (kind) {
             OUTPUT -> false
-            ARMOR -> Items[s.id]?.armorSlot == i
+            ARMOR -> i == 4 || Items[s.id]?.armorSlot == i
             FURNACE_SLOT -> when (i) { 0 -> Recipes.smelting.containsKey(s.id); 1 -> Items.fuel(s.id) > 0f; else -> false }
             else -> true
         }
@@ -260,7 +261,7 @@ class ContainerScreen(
                 val old = g.inventory.armor[slot]
                 g.inventory.armor[slot] = s; g.inventory.slots[c.index] = old
             }
-            c.kind == ARMOR -> if (g.inventory.add(s.id, 1, s.damage) == 0) g.inventory.armor[c.index] = null
+            c.kind == ARMOR -> if (g.inventory.add(s.id, 1, s.damage) == 0) { if (c.index == 4) g.inventory.offhand = null else g.inventory.armor[c.index] = null }
             c.kind == GRID -> { s.count = g.inventory.add(s.id, s.count, s.damage); if (s.count <= 0) g.craftGrid[c.index] = null }
         }
     }
@@ -470,7 +471,7 @@ class ContainerScreen(
                 val pad = (r.width() - 18f * u) / 2
                 if (c.kind == ARMOR && get(game, c.kind, c.index) == null) {
                     small.textAlign = Paint.Align.CENTER
-                    canvas.drawText(listOf("H", "B", "L", "F")[c.index], r.centerX(), r.centerY() + 2.5f * u, small); small.textAlign = Paint.Align.LEFT
+                    canvas.drawText(listOf("H", "B", "L", "F", "LH")[c.index], r.centerX(), r.centerY() + 2.5f * u, small); small.textAlign = Paint.Align.LEFT
                 }
                 StackPainter.draw(canvas, get(game, c.kind, c.index), r.left + pad, r.top + pad, 18f * u)
             }

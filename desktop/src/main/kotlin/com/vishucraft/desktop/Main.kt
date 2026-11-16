@@ -76,7 +76,7 @@ const val CONTROLS_HELP =
         "Double-tap Space or F: fly (Creative)    ·    Ctrl: sprint\n" +
         "Minecart: place it on a rail, Space next to it to get in, Shift to get out\n" +
         "1-9 or mouse wheel: choose hotbar slot    ·    Q: drop item (Ctrl+Q: whole stack)\n" +
-        "E: inventory & crafting    ·    Esc: pause menu\n" +
+        "E: inventory & crafting    ·    H: swap with the left hand (shield)    ·    Esc: settings\n" +
         "F3: FPS & coordinates    ·    F11: fullscreen    ·    F2: screenshot"
 
 class App(demo: File?) : ClientApp(demo) {
@@ -242,6 +242,7 @@ class App(demo: File?) : ClientApp(demo) {
                 GLFW_KEY_ESCAPE -> overlay = Overlay.PAUSE
                 GLFW_KEY_E, GLFW_KEY_I -> openInventory()
                 GLFW_KEY_F -> input.actions.add(GameInput.Action.TOGGLE_FLY)
+                GLFW_KEY_H -> input.actions.add(GameInput.Action.SWAP_HANDS)
                 GLFW_KEY_Q -> input.actions.add(if (mods and GLFW_MOD_CONTROL != 0) GameInput.Action.DROP_STACK else GameInput.Action.DROP)
                 GLFW_KEY_SPACE -> {
                     val now = glfwGetTime()
@@ -423,6 +424,7 @@ class App(demo: File?) : ClientApp(demo) {
                 g.inventory.armor[0] = com.vishucraft.game.world.ItemStack(com.vishucraft.game.world.Items.find("Diamond Helmet"), 1)
                 g.inventory.armor[1] = com.vishucraft.game.world.ItemStack(com.vishucraft.game.world.Items.find("Iron Chestplate"), 1)
                 g.inventory.armor[3] = com.vishucraft.game.world.ItemStack(com.vishucraft.game.world.Items.find("Golden Boots"), 1)
+                g.inventory.offhand = com.vishucraft.game.world.ItemStack(com.vishucraft.game.world.Items.find("Shield"), 1)
                 g.player.pitch = -0.2f
             }
             f == 425 -> { shot("04c2-outfit-behind"); session?.game?.let { it.viewMode = 2; it.player.pitch = -0.05f } }
@@ -433,7 +435,7 @@ class App(demo: File?) : ClientApp(demo) {
                 a[com.vishucraft.game.world.Appearance.EYES] = 2; a[com.vishucraft.game.world.Appearance.FACE_EXTRA] = 3; a[com.vishucraft.game.world.Appearance.SHIRT_STYLE] = 3
                 a[com.vishucraft.game.world.Appearance.SHIRT_COLOR] = 5; a[com.vishucraft.game.world.Appearance.PANTS_STYLE] = 1; a[com.vishucraft.game.world.Appearance.HAT] = 3
                 a[com.vishucraft.game.world.Appearance.BUILD] = 2; a[com.vishucraft.game.world.Appearance.MOUTH] = 2
-                g.inventory.armor.fill(null); g.viewMode = 2; lookBefore = 0; overlay = Overlay.LOOK
+                g.inventory.armor.fill(null); g.inventory.offhand = null; g.viewMode = 2; lookBefore = 0; overlay = Overlay.LOOK
             } }
             f == 434 -> { shot("04c4-customize-character"); overlay = Overlay.NONE; session?.game?.viewMode = 0 }
             f == 436 -> session?.game?.let { g ->
@@ -719,6 +721,7 @@ class App(demo: File?) : ClientApp(demo) {
             f == 1602 -> session?.let {
                 it.game.inventory.add(com.vishucraft.game.world.Items.find("Minecart"), 1)
                 it.game.inventory.add(Blocks.LOG, 8)
+                it.game.inventory.offhand = com.vishucraft.game.world.ItemStack(com.vishucraft.game.world.Items.find("Shield"), 1)
                 openInventory()
             }
             f == 1606 -> shot("07-survival-inventory")

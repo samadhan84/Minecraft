@@ -23,6 +23,7 @@ object Tiles {
     init {
         for (n in 0 until 32) id("p4_c_$n")
         for (n in 0 until 7) id("p4_armor_$n")
+        id("p4_shield")
     }
 }
 

@@ -2548,6 +2548,17 @@ object TextureAtlas {
                 return true
             }
             "p4_crystal_base" -> { t.fill { x, y -> if (x == 0 || y == 0 || x == 15 || y == 15) rgb(14, 10, 20) else scale(rgb(38, 30, 52), t.jitter(0.1f)) }; return true }
+            "p4_shield" -> {
+                t.fill { x, y ->
+                    val edge = x == 0 || y == 0 || x == 15 || y == 15
+                    when {
+                        edge -> rgb(96, 96, 104)
+                        x in 7..8 || y in 7..8 -> rgb(214, 170, 40)         // a gold cross on a blue field
+                        else -> scale(rgb(40, 80, 170), t.jitter(0.06f))
+                    }
+                }
+                return true
+            }
             "p4_cage" -> {
                 t.fill { x, y -> if (x % 4 == 0 || y % 4 == 0) rgb(30, 30, 36) else scale(rgb(150, 40, 50), t.jitter(0.1f)) }
                 for ((x, y) in listOf(6 to 6, 9 to 9)) for (i in 0..1) for (j in 0..1) t[x + i, y + j] = rgb(255, 200, 80)

@@ -6,6 +6,8 @@ import java.util.concurrent.ConcurrentLinkedQueue
 class GameInput {
     enum class Action {
         PLACE, TOGGLE_FLY, ATTACK,
+        /** Swap the held item with the left hand. */
+        SWAP_HANDS,
         /** Throw one of the held item (Q), or the whole stack (Ctrl+Q). */
         DROP, DROP_STACK,
     }

@@ -29,6 +29,8 @@ class Inventory {
 
     val slots = arrayOfNulls<ItemStack>(SIZE)
     val armor = arrayOfNulls<ItemStack>(4)
+    /** The left hand: a shield (it blocks hits while it is there), a torch or anything else. */
+    var offhand: ItemStack? = null
 
     /** Adds items, filling existing stacks first. Returns how many did not fit. */
     fun add(id: Int, count: Int, damage: Int = 0): Int {
@@ -71,7 +73,7 @@ class Inventory {
 
     fun armorPoints(): Int = armor.sumOf { s -> s?.let { Items[it.id]?.armorPoints } ?: 0 }
 
-    fun clear() { slots.fill(null); armor.fill(null) }
+    fun clear() { slots.fill(null); armor.fill(null); offhand = null }
 
     fun write(d: DataOutputStream) {
         for (s in slots) writeStack(d, s)
