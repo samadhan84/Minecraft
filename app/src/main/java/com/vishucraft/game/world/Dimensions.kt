@@ -180,14 +180,37 @@ class Structures(private val seed: Long, private val gen: WorldGenerator, privat
     }
 
     private fun lootChest(p: Put, x: Int, y: Int, z: Int, rnd: Random, loot: List<Pair<Int, IntRange>>, facing: Int = 2) {
+        // The dice are always rolled, in every chunk, so a building comes out the same wherever its pieces are made.
+        val rolls = loot.map { (id, range) -> Triple(id, range.first + rnd.nextInt(range.last - range.first + 1), rnd.nextInt(27)) }
         if (!p.inside(x, z)) return
         set(p, x, y, z, Blocks.CHEST, facing)
         val chest = ChestEntity()
-        for ((id, range) in loot) {
-            val n = range.first + rnd.nextInt(range.last - range.first + 1)
-            if (n > 0) chest.slots[rnd.nextInt(27)] = ItemStack(id, n)
-        }
+        for ((id, n, slot) in rolls) if (n > 0) chest.slots[slot] = ItemStack(id, n)
         world.blockEntities.map.putIfAbsent(RedstoneIds.pack(x, y, z), chest)
+    }
+
+    /**
+     * Makes a flat, level pad for a building: hills are cut away (trees and plants too), dips are filled with dirt,
+     * and the ground cover of the spot is carried to the new level. Without it a building on a slope ends up half
+     * buried on one side and floating on the other.
+     */
+    private fun levelPad(p: Put, cx: Int, cz: Int, rx: Int, rz: Int, y0: Int) {
+        for (dx in -rx..rx) for (dz in -rz..rz) {
+            val x = cx + dx; val z = cz + dz
+            if (!p.inside(x, z)) continue
+            val s = gen.surfaceHeight(x, z)
+            val cover = p.chunk.get(x - p.x0, s.coerceIn(1, Chunk.BASE - 1), z - p.z0).let { if (it == Blocks.AIR || Blocks.isLiquid(it)) Blocks.GRASS else it }
+            for (y in y0 + 1..maxOf(s, y0) + 12) set(p, x, y, z, Blocks.AIR)
+            for (y in s + 1 until y0) set(p, x, y, z, Blocks.DIRT)
+            if (s != y0) set(p, x, y0, z, cover)
+        }
+    }
+
+    /** The middle height of a spot and four points around it (a good level for a building), or -1 if it is too steep or wet. */
+    private fun siteLevel(x: Int, z: Int, r: Int): Int {
+        val hs = intArrayOf(gen.surfaceHeight(x, z), gen.surfaceHeight(x - r, z - r), gen.surfaceHeight(x + r, z - r), gen.surfaceHeight(x - r, z + r), gen.surfaceHeight(x + r, z + r))
+        if (hs.min() <= TerrainGenerator.SEA_LEVEL + 1 || hs.max() - hs.min() > 7) return -1
+        return hs.sorted()[2]
     }
 
     /** Old worlds: adds the XP farm of any village whose chunk was generated before farms existed (see World.ensureLoaded). */
@@ -236,6 +259,7 @@ class Structures(private val seed: Long, private val gen: WorldGenerator, privat
     /** A village's sky portal: a stone-brick platform with the twelve gate stones, each holding an eye, and the 3 x 3 portal open. */
     private fun skyShrine(p: Put, x: Int, z: Int) {
         val g = gen.surfaceHeight(x, z)
+        levelPad(p, x, z, 5, 5, g)
         for (dx in -4..4) for (dz in -4..4) {
             for (y in g - 3 until g) set(p, x + dx, y, z + dz, Blocks.STONE_BRICKS)
             set(p, x + dx, g, z + dz, if (abs(dx) == 4 || abs(dz) == 4) Blocks.MOSSY_STONE_BRICKS else Blocks.STONE_BRICKS)
@@ -252,6 +276,7 @@ class Structures(private val seed: Long, private val gen: WorldGenerator, privat
     /** The blacksmith's home: a stone-brick forge house 11 x 9 with furnaces, anvil, grindstone, a sky portal in the middle, loot chests and a villager. */
     private fun smithy(p: Put, sx: Int, sz: Int, vx: Int, vz: Int) {
         val y0 = gen.surfaceHeight(sx, sz)
+        levelPad(p, sx, sz, 6, 5, y0)
         val rnd = Random(seed xor (sx * 31L) xor (sz * 17L))
         val doorOnX = abs(vx - sx) > abs(vz - sz)
         val doorX = if (doorOnX) (if (vx > sx) 5 else -5) else 0
@@ -593,8 +618,12 @@ class Structures(private val seed: Long, private val gen: WorldGenerator, privat
      * worlds a theme park opens beside each new village (built by the game: see engine/ThemePark).
      */
     private fun village(p: Put, cx: Int, cz: Int, rnd: Random) {
+        // Every decision about the village is made the same way in every chunk (the dice are always rolled),
+        // so the houses are whole wherever the chunk borders fall.
+        val villagers = 3 + rnd.nextInt(3)
         val wh = gen.surfaceHeight(cx, cz)
-        val white = Blocks.CONCRETE_FIRST; val cyan = Blocks.CONCRETE_FIRST + 9; val lightBlue = Blocks.CONCRETE_FIRST + 3
+        val white = Blocks.CONCRETE_FIRST; val lightBlue = Blocks.CONCRETE_FIRST + 3
+        levelPad(p, cx, cz, 8, 8, wh)
         // The plaza: white with a light blue ring, a fountain and a glowing tower in the middle.
         for (dx in -5..5) for (dz in -5..5) {
             val ring = abs(dx) == 5 || abs(dz) == 5
@@ -612,20 +641,49 @@ class Structures(private val seed: Long, private val gen: WorldGenerator, privat
         set(p, cx, wh + 6, cz, Blocks.QUARTZ_BLOCK)
         for ((dx, dz) in listOf(4 to 4, -4 to 4, 4 to -4, -4 to -4)) lamp(p, cx + dx, wh + 1, cz + dz)
         if (p.inside(cx, cz)) {
-            repeat(3 + rnd.nextInt(3)) { world.pendingVillagers.add(Triple(cx + 3, wh + 1, cz + 3)) }
+            repeat(villagers) { world.pendingVillagers.add(Triple(cx + 3, wh + 1, cz + 3)) }
             world.pendingParks.add(Triple(cx, wh, cz))
         }
 
-        val houses = 4 + rnd.nextInt(4)
-        for (i in 0 until houses) {
-            val a = i * (Math.PI * 2 / houses) + rnd.nextDouble() * 0.5
-            val r = 12 + rnd.nextInt(10)
-            val hx = cx + (Math.cos(a) * r).toInt(); val hz = cz + (Math.sin(a) * r).toInt()
-            path(p, cx, cz, hx, hz)
-            if (rnd.nextInt(4) == 0) farm(p, hx, hz, rnd) else house(p, hx, hz, rnd, cx, cz)
+        // The houses: on two rings round the plaza, only where the ground is level enough and dry, never on top of
+        // each other or of the farm tower, the smithy and the portal shrine.
+        val layout = Random(seed xor (cx * 5851L) xor (cz * 19937L) xor 0x40C5)
+        val extras = extraSites(cx, cz)
+        val sites = ArrayList<IntArray>()      // x, z, half width, level, 1 = crop farm
+        for ((ring, count) in listOf(13 to 5, 20 to 7)) {
+            val jitter = layout.nextDouble() * 6.2832
+            for (i in 0 until count) {
+                val a = jitter + i * 2 * Math.PI / count + (layout.nextDouble() - 0.5) * 0.25
+                val hx = cx + (Math.cos(a) * ring).toInt(); val hz = cz + (Math.sin(a) * ring).toInt()
+                val w = 2 + layout.nextInt(2)
+                val farm = layout.nextInt(4) == 0
+                val level = siteLevel(hx, hz, w + 1)
+                if (level < 0) continue
+                if (sites.any { (it[0] - hx) * (it[0] - hx) + (it[1] - hz) * (it[1] - hz) < 10 * 10 }) continue
+                if (extras.any { (it[0] - hx) * (it[0] - hx) + (it[1] - hz) * (it[1] - hz) < (it[2] + w + 3) * (it[2] + w + 3) }) continue
+                sites.add(intArrayOf(hx, hz, w, level, if (farm) 1 else 0))
+            }
+        }
+        for (s in sites) levelPad(p, s[0], s[1], s[2] + 2, s[2] + 2, s[3])
+        for (s in sites) path(p, cx, cz, s[0], s[1])
+        for (s in sites) {
+            val hr = Random(seed xor (s[0] * 7349L) xor (s[1] * 9157L) xor 0x40E)
+            if (s[4] == 1) farm(p, s[0], s[1], s[3], hr) else house(p, s[0], s[1], s[3], s[2], hr, cx, cz)
         }
         // Every village has a big XP farm tower a little way out.
         farmFor(p, cx, cz)
+    }
+
+    /** Where the farm tower, the smithy and the portal shrine of the village at (cx, cz) stand: x, z and how far they reach. */
+    private fun extraSites(cx: Int, cz: Int): List<IntArray> {
+        val fa = Random(seed xor (cx * 341873128712L) xor (cz * 132897987541L) xor 0xFA12).nextDouble() * Math.PI * 2
+        val sa = fa + Math.PI * (0.6 + Random(seed xor (cx * 91L) xor (cz * 7919L)).nextDouble() * 0.8)
+        val ea = fa + Math.PI * 0.5
+        return listOf(
+            intArrayOf(cx + (Math.cos(fa) * 36).toInt(), cz + (Math.sin(fa) * 36).toInt(), 6),
+            intArrayOf(cx + (Math.cos(sa) * 28).toInt(), cz + (Math.sin(sa) * 28).toInt(), 7),
+            intArrayOf(cx + (Math.cos(ea) * 40).toInt(), cz + (Math.sin(ea) * 40).toInt(), 6),
+        )
     }
 
     /**
@@ -637,6 +695,7 @@ class Structures(private val seed: Long, private val gen: WorldGenerator, privat
         // A chunk gets its farm part once: new chunks mark themselves here, old worlds are patched when the chunk first loads.
         if (!world.farmChunks.add(Chunk.key(p.chunk.cx, p.chunk.cz))) return
         val g = gen.surfaceHeight(fx, fz)
+        levelPad(p, fx, fz + 1, 4, 6, g)
         val white = Blocks.CONCRETE_FIRST
         // The platform and its steps first (south side).
         for (dx in -1..1) {
@@ -695,9 +754,7 @@ class Structures(private val seed: Long, private val gen: WorldGenerator, privat
     }
 
     /** A futuristic pod house: white walls with big glass windows, glowing trim, a flat roof with solar panels. */
-    private fun house(p: Put, hx: Int, hz: Int, rnd: Random, cx: Int, cz: Int) {
-        val y0 = gen.surfaceHeight(hx, hz)
-        val w = 2 + rnd.nextInt(2) // half width -> 5x5 or 7x7
+    private fun house(p: Put, hx: Int, hz: Int, y0: Int, w: Int, rnd: Random, cx: Int, cz: Int) {   // half width w -> 5x5 or 7x7
         val white = Blocks.CONCRETE_FIRST
         val accent = Blocks.CONCRETE_FIRST + listOf(9, 3, 11, 10)[rnd.nextInt(4)]   // cyan, light blue, blue or purple
         // Door faces the plaza.
@@ -706,7 +763,7 @@ class Structures(private val seed: Long, private val gen: WorldGenerator, privat
         for (x in -w..w) for (z in -w..w) {
             val edge = abs(x) == w || abs(z) == w
             val corner = abs(x) == w && abs(z) == w
-            for (y in y0 - 4 until y0) set(p, hx + x, y, hz + z, Blocks.QUARTZ_BLOCK)
+            for (y in y0 - 6 until y0) set(p, hx + x, y, hz + z, Blocks.QUARTZ_BLOCK)
             set(p, hx + x, y0, hz + z, if (edge) Blocks.QUARTZ_BLOCK else Blocks.SMOOTH_STONE)
             for (y in y0 + 1..y0 + 3) {
                 val id = when {
@@ -741,8 +798,7 @@ class Structures(private val seed: Long, private val gen: WorldGenerator, privat
         ))
     }
 
-    private fun farm(p: Put, fx: Int, fz: Int, rnd: Random) {
-        val y = gen.surfaceHeight(fx, fz)
+    private fun farm(p: Put, fx: Int, fz: Int, y: Int, rnd: Random) {
         val crop = when (rnd.nextInt(3)) { 0 -> Blocks.CARROTS; 1 -> Blocks.POTATOES; else -> Blocks.WHEAT_CROP }
         for (x in -3..3) for (z in -2..2) {
             val border = abs(x) == 3 || abs(z) == 2

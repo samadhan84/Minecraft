@@ -16,7 +16,7 @@ import kotlin.math.floor
  */
 enum class Dimension { OVERWORLD, EMBER, SKY }
 
-class World(val seed: Long, private val saveDir: File?, val dimension: Dimension = Dimension.OVERWORLD, val flat: Boolean = false, val flatSea: Boolean = false, val kind: Int = 0) {
+class World(val seed: Long, private val saveDir: File?, val dimension: Dimension = Dimension.OVERWORLD, val flat: Boolean = false, val flatSea: Boolean = false, val kind: Int = 0, val terrain: Int = 1) {
     /** Villagers placed by structure generation, waiting to be spawned on the game thread. */
     val pendingVillagers = java.util.concurrent.ConcurrentLinkedQueue<Triple<Int, Int, Int>>()
     /** Village plazas (x, y, z) from world generation, where survival worlds open a theme park. */
@@ -28,7 +28,7 @@ class World(val seed: Long, private val saveDir: File?, val dimension: Dimension
     /** Positions (see [RedstoneIds.pack]) of every redstone component in loaded chunks. */
     val components: MutableSet<Long> = java.util.Collections.newSetFromMap(ConcurrentHashMap())
     val generator: WorldGenerator = when (dimension) {
-        Dimension.OVERWORLD -> if (kind == 2 || kind == 3) VoidGenerator(kind) else if (flat) FlatGenerator(seed, flatSea, this) else TerrainGenerator(seed, this)
+        Dimension.OVERWORLD -> if (kind == 2 || kind == 3) VoidGenerator(kind) else if (flat) FlatGenerator(seed, flatSea, this) else TerrainGenerator(seed, this, terrain)
         Dimension.EMBER -> EmberGenerator(seed)
         Dimension.SKY -> SkyGenerator(seed)
     }
@@ -292,11 +292,13 @@ class LevelData(
     var worldKind = 0
     /** How many times the One Block was broken (it levels up every 50). */
     var oneBreaks = 0
+    /** Which terrain recipe made this world (1 = the first, 2 = hills, ridges, rivers and lakes). Old worlds keep theirs. */
+    var terrain = 1
     var crystalMask = 0
     var drakeHealth = 300f
 
     companion object {
-        private const val VERSION = 18
+        private const val VERSION = 19
 
         /** Creative worlds start with a useful hotbar; survival starts empty-handed. */
         /**
@@ -306,6 +308,7 @@ class LevelData(
         fun create(seed: Long, name: String, mode: GameMode, flat: Boolean = true, kind: Int = 0, hardcore: Boolean = false): LevelData {
             val l = LevelData(seed, mode = mode, name = name)
             l.worldKind = kind; l.hardcore = hardcore && mode == GameMode.SURVIVAL
+            l.terrain = 2   // new worlds get the livelier terrain
             if (mode == GameMode.CREATIVE) {
                 l.flat = flat && name != "Showcase World"
                 l.flatSea = l.flat
@@ -375,6 +378,7 @@ class LevelData(
                         if (version >= 16) l.timeMode = d.readInt().coerceIn(0, 2)
                         if (version >= 17) { l.worldKind = d.readInt(); l.oneBreaks = d.readInt() }
                         if (version >= 18) l.inventory.offhand = Inventory.readStack(d)
+                        if (version >= 19) l.terrain = d.readInt()
                     }
                     l.hasPlayer = true
                     l
@@ -424,6 +428,7 @@ class LevelData(
             d.writeInt(timeMode)
             d.writeInt(worldKind); d.writeInt(oneBreaks)
             Inventory.writeStack(d, inventory.offhand)
+            d.writeInt(terrain)
         }
         tmp.renameTo(f)
     }

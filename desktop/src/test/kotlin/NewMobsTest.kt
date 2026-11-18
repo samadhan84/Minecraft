@@ -1196,3 +1196,43 @@ class VillagerTotemTest {
         assertTrue(g.drops.list.any { it.stack.id == totem })
     }
 }
+
+class VillageWholeTest {
+    @Test fun aVillageIsBuiltTheSameWhicheverChunkIsMadeFirst() {
+        // Find a village, then build the area round it twice with the chunks made in opposite orders: the blocks must be identical.
+        val probe = World(21L, kotlin.io.path.createTempDirectory("vp").toFile(), Dimension.OVERWORLD)
+        var v: IntArray? = null
+        loop@ for (rx in -4..4) for (rz in -4..4) { v = villageIn(21L, probe.generator, rx, rz); if (v != null) break@loop }
+        val c = v!!
+        val ccx = c[0] shr 4; val ccz = c[2] shr 4
+        fun area(order: List<Pair<Int, Int>>): Map<Long, Int> {
+            val w = World(21L, kotlin.io.path.createTempDirectory("vw").toFile(), Dimension.OVERWORLD)
+            for ((cx, cz) in order) w.ensureLoaded(cx, cz)
+            val out = HashMap<Long, Int>()
+            for (x in (c[0] - 60)..(c[0] + 60)) for (z in (c[2] - 60)..(c[2] + 60)) for (y in 50..115) out[(x + 5000L) * 100000000L + (z + 5000L) * 1000L + y] = w.getBlock(x, y, z)
+            return out
+        }
+        val cells = ArrayList<Pair<Int, Int>>()
+        for (cx in ccx - 6..ccx + 6) for (cz in ccz - 6..ccz + 6) cells.add(cx to cz)
+        val a = area(cells)
+        val b = area(cells.reversed())
+        var diff = 0
+        for ((k, v2) in a) if (b[k] != v2) diff++
+        assertEquals(0, diff, "the chunk order changes $diff blocks")
+    }
+
+    @Test fun housesStandOnLevelGroundWithAFoundation() {
+        val w = World(21L, kotlin.io.path.createTempDirectory("vh").toFile(), Dimension.OVERWORLD)
+        for (cx in -16..16) for (cz in -16..16) w.ensureLoaded(cx, cz)
+        // Every glass-walled house corner (accent concrete) has solid ground under it and air for the room above the floor.
+        var houses = 0; var floating = 0
+        for (x in -256..256) for (z in -256..256) {
+            val y = (60..100).firstOrNull { w.getBlock(x, it, z) == Blocks.SOLAR_PANEL } ?: continue
+            houses++
+            var under = y - 7
+            if (!Blocks.solid[w.getBlock(x, under, z)]) floating++
+        }
+        assertTrue(houses > 0, "houses exist")
+        assertEquals(0, floating, "no house floats ($houses houses)")
+    }
+}

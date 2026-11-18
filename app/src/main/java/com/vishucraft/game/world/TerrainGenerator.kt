@@ -60,7 +60,7 @@ class FlatGenerator(private val seed: Long = 0L, val sea: Boolean = false, priva
 }
 
 /** Deterministic procedural terrain: heightmap + biomes + caves + ores + vegetation. */
-class TerrainGenerator(private val seed: Long, private val world: World? = null) : WorldGenerator {
+class TerrainGenerator(private val seed: Long, private val world: World? = null, private val version: Int = 1) : WorldGenerator {
     companion object {
         const val SEA_LEVEL = 62
     }
@@ -75,6 +75,10 @@ class TerrainGenerator(private val seed: Long, private val world: World? = null)
     private val cavernNoise = Noise(seed + 71)
     private val floorNoise = Noise(seed + 83)
     private val rareNoise = Noise(seed + 97)
+    private val hillNoise = Noise(seed + 101)
+    private val ridgeNoise = Noise(seed + 113)
+    private val riverNoise = Noise(seed + 127)
+    private val lakeNoise = Noise(seed + 131)
 
     private fun smoothstep(e0: Double, e1: Double, x: Double): Double {
         val t = ((x - e0) / (e1 - e0)).coerceIn(0.0, 1.0)
@@ -86,6 +90,18 @@ class TerrainGenerator(private val seed: Long, private val world: World? = null)
         val detail = detailNoise.fbm2(x * 0.03, z * 0.03, 3)
         val m = smoothstep(0.05, 0.55, mountainNoise.fbm2(x * 0.0035, z * 0.0035, 4))
         var h = 64 + base * 16 + detail * 3 + m * (28 + 22 * abs(detail))
+        if (version >= 2) {
+            // Worlds made from version 2 on are far less flat: rolling hills everywhere, sharp mountain ridges,
+            // rivers that wind between valleys, and lakes in the low places.
+            h += hillNoise.fbm2(x * 0.011, z * 0.011, 3) * 11 - 1
+            val ridge = 1.0 - minOf(1.0, abs(ridgeNoise.fbm2(x * 0.007, z * 0.007, 4) * 2.4))
+            val mm = smoothstep(-0.12, 0.38, mountainNoise.fbm2(x * 0.0035, z * 0.0035, 4))
+            h += mm * (10 + ridge * ridge * 46)
+            val lake = smoothstep(0.38, 0.54, lakeNoise.fbm2(x * 0.009 + 3.0, z * 0.009, 3))
+            if (lake > 0.0 && mm < 0.3) h += (SEA_LEVEL - 5 - h) * lake
+            val river = 1.0 - smoothstep(0.0, 0.032, abs(riverNoise.fbm2(x * 0.0045, z * 0.0045, 3)))
+            if (river > 0.0) h += (SEA_LEVEL - 4 - h) * river * (1.0 - mm * 0.8)
+        }
         // Swamps are flat and wet: pull the land down to just above the water.
         val sw = swampiness(x, z)
         if (sw > 0.0 && h > SEA_LEVEL - 1) h += (SEA_LEVEL + 0.3 - h) * sw * 0.9
