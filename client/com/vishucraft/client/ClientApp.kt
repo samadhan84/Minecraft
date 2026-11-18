@@ -66,7 +66,7 @@ interface NetSupport {
  */
 abstract class ClientApp(protected val demo: File?) {
     protected enum class Menu { TITLE, WORLDS, CREATE, JOIN, SETTINGS, CONTROLS, CONFIRM_DELETE, PASSWORD, LOOK }
-    protected enum class Overlay { NONE, PAUSE, CREATIVE, CONTAINER, SETTINGS, CONTROLS, NAME_MOB, TRADE, ACHIEVEMENTS, SIGN, ENDING, INTERNET, FLIGHTS, FLOORS, METRO, CALL_TRAIN, ROBOT, PASSWORD_ASK, PASSWORD_SET, PASSWORD_REMOVE, LOOK, HARDCORE_OVER }
+    protected enum class Overlay { NONE, PAUSE, CREATIVE, CONTAINER, SETTINGS, CONTROLS, NAME_MOB, TRADE, ACHIEVEMENTS, SIGN, ENDING, INTERNET, FLIGHTS, FLOORS, METRO, CALL_TRAIN, ROBOT, PASSWORD_ASK, PASSWORD_SET, PASSWORD_REMOVE, LOOK, HARDCORE_OVER, DEATH }
 
     // ---------------------------------------------------------------- platform parts
     protected abstract val prefs: ClientPrefs
@@ -191,6 +191,7 @@ abstract class ClientApp(protected val demo: File?) {
             Overlay.ENDING -> endingScreen()
             Overlay.LOOK -> lookScreen(s)
             Overlay.HARDCORE_OVER -> hardcoreOverScreen(s)
+            Overlay.DEATH -> deathScreen(s)
             Overlay.INTERNET -> internetScreen()
         }
         ui.end()
@@ -210,7 +211,7 @@ abstract class ClientApp(protected val demo: File?) {
         fun pos() = e.substringAfterLast(':').split(',').map { it.toInt() }
         when {
             e == "hurt" -> hud.hurt = 1f
-            e == "died" -> hud.toast("You died! Respawning…")
+            e == "death" -> { overlay = Overlay.DEATH; setCapture(false) }
             e == "hardcore_over" -> { overlay = Overlay.HARDCORE_OVER; setCapture(false) }
             e == "sleep" -> hud.sleep = 3f
             e.startsWith("toast:") -> hud.toast(e.removePrefix("toast:"), 3f)
@@ -1132,11 +1133,24 @@ abstract class ClientApp(protected val demo: File?) {
         if (ui.button("Done", ui.width / 2 + 75, by, 140f, 40f)) menu = Menu.TITLE
     }
 
+    /** Survival death: two choices, Respawn or leave (back to the title screen). */
+    protected fun deathScreen(s: GameSession) {
+        val cx = ui.width / 2
+        ui.rect(0f, 0f, ui.width, ui.height, rgba(110, 10, 10, 190))
+        ui.text("You died!", cx, ui.height * 0.22f, 64f, -1, 1)
+        ui.text("What you carried dropped where you died.", cx, ui.height * 0.22f + 84f, 20f, rgba(240, 220, 220), 1)
+        if (ui.button("Respawn", cx - 190f, ui.height * 0.5f, 380f, 48f)) { s.game.respawn(); overlay = Overlay.NONE; setCapture(true) }
+        if (ui.button("Leave to title (go back home)", cx - 190f, ui.height * 0.5f + 62f, 380f, 48f)) leaveToTitle()
+    }
+
+    /** Hardcore death: you cannot respawn. You can watch the world, or leave. */
     protected fun hardcoreOverScreen(s: GameSession) {
-        ui.rect(0f, 0f, ui.width, ui.height, rgba(80, 0, 0, 170))
-        title("You died", ui.height * 0.25f)
-        ui.text("This was a hardcore world: you cannot respawn.", ui.width / 2, ui.height * 0.25f + 70, 22f, -1, 1)
-        if (ui.button("Back to title", ui.width / 2 - 150, ui.height * 0.25f + 130, 300f, 46f)) leaveToTitle()
+        val cx = ui.width / 2
+        ui.rect(0f, 0f, ui.width, ui.height, rgba(60, 0, 0, 200))
+        ui.text("You died", cx, ui.height * 0.22f, 64f, -1, 1)
+        ui.text("This was a hardcore world: you cannot respawn.", cx, ui.height * 0.22f + 84f, 20f, rgba(240, 220, 220), 1)
+        if (ui.button("Watch the world", cx - 190f, ui.height * 0.5f, 380f, 48f)) { s.game.startSpectating(); overlay = Overlay.NONE; setCapture(true) }
+        if (ui.button("Leave to title (go back home)", cx - 190f, ui.height * 0.5f + 62f, 380f, 48f)) leaveToTitle()
     }
 
     protected fun controlsScreen(back: () -> Unit) {

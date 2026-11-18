@@ -673,10 +673,20 @@ class GameActivity : Activity() {
                 hurtFlash.alpha = 1f
                 hurtFlash.animate().alpha(0f).setDuration(350).start()
             }
-            e == "died" -> showToast("You died! Respawning…")
-            e == "hardcore_over" -> android.app.AlertDialog.Builder(this).setTitle("You died")
-                .setMessage("This was a hardcore world: you cannot respawn.").setCancelable(false)
-                .setPositiveButton("Back to title") { _, _ -> finish() }.show()
+            e == "death" -> {
+                releaseInputs()
+                android.app.AlertDialog.Builder(this).setTitle("You died!")
+                    .setMessage("What you carried dropped where you died.").setCancelable(false)
+                    .setPositiveButton("Respawn") { _, _ -> glView.queueEvent { game.respawn() } }
+                    .setNegativeButton("Leave to title (go back home)") { _, _ -> finish() }.show()
+            }
+            e == "hardcore_over" -> {
+                releaseInputs()
+                android.app.AlertDialog.Builder(this).setTitle("You died")
+                    .setMessage("This was a hardcore world: you cannot respawn. You can watch the world, or leave.").setCancelable(false)
+                    .setPositiveButton("Watch the world") { _, _ -> glView.queueEvent { game.startSpectating() } }
+                    .setNegativeButton("Leave to title (go back home)") { _, _ -> finish() }.show()
+            }
             e == "sleep" -> {
                 // Fade to black and back while the night passes.
                 hurtFlash.animate().cancel()

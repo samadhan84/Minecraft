@@ -597,6 +597,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
 
         while (true) {
             val action = input.actions.poll() ?: break
+            if (!playerAlive && action != GameInput.Action.TOGGLE_FLY) continue   // the dead (or a hardcore spectator) touch nothing
             when (action) {
                 GameInput.Action.PLACE -> use()
                 GameInput.Action.ATTACK -> if (eatInsteadOfDig()) use() else attack()
@@ -638,7 +639,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
             player.jumpMul = if (hasEffect("leaping")) 1.22f else 1f
             if (coasters.riding == null && carts.riding == null && mount == null && boats.riding == null && aircraft.riding == null && vehicles.riding == null && !sitting && !lift.riding &&
                 !rideEscalator(dt)) {
-                if (level.hardcoreOver) player.update(dt, world, 0f, 0f, false, false)   // a hardcore death: you cannot move any more
+                if (awaitingRespawn || (level.hardcoreOver && !spectating)) player.update(dt, world, 0f, 0f, false, false)   // dead: you cannot move until you choose
                 else player.update(dt, world, input.moveForward, input.moveStrafe, input.jumpHeld, input.descendHeld)
             }
             updateFlight(dt)
@@ -769,7 +770,9 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
         if (health <= 0f) {
             // A Totem of Undying anywhere in the inventory saves you once.
             val totem = Items.find("Totem of Undying")
-            if (inventory.remove(totem, 1)) {
+            val offTotem = inventory.offhand?.takeIf { it.id == totem }
+            if (offTotem != null || inventory.remove(totem, 1)) {
+                if (offTotem != null) { offTotem.count--; if (offTotem.count <= 0) inventory.offhand = null }
                 health = 2f
                 effects["regeneration"] = 40f
                 uiEvents.add("toast:Your Totem of Undying saved you!")
@@ -777,28 +780,46 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
                 sound("pop", player.x, player.y + 1f, player.z)
                 return
             }
-            respawn()
+            die()
         }
     }
 
-    private fun respawn() {
+    /** True from the moment you die until you choose Respawn (survival): the game waits for your choice. */
+    var awaitingRespawn = false
+        private set
+    /** After a hardcore death you can only watch the world: flying around, touching nothing. */
+    var spectating = false
+        private set
+
+    fun startSpectating() {
+        if (!level.hardcoreOver) return
+        spectating = true
+        player.flying = true
+        uiEvents.add("toast:You are watching the world. Press Esc for the settings and to leave")
+    }
+
+    /** Death: everything you carried is dropped where you died. Survival waits for Respawn; hardcore ends the world. */
+    private fun die() {
+        for (st in inventory.slots) if (st != null) drops.spawn(st, player.x, player.y + 1f, player.z)
+        for (st in inventory.armor) if (st != null) drops.spawn(st, player.x, player.y + 1f, player.z)
+        inventory.offhand?.let { drops.spawn(it, player.x, player.y + 1f, player.z) }
+        inventory.clear()
+        health = 0f
         if (level.hardcore) {
-            // One life: everything is dropped, and the world is over.
-            for (st in inventory.slots) if (st != null) drops.spawn(st, player.x, player.y + 1f, player.z)
-            for (st in inventory.armor) if (st != null) drops.spawn(st, player.x, player.y + 1f, player.z)
-            inventory.offhand?.let { drops.spawn(it, player.x, player.y + 1f, player.z) }
-            inventory.clear()
+            // One life: the world is over (you can watch it, or leave).
             level.hardcoreOver = true
-            health = 0f
             uiEvents.add("hardcore_over")
             if (!isClient) save()
             return
         }
-        // Survival: everything you carried is dropped where you died.
-        for (s in inventory.slots) if (s != null) drops.spawn(s, player.x, player.y + 1f, player.z)
-        for (s in inventory.armor) if (s != null) drops.spawn(s, player.x, player.y + 1f, player.z)
-        inventory.offhand?.let { drops.spawn(it, player.x, player.y + 1f, player.z) }
-        inventory.clear()
+        awaitingRespawn = true
+        uiEvents.add("death")
+    }
+
+    /** Respawn after dying in survival (the Respawn button). */
+    fun respawn() {
+        if (!awaitingRespawn) return
+        awaitingRespawn = false
         food = 20f; saturation = 5f; exhaustion = 0f
         level.xp = 0; air = 10f; effects.clear()
         val bed = level.hasBedSpawn && dimension == com.vishucraft.game.world.Dimension.OVERWORLD &&
@@ -816,7 +837,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
         player.vx = 0f; player.vy = 0f; player.vz = 0f
         health = 20f
         spawned = bed // drop onto the real surface once the chunk is loaded (unless waking in bed)
-        uiEvents.add("died")
+        uiEvents.add("toast:You are back")
     }
 
     fun explode(x: Float, y: Float, z: Float, radius: Float) = redstone.explodeAt(x, y, z, radius)
@@ -924,7 +945,9 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
                 i("Amethyst Shard") to r.nextInt(2))
             MobType.CAMEL -> listOf(i("Leather") to r.nextInt(2))
             MobType.SNIFFER -> listOf(i("Wheat Seeds") to 1 + r.nextInt(2))
-            MobType.VILLAGER, MobType.EXPLORER, MobType.WOLF, MobType.HORSE -> if (m.type == MobType.HORSE) listOf(i("Leather") to r.nextInt(3)) else emptyList()
+            // A villager keeps a Totem of Undying, and drops it if it is defeated.
+            MobType.VILLAGER -> listOf(i("Totem of Undying") to 1)
+            MobType.EXPLORER, MobType.WOLF, MobType.HORSE -> if (m.type == MobType.HORSE) listOf(i("Leather") to r.nextInt(3)) else emptyList()
             MobType.FLAME_SPINNER -> listOf(i("Blaze Rod") to r.nextInt(2), i("Glowstone Dust") to r.nextInt(2))
             MobType.TEAR_DRIFTER -> listOf(i("Ghast Tear") to (if (r.nextInt(2) == 0) 1 else 0), i("Gunpowder") to r.nextInt(3))
             MobType.SEA_SENTINEL -> listOf(i("Prismarine Shard") to r.nextInt(3), i("Raw Cod") to r.nextInt(2))
@@ -1067,6 +1090,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
     private var creativeBreakWait = 0f
 
     private fun updateBreaking(dt: Float) {
+        if (!playerAlive) { breakProgress = 0f; return }
         val t = target
         creativeBreakWait -= dt
         // In creative anything breaks with one tap (even bedrock, except the very bottom layer of the world).

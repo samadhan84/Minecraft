@@ -925,7 +925,15 @@ class HardcoreTest {
         val l3 = LevelData.create(98L, "t", GameMode.SURVIVAL)
         val g3 = Game(World(l3.seed, dir, Dimension.OVERWORLD, flat = true), l3, GameInput(), dir)
         g3.hurtPlayer(100f, 0f, 0f)
-        assertTrue(g3.playerAlive)
+        assertFalse(g3.playerAlive, "dead until you choose")
+        assertTrue(g3.awaitingRespawn)
+        assertTrue(g3.uiEvents.contains("death"))
+        g3.respawn()
+        assertTrue(g3.playerAlive, "Respawn brings you back")
+        // A hardcore spectator can fly around but touches nothing.
+        assertTrue(g.level.hardcoreOver)
+        g.startSpectating()
+        assertTrue(g.spectating && g.player.flying)
     }
 }
 
@@ -1166,5 +1174,25 @@ class LeftHandTest {
         // And the body shows the shield.
         val bare = com.vishucraft.game.render.MobModels.playerModel(Appearance.default(), intArrayOf(-1, -1, -1, -1), false).size
         assertEquals(bare + 1, com.vishucraft.game.render.MobModels.playerModel(Appearance.default(), intArrayOf(-1, -1, -1, -1), true).size)
+    }
+}
+
+class VillagerTotemTest {
+    @Test fun everyVillagerJobTradesATotemAndTheVillagerDropsOne() {
+        val totem = Items.find("Totem of Undying")
+        for (job in Trades.jobs) assertTrue(job.offers.any { it.get == totem }, "${job.title} has the totem trade")
+        val dir = kotlin.io.path.createTempDirectory("vt").toFile()
+        val level = LevelData.create(107L, "t", GameMode.SURVIVAL)
+        val g = Game(World(level.seed, dir, Dimension.OVERWORLD, flat = true), level, GameInput(), dir)
+        val em = Items.find("Emerald")
+        g.inventory.slots[0] = ItemStack(em, 10)
+        val v = Mob(MobType.VILLAGER, 3.5f, 70f, 3.5f); g.mobs.list.add(v)
+        val index = Trades.jobFor(v.uid).offers.indexOfFirst { it.get == totem }
+        assertTrue(index >= 0)
+        g.trade(v.uid, index)
+        assertEquals(1, g.inventory.count(totem), "the villager gave its totem")
+        // Defeating a villager drops one too.
+        g.mobs.damage(v, 1000f, 0f, 0f)
+        assertTrue(g.drops.list.any { it.stack.id == totem })
     }
 }

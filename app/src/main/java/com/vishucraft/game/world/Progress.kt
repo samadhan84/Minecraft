@@ -27,6 +27,8 @@ object Trades {
     val jobs: List<Job> by lazy {
         fun i(n: String) = Items.find(n)
         val em = i("Emerald")
+        // Every villager keeps a Totem of Undying and will trade it for 6 emeralds (the Cleric already did).
+        val totem = Trade(em, 6, i("Totem of Undying"), 1)
         listOf(
             Job("Farmer", listOf(
                 Trade(i("Wheat"), 20, em, 1), Trade(i("Carrot"), 22, em, 1), Trade(i("Potato"), 26, em, 1),
@@ -44,7 +46,7 @@ object Trades {
             Job("Cleric", listOf(
                 Trade(i("Rotten Flesh"), 32, em, 1), Trade(i("Gold Ingot"), 3, em, 1), Trade(em, 1, Blocks.REDSTONE_DUST, 2),
                 Trade(em, 1, i("Lapis Lazuli"), 1), Trade(em, 4, i("Glowstone Dust"), 4), Trade(em, 5, i("Ender Pearl"), 1),
-                Trade(em, 3, i("Potion of Healing"), 1), Trade(em, 6, i("Totem of Undying"), 1),
+                Trade(em, 3, i("Potion of Healing"), 1), totem,
             )),
             Job("Fisherman", listOf(
                 Trade(i("String"), 20, em, 1), Trade(i("Raw Cod"), 6, em, 1), Trade(em, 1, i("Cooked Cod"), 6),
@@ -54,7 +56,7 @@ object Trades {
                 Trade(Blocks.WOOL_WHITE, 18, em, 1), Trade(em, 2, i("Shears"), 1), Trade(em, 1, Blocks.WOOL_RED, 1),
                 Trade(em, 1, Blocks.WOOL_BLUE, 1), Trade(em, 3, Blocks.BED_FIRST + 14, 1), Trade(em, 1, i("Saddle"), 1),
             )),
-        )
+        ).map { j -> if (j.offers.any { it.get == totem.get }) j else Job(j.title, j.offers + totem) }
     }
 
     fun jobFor(uid: Int): Job = jobs[Math.floorMod(uid * 7919, jobs.size)]

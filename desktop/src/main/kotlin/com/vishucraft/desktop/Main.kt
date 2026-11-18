@@ -256,7 +256,7 @@ class App(demo: File?) : ClientApp(demo) {
             Overlay.SIGN, Overlay.FLIGHTS, Overlay.FLOORS, Overlay.METRO, Overlay.CALL_TRAIN, Overlay.ROBOT -> if (key == GLFW_KEY_ESCAPE) { ui.focus = null; overlay = Overlay.NONE }
             Overlay.ENDING -> if (key == GLFW_KEY_ESCAPE) overlay = Overlay.NONE
             Overlay.LOOK -> if (key == GLFW_KEY_ESCAPE) { s.game.viewMode = lookBefore; overlay = Overlay.PAUSE }
-            Overlay.HARDCORE_OVER -> {}
+            Overlay.HARDCORE_OVER, Overlay.DEATH -> {}
             Overlay.INTERNET -> if (key == GLFW_KEY_ESCAPE) overlay = Overlay.PAUSE
             Overlay.SETTINGS, Overlay.CONTROLS, Overlay.NAME_MOB, Overlay.ACHIEVEMENTS -> if (key == GLFW_KEY_ESCAPE) { ui.focus = null; overlay = Overlay.PAUSE }
             Overlay.PASSWORD_ASK, Overlay.PASSWORD_SET, Overlay.PASSWORD_REMOVE -> if (key == GLFW_KEY_ESCAPE) { ui.focus = null; overlay = Overlay.PAUSE }
