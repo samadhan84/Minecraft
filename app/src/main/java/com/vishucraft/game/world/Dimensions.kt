@@ -1,5 +1,6 @@
 package com.vishucraft.game.world
 
+import com.vishucraft.game.engine.MobType
 import java.util.Random
 import kotlin.math.abs
 import kotlin.math.max
@@ -673,20 +674,22 @@ class Structures(private val seed: Long, private val gen: WorldGenerator, privat
             for (i in 0 until count) {
                 val a = jitter + i * 2 * Math.PI / count + (layout.nextDouble() - 0.5) * 0.25
                 val hx = cx + (Math.cos(a) * ring).toInt(); val hz = cz + (Math.sin(a) * ring).toInt()
-                val w = 2 + layout.nextInt(2)
-                val farm = layout.nextInt(4) == 0
+                var w = 2 + layout.nextInt(2)
+                val roll = layout.nextInt(8)
+                val kind = if (roll < 2) 1 else if (roll < 4) 2 else 0     // house, crop farm or animal pen
+                if (kind == 2) w = 4
                 val level = siteLevel(hx, hz, w + 2)
                 if (level < 0) continue
                 if (sites.any { (it[0] - hx) * (it[0] - hx) + (it[1] - hz) * (it[1] - hz) < 11 * 11 }) continue
                 if ((sx - hx) * (sx - hx) + (sz - hz) * (sz - hz) < (w + 10) * (w + 10)) continue
-                sites.add(intArrayOf(hx, hz, w, level, if (farm) 1 else 0))
+                sites.add(intArrayOf(hx, hz, w, level, kind))
             }
         }
         for (s in sites) levelPad(p, s[0], s[1], s[2] + 3, s[2] + 3, s[3])
         for (s in sites) path(p, cx, cz, s[0], s[1])
         for (s in sites) {
             val hr = Random(seed xor (s[0] * 7349L) xor (s[1] * 9157L) xor 0x40E)
-            if (s[4] == 1) farm(p, s[0], s[1], s[3], hr) else house(p, s[0], s[1], s[3], s[2], hr, cx, cz)
+            when (s[4]) { 1 -> farm(p, s[0], s[1], s[3], hr); 2 -> pen(p, s[0], s[1], s[3], hr, cx, cz); else -> house(p, s[0], s[1], s[3], s[2], hr, cx, cz) }
         }
     }
 
@@ -781,6 +784,27 @@ class Structures(private val seed: Long, private val gen: WorldGenerator, privat
             set(p, hx + 2, y0 + 1, hz + 2, Blocks.FURNACE, 3)
             set(p, hx + 2, y0 + 2, hz + 2, Blocks.TORCH)
         }
+    }
+
+    /** A fenced pen of pigs, cows, chickens or sheep: grass, a gate towards the square, a hay bale and a drinking hole. */
+    private fun pen(p: Put, hx: Int, hz: Int, y0: Int, rnd: Random, cx: Int, cz: Int) {
+        val animal = intArrayOf(MobType.PIG.ordinal, MobType.COW.ordinal, MobType.CHICKEN.ordinal, MobType.SHEEP.ordinal)[rnd.nextInt(4)]
+        val count = if (animal == MobType.CHICKEN.ordinal) 4 else 3
+        val dx = cx - hx; val dz = cz - hz
+        val gateOnX = abs(dx) > abs(dz)
+        val gx = if (gateOnX) (if (dx > 0) 4 else -4) else 0
+        val gz = if (gateOnX) 0 else (if (dz > 0) 3 else -3)
+        for (x in -4..4) for (z in -3..3) {
+            val edge = abs(x) == 4 || abs(z) == 3
+            for (y in y0 - 2 until y0) set(p, hx + x, y, hz + z, Blocks.DIRT)
+            set(p, hx + x, y0, hz + z, Blocks.GRASS)
+            for (y in y0 + 1..y0 + 3) set(p, hx + x, y, hz + z, Blocks.AIR)
+            if (edge) set(p, hx + x, y0 + 1, hz + z, if (x == gx && z == gz) Blocks.OAK_FENCE_GATE else Blocks.OAK_FENCE, if (gateOnX) 4 else 2)
+        }
+        set(p, hx + (if (gateOnX) -3 else 3), y0 + 1, hz + (if (gateOnX) -2 else -2), Blocks.HAY_BALE)
+        set(p, hx + (if (gateOnX) -3 else 3), y0, hz + (if (gateOnX) 2 else 2), Blocks.WATER)
+        for ((tx, tz) in listOf(-4 to -3, 4 to -3, -4 to 3, 4 to 3)) set(p, hx + tx, y0 + 2, hz + tz, Blocks.TORCH)
+        if (p.inside(hx, hz)) repeat(count) { i -> world.pendingAnimals.add(intArrayOf(animal, hx - 1 + i % 3, y0 + 1, hz - 1 + i / 3)) }
     }
 
     /** A crop farm: a log-cornered plank border, rows of crops either side of a water channel. */

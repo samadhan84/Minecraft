@@ -1357,6 +1357,12 @@ class Mobs(private val world: World) {
             if (++villagersSeen % 4 == 0) list.add(Mob(MobType.IRON_GOLEM, x + 1.5f, y.toFloat(), z + 0.5f))
         }
 
+        // The animals of the village pens.
+        while (true) {
+            val a = world.pendingAnimals.poll() ?: break
+            list.add(Mob(MobType.values()[a[0]], a[1] + 0.5f, a[2].toFloat(), a[3] + 0.5f))
+        }
+
         if (game.dimension == com.vishucraft.game.world.Dimension.SKY && hostileEnabled && !game.level.bossDefeated) arena(game)
         if (game.dimension == com.vishucraft.game.world.Dimension.EMBER && list.count { it.type == MobType.LAVA_STRIDER } < 3 && rnd.nextInt(3) == 0) {
             // Lava Striders stroll over the lava sea.

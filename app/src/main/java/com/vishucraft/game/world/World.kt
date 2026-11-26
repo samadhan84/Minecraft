@@ -18,6 +18,8 @@ enum class Dimension { OVERWORLD, EMBER, SKY }
 
 class World(val seed: Long, private val saveDir: File?, val dimension: Dimension = Dimension.OVERWORLD, val flat: Boolean = false, val flatSea: Boolean = false, val kind: Int = 0, val terrain: Int = 1) {
     /** Villagers placed by structure generation, waiting to be spawned on the game thread. */
+    /** Farm animals waiting from world generation: [mob type number, x, y, z]. */
+    val pendingAnimals = java.util.concurrent.ConcurrentLinkedQueue<IntArray>()
     val pendingVillagers = java.util.concurrent.ConcurrentLinkedQueue<Triple<Int, Int, Int>>()
     /** Village plazas (x, y, z) from world generation, where survival worlds open a theme park. */
     val pendingParks = java.util.concurrent.ConcurrentLinkedQueue<Triple<Int, Int, Int>>()

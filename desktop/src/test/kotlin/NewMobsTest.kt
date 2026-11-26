@@ -1211,3 +1211,24 @@ class DollRendererTest {
         } catch (_: Throwable) {}
     }
 }
+
+class VillagePensTest {
+    @Test fun villagesHavePensWithFarmAnimalsAndCropFarms() {
+        val dir = kotlin.io.path.createTempDirectory("pens").toFile()
+        val level = LevelData.create(21L, "t", GameMode.SURVIVAL)
+        val w = World(21L, dir, Dimension.OVERWORLD)
+        for (cx in -16..16) for (cz in -16..16) w.ensureLoaded(cx, cz)
+        val kinds = w.pendingAnimals.map { it[0] }.toSet()
+        assertTrue(w.pendingAnimals.size >= 6, "animals wait in the pens (${w.pendingAnimals.size})")
+        assertTrue(kinds.size >= 2, "more than one kind of animal")
+        var gates = 0; var crops = 0
+        for (x in -256..256) for (z in -256..256) for (y in 50..110) { val b = w.getBlock(x, y, z); if (b == Blocks.OAK_FENCE_GATE) gates++; if (b == Blocks.WHEAT_CROP || b == Blocks.CARROTS || b == Blocks.POTATOES) crops++ }
+        assertTrue(gates >= 3, "pens have gates ($gates)")
+        assertTrue(crops > 20, "crop farms ($crops)")
+        // The animals come out into the world.
+        val g = Game(w, level.apply { hasPlayer = true; x = 0.5f; y = 120f; z = 0.5f }, GameInput(), dir)
+        val n = w.pendingAnimals.size
+        repeat(5) { g.update(0.5f) }
+        assertTrue(g.mobs.list.count { it.type == MobType.PIG || it.type == MobType.COW || it.type == MobType.SHEEP || it.type == MobType.CHICKEN } >= minOf(n, 3))
+    }
+}
