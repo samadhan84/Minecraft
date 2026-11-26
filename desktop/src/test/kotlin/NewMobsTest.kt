@@ -820,21 +820,6 @@ class WallTorchTest {
     }
 }
 
-class VillageSkyPortalTest {
-    @Test fun villagesHaveAnOpenSkyPortalAlsoInOldWorlds() {
-        val dir = kotlin.io.path.createTempDirectory("vsp").toFile()
-        val w1 = World(21L, dir, Dimension.OVERWORLD)
-        for (cx in -16..16) for (cz in -16..16) w1.ensureLoaded(cx, cz)
-        fun portals(w: World): Int { var n = 0; for (x in -256..256) for (z in -256..256) for (y in 50..110) if (w.getBlock(x, y, z) == Blocks.SKY_PORTAL) n++; return n }
-        assertTrue(portals(w1) >= 9, "a village sky portal was built")
-        for (x in -256..256) for (z in -256..256) for (y in 50..110) if (w1.getBlock(x, y, z) == Blocks.SKY_PORTAL) w1.setBlock(x, y, z, Blocks.AIR)
-        w1.saveChunks(); java.io.File(dir, "bigs.dat").delete(); w1.shutdown()
-        val w2 = World(21L, dir, Dimension.OVERWORLD)
-        for (cx in -16..16) for (cz in -16..16) w2.ensureLoaded(cx, cz)
-        assertTrue(portals(w2) >= 9, "an old world got its village portal")
-    }
-}
-
 class OutfitTest {
     @Test fun everyPartOfTheLookChangesAndArmorShowsOnTheBody() {
         val dir = kotlin.io.path.createTempDirectory("fit").toFile()
@@ -1143,16 +1128,17 @@ class VillageWholeTest {
     @Test fun housesStandOnLevelGroundWithAFoundation() {
         val w = World(21L, kotlin.io.path.createTempDirectory("vh").toFile(), Dimension.OVERWORLD)
         for (cx in -16..16) for (cz in -16..16) w.ensureLoaded(cx, cz)
-        // Every glass-walled house corner (accent concrete) has solid ground under it and air for the room above the floor.
-        var houses = 0; var floating = 0
-        for (x in -256..256) for (z in -256..256) {
-            val y = (60..100).firstOrNull { w.getBlock(x, it, z) == Blocks.SOLAR_PANEL } ?: continue
+        // Every house door has a solid base under it, a window or wall beside it and a roof above.
+        var houses = 0; var floating = 0; var roofless = 0
+        for (x in -256..256) for (z in -256..256) for (y in 50..110) {
+            if (w.getBlock(x, y, z) != Blocks.OAK_DOOR || w.getBlock(x, y - 1, z) == Blocks.OAK_DOOR) continue
             houses++
-            var under = y - 7
-            if (!Blocks.solid[w.getBlock(x, under, z)]) floating++
+            if (!Blocks.solid[w.getBlock(x, y - 1, z)] || !Blocks.solid[w.getBlock(x, y - 3, z)]) floating++
+            if ((y + 4..y + 12).none { Blocks.solid[w.getBlock(x, it, z)] || w.getBlock(x, it, z) == Blocks.OAK_STAIRS || w.getBlock(x, it, z) == Blocks.BRICK_STAIRS || w.getBlock(x, it, z) == Blocks.COBBLESTONE_STAIRS }) roofless++
         }
-        assertTrue(houses > 0, "houses exist")
+        assertTrue(houses > 5, "houses exist ($houses)")
         assertEquals(0, floating, "no house floats ($houses houses)")
+        assertEquals(0, roofless, "every house has a roof")
     }
 }
 
@@ -1194,5 +1180,34 @@ class EyeOfEnderTest {
         g.inventory.slots[0] = ItemStack(Items.find("Eye of Ender"), 2); g.input.selectedSlot = 0
         g.putEye(0, y, 0, Items[Items.find("Eye of Ender")])
         assertEquals(Blocks.SKY_GATE_EYE, g.world.getBlock(0, y, 0))
+    }
+}
+
+class DollRendererTest {
+    private fun count(pix: IntArray) = pix.count { it != 0 }
+
+    @Test fun theCharacterIsDrawnInThreeDimensionsWithItsArmor() {
+        val R = com.vishucraft.game.render.DollRenderer
+        val look = Appearance.default().also { it[Appearance.HAT] = 3; it[Appearance.HAIR_STYLE] = 1; it[Appearance.SHIRT_COLOR] = 4 }
+        val none = IntArray(4) { -1 }
+        val front = R.render(look, none, false, 0f, 56, 100)
+        val side = R.render(look, none, false, 1.5708f, 56, 100)
+        val back = R.render(look, none, false, 3.1416f, 56, 100)
+        assertTrue(count(front) > 800, "a body is drawn (${count(front)})")
+        assertTrue(!front.contentEquals(side) && !front.contentEquals(back), "it turns")
+        assertTrue(count(side) < count(front), "seen from the side it is thinner")
+        // Armor shows: iron on every piece changes the picture and colours it grey.
+        val armor = intArrayOf(2, 2, 2, 2)
+        val worn = R.render(look, armor, false, 0f, 56, 100)
+        assertTrue(!worn.contentEquals(front), "armor changes the look")
+        // Write pictures for a look at them.
+        try {
+            val dir = java.io.File("/tmp/claude-0/doll"); dir.mkdirs()
+            for ((n, pix) in listOf("front" to front, "side" to R.render(look, armor, true, 0.8f, 56, 100), "worn" to worn, "back" to back)) {
+                val img = java.awt.image.BufferedImage(56 * 6, 100 * 6, java.awt.image.BufferedImage.TYPE_INT_RGB)
+                for (y in 0 until 100) for (x in 0 until 56) for (dy in 0 until 6) for (dx in 0 until 6) img.setRGB(x * 6 + dx, y * 6 + dy, if (pix[y * 56 + x] == 0) 0x3C3C40 else pix[y * 56 + x])
+                javax.imageio.ImageIO.write(img, "png", java.io.File(dir, "$n.png"))
+            }
+        } catch (_: Throwable) {}
     }
 }

@@ -1105,13 +1105,15 @@ abstract class ClientApp(protected val demo: File?) {
 
     protected var homeLook: IntArray = com.vishucraft.game.world.Appearance.default()
 
-    /** Draws the character from the front as coloured blocks ([scale] pixels per grid cell), with its feet at the bottom of the picture. */
-    protected fun drawLookPreview(look: IntArray, x: Float, y: Float, scale: Float) {
-        val A = com.vishucraft.game.world.Appearance
-        for (r in A.flat(look)) {
-            val c = A.palette[r[4].coerceIn(0, A.palette.size - 1)]
-            ui.rect(x + r[0] * scale, y + r[1] * scale, r[2] * scale, r[3] * scale, rgba(c[0], c[1], c[2]))
-        }
+    /** Draws the character in 3D, slowly turning, [scale] pixels per old grid cell (a 16 x 36 cell box), with its feet at the bottom of the picture. */
+    protected fun drawLookPreview(look: IntArray, x: Float, y: Float, scale: Float, armor: Array<com.vishucraft.game.world.ItemStack?>? = null) {
+        val R = com.vishucraft.game.render.DollRenderer
+        val gw = 56; val gh = 100
+        val yaw = ((System.currentTimeMillis() / 40) % 628) / 100f
+        val pix = R.render(look, R.armorColors(armor), false, yaw, gw, gh)
+        val cell = 36f * scale / gh
+        val x0 = x + 8 * scale - gw * cell / 2f
+        R.runs(pix, gw, gh) { px, py, len, c -> ui.rect(x0 + px * cell, y + py * cell, len * cell + 0.6f, cell + 0.6f, rgba(c shr 16 and 255, c shr 8 and 255, c and 255)) }
     }
 
     /** The home-screen customizer: the same choices as in the game, with a picture of you. Your look is kept for every world. */

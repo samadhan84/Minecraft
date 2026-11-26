@@ -451,6 +451,87 @@ class ContainerScreen(
             val bx = pr.left + 26 * u; val by = pr.top + 8 * u
             canvas.drawRect(bx, by, bx + 49 * u, by + 70 * u, black)
             canvas.drawRect(bx + 2, by + 2, bx + 49 * u - 2, by + 70 * u - 2, slotTop)
+            // You, in 3D, with your own look and the armor you really wear.
+            val gw = 44; val gh = 80
+            val yaw = ((System.currentTimeMillis() / 50) % 628) / 100f
+            val shield = g.inventory.offhand?.let { Items[it.id]?.name == "Shield" } == true
+            val pix = com.vishucraft.game.render.DollRenderer.render(g.level.appearance, com.vishucraft.game.render.DollRenderer.armorColors(g.inventory.armor), shield, yaw, gw, gh)
+            val cell = (70f * u - 8f) / gh
+            val x0 = bx + 24.5f * u - gw * cell / 2f; val y0 = by + 4f
+            val dollPaint = Paint().apply { isAntiAlias = false }
+            com.vishucraft.game.render.DollRenderer.runs(pix, gw, gh) { px, py, len, c ->
+                dollPaint.color = c
+                canvas.drawRect(x0 + px * cell, y0 + py * cell, x0 + (px + len) * cell + 0.6f, y0 + (py + 1) * cell + 0.6f, dollPaint)
+            }
+            invalidate()
+        }
+
+        for ((i, c) in cells.withIndex()) {
+            if (i == cursor) continue
+            val ox = c.rect.centerX() - cx; val oy = c.rect.centerY() - cy
+            val along = ox * dx + oy * dy
+            if (along <= dp(2f)) continue
+            val across = abs(ox * dy) + abs(oy * dx)
+            val score = along + across * 2.5f
+            if (score < bestScore) { bestScore = score; best = i }
+        }
+        if (best >= 0) {
+            cursor = best
+            val c = cells[best]
+            if (c.kind == RECIPE) {
+                if (c.rect.top < recipeArea.top) recipeScroll -= recipeArea.top - c.rect.top
+                if (c.rect.bottom > recipeArea.bottom) recipeScroll += c.rect.bottom - recipeArea.bottom
+                recipeScroll = recipeScroll.coerceIn(0f, maxRecipeScroll())
+            }
+        }
+        invalidate()
+        return true
+    }
+
+    // ---------------------------------------------------------------- drawing
+
+    private val black = Paint().apply { color = Color.BLACK }
+    private val white = Paint().apply { color = Color.WHITE }
+    private val shade = Paint().apply { color = Color.rgb(85, 85, 85) }
+    private val slotTop = Paint().apply { color = Color.rgb(55, 55, 55) }
+
+    /** The grey Minecraft window: black outline, light top and left edge, dark bottom and right edge. */
+    private fun window(c: Canvas, r: RectF, u: Float) {
+        c.drawRect(r, black)
+        c.drawRect(r.left + u, r.top + u, r.right - u, r.bottom - u, panel)
+        c.drawRect(r.left + u, r.top + u, r.right - u, r.top + 2 * u, white)
+        c.drawRect(r.left + u, r.top + u, r.left + 2 * u, r.bottom - u, white)
+        c.drawRect(r.left + u, r.bottom - 2 * u, r.right - u, r.bottom - u, shade)
+        c.drawRect(r.right - 2 * u, r.top + u, r.right - u, r.bottom - u, shade)
+    }
+
+    /** A sunken slot: dark on the top and left, light on the bottom and right. */
+    private fun slotBox(c: Canvas, r: RectF, u: Float) {
+        c.drawRect(r, slotTop)
+        c.drawRect(r.left + u, r.top + u, r.right, r.bottom, white)
+        c.drawRect(r.left + u, r.top + u, r.right - u, r.bottom - u, slotPaint)
+    }
+
+    override fun onDraw(canvas: Canvas) {
+        val all = layoutCells()
+        val u = unit; val pr = panelRect
+        canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), dim)
+        window(canvas, pr, u)
+        if (all.right > pr.right + 1f) window(canvas, RectF(pr.right + 4 * u, pr.top, all.right, pr.bottom), u)
+        val hopper = mode == Mode.CHEST && chest is com.vishucraft.game.world.HopperEntity
+        title.textSize = 7f * u; small.textSize = 6f * u
+        val name = when (mode) {
+            Mode.INVENTORY, Mode.CRAFTING -> "Crafting"; Mode.FURNACE -> "Furnace"
+            Mode.CHEST -> if (hopper) "Item Hopper" else "Chest"
+        }
+        val tx = pr.left + (when (mode) { Mode.INVENTORY -> 98f; Mode.CRAFTING -> 28f; Mode.FURNACE -> 60f; else -> 8f }) * u
+        canvas.drawText(name, tx, pr.top + 14 * u, title)
+        if (mode != Mode.INVENTORY) canvas.drawText("Inventory", pr.left + 8 * u, pr.top + ((if (hopper) 51f else 84f) - 3f) * u, title)
+        if (mode == Mode.INVENTORY) {
+            // The player in the box between the armour and the crafting grid.
+            val bx = pr.left + 26 * u; val by = pr.top + 8 * u
+            canvas.drawRect(bx, by, bx + 49 * u, by + 70 * u, black)
+            canvas.drawRect(bx + 2, by + 2, bx + 49 * u - 2, by + 70 * u - 2, slotTop)
             val cx = bx + 24.5f * u; val k = 70f * u / 36f
             fun box(l: Float, t: Float, w: Float, h: Float, color: Int) { canvas.drawRect(cx + l * k, by + t * k, cx + (l + w) * k, by + (t + h) * k, Paint().apply { this.color = color }) }
             box(-4f, 4f, 8f, 8f, Color.rgb(196, 146, 104)); box(-4f, 4f, 8f, 3f, Color.rgb(70, 44, 24))

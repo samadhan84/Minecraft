@@ -452,15 +452,17 @@ class ContainerScreen(private val game: Game) {
         ui.rect(x + u, y + u, size - 2 * u, size - 2 * u, SLOT)
     }
 
-    /** Steve-like figure in the box of the inventory screen. */
+    /** You, in 3D, in the box of the inventory screen: your own look, with the armor you really wear. */
     private fun figure(ui: Ui, x: Float, y: Float, w: Float, h: Float) {
         ui.rect(x, y, w, h, rgba(20, 20, 20)); ui.rect(x + 2, y + 2, w - 4, h - 4, rgba(60, 60, 64))
-        val cx = x + w / 2; val u = h / 36f
-        ui.rect(cx - 4 * u, y + 4 * u, 8 * u, 8 * u, rgba(196, 146, 104))        // head
-        ui.rect(cx - 4 * u, y + 4 * u, 8 * u, 3 * u, rgba(70, 44, 24))           // hair
-        ui.rect(cx - 4 * u, y + 12 * u, 8 * u, 12 * u, rgba(0, 170, 170))        // shirt
-        ui.rect(cx - 8 * u, y + 12 * u, 4 * u, 12 * u, rgba(196, 146, 104)); ui.rect(cx + 4 * u, y + 12 * u, 4 * u, 12 * u, rgba(196, 146, 104))
-        ui.rect(cx - 4 * u, y + 24 * u, 4 * u, 12 * u, rgba(54, 56, 130)); ui.rect(cx, y + 24 * u, 4 * u, 12 * u, rgba(54, 56, 130))
+        val R = com.vishucraft.game.render.DollRenderer
+        val gw = 44; val gh = 80
+        val yaw = ((System.currentTimeMillis() / 50) % 628) / 100f
+        val shield = game.inventory.offhand?.let { Items[it.id]?.name == "Shield" } == true
+        val pix = R.render(game.level.appearance, R.armorColors(game.inventory.armor), shield, yaw, gw, gh)
+        val cell = (h - 8f) / gh
+        val x0 = x + w / 2 - gw * cell / 2f; val y0 = y + 4f
+        R.runs(pix, gw, gh) { px, py, len, c -> ui.rect(x0 + px * cell, y0 + py * cell, len * cell + 0.6f, cell + 0.6f, rgba(c shr 16 and 255, c shr 8 and 255, c and 255)) }
     }
 
     /** Returns false when the screen should close. */
