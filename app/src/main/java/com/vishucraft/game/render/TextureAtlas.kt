@@ -688,6 +688,7 @@ object TextureAtlas {
         for (i in 0..length) {
             val x = 5 + i; val y = 10 - i
             p(x, y, light); p(x + 1, y, mat); p(x, y + 1, dark)
+            p(x + 2, y, mat); p(x, y - 1, light); p(x + 1, y - 1, light); p(x + 2, y + 1, dark)       // a broad, thick blade
             if (i in 1..length - 1) p(x + 1, y + 1, scale(mat, 0.8f))              // the shaded lower edge
         }
         p(5 + length + 1, 10 - length - 1, light); p(5 + length, 10 - length - 1, light)   // the tip
@@ -696,7 +697,7 @@ object TextureAtlas {
             "iron" -> for (i in 3..length - 2) p(6 + i, 10 - i, scale(mat, 1.15f))
             "gold" -> { p(9, 6, rgb(255, 245, 190)); p(12, 3, rgb(255, 245, 190)) }
             "diamond" -> { p(9, 6, rgb(255, 255, 255)); p(11, 4, rgb(255, 255, 255)); p(13, 2, rgb(210, 255, 250)); p(7, 8, rgb(200, 255, 250)) }
-            "netherite" -> { for (i in 3..length - 1 step 3) p(6 + i, 10 - i, rgb(255, 120, 30)); p(13, 1, rgb(255, 170, 60)) }
+            "netherite" -> { for (i in 1..length - 1) { p(6 + i, 10 - i, rgb(190, 90, 255)); p(7 + i, 10 - i, rgb(120, 40, 200)) }; for (i in 3..length - 1 step 2) p(6 + i, 10 - i, rgb(250, 220, 255)); p(13, 1, rgb(255, 170, 60)) }
         }
         // The cross-guard, across the blade near the handle.
         for (i in -3..3) { p(5 + i, 10 + i, guard); p(6 + i, 10 + i, if (i < 0) guardLight else guardDark) }
@@ -879,22 +880,32 @@ object TextureAtlas {
                 for (x in 0 until 16) { t[x, 14] = rgb(40, 36, 32); t[x, 15] = rgb(40, 36, 32) }
             }
             "boomling_shell" -> {
-                // A leafy green shell: soft patches of light and dark green, nothing glowing.
+                // A mossy shell split by glowing ember cracks: dark and light green patches with orange seams.
                 t.fill { x, y ->
                     val patch = ((x / 3) * 7 + (y / 3) * 13) % 5
-                    val c = when (patch) { 0 -> rgb(84, 150, 66); 1 -> rgb(70, 132, 58); 2 -> rgb(96, 164, 76); 3 -> rgb(62, 118, 52); else -> rgb(78, 142, 62) }
-                    scale(c, t.jitter(0.06f))
+                    val c = when (patch) { 0 -> rgb(70, 130, 56); 1 -> rgb(52, 104, 46); 2 -> rgb(92, 160, 72); 3 -> rgb(40, 84, 40); else -> rgb(64, 120, 52) }
+                    scale(c, t.jitter(0.07f))
                 }
+                var cx = 5 + t.rnd.nextInt(5)
+                for (y in 0 until 16) {
+                    t[cx.coerceIn(0, 15), y] = rgb(255, 150, 30)
+                    if (y % 3 == 0) t[(cx + 1).coerceIn(0, 15), y] = rgb(255, 210, 70)
+                    cx += t.rnd.nextInt(3) - 1
+                }
+                for (x in 0 until 16) if (x % 5 != 2) t[x, 7 + (x / 4) % 2] = rgb(220, 110, 24)
             }
             "boomling_leg" -> noisy(t, rgb(48, 92, 46), 0.08f, 0.2f)
             "boomling_face" -> {
                 t.fill { x, y ->
                     val patch = ((x / 3) * 7 + (y / 3) * 13) % 5
-                    scale(if (patch % 2 == 0) rgb(84, 150, 66) else rgb(72, 134, 60), t.jitter(0.05f))
+                    scale(if (patch % 2 == 0) rgb(70, 130, 56) else rgb(52, 108, 46), t.jitter(0.06f))
                 }
-                // Big round eyes and a small round mouth: a friendly little face with its own look.
-                for ((cx, cy) in listOf(4 to 5, 11 to 5)) for (dy in -1..1) for (dx in -1..1) t[cx + dx, cy + dy] = if (dx == 0 && dy == 0) rgb(20, 30, 20) else rgb(240, 244, 230)
-                for ((x, y) in listOf(7 to 10, 8 to 10, 6 to 11, 9 to 11, 7 to 12, 8 to 12)) t[x, y] = rgb(30, 50, 30)
+                // Dark sockets with glowing ember eyes and a jagged little mouth: a fierce face of its own.
+                for ((cx, cy) in listOf(4 to 5, 11 to 5)) for (dy in -2..2) for (dx in -2..2) t[cx + dx, cy + dy] = if (dx in -1..0 && dy in -1..0) rgb(255, 190, 50) else rgb(30, 22, 16)
+                for (x in 5..10) t[x, 10] = rgb(30, 18, 12)
+                for ((x, y) in listOf(5 to 11, 7 to 11, 8 to 11, 10 to 11, 6 to 12, 9 to 12)) t[x, y] = rgb(30, 18, 12)
+                for (x in 3..12) t[x, 3] = rgb(255, 140, 30)
+                for (y in 0..2) t[7, y] = rgb(255, 150, 30)
             }
             "boomling_fuse" -> t.fill { _, y ->
                 when {

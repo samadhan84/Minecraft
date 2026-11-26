@@ -25,7 +25,7 @@ enum class MobType(
     SHEEP("Sheep", 0.45f, 1.3f, 8, false, 1.3f),
     ZOMBIE("Zombie", 0.3f, 1.95f, 20, true, 2.4f),
     /** Original exploding mob: a squat stone creature with glowing cracks. */
-    BOOMLING("Boomling", 0.4f, 1.3f, 20, true, 2.2f),
+    BOOMLING("Boomling", 0.4f, 1.9f, 20, true, 2.2f),
     /** Hooded thornwood archer that keeps its distance and shoots thorns. */
     RATTLER("Rattler", 0.3f, 1.9f, 20, true, 2.2f),
     /** Six-legged rock beetle that climbs walls; only hunts at night unless provoked. */

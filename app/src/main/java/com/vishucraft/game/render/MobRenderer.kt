@@ -466,9 +466,9 @@ object MobModels {
             box(-0.2f, 0.6f, 1.2f, 0.2f, 0.9f, 2.6f, tiles("warden_body")),
         ),
         MobType.BOOMLING to listOf(
-            box(-0.4f, 0.35f, -0.4f, 0.4f, 1.1f, 0.4f, tiles("boomling_shell", front = "boomling_face")),
-            box(-0.3f, 1.1f, -0.3f, 0.3f, 1.2f, 0.3f, tiles("boomling_shell")),
-            box(-0.05f, 1.2f, -0.05f, 0.05f, 1.45f, 0.05f, tiles("boomling_fuse")),
+            box(-0.28f, 0.35f, -0.28f, 0.28f, 1.2f, 0.28f, tiles("boomling_shell")),
+            box(-0.4f, 1.2f, -0.4f, 0.4f, 1.8f, 0.4f, tiles("boomling_shell", front = "boomling_face")),
+            box(-0.05f, 1.8f, -0.05f, 0.05f, 2.05f, 0.05f, tiles("boomling_fuse")),
         ) + legs(0.22f, 0.22f, 0.25f, 0.35f, "boomling_leg"),
         // ---- Creature pack 3
         MobType.IRON_GOLEM to listOf(
