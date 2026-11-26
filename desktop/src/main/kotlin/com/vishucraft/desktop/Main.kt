@@ -784,7 +784,7 @@ class App(demo: File?) : ClientApp(demo) {
                 if (f == 1958) shot("17-coaster-loop")
             }
             f == 1962 -> session?.game?.let { g ->
-                // A futuristic village with its theme park.
+                // A plain village from above.
                 g.coasters.riding = null
                 val gen = g.world.generator
                 var best: Pair<Int, Int>? = null
@@ -799,19 +799,18 @@ class App(demo: File?) : ClientApp(demo) {
                 }
                 val (cx, cz) = best!!
                 for (dz in -3..4) for (dx in -3..3) g.world.ensureLoaded((cx shr 4) + dx, (cz shr 4) + dz)
-                g.buildThemePark(cx, gen.surfaceHeight(cx, cz), cz)
                 g.player.x = cx + 30f; g.player.y = gen.surfaceHeight(cx, cz) + 30f; g.player.z = cz - 30f; g.player.flying = true
                 g.player.yaw = kotlin.math.atan2(-(30f), -(60f)); g.player.pitch = -0.5f
                 demoCx = cx; demoCz = cz
             }
-            f == 2060 -> shot("18-village-and-theme-park")
+            f == 2060 -> shot("18-village")
             f == 2062 -> session?.game?.let { g ->
                 // Close up on a village street.
                 val y = g.world.generator.surfaceHeight(demoCx, demoCz)
                 g.player.x = demoCx + 9f; g.player.y = y + 6f; g.player.z = demoCz + 9f
                 g.player.yaw = kotlin.math.atan2(-9f, 9f); g.player.pitch = -0.3f
             }
-            f == 2110 -> shot("19-futuristic-village")
+            f == 2110 -> shot("19-village-street")
             f == 2112 -> session?.game?.let { g ->
                 // Roller coaster track laid by hand (like rails), with a coaster cart on it.
                 val x0 = kotlin.math.floor(g.player.x).toInt() + 4; val z0 = kotlin.math.floor(g.player.z).toInt()

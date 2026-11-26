@@ -20,6 +20,7 @@ class DropRenderer {
     private val snowballTile = Items[Items.find("Snowball")]!!.icon
     private val eggTile = Items[Items.find("Egg")]!!.icon
     private val pearlTile = Items[Items.find("Ender Pearl")]!!.icon
+    private val eyeTile = Items[Items.find("Eye of Ender")]!!.icon
     private val potionTile = Items[Items.find("Potion of Healing")]!!.icon
     private val fireTile = Items[Items.find("Fire Charge")]!!.icon
 
@@ -54,12 +55,13 @@ class DropRenderer {
                 com.vishucraft.game.engine.Projectile.SNOWBALL -> snowballTile
                 com.vishucraft.game.engine.Projectile.EGG -> eggTile
                 com.vishucraft.game.engine.Projectile.PEARL -> pearlTile
+                com.vishucraft.game.engine.Projectile.EYE -> eyeTile
                 com.vishucraft.game.engine.Projectile.POTION -> potionTile
                 com.vishucraft.game.engine.Projectile.FIREBALL -> fireTile
                 else -> arrowTile
             }
             val arrowLike = a.kind == com.vishucraft.game.engine.Projectile.ARROW || a.kind == com.vishucraft.game.engine.Projectile.THORN
-            sprite(a.x, a.y - 0.2f, a.z, if (arrowLike) 0.2f else 0.12f, kotlin.math.atan2(a.vz, a.vx), tile)
+            sprite(a.x, a.y - 0.2f, a.z, if (arrowLike) 0.2f else if (a.kind == com.vishucraft.game.engine.Projectile.EYE) 0.3f else 0.12f, kotlin.math.atan2(a.vz, a.vx), tile)
         }
         for (e in drops.list) {
             val dx = e.x - camX; val dz = e.z - camZ

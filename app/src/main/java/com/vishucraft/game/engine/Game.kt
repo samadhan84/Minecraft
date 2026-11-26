@@ -1363,6 +1363,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
 
     /** Uses that don't need a block under the crosshair. Returns true when the item was used. */
     private fun useItem(item: ItemDef): Boolean {
+        if (item.name == "Eye of Ender" && target?.block != Blocks.SKY_GATE) return throwEye()
         when (item.use) {
             ItemUse.DRINK -> { drink(item); return true }
             ItemUse.THROW -> {
@@ -1991,6 +1992,34 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
             return true
         }
         return false
+    }
+
+    /**
+     * A Warp Eye thrown at the sky: it flies, in one go, to the sky gate nearest to you and sinks into the ground right above
+     * it. Dig straight down from there to reach the gate room.
+     */
+    private fun throwEye(): Boolean {
+        if (isClient) return true
+        if (dimension != com.vishucraft.game.world.Dimension.OVERWORLD) { uiEvents.add("toast:The Warp Eye only finds sky gates in the overworld"); return true }
+        val site = com.vishucraft.game.world.Structures.gateRoomNear(world.seed, world.generator, player.x, player.z)
+        if (site == null) { uiEvents.add("toast:The Warp Eye finds no sky gate near here"); return true }
+        val gy = world.generator.surfaceHeight(site[0], site[2]).toFloat() + 1f
+        val dx = site[0] + 0.5f - player.x; val dz = site[2] + 0.5f - player.z
+        val seconds = (sqrt(dx * dx + dz * dz) / 16f).coerceIn(2.5f, 14f)
+        projectiles.flyEye(player.x, player.eyeY, player.z, site[0] + 0.5f, gy, site[2] + 0.5f, seconds)
+        consumeHeld()
+        sound("bow", player.x, player.eyeY, player.z, 0.6f)
+        uiEvents.add("toast:The Warp Eye flies away…")
+        return true
+    }
+
+    /** The Warp Eye has come down: it lies on the ground above the sky gate room. */
+    internal fun eyeLanded(x: Float, y: Float, z: Float) {
+        world.ensureLoaded(floorInt(x) shr 4, floorInt(z) shr 4)
+        val gy = world.generator.surfaceHeight(floorInt(x), floorInt(z)) + 1.3f
+        drops.spawn(ItemStack(Items.find("Eye of Ender"), 1), x, gy, z)
+        sound("pop", x, gy, z, 0.9f)
+        uiEvents.add("toast:The Warp Eye sank down. The sky gate is deep under it: dig straight down!")
     }
 
     /** A Warp Eye goes into a gate stone; the twelfth opens the gate. */

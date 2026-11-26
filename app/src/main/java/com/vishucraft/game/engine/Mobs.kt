@@ -1426,19 +1426,19 @@ class Mobs(private val world: World) {
         }
     }
 
-    /** Where Sky Crystal number [i] (0..9) stands: on top of pillar i of the arena. */
+    /** Where Sky Crystal number [i] (0..7) stands: on top of pillar i of the arena. */
     private fun crystalSpot(i: Int): Triple<Float, Float, Float> {
-        val a = i * 2.0 * Math.PI / 10.0
+        val a = i * 2.0 * Math.PI / com.vishucraft.game.world.SkyGenerator.CRYSTALS
         val x = (cos(a) * 26.0).toInt(); val z = (sin(a) * 26.0).toInt()
         return Triple(x + 0.5f, (world.generator.surfaceHeight(x, z) + com.vishucraft.game.world.SkyGenerator.pillarHeight(i) + 1).toFloat(), z + 0.5f)
     }
 
-    /** The dragon fight: the first time you are here the drake, ten crystals and some Shadow Walkers appear; later visits bring back what is left. */
+    /** The dragon fight: the first time you are here the drake, eight crystals and some Shadow Walkers appear; later visits bring back what is left. */
     private fun arena(game: Game) {
         val lv = game.level
         if (!lv.arenaStarted) {
-            lv.arenaStarted = true; lv.crystalMask = 1023; lv.drakeHealth = MobType.SKY_DRAKE.maxHealth.toFloat()
-            game.uiEvents.add("toast:The Sky Drake wakes! Break all ten Sky Crystals so it cannot heal, then defeat it")
+            lv.arenaStarted = true; lv.crystalMask = (1 shl com.vishucraft.game.world.SkyGenerator.CRYSTALS) - 1; lv.drakeHealth = MobType.SKY_DRAKE.maxHealth.toFloat()
+            game.uiEvents.add("toast:The Sky Drake wakes! Break all eight Sky Crystals so it cannot heal, then defeat it")
             // Shadow Walkers wander the platform.
             repeat(7) {
                 val a = rnd.nextFloat() * 6.2832f; val r = 6f + rnd.nextFloat() * 24f
@@ -1446,10 +1446,11 @@ class Mobs(private val world: World) {
                 list.add(Mob(MobType.ENDERMAN, x + 0.5f, (world.generator.surfaceHeight(x, z) + 1).toFloat(), z + 0.5f))
             }
         }
+        lv.crystalMask = lv.crystalMask and ((1 shl com.vishucraft.game.world.SkyGenerator.CRYSTALS) - 1)
         if (list.none { it.type == MobType.SKY_DRAKE && !it.dead }) {
             val d = Mob(MobType.SKY_DRAKE, 0f, arenaY() + 22f, -20f); d.health = lv.drakeHealth.coerceIn(1f, MobType.SKY_DRAKE.maxHealth.toFloat()); list.add(d)
         }
-        for (i in 0 until 10) if (lv.crystalMask and (1 shl i) != 0 && list.none { it.type == MobType.SKY_CRYSTAL && !it.dead && crystalIndex(it) == i }) {
+        for (i in 0 until com.vishucraft.game.world.SkyGenerator.CRYSTALS) if (lv.crystalMask and (1 shl i) != 0 && list.none { it.type == MobType.SKY_CRYSTAL && !it.dead && crystalIndex(it) == i }) {
             val (x, y, z) = crystalSpot(i)
             list.add(Mob(MobType.SKY_CRYSTAL, x, y, z))
         }
@@ -1458,7 +1459,7 @@ class Mobs(private val world: World) {
     /** Which pillar a crystal stands on (from where it is). */
     fun crystalIndex(m: Mob): Int {
         val a = atan2(m.z, m.x).toDouble().let { if (it < 0) it + 2 * Math.PI else it }
-        return Math.round(a / (2 * Math.PI / 10)).toInt() % 10
+        return Math.round(a / (2 * Math.PI / com.vishucraft.game.world.SkyGenerator.CRYSTALS)).toInt() % com.vishucraft.game.world.SkyGenerator.CRYSTALS
     }
 
     private fun ringPoint(cx: Float, cz: Float, minR: Float, maxR: Float): Pair<Int, Int> {

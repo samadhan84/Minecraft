@@ -13,6 +13,8 @@ class Projectile(var x: Float, var y: Float, var z: Float, var vx: Float, var vy
                  val fromPlayer: Boolean, val damage: Float, val kind: Int = ARROW) {
     var age = 0f
     var stuck = false
+    /** A flying Warp Eye: where it started, where it lands and how long the flight takes. */
+    var sx = 0f; var sy = 0f; var sz = 0f; var tx = 0f; var ty = 0f; var tz = 0f; var dur = 1f
 
     companion object {
         const val ARROW = 0
@@ -24,6 +26,8 @@ class Projectile(var x: Float, var y: Float, var z: Float, var vx: Float, var vy
         const val POTION = 5
         /** The Sky Warden's fireball. */
         const val FIREBALL = 6
+        /** A thrown Warp Eye (Eye of Ender): it flies to the nearest sky gate and sinks to the ground above it. */
+        const val EYE = 7
     }
 }
 
@@ -36,11 +40,25 @@ class Projectiles(private val world: World) {
         list.add(Projectile(x, y, z, vx, vy, vz, fromPlayer, damage, kind))
     }
 
+    /** Throws a Warp Eye from (x, y, z) towards a landing place; it takes [seconds] and rises in an arc. */
+    fun flyEye(x: Float, y: Float, z: Float, tx: Float, ty: Float, tz: Float, seconds: Float) {
+        list.add(Projectile(x, y, z, tx - x, 0f, tz - z, true, 0f, Projectile.EYE).also {
+            it.sx = x; it.sy = y; it.sz = z; it.tx = tx; it.ty = ty; it.tz = tz; it.dur = seconds
+        })
+    }
+
     fun update(dt: Float, game: Game) {
         val it = list.iterator()
         while (it.hasNext()) {
             val a = it.next()
             a.age += dt
+            if (a.kind == Projectile.EYE) {
+                val u = (a.age / a.dur).coerceAtMost(1f)
+                a.x = a.sx + (a.tx - a.sx) * u; a.z = a.sz + (a.tz - a.sz) * u
+                a.y = a.sy + (a.ty - a.sy) * u + kotlin.math.sin(Math.PI.toFloat() * u) * 24f
+                if (u >= 1f) { game.eyeLanded(a.tx, a.ty, a.tz); it.remove() }
+                continue
+            }
             if (a.age > 20f || a.y < -10f) { it.remove(); continue }
             if (a.stuck) continue
             a.vy -= 12f * dt

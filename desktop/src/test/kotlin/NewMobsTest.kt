@@ -756,45 +756,6 @@ class SkyGateTest {
     }
 }
 
-class XpFarmTest {
-    @Test fun villagesHaveAnXpFarmWhoseCagesSpawnMonsters() {
-        val dir = kotlin.io.path.createTempDirectory("xpf").toFile()
-        val level = LevelData.create(21L, "t", GameMode.SURVIVAL)
-        val g = Game(World(level.seed, dir, Dimension.OVERWORLD), level, GameInput(), dir)
-        for (cx in -16..16) for (cz in -16..16) g.world.ensureLoaded(cx, cz)
-        var cage: IntArray? = null
-        loop@ for (x in -256..256) for (z in -256..256) for (y in 60..130) if (g.world.getBlock(x, y, z) == Blocks.MOB_CAGE) { cage = intArrayOf(x, y, z); break@loop }
-        assertTrue(cage != null, "an XP farm was generated")
-        val (x, y, z) = cage!!
-        g.player.x = x + 0.5f; g.player.z = z + 6.5f; g.player.y = (y - 25).toFloat()
-        g.mobs.list.clear()
-        var t = 0f; var seen = 0
-        while (t < 12f) { g.update(1 / 20f); g.dirtyChunks.clear(); t += 1 / 20f; g.player.x = x + 0.5f; g.player.z = z + 6.5f; g.player.y = (y - 25).toFloat(); seen = maxOf(seen, g.mobs.list.count { it.type.hostile }) }
-        val spawned = seen
-        println("XPFARM cage=$x,$y,$z hostile=$spawned")
-        assertTrue(spawned > 0, "monsters appeared in the shaft")
-    }
-}
-
-class OldWorldFarmTest {
-    @Test fun anOldWorldGetsItsVillageFarmWhenItsChunksLoad() {
-        val dir = kotlin.io.path.createTempDirectory("oldfarm").toFile()
-        val w1 = World(21L, dir, Dimension.OVERWORLD)
-        for (cx in -16..16) for (cz in -16..16) w1.ensureLoaded(cx, cz)
-        var cage: IntArray? = null
-        loop@ for (x in -256..256) for (z in -256..256) for (y in 60..130) if (w1.getBlock(x, y, z) == Blocks.MOB_CAGE) { cage = intArrayOf(x, y, z); break@loop }
-        assertTrue(cage != null)
-        // Make it an "old" world: no cages anywhere, no record of farms.
-        for (x in -256..256) for (z in -256..256) for (y in 60..130) if (w1.getBlock(x, y, z) == Blocks.MOB_CAGE) w1.setBlock(x, y, z, Blocks.AIR)
-        w1.saveChunks()
-        java.io.File(dir, "farms.dat").delete()
-        w1.shutdown()
-        val w2 = World(21L, dir, Dimension.OVERWORLD)
-        for (cx in -16..16) for (cz in -16..16) w2.ensureLoaded(cx, cz)
-        assertEquals(Blocks.MOB_CAGE, w2.getBlock(cage!![0], cage[1], cage[2]), "the farm came back to the old chunks")
-    }
-}
-
 class OldWorldBigTest {
     @Test fun anOldWorldGetsFortsAndMansionsWhenItsChunksLoad() {
         val dir = kotlin.io.path.createTempDirectory("oldbig").toFile()
@@ -830,17 +791,13 @@ class PortalItemsTest {
 }
 
 class SmithyTest {
-    @Test fun villagesHaveABlacksmithHomeAlsoInOldWorlds() {
+    @Test fun villagesHaveABlacksmithHome() {
         val dir = kotlin.io.path.createTempDirectory("smith").toFile()
         val w1 = World(21L, dir, Dimension.OVERWORLD)
         for (cx in -16..16) for (cz in -16..16) w1.ensureLoaded(cx, cz)
         fun anvils(w: World): Int { var n = 0; for (x in -256..256) for (z in -256..256) for (y in 50..110) if (w.getBlock(x, y, z) == Blocks.ANVIL) n++; return n }
         assertTrue(anvils(w1) > 0, "a smithy was built")
-        for (x in -256..256) for (z in -256..256) for (y in 50..110) if (w1.getBlock(x, y, z) == Blocks.ANVIL) w1.setBlock(x, y, z, Blocks.AIR)
-        w1.saveChunks(); java.io.File(dir, "bigs.dat").delete(); java.io.File(dir, "farms.dat").delete(); w1.shutdown()
-        val w2 = World(21L, dir, Dimension.OVERWORLD)
-        for (cx in -16..16) for (cz in -16..16) w2.ensureLoaded(cx, cz)
-        assertTrue(anvils(w2) > 0, "an old world got its smithy")
+        w1.shutdown()
     }
 }
 
@@ -988,44 +945,6 @@ class NoteBlockDiscTest {
     }
 }
 
-class SmithyPortalTest {
-    @Test fun everySmithyHasAWorkingSkyPortalInside() {
-        val dir = kotlin.io.path.createTempDirectory("sp").toFile()
-        val w1 = World(21L, dir, Dimension.OVERWORLD)
-        for (cx in -16..16) for (cz in -16..16) w1.ensureLoaded(cx, cz)
-        fun anvils(w: World): List<IntArray> { val l = ArrayList<IntArray>(); for (x in -256..256) for (z in -256..256) for (y in 50..110) if (w.getBlock(x, y, z) == Blocks.ANVIL) l.add(intArrayOf(x, y, z)); return l }
-        // The portal stands within a few blocks of the anvil, at floor level: 3 x 3 portal with 12 stones around it.
-        fun portalNear(w: World, a: IntArray): Boolean {
-            for (dx in -5..5) for (dz in -5..5) {
-                val cx = a[0] + dx; val cz = a[2] + dz; val y = a[1]
-                var ok = true
-                for (i in -1..1) for (j in -1..1) if (w.getBlock(cx + i, y, cz + j) != Blocks.SKY_PORTAL) ok = false
-                for (d in -1..1) for (e in intArrayOf(-2, 2)) if (w.getBlock(cx + e, y, cz + d) != Blocks.SKY_GATE_EYE || w.getBlock(cx + d, y, cz + e) != Blocks.SKY_GATE_EYE) ok = false
-                if (ok) return true
-            }
-            return false
-        }
-        val smiths = anvils(w1)
-        assertTrue(smiths.isNotEmpty())
-        for (a in smiths) assertTrue(portalNear(w1, a), "a new smithy at ${a.toList()} has its sky portal")
-        // An old smithy (built before the portals): take every portal out, forget only the "portal built" marks, load again.
-        val centers = ArrayList<IntArray>()
-        for (a in smiths) for (dx in -5..5) for (dz in -5..5) {
-            val cx = a[0] + dx; val cz = a[2] + dz
-            if ((-1..1).all { i -> (-1..1).all { j -> w1.getBlock(cx + i, a[1], cz + j) == Blocks.SKY_PORTAL } }) centers.add(intArrayOf(cx, a[1], cz))
-        }
-        assertTrue(centers.isNotEmpty())
-        for (c in centers) for (dx in -2..2) for (dz in -2..2) w1.setBlock(c[0] + dx, c[1], c[2] + dz, Blocks.STONE_BRICKS)
-        w1.saveChunks()
-        w1.shutdown()
-        val w2 = World(21L, dir, Dimension.OVERWORLD)
-        for (c in centers) for (cx in ((c[0] - 8) shr 4)..((c[0] + 8) shr 4)) for (cz in ((c[2] - 8) shr 4)..((c[2] + 8) shr 4))
-            w2.bigDone.remove(Chunk.key(cx, cz) * 31L + ((c[0] * 73856093L) xor (c[2] * 19349663L) xor 6L))
-        for (cx in -16..16) for (cz in -16..16) w2.ensureLoaded(cx, cz)
-        for (c in centers) assertTrue(portalNear(w2, intArrayOf(c[0], c[1], c[2])), "an old smithy at ${c.toList()} got its sky portal")
-    }
-}
-
 class DragonFightTest {
     private fun sky(): Game {
         val dir = kotlin.io.path.createTempDirectory("drake").toFile()
@@ -1034,12 +953,12 @@ class DragonFightTest {
     }
     private fun run(g: Game, seconds: Float) { var t = 0f; while (t < seconds) { g.update(0.05f); g.dirtyChunks.clear(); t += 0.05f; g.player.x = 0.5f; g.player.z = -32.5f; g.player.y = 65f } }
 
-    @Test fun theArenaHasADrakeTenCrystalsAndShadowWalkers() {
+    @Test fun theArenaHasADrakeEightCrystalsAndShadowWalkers() {
         val g = sky()
         for (cx in -4..4) for (cz in -5..4) g.world.ensureLoaded(cx, cz)
         run(g, 3f)
         assertEquals(1, g.mobs.list.count { it.type == MobType.SKY_DRAKE && !it.dead }, "one Sky Drake")
-        assertEquals(10, g.mobs.list.count { it.type == MobType.SKY_CRYSTAL && !it.dead }, "ten Sky Crystals")
+        assertEquals(8, g.mobs.list.count { it.type == MobType.SKY_CRYSTAL && !it.dead }, "eight Sky Crystals")
         assertTrue(g.mobs.list.count { it.type == MobType.ENDERMAN } >= 5, "Shadow Walkers on the platform")
         // The room by the portal home exists, with the portal in its back wall.
         assertEquals(Blocks.SKY_PORTAL, g.world.getBlock(0, 65, SkyGenerator.ROOM_Z - 4))
@@ -1055,10 +974,10 @@ class DragonFightTest {
         val drake = g.mobs.list.first { it.type == MobType.SKY_DRAKE }
         drake.health = 100f
         run(g, 5f)
-        assertTrue(drake.health > 120f, "ten crystals heal it (${drake.health})")
+        assertTrue(drake.health > 120f, "the crystals heal it (${drake.health})")
         // Break the crystals one by one.
         for (c in g.mobs.list.filter { it.type == MobType.SKY_CRYSTAL }) g.mobs.damage(c, 5f, 0f, 0f)
-        assertEquals(0, g.level.crystalMask, "all ten are gone")
+        assertEquals(0, g.level.crystalMask, "all eight are gone")
         drake.health = 100f
         run(g, 5f)
         assertTrue(drake.health <= 100f, "no crystals: it cannot heal (${drake.health})")
@@ -1234,5 +1153,46 @@ class VillageWholeTest {
         }
         assertTrue(houses > 0, "houses exist")
         assertEquals(0, floating, "no house floats ($houses houses)")
+    }
+}
+
+class EyeOfEnderTest {
+    @Test fun anEyeFliesToTheGateRoomInOneThrowAndLandsAboveIt() {
+        val dir = kotlin.io.path.createTempDirectory("eye").toFile()
+        val level = LevelData.create(4242L, "t", GameMode.SURVIVAL)
+        val w = World(level.seed, dir, Dimension.OVERWORLD)
+        val g = Game(w, level, GameInput(), dir)
+        val site = Structures.gateRoomNear(w.seed, w.generator, 0f, 0f)
+        assertTrue(site != null, "a gate room is near")
+        val (sx, sy, sz) = site!!
+        for (dz in -2..2) for (dx in -2..2) w.ensureLoaded((sx shr 4) + dx, (sz shr 4) + dz)
+        // The room is underground, with its twelve stones and its roof.
+        assertEquals(Blocks.SKY_GATE, w.getBlock(sx + 2, sy, sz), "a gate stone")
+        assertTrue(sy + 6 < w.generator.surfaceHeight(sx, sz) - 4, "deep under the ground")
+        g.player.x = 0.5f; g.player.z = 0.5f; g.player.y = w.generator.surfaceHeight(0, 0) + 1f
+        w.ensureLoaded(0, 0)
+        g.inventory.slots[0] = ItemStack(Items.find("Eye of Ender"), 1); g.input.selectedSlot = 0
+        g.player.pitch = 1.2f
+        g.input.actions.add(GameInput.Action.PLACE); g.update(0.05f)
+        assertEquals(1, g.projectiles.list.size, "the eye flies")
+        assertEquals(0, g.inventory.count(Items.find("Eye of Ender")), "the thrown eye is gone from the hand")
+        var t = 0f
+        while (g.projectiles.list.isNotEmpty() && t < 40f) { g.update(0.1f); g.dirtyChunks.clear(); t += 0.1f }
+        assertTrue(g.projectiles.list.isEmpty(), "it came down")
+        val eye = g.drops.list.firstOrNull { it.stack.id == Items.find("Eye of Ender") }
+        assertTrue(eye != null, "it lies on the ground")
+        assertTrue(Math.abs(eye!!.x - (sx + 0.5f)) < 1.5f && Math.abs(eye.z - (sz + 0.5f)) < 1.5f, "right above the gate room")
+    }
+
+    @Test fun aGateStoneStillTakesTheEye() {
+        val dir = kotlin.io.path.createTempDirectory("eye2").toFile()
+        val level = LevelData.create(4243L, "t", GameMode.SURVIVAL, true)
+        val g = Game(World(level.seed, dir, Dimension.OVERWORLD, true), level, GameInput(), dir)
+        for (cx in -2..2) for (cz in -2..2) g.world.ensureLoaded(cx, cz)
+        val y = g.world.generator.surfaceHeight(0, 0) + 1
+        g.setBlock(0, y, 0, Blocks.SKY_GATE)
+        g.inventory.slots[0] = ItemStack(Items.find("Eye of Ender"), 2); g.input.selectedSlot = 0
+        g.putEye(0, y, 0, Items[Items.find("Eye of Ender")])
+        assertEquals(Blocks.SKY_GATE_EYE, g.world.getBlock(0, y, 0))
     }
 }

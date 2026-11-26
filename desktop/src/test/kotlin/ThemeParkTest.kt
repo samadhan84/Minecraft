@@ -16,64 +16,60 @@ class ThemeParkTest {
         error("no village")
     }
 
-    @Test fun villagesAreFuturisticAndAskForAThemePark() {
-        val world = World(12345L, null, Dimension.OVERWORLD, false)
-        val (cx, cz) = villageCentre(world)
-        world.ensureLoaded(cx shr 4, cz shr 4)
-        val h = world.generator.surfaceHeight(cx, cz)
-        assertTrue((h + 1..h + 5).any { world.getBlock(cx, it, cz) == Blocks.SEA_LANTERN }, "glowing tower in the plaza")
-        assertEquals(Blocks.QUARTZ_BLOCK, world.getBlock(cx + 2, h, cz + 2), "fountain rim")
-        assertTrue(world.pendingParks.any { it.first == cx && it.third == cz })
-    }
-
-    @Test fun villagesGetAThemePark() {
-        val dir = kotlin.io.path.createTempDirectory("park").toFile()
+    @Test fun villagesArePlainWoodenOnes() {
+        val dir = kotlin.io.path.createTempDirectory("plain").toFile()
         val world = World(12345L, dir, Dimension.OVERWORLD, false)
         val (cx, cz) = villageCentre(world)
         val lvl = LevelData.create(12345L, "P", GameMode.SURVIVAL).apply { hasPlayer = true; x = cx + 0.5f; y = 120f; z = cz + 0.5f }
         val g = Game(world, lvl, GameInput(), dir).also { it.mobs.hostileEnabled = false }
-        world.ensureLoaded(cx shr 4, cz shr 4)
+        for (dz in -5..5) for (dx in -5..5) world.ensureLoaded((cx shr 4) + dx, (cz shr 4) + dz)
         g.openThemeParks()
-        assertTrue(g.coasters.list.isEmpty(), "no roller coaster any more")
-        val gy = world.generator.surfaceHeight(cx, cz + 32)
-        assertEquals(Blocks.IRON_BLOCK, world.getBlock(cx - 16, gy + 12, cz + 34), "Ferris wheel hub")
-    }
-
-    @Test fun creativeVillagesGetOneToo() {
-        val dir = kotlin.io.path.createTempDirectory("park2").toFile()
-        val world = World(12345L, dir, Dimension.OVERWORLD, false)
-        val (cx, cz) = villageCentre(world)
-        val lvl = LevelData.create(12345L, "P", GameMode.CREATIVE).apply { hasPlayer = true; x = cx + 0.5f; y = 120f; z = cz + 0.5f }
-        val g = Game(world, lvl, GameInput(), dir)
-        world.ensureLoaded(cx shr 4, cz shr 4)
-        g.openThemeParks()
-        val gy = world.generator.surfaceHeight(cx, cz + 32)
-        assertEquals(Blocks.IRON_BLOCK, world.getBlock(cx - 16, gy + 12, cz + 34), "Ferris wheel")
-        assertTrue(g.coasters.list.isEmpty())
-        // Only once, even after looking round again.
-        repeat(300) { g.openThemeParks() }
-        assertEquals(1, (cx - 20..cx - 12).sumOf { x -> (gy + 12..gy + 12).count { y -> world.getBlock(x, y, cz + 34) == Blocks.IRON_BLOCK } })
-    }
-
-    @Test fun oldVillagesAreMadeOver() {
-        val dir = kotlin.io.path.createTempDirectory("park3").toFile()
-        val world = World(12345L, dir, Dimension.OVERWORLD, false)
-        val (cx, cz) = villageCentre(world)
-        val lvl = LevelData.create(12345L, "P", GameMode.CREATIVE).apply { hasPlayer = true; x = cx + 0.5f; y = 120f; z = cz + 0.5f }
-        val g = Game(world, lvl, GameInput(), dir)
-        for (dz in -2..2) for (dx in -2..2) world.ensureLoaded((cx shr 4) + dx, (cz shr 4) + dz)
-        world.pendingParks.clear()
         val h = world.generator.surfaceHeight(cx, cz)
-        // Turn it back into an old village: the well, and a wooden wall with a log corner and a path.
-        g.setBlock(cx, h, cz, Blocks.WATER); g.setBlock(cx + 2, h, cz + 2, Blocks.COBBLESTONE); g.setBlock(cx + 2, h + 1, cz + 2, Blocks.OAK_FENCE)
-        val hx = cx + 14; val hy = world.generator.surfaceHeight(hx, cz)
-        g.setBlock(hx, hy + 1, cz, Blocks.PLANKS); g.setBlock(hx + 1, hy + 1, cz, Blocks.LOG); g.setBlock(hx - 1, hy, cz, Blocks.DIRT_PATH)
-        g.openThemeParks()
-        assertEquals(Blocks.CONCRETE_FIRST, world.getBlock(hx, hy + 1, cz), "planks became white walls")
-        assertNotEquals(Blocks.LOG, world.getBlock(hx + 1, hy + 1, cz), "log corner became a coloured corner")
-        assertEquals(Blocks.SMOOTH_STONE, world.getBlock(hx - 1, hy, cz))
-        assertEquals(Blocks.QUARTZ_BLOCK, world.getBlock(cx + 2, h, cz + 2), "new plaza")
-        assertTrue(g.coasters.list.isEmpty(), "and a theme park without a roller coaster")
+        assertEquals(Blocks.WATER, world.getBlock(cx, h, cz), "a well in the middle")
+        assertEquals(Blocks.COBBLESTONE, world.getBlock(cx + 1, h + 1, cz), "its rim")
+        assertTrue(world.pendingParks.isEmpty())
+        val seen = HashMap<Int, Int>()
+        for (x in cx - 60..cx + 60) for (z in cz - 60..cz + 60) for (y in h - 4..h + 30) seen.merge(world.getBlock(x, y, z), 1, Int::plus)
+        for (bad in listOf(Blocks.SEA_LANTERN, Blocks.CONCRETE_FIRST, Blocks.MOB_CAGE, Blocks.HOPPER, Blocks.SKY_PORTAL, Blocks.SKY_GATE_EYE, Blocks.IRON_BLOCK, Blocks.SOLAR_PANEL))
+            assertEquals(0, seen[bad] ?: 0, "no futuristic block ${Blocks[bad].name}")
+        assertTrue((seen[Blocks.OAK_DOOR] ?: 0) >= 6, "houses with doors")
+        assertTrue((seen[Blocks.OAK_STAIRS] ?: 0) + (seen[Blocks.BRICK_STAIRS] ?: 0) + (seen[Blocks.COBBLESTONE_STAIRS] ?: 0) > 30, "pitched roofs")
+    }
+
+    @Test fun everyHouseIsWholeFromBaseToRidge() {
+        val world = World(12345L, null, Dimension.OVERWORLD, false)
+        val (cx, cz) = villageCentre(world)
+        for (dz in -5..5) for (dx in -5..5) world.ensureLoaded((cx shr 4) + dx, (cz shr 4) + dz)
+        var checked = 0
+        for (x in cx - 40..cx + 40) for (z in cz - 40..cz + 40) {
+            val g0 = world.generator.surfaceHeight(x, z)
+            for (y in g0 - 3..g0 + 6) {
+                if (world.getBlock(x, y, z) != Blocks.OAK_DOOR || world.getBlock(x, y - 1, z) == Blocks.OAK_DOOR) continue
+                val ids = (y + 3..y + 12).map { world.getBlock(x, it, z) }
+                assertTrue(ids.any { it == Blocks.OAK_STAIRS || it == Blocks.BRICK_STAIRS || it == Blocks.COBBLESTONE_STAIRS || it == Blocks.PLANKS || it == Blocks.BRICKS || it == Blocks.COBBLESTONE }, "a roof above the door at $x,$z")
+                checked++
+            }
+        }
+        assertTrue(checked >= 3, "found houses: $checked")
+    }
+
+    @Test fun oldVillagesLoseTheirFarmShrineAndSmithyPortal() {
+        val dir = kotlin.io.path.createTempDirectory("retire").toFile()
+        val world = World(12345L, dir, Dimension.OVERWORLD, false)
+        val (cx, cz) = villageCentre(world)
+        // A smithy chunk that was made in the old days: its gate is there, and no marker says it was cleaned.
+        val sa = Random0(world.seed, cx, cz)
+        val sx = sa.first; val sz = sa.second
+        world.ensureLoaded(sx shr 4, sz shr 4)
+        val y0 = world.generator.surfaceHeight(sx, sz)
+        assertNotEquals(Blocks.SKY_PORTAL, world.getBlock(sx, y0 + 1, sz), "new smithies have no sky portal")
+        assertNotEquals(Blocks.SKY_GATE_EYE, world.getBlock(sx + 2, y0 + 1, sz), "no gate stones")
+    }
+
+    private fun Random0(seed: Long, cx: Int, cz: Int): Pair<Int, Int> {
+        val fa = java.util.Random(seed xor (cx * 341873128712L) xor (cz * 132897987541L) xor 0xFA12).nextDouble() * Math.PI * 2
+        val sa = fa + Math.PI * (0.6 + java.util.Random(seed xor (cx * 91L) xor (cz * 7919L)).nextDouble() * 0.8)
+        return (cx + (Math.cos(sa) * 28).toInt()) to (cz + (Math.sin(sa) * 28).toInt())
     }
 
     @Test fun coasterTrackAndCart() {

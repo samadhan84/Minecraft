@@ -71,20 +71,22 @@ class EmberGenerator(private val seed: Long) : WorldGenerator {
 /** The Sky Isles: floating islands of pale stone over an endless void, with sky stone towers; the dragon arena is in the middle. */
 class SkyGenerator(private val seed: Long) : WorldGenerator {
     companion object {
-        /** Height of obsidian pillar [i] (0..9) above the platform; each crystal stands on top of one. */
-        fun pillarHeight(i: Int) = 12 + (i * 7 % 5) * 3
+        /** How many pillars (and crystals) the arena has. */
+        const val CRYSTALS = 8
+        /** Height of obsidian pillar [i] (0..7) above the platform; each crystal stands on top of one. */
+        fun pillarHeight(i: Int) = 12 + (i * 3 % 5) * 3
         const val ROOM_Z = -34
     }
 
-    /** Ten obsidian pillars around the middle, and the room (with the way home) at the edge of the platform. */
+    /** Eight obsidian pillars around the middle, and the room (with the way home) at the edge of the platform. */
     private fun arena(chunk: Chunk) {
         fun put(wx: Int, y: Int, wz: Int, id: Int) {
             val x = wx - chunk.cx * 16; val z = wz - chunk.cz * 16
             if (x in 0..15 && z in 0..15 && y in 1 until Chunk.BASE) chunk.set(x, y, z, id)
         }
         val top = 64
-        for (i in 0 until 10) {
-            val a = i * 2.0 * Math.PI / 10.0
+        for (i in 0 until CRYSTALS) {
+            val a = i * 2.0 * Math.PI / CRYSTALS
             val px = Math.round(Math.cos(a) * 26.0).toInt(); val pz = Math.round(Math.sin(a) * 26.0).toInt()
             if (abs(px - chunk.cx * 16 - 8) > 12 || abs(pz - chunk.cz * 16 - 8) > 12) continue
             val h = pillarHeight(i)
@@ -169,6 +171,32 @@ fun villageIn(seed: Long, generator: WorldGenerator, rx: Int, rz: Int): IntArray
 
 /** Villages, desert temples and dungeons, generated chunk by chunk from a deterministic layout. */
 class Structures(private val seed: Long, private val gen: WorldGenerator, private val world: World) {
+    companion object {
+        const val GATE_CELL = 256
+
+        /** The centre (x, y, z) of the sky gate room in grid cell (rx, rz), or null if that cell has none. */
+        fun gateRoomAt(seed: Long, gen: WorldGenerator, rx: Int, rz: Int): IntArray? {
+            val rnd = Random(seed xor (rx * 60493L) xor (rz * 94781L) xor 0x6A7E)
+            val x = rx * GATE_CELL + 24 + rnd.nextInt(GATE_CELL - 48); val z = rz * GATE_CELL + 24 + rnd.nextInt(GATE_CELL - 48)
+            val y = 10 + rnd.nextInt(6)
+            if (gen.surfaceHeight(x, z) - 12 < y) return null
+            return intArrayOf(x, y, z)
+        }
+
+        /** The sky gate room nearest to (x, z), looked for in the cells round it, or null if there is none near. */
+        fun gateRoomNear(seed: Long, gen: WorldGenerator, x: Float, z: Float): IntArray? {
+            if (gen is FlatGenerator) return null
+            val cx = Math.floorDiv(x.toInt(), GATE_CELL); val cz = Math.floorDiv(z.toInt(), GATE_CELL)
+            var best: IntArray? = null; var bestD = Float.MAX_VALUE
+            for (rz in cz - 3..cz + 3) for (rx in cx - 3..cx + 3) {
+                val r = gateRoomAt(seed, gen, rx, rz) ?: continue
+                val d = (r[0] - x) * (r[0] - x) + (r[2] - z) * (r[2] - z)
+                if (d < bestD) { bestD = d; best = r }
+            }
+            return best
+        }
+    }
+
     private class Put(val chunk: Chunk) {
         val x0 = chunk.cx * 16; val z0 = chunk.cz * 16
         fun inside(x: Int, z: Int) = x >= x0 && x < x0 + 16 && z >= z0 && z < z0 + 16
@@ -224,56 +252,52 @@ class Structures(private val seed: Long, private val gen: WorldGenerator, privat
         p.x0 + 15 >= x - 16 && p.x0 <= x + 16 && p.z0 + 15 >= z - 16 && p.z0 <= z + 16 &&
         world.bigDone.add(Chunk.key(p.chunk.cx, p.chunk.cz) * 31L + ((x * 73856093L) xor (z * 19349663L) xor kind.toLong()))
 
-    private fun farmFor(p: Put, cx: Int, cz: Int) {
+    /** Where the smithy of the village at (cx, cz) stands. (The same angles once also placed a farm tower and a portal shrine.) */
+    private fun smithySite(cx: Int, cz: Int): IntArray {
         val fa = Random(seed xor (cx * 341873128712L) xor (cz * 132897987541L) xor 0xFA12).nextDouble() * Math.PI * 2
-        xpFarm(p, cx + (Math.cos(fa) * 36).toInt(), cz + (Math.sin(fa) * 36).toInt())
-        // The blacksmith's home, on its own side of the village (kept clear of the farm's side).
         val sa = fa + Math.PI * (0.6 + Random(seed xor (cx * 91L) xor (cz * 7919L)).nextDouble() * 0.8)
-        val sx = cx + (Math.cos(sa) * 28).toInt(); val sz = cz + (Math.sin(sa) * 28).toInt()
-        if (p.x0 + 15 >= sx - 8 && p.x0 <= sx + 8 && p.z0 + 15 >= sz - 8 && p.z0 <= sz + 8) {
-            val ck = Chunk.key(p.chunk.cx, p.chunk.cz) * 31L
-            if (world.bigDone.add(ck + ((sx * 73856093L) xor (sz * 19349663L) xor 4L))) {
-                smithy(p, sx, sz, cx, cz)                        // a new smithy comes with its sky portal
-                world.bigDone.add(ck + ((sx * 73856093L) xor (sz * 19349663L) xor 6L))
-            } else if (world.bigDone.add(ck + ((sx * 73856093L) xor (sz * 19349663L) xor 6L))) {
-                smithyGate(p, sx, gen.surfaceHeight(sx, sz), sz)  // a smithy built before the portals: add it now
+        return intArrayOf(cx + (Math.cos(sa) * 28).toInt(), cz + (Math.sin(sa) * 28).toInt())
+    }
+
+    /**
+     * Old worlds: villages made before this update had an XP farm tower, a sky portal shrine and a sky portal inside the
+     * smithy. They are taken away, once per chunk. New chunks mark themselves as done and never get here.
+     */
+    private fun retire(p: Put, cx: Int, cz: Int) {
+        if (!world.bigDone.add(Chunk.key(p.chunk.cx, p.chunk.cz) * 31L + ((cx * 73856093L) xor (cz * 19349663L) xor 7L))) return
+        val fa = Random(seed xor (cx * 341873128712L) xor (cz * 132897987541L) xor 0xFA12).nextDouble() * Math.PI * 2
+        // The farm tower and its platform.
+        val fx = cx + (Math.cos(fa) * 36).toInt(); val fz = cz + (Math.sin(fa) * 36).toInt()
+        if (p.x0 + 15 >= fx - 4 && p.x0 <= fx + 4 && p.z0 + 15 >= fz - 4 && p.z0 <= fz + 7) {
+            val g = gen.surfaceHeight(fx, fz)
+            for (x in fx - 3..fx + 3) for (z in fz - 3..fz + 6) if (p.inside(x, z)) {
+                for (y in g + 1..g + 31) set(p, x, y, z, Blocks.AIR)
+                set(p, x, g, z, Blocks.GRASS); set(p, x, g - 1, z, Blocks.DIRT)
+                for (y in g - 1..g) world.blockEntities.map.remove(RedstoneIds.pack(x, y, z))
             }
         }
-        // And an open End-style (sky) portal shrine, on the side between the farm and the smithy.
+        // The portal shrine.
         val ea = fa + Math.PI * 0.5
         val ex = cx + (Math.cos(ea) * 40).toInt(); val ez = cz + (Math.sin(ea) * 40).toInt()
-        if (p.x0 + 15 >= ex - 7 && p.x0 <= ex + 7 && p.z0 + 15 >= ez - 7 && p.z0 <= ez + 7 && world.bigDone.add(Chunk.key(p.chunk.cx, p.chunk.cz) * 31L + ((ex * 73856093L) xor (ez * 19349663L) xor 5L)))
-            skyShrine(p, ex, ez)
-    }
-
-    /** The sky portal inside the smithy: the floor made plain, the twelve eye stones around, the 3 x 3 portal open, and head room above. */
-    private fun smithyGate(p: Put, x: Int, y0: Int, z: Int) {
-        for (dx in -2..2) for (dz in -2..2) {
-            set(p, x + dx, y0, z + dz, Blocks.STONE_BRICKS)          // (an old lava forge pit becomes floor)
-            for (y in y0 + 1..y0 + 3) set(p, x + dx, y, z + dz, Blocks.AIR)
+        if (p.x0 + 15 >= ex - 6 && p.x0 <= ex + 6 && p.z0 + 15 >= ez - 6 && p.z0 <= ez + 6) {
+            val g = gen.surfaceHeight(ex, ez)
+            for (x in ex - 5..ex + 5) for (z in ez - 5..ez + 5) if (p.inside(x, z)) {
+                for (y in g + 1..g + 6) set(p, x, y, z, Blocks.AIR)
+                set(p, x, g, z, Blocks.GRASS); set(p, x, g - 1, z, Blocks.DIRT)
+            }
         }
-        for (d in -1..1) for (e in intArrayOf(-2, 2)) { set(p, x + e, y0 + 1, z + d, Blocks.SKY_GATE_EYE); set(p, x + d, y0 + 1, z + e, Blocks.SKY_GATE_EYE) }
-        for (dx in -1..1) for (dz in -1..1) set(p, x + dx, y0 + 1, z + dz, Blocks.SKY_PORTAL)
-    }
-
-    /** A village's sky portal: a stone-brick platform with the twelve gate stones, each holding an eye, and the 3 x 3 portal open. */
-    private fun skyShrine(p: Put, x: Int, z: Int) {
-        val g = gen.surfaceHeight(x, z)
-        levelPad(p, x, z, 5, 5, g)
-        for (dx in -4..4) for (dz in -4..4) {
-            for (y in g - 3 until g) set(p, x + dx, y, z + dz, Blocks.STONE_BRICKS)
-            set(p, x + dx, g, z + dz, if (abs(dx) == 4 || abs(dz) == 4) Blocks.MOSSY_STONE_BRICKS else Blocks.STONE_BRICKS)
-            for (y in g + 1..g + 4) set(p, x + dx, y, z + dz, Blocks.AIR)
-        }
-        for (d in -1..1) for (e in intArrayOf(-2, 2)) { set(p, x + e, g + 1, z + d, Blocks.SKY_GATE_EYE); set(p, x + d, g + 1, z + e, Blocks.SKY_GATE_EYE) }
-        for (dx in -1..1) for (dz in -1..1) set(p, x + dx, g + 1, z + dz, Blocks.SKY_PORTAL)
-        for ((dx, dz) in listOf(-3 to -3, 3 to -3, -3 to 3, 3 to 3)) {
-            for (y in g + 1..g + 3) set(p, x + dx, y, z + dz, Blocks.STONE_BRICKS)
-            set(p, x + dx, g + 4, z + dz, Blocks.TORCH)
+        // The portal in the smithy's floor: the stones and the opening go, the floor stays.
+        val (sx, sz) = smithySite(cx, cz).let { it[0] to it[1] }
+        if (p.x0 + 15 >= sx - 3 && p.x0 <= sx + 3 && p.z0 + 15 >= sz - 3 && p.z0 <= sz + 3) {
+            val y0 = gen.surfaceHeight(sx, sz)
+            for (x in sx - 2..sx + 2) for (z in sz - 2..sz + 2) {
+                val b = if (p.inside(x, z)) p.chunk.get(x - p.x0, y0 + 1, z - p.z0) else Blocks.AIR
+                if (b == Blocks.SKY_GATE_EYE || b == Blocks.SKY_GATE || b == Blocks.SKY_PORTAL) set(p, x, y0 + 1, z, Blocks.AIR)
+            }
         }
     }
 
-    /** The blacksmith's home: a stone-brick forge house 11 x 9 with furnaces, anvil, grindstone, a sky portal in the middle, loot chests and a villager. */
+    /** The blacksmith's home: a stone-brick forge house 11 x 9 with furnaces, anvil, grindstone, loot chests and a villager. */
     private fun smithy(p: Put, sx: Int, sz: Int, vx: Int, vz: Int) {
         val y0 = gen.surfaceHeight(sx, sz)
         levelPad(p, sx, sz, 6, 5, y0)
@@ -308,10 +332,9 @@ class Structures(private val seed: Long, private val gen: WorldGenerator, privat
         set(p, sx + bx + ax * 1, y0 + 1, sz + bz + az * 1, Blocks.ANVIL)
         set(p, sx + bx + ax * 2, y0 + 1, sz + bz + az * 2, Blocks.GRINDSTONE)
         for (y in y0 + 5..y0 + 7) { set(p, sx + bx + ax * -2, y, sz + bz + az * -2, Blocks.COBBLESTONE); set(p, sx + bx, y, sz + bz, Blocks.COBBLESTONE) }
-        // The sky portal in the middle of the room: twelve stones with an eye each, and the 3 x 3 portal open.
-        smithyGate(p, sx, y0, sz)
-        // Torches and loot.
-        for ((dx, dz) in listOf(-4 to -3, 4 to -3, -4 to 3, 4 to 3)) set(p, sx + dx, y0 + 3, sz + dz, Blocks.TORCH)
+        // A table and a bed in the middle of the room, torches in the corners and loot.
+        set(p, sx - 1, y0 + 1, sz, Blocks.CRAFTING_TABLE, 2)
+        for ((dx, dz) in listOf(-4 to -3, 4 to -3, -4 to 3, 4 to 3)) set(p, sx + dx, y0 + 1, sz + dz, Blocks.TORCH)
         val loot = listOf(
             Items.find("Iron Ingot") to 2..7, Items.find("Coal") to 3..9, Items.find("Iron Pickaxe") to (if (rnd.nextInt(2) == 0) 1..1 else 0..0),
             Items.find("Iron Sword") to (if (rnd.nextInt(2) == 0) 1..1 else 0..0), Items.find("Diamond") to (if (rnd.nextInt(4) == 0) 1..2 else 0..0),
@@ -337,7 +360,7 @@ class Structures(private val seed: Long, private val gen: WorldGenerator, privat
                 val h = gen.surfaceHeight(cx, cz)
                 if (h <= TerrainGenerator.SEA_LEVEL + 1 || h > 88) continue
                 when (gen.biomeAt(cx, cz)) {
-                    Biome.PLAINS, Biome.SAVANNA, Biome.FOREST, Biome.SNOW, Biome.CHERRY, Biome.JUNGLE, Biome.SWAMP -> if (farmsOnly) farmFor(p, cx, cz) else village(p, cx, cz, rnd)
+                    Biome.PLAINS, Biome.SAVANNA, Biome.FOREST, Biome.SNOW, Biome.CHERRY, Biome.JUNGLE, Biome.SWAMP -> if (farmsOnly) retire(p, cx, cz) else village(p, cx, cz, rnd)
                     Biome.DESERT -> if (!farmsOnly) temple(p, cx, h, cz, rnd)
                     else -> {}
                 }
@@ -378,14 +401,12 @@ class Structures(private val seed: Long, private val gen: WorldGenerator, privat
                 if (firstTime(p, 1, x, z)) fort(p, x, y, z, rnd)
             }
         // Sky gate rooms deep under the hills, one in a while.
-        val gateCell = 256
+        val gateCell = GATE_CELL
         for (rz in (p.z0 - 16).floorDiv(gateCell)..(p.z0 + 32).floorDiv(gateCell))
             for (rx in (p.x0 - 16).floorDiv(gateCell)..(p.x0 + 32).floorDiv(gateCell)) {
-                val rnd = Random(seed xor (rx * 60493L) xor (rz * 94781L) xor 0x6A7E)
-                val x = rx * gateCell + 24 + rnd.nextInt(gateCell - 48); val z = rz * gateCell + 24 + rnd.nextInt(gateCell - 48)
-                val y = 10 + rnd.nextInt(6)
-                if (gen.surfaceHeight(x, z) - 12 < y) continue
-                if (firstTime(p, 2, x, z)) skyGateRoom(p, x, y, z, rnd)
+                val r = gateRoomAt(seed, gen, rx, rz) ?: continue
+                val rnd = Random(seed xor (rx * 60493L) xor (rz * 94781L) xor 0x6A7F)
+                if (firstTime(p, 2, r[0], r[2])) skyGateRoom(p, r[0], r[1], r[2], rnd)
             }
         val mansionCell = 192
         for (rz in (p.z0 - 24).floorDiv(mansionCell)..(p.z0 + 40).floorDiv(mansionCell))
@@ -449,7 +470,7 @@ class Structures(private val seed: Long, private val gen: WorldGenerator, privat
         for (dx in -1..1) for (dz in -1..1) set(p, x + dx, y - 1, z + dz, Blocks.STONE_BRICKS)
         for (d in -1..1) for (e in intArrayOf(-2, 2)) { set(p, x + e, y, z + d, Blocks.SKY_GATE); set(p, x + d, y, z + e, Blocks.SKY_GATE) }
         for (sx in intArrayOf(-5, 5)) for (sz in intArrayOf(-5, 5)) set(p, x + sx, y + 1, z + sz, Blocks.TORCH)
-        val loot = listOf(Items.find("Ender Pearl") to 1..3, Items.find("Blaze Powder") to 0..2, Items.find("Iron Ingot") to 1..4, Items.find("Bread") to 1..3)
+        val loot = listOf(Items.find("Ender Pearl") to 2..5, Items.find("Blaze Powder") to 1..3, Items.find("Eye of Ender") to 0..2, Items.find("Iron Ingot") to 1..4, Items.find("Bread") to 1..3)
         lootChest(p, x, y, z - 5, rnd, loot, 3)
     }
 
@@ -613,42 +634,39 @@ class Structures(private val seed: Long, private val gen: WorldGenerator, privat
     // ---------------------------------------------------------------- village
 
     /*
-     * Villages are futuristic: a glowing plaza with a fountain and a light tower in the middle, smooth lit streets,
-     * white pod houses with big glass walls, glowing roof trim and solar panels, and hydroponic farms. In survival
-     * worlds a theme park opens beside each new village (built by the game: see engine/ThemePark).
+     * Villages are plain, old-fashioned ones: a cobblestone well on a gravel square, dirt paths with lamp posts, wooden
+     * houses with a stone base, windows, a door, a pitched roof and a bed, crop farms, and the blacksmith's stone house.
      */
     private fun village(p: Put, cx: Int, cz: Int, rnd: Random) {
         // Every decision about the village is made the same way in every chunk (the dice are always rolled),
         // so the houses are whole wherever the chunk borders fall.
+        world.bigDone.add(Chunk.key(p.chunk.cx, p.chunk.cz) * 31L + ((cx * 73856093L) xor (cz * 19349663L) xor 7L))   // nothing old to take away here
         val villagers = 3 + rnd.nextInt(3)
         val wh = gen.surfaceHeight(cx, cz)
-        val white = Blocks.CONCRETE_FIRST; val lightBlue = Blocks.CONCRETE_FIRST + 3
         levelPad(p, cx, cz, 8, 8, wh)
-        // The plaza: white with a light blue ring, a fountain and a glowing tower in the middle.
+        // The square: gravel with a cobblestone edge, and a well in the middle.
         for (dx in -5..5) for (dz in -5..5) {
             val ring = abs(dx) == 5 || abs(dz) == 5
-            for (y in wh - 3 until wh) set(p, cx + dx, y, cz + dz, Blocks.STONE)
-            set(p, cx + dx, wh, cz + dz, if (ring) lightBlue else white)
-            for (y in wh + 1..wh + 8) set(p, cx + dx, y, cz + dz, Blocks.AIR)
+            for (y in wh - 3 until wh) set(p, cx + dx, y, cz + dz, Blocks.DIRT)
+            set(p, cx + dx, wh, cz + dz, if (ring) Blocks.COBBLESTONE else if ((dx + dz) % 2 == 0) Blocks.GRAVEL else Blocks.DIRT_PATH)
+            for (y in wh + 1..wh + 6) set(p, cx + dx, y, cz + dz, Blocks.AIR)
         }
-        for (dx in -2..2) for (dz in -2..2) {
-            val rim = abs(dx) == 2 || abs(dz) == 2
-            set(p, cx + dx, wh, cz + dz, if (rim) Blocks.QUARTZ_BLOCK else Blocks.WATER)
-            if (rim) set(p, cx + dx, wh + 1, cz + dz, if ((dx + dz) % 2 == 0) Blocks.QUARTZ_BLOCK else Blocks.GLASS_PANE)
+        for (dx in -1..1) for (dz in -1..1) {
+            val rim = dx != 0 || dz != 0
+            if (rim) set(p, cx + dx, wh + 1, cz + dz, Blocks.COBBLESTONE)
+            else { set(p, cx, wh, cz, Blocks.WATER); set(p, cx, wh - 1, cz, Blocks.WATER); set(p, cx, wh - 2, cz, Blocks.COBBLESTONE) }
         }
-        for (y in wh - 2 until wh) for (dx in -1..1) for (dz in -1..1) set(p, cx + dx, y, cz + dz, Blocks.WATER)
-        for (y in wh + 1..wh + 5) set(p, cx, y, cz, if (y % 2 == 0) Blocks.SEA_LANTERN else Blocks.GLASS)
-        set(p, cx, wh + 6, cz, Blocks.QUARTZ_BLOCK)
-        for ((dx, dz) in listOf(4 to 4, -4 to 4, 4 to -4, -4 to -4)) lamp(p, cx + dx, wh + 1, cz + dz)
-        if (p.inside(cx, cz)) {
-            repeat(villagers) { world.pendingVillagers.add(Triple(cx + 3, wh + 1, cz + 3)) }
-            world.pendingParks.add(Triple(cx, wh, cz))
-        }
+        for ((dx, dz) in listOf(-1 to -1, 1 to -1, -1 to 1, 1 to 1)) { set(p, cx + dx, wh + 2, cz + dz, Blocks.OAK_FENCE); set(p, cx + dx, wh + 3, cz + dz, Blocks.OAK_FENCE) }
+        for (dx in -1..1) for (dz in -1..1) set(p, cx + dx, wh + 4, cz + dz, Blocks.OAK_SLAB)
+        for ((dx, dz) in listOf(-4 to -4, 4 to -4, -4 to 4, 4 to 4)) lamp(p, cx + dx, wh + 1, cz + dz)
+        if (p.inside(cx, cz)) repeat(villagers) { world.pendingVillagers.add(Triple(cx + 3, wh + 1, cz + 3)) }
 
-        // The houses: on two rings round the plaza, only where the ground is level enough and dry, never on top of
-        // each other or of the farm tower, the smithy and the portal shrine.
+        // The blacksmith's house, on a side of the village of its own.
+        val (sx, sz) = smithySite(cx, cz).let { it[0] to it[1] }
+        if (p.x0 + 15 >= sx - 8 && p.x0 <= sx + 8 && p.z0 + 15 >= sz - 8 && p.z0 <= sz + 8) smithy(p, sx, sz, cx, cz)
+
+        // The houses: on two rings round the square, only where the ground is level enough and dry, never on top of each other or of the smithy.
         val layout = Random(seed xor (cx * 5851L) xor (cz * 19937L) xor 0x40C5)
-        val extras = extraSites(cx, cz)
         val sites = ArrayList<IntArray>()      // x, z, half width, level, 1 = crop farm
         for ((ring, count) in listOf(13 to 5, 20 to 7)) {
             val jitter = layout.nextDouble() * 6.2832
@@ -657,82 +675,27 @@ class Structures(private val seed: Long, private val gen: WorldGenerator, privat
                 val hx = cx + (Math.cos(a) * ring).toInt(); val hz = cz + (Math.sin(a) * ring).toInt()
                 val w = 2 + layout.nextInt(2)
                 val farm = layout.nextInt(4) == 0
-                val level = siteLevel(hx, hz, w + 1)
+                val level = siteLevel(hx, hz, w + 2)
                 if (level < 0) continue
-                if (sites.any { (it[0] - hx) * (it[0] - hx) + (it[1] - hz) * (it[1] - hz) < 10 * 10 }) continue
-                if (extras.any { (it[0] - hx) * (it[0] - hx) + (it[1] - hz) * (it[1] - hz) < (it[2] + w + 3) * (it[2] + w + 3) }) continue
+                if (sites.any { (it[0] - hx) * (it[0] - hx) + (it[1] - hz) * (it[1] - hz) < 11 * 11 }) continue
+                if ((sx - hx) * (sx - hx) + (sz - hz) * (sz - hz) < (w + 10) * (w + 10)) continue
                 sites.add(intArrayOf(hx, hz, w, level, if (farm) 1 else 0))
             }
         }
-        for (s in sites) levelPad(p, s[0], s[1], s[2] + 2, s[2] + 2, s[3])
+        for (s in sites) levelPad(p, s[0], s[1], s[2] + 3, s[2] + 3, s[3])
         for (s in sites) path(p, cx, cz, s[0], s[1])
         for (s in sites) {
             val hr = Random(seed xor (s[0] * 7349L) xor (s[1] * 9157L) xor 0x40E)
             if (s[4] == 1) farm(p, s[0], s[1], s[3], hr) else house(p, s[0], s[1], s[3], s[2], hr, cx, cz)
         }
-        // Every village has a big XP farm tower a little way out.
-        farmFor(p, cx, cz)
     }
 
-    /** Where the farm tower, the smithy and the portal shrine of the village at (cx, cz) stand: x, z and how far they reach. */
-    private fun extraSites(cx: Int, cz: Int): List<IntArray> {
-        val fa = Random(seed xor (cx * 341873128712L) xor (cz * 132897987541L) xor 0xFA12).nextDouble() * Math.PI * 2
-        val sa = fa + Math.PI * (0.6 + Random(seed xor (cx * 91L) xor (cz * 7919L)).nextDouble() * 0.8)
-        val ea = fa + Math.PI * 0.5
-        return listOf(
-            intArrayOf(cx + (Math.cos(fa) * 36).toInt(), cz + (Math.sin(fa) * 36).toInt(), 6),
-            intArrayOf(cx + (Math.cos(sa) * 28).toInt(), cz + (Math.sin(sa) * 28).toInt(), 7),
-            intArrayOf(cx + (Math.cos(ea) * 40).toInt(), cz + (Math.sin(ea) * 40).toInt(), 6),
-        )
-    }
-
-    /**
-     * A village XP farm: a 5 x 5 tower. Spawn Cages in the roof drop monsters down the 3 x 3 shaft into a pit of hoppers
-     * (with a chest below for the loot). You stand on the platform outside and hit them through a window, two blocks above the pit.
-     */
-    private fun xpFarm(p: Put, fx: Int, fz: Int) {
-        if (p.x0 + 15 < fx - 8 || p.x0 > fx + 8 || p.z0 + 15 < fz - 8 || p.z0 > fz + 8) return
-        // A chunk gets its farm part once: new chunks mark themselves here, old worlds are patched when the chunk first loads.
-        if (!world.farmChunks.add(Chunk.key(p.chunk.cx, p.chunk.cz))) return
-        val g = gen.surfaceHeight(fx, fz)
-        levelPad(p, fx, fz + 1, 4, 6, g)
-        val white = Blocks.CONCRETE_FIRST
-        // The platform and its steps first (south side).
-        for (dx in -1..1) {
-            for (y in g - 3 until g + 1) for (dz in 3..5) set(p, fx + dx, y, fz + dz, Blocks.STONE)
-            set(p, fx + dx, g + 1, fz + 5, Blocks.SMOOTH_STONE)
-            for (dz in 3..4) { set(p, fx + dx, g + 1, fz + dz, Blocks.SMOOTH_STONE); set(p, fx + dx, g + 2, fz + dz, Blocks.SMOOTH_STONE) }
-            for (y in g + 3..g + 6) for (dz in 3..5) set(p, fx + dx, y, fz + dz, Blocks.AIR)
-        }
-        // The tower: solid base, walls with glowing bands, an open shaft, and a roof.
-        for (dx in -2..2) for (dz in -2..2) {
-            val wall = abs(dx) == 2 || abs(dz) == 2
-            for (y in g - 3..g - 1) set(p, fx + dx, y, fz + dz, Blocks.STONE)
-            for (y in g + 1..g + 28) set(p, fx + dx, y, fz + dz, if (!wall) Blocks.AIR else if (y % 6 == 0) Blocks.SEA_LANTERN else white)
-            set(p, fx + dx, g + 29, fz + dz, Blocks.QUARTZ_BLOCK)
-        }
-        // The window you hit through, two blocks above the pit floor.
-        for (dx in -1..1) for (y in g + 3..g + 4) set(p, fx + dx, y, fz + 2, Blocks.AIR)
-        // The pit floor: hoppers that point to the middle one, which empties into a chest underneath.
-        for (dx in -1..1) for (dz in -1..1) {
-            val meta = when { dx == 0 && dz == 0 -> 0; dx != 0 -> if (dx > 0) 5 else 4; dz > 0 -> 3; else -> 2 }
-            set(p, fx + dx, g, fz + dz, Blocks.HOPPER, meta)
-            world.blockEntities.map.putIfAbsent(RedstoneIds.pack(fx + dx, g, fz + dz), HopperEntity())
-        }
-        set(p, fx, g - 1, fz, Blocks.CHEST, 2)
-        world.blockEntities.map.putIfAbsent(RedstoneIds.pack(fx, g - 1, fz), ChestEntity())
-        // Cages in the roof, at the corners of the shaft and in the middle.
-        for ((dx, dz) in listOf(-1 to -1, 1 to -1, -1 to 1, 1 to 1, 0 to 0)) set(p, fx + dx, g + 28, fz + dz, Blocks.MOB_CAGE)
-        // Lamps around the foot.
-        for ((dx, dz) in listOf(-3 to -3, 3 to -3, -3 to 3, 3 to 3)) if (p.inside(fx + dx, fz + dz)) lamp(p, fx + dx, gen.surfaceHeight(fx + dx, fz + dz) + 1, fz + dz)
-    }
-
-    /** A street lamp: a pole two blocks high with the lamp on top. */
+    /** A street lamp: a fence post two high with a torch on top. */
     private fun lamp(p: Put, x: Int, y: Int, z: Int) {
-        set(p, x, y, z, Blocks.STREET_LAMP, 2 or 8); set(p, x, y + 1, z, Blocks.STREET_LAMP, 2 or 8); set(p, x, y + 2, z, Blocks.STREET_LAMP, 2)
+        set(p, x, y, z, Blocks.OAK_FENCE); set(p, x, y + 1, z, Blocks.OAK_FENCE); set(p, x, y + 2, z, Blocks.TORCH)
     }
 
-    /** A smooth grey street, two blocks wide, with a street lamp every 8 blocks. */
+    /** A dirt path, two blocks wide, with a lamp post every 8 blocks. */
     private fun path(p: Put, x0: Int, z0: Int, x1: Int, z1: Int) {
         val steps = max(abs(x1 - x0), abs(z1 - z0))
         val alongX = abs(x1 - x0) >= abs(z1 - z0)
@@ -743,7 +706,7 @@ class Structures(private val seed: Long, private val gen: WorldGenerator, privat
                 if (!p.inside(px, pz) || (abs(px - x0) <= 5 && abs(pz - z0) <= 5)) continue
                 val y = gen.surfaceHeight(px, pz)
                 val cur = p.chunk.get(px - p.x0, y, pz - p.z0)
-                if (cur == Blocks.GRASS || cur == Blocks.SNOW_GRASS || cur == Blocks.DIRT || cur == Blocks.SAND) set(p, px, y, pz, Blocks.SMOOTH_STONE)
+                if (cur == Blocks.GRASS || cur == Blocks.SNOW_GRASS || cur == Blocks.DIRT || cur == Blocks.SAND) set(p, px, y, pz, Blocks.DIRT_PATH)
                 if (Blocks[p.chunk.get(px - p.x0, y + 1, pz - p.z0)].render == RenderType.CROSS) set(p, px, y + 1, pz, Blocks.AIR)
             }
             if (i % 8 == 4 && i < steps - 4) {
@@ -753,59 +716,83 @@ class Structures(private val seed: Long, private val gen: WorldGenerator, privat
         }
     }
 
-    /** A futuristic pod house: white walls with big glass windows, glowing trim, a flat roof with solar panels. */
+    /**
+     * A wooden house, whole from the ground up: a cobblestone base, plank walls with log corners, windows, a door that
+     * faces the square, a pitched roof of stairs with closed gable ends, and a bed, a table, a chest and a torch inside.
+     */
     private fun house(p: Put, hx: Int, hz: Int, y0: Int, w: Int, rnd: Random, cx: Int, cz: Int) {   // half width w -> 5x5 or 7x7
-        val white = Blocks.CONCRETE_FIRST
-        val accent = Blocks.CONCRETE_FIRST + listOf(9, 3, 11, 10)[rnd.nextInt(4)]   // cyan, light blue, blue or purple
-        // Door faces the plaza.
-        val dx = cx - hx; val dz = cz - hz
-        val doorSide = if (abs(dx) > abs(dz)) (if (dx > 0) 4 else 5) else (if (dz > 0) 2 else 3)
-        for (x in -w..w) for (z in -w..w) {
-            val edge = abs(x) == w || abs(z) == w
-            val corner = abs(x) == w && abs(z) == w
-            for (y in y0 - 6 until y0) set(p, hx + x, y, hz + z, Blocks.QUARTZ_BLOCK)
-            set(p, hx + x, y0, hz + z, if (edge) Blocks.QUARTZ_BLOCK else Blocks.SMOOTH_STONE)
-            for (y in y0 + 1..y0 + 3) {
-                val id = when {
-                    corner -> accent
-                    edge && y >= y0 + 2 -> Blocks.GLASS        // big panoramic windows all round
-                    edge -> white
-                    else -> Blocks.AIR
-                }
-                set(p, hx + x, y, hz + z, id)
-            }
-            // Flat white roof with a glowing rim.
-            set(p, hx + x, y0 + 4, hz + z, if (edge) Blocks.SEA_LANTERN else white)
-        }
-        // Solar panels on the roof, and a light in the ceiling.
-        for (x in -w + 1..w - 1 step 2) set(p, hx + x, y0 + 5, hz, Blocks.SOLAR_PANEL, 2)
-        set(p, hx, y0 + 4, hz, Blocks.SEA_LANTERN)
-        // Door.
-        val (ddx, ddz) = when (doorSide) { 2 -> 0 to w; 3 -> 0 to -w; 4 -> w to 0; else -> -w to 0 }
-        set(p, hx + ddx, y0 + 1, hz + ddz, Blocks.OAK_DOOR, doorSide)
-        set(p, hx + ddx, y0 + 2, hz + ddz, Blocks.OAK_DOOR, doorSide or Shapes.UPPER)
-        set(p, hx + ddx, y0 + 3, hz + ddz, accent)
-        // Bigger houses get a red bed in a corner, clear of every possible doorway.
-        if (w == 3) {
-            set(p, hx - 2, y0 + 1, hz + 2, Blocks.BED_FIRST + 14, 4)
-            set(p, hx - 1, y0 + 1, hz + 2, Blocks.BED_FIRST + 14, 4 or Shapes.UPPER)
-        }
-        set(p, hx - w + 1, y0 + 1, hz - w + 1, Blocks.CRAFTING_TABLE, 2)
-        lootChest(p, hx + w - 1, y0 + 1, hz - w + 1, rnd, listOf(
+        val wallId = intArrayOf(Blocks.PLANKS, Blocks.SPRUCE_PLANKS, Blocks.BIRCH_PLANKS)[rnd.nextInt(3)]
+        val roofKind = rnd.nextInt(3)
+        val stair = intArrayOf(Blocks.OAK_STAIRS, Blocks.BRICK_STAIRS, Blocks.COBBLESTONE_STAIRS)[roofKind]
+        val solid = intArrayOf(Blocks.PLANKS, Blocks.BRICKS, Blocks.COBBLESTONE)[roofKind]
+        val chestLoot = listOf(
             Items.find("Bread") to 1..4, Items.find("Apple") to 0..3, Items.find("Wheat") to 0..6,
             Items.find("Iron Ingot") to 0..2, Items.find("Wheat Seeds") to 0..5, Blocks.SAPLING_FIRST to 0..2,
             Items.find("Emerald") to 0..2,
-        ))
+        )
+        // Door faces the square.
+        val dx = cx - hx; val dz = cz - hz
+        val doorSide = if (abs(dx) > abs(dz)) (if (dx > 0) 4 else 5) else (if (dz > 0) 2 else 3)
+        val (ddx, ddz) = when (doorSide) { 2 -> 0 to w; 3 -> 0 to -w; 4 -> w to 0; else -> -w to 0 }
+        // Floor and base.
+        for (x in -w..w) for (z in -w..w) {
+            for (y in y0 - 3 until y0) set(p, hx + x, y, hz + z, Blocks.COBBLESTONE)
+            set(p, hx + x, y0, hz + z, if (abs(x) == w || abs(z) == w) Blocks.COBBLESTONE else Blocks.PLANKS)
+        }
+        // Walls, four high: a cobblestone course, planks above it, log corners, glass panes for windows.
+        for (x in -w..w) for (z in -w..w) {
+            val edge = abs(x) == w || abs(z) == w
+            if (!edge) { for (y in y0 + 1..y0 + 4) set(p, hx + x, y, hz + z, Blocks.AIR); continue }
+            val corner = abs(x) == w && abs(z) == w
+            val window = !corner && (if (abs(z) == w) abs(x) == 1 else abs(z) == 1)
+            for (y in y0 + 1..y0 + 4) {
+                val id = when {
+                    corner -> Blocks.LOG
+                    y == y0 + 1 -> Blocks.COBBLESTONE
+                    window && y == y0 + 2 -> Blocks.GLASS_PANE
+                    else -> wallId
+                }
+                set(p, hx + x, y, hz + z, id)
+            }
+        }
+        // The pitched roof: the ridge runs along x. Each row is a line of stairs, one block higher and one block closer to the ridge.
+        for (k in 0..w) {
+            val rz = w + 1 - k; val y = y0 + 4 + k
+            for (x in -w - 1..w + 1) {
+                set(p, hx + x, y, hz + rz, stair, 2)      // the south slope: its low side faces +z
+                set(p, hx + x, y, hz - rz, stair, 3)      // the north slope
+            }
+            // The gable ends are closed with planks up to the roof.
+            for (z in -rz + 1..rz - 1) { set(p, hx - w, y, hz + z, wallId); set(p, hx + w, y, hz + z, wallId) }
+            if (k >= 1) for (z in -rz + 1..rz - 1) for (x in -w + 1..w - 1) set(p, hx + x, y, hz + z, Blocks.AIR)
+        }
+        for (x in -w - 1..w + 1) set(p, hx + x, y0 + 5 + w, hz, solid)       // the ridge
+        for (x in -w + 1..w - 1) set(p, hx + x, y0 + 4, hz + w, wallId)
+        // Door and a step.
+        set(p, hx + ddx, y0 + 1, hz + ddz, Blocks.OAK_DOOR, doorSide)
+        set(p, hx + ddx, y0 + 2, hz + ddz, Blocks.OAK_DOOR, doorSide or Shapes.UPPER)
+        // Inside: a table with a torch on it, a chest, and in the bigger house a bed and a furnace.
+        set(p, hx - w + 1, y0 + 1, hz - w + 1, Blocks.CRAFTING_TABLE, 2)
+        set(p, hx - w + 1, y0 + 2, hz - w + 1, Blocks.TORCH)
+        lootChest(p, hx + w - 1, y0 + 1, hz - w + 1, rnd, chestLoot)
+        if (w == 3) {
+            set(p, hx - 2, y0 + 1, hz + 2, Blocks.BED_FIRST + 14, 4)
+            set(p, hx - 1, y0 + 1, hz + 2, Blocks.BED_FIRST + 14, 4 or Shapes.UPPER)
+            set(p, hx + 2, y0 + 1, hz + 2, Blocks.FURNACE, 3)
+            set(p, hx + 2, y0 + 2, hz + 2, Blocks.TORCH)
+        }
     }
 
+    /** A crop farm: a log-cornered plank border, rows of crops either side of a water channel. */
     private fun farm(p: Put, fx: Int, fz: Int, y: Int, rnd: Random) {
         val crop = when (rnd.nextInt(3)) { 0 -> Blocks.CARROTS; 1 -> Blocks.POTATOES; else -> Blocks.WHEAT_CROP }
         for (x in -3..3) for (z in -2..2) {
             val border = abs(x) == 3 || abs(z) == 2
             for (yy in y - 2 until y) set(p, fx + x, yy, fz + z, Blocks.DIRT)
-            set(p, fx + x, y, fz + z, if (border) (if (abs(x) == 3 && abs(z) == 2) Blocks.SEA_LANTERN else Blocks.QUARTZ_BLOCK) else if (x == 0) Blocks.WATER else Blocks.FARMLAND)
+            set(p, fx + x, y, fz + z, if (border) (if (abs(x) == 3 && abs(z) == 2) Blocks.LOG else Blocks.PLANKS) else if (x == 0) Blocks.WATER else Blocks.FARMLAND)
             set(p, fx + x, y + 1, fz + z, if (!border && x != 0) crop else Blocks.AIR, if (!border && x != 0) rnd.nextInt(8) else 0)
-            set(p, fx + x, y + 2, fz + z, Blocks.AIR)
+            for (yy in y + 2..y + 3) set(p, fx + x, yy, fz + z, Blocks.AIR)
         }
+        set(p, fx - 3, y + 1, fz - 2, Blocks.TORCH); set(p, fx + 3, y + 1, fz + 2, Blocks.TORCH)
     }
 }

@@ -28,6 +28,8 @@ private fun regionKey(rx: Int, rz: Int) = (rx.toLong() shl 32) or (rz.toLong() a
 
 /** Theme parks for villages world generation has just made, then a look round for older villages nearby. */
 internal fun Game.openThemeParks() {
+    world.pendingParks.clear()
+    if (true) return   // villages are plain old-fashioned ones now: no theme park, no futuristic make-over
     if (isClient || dimension != com.vishucraft.game.world.Dimension.OVERWORLD) { world.pendingParks.clear(); return }
     while (true) {
         val (x, y, z) = world.pendingParks.poll() ?: break
