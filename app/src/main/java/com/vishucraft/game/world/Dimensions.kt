@@ -154,20 +154,34 @@ class SkyGenerator(private val seed: Long) : WorldGenerator {
     }
 }
 
-/** Where villages are: the village plaza (x, y, z) in region (rx, rz) of the 144-block grid, or null if none. */
+/**
+ * Where villages are: the plaza (x, y, z, desert) in region (rx, rz) of the 144-block grid, or null if none. A village
+ * needs fairly flat, low ground (not a mountain top); a few places are tried and the first good one is used.
+ * The last number is 1 for a desert village (which has a pyramid beside it).
+ */
 fun villageIn(seed: Long, generator: WorldGenerator, rx: Int, rz: Int): IntArray? {
     val region = 144
     if (generator !is TerrainGenerator) return null   // flat worlds (with or without sea) have no villages
     val gen = generator
-    val rnd = Random(seed xor (rx * 341873128712L) xor (rz * 132897987541L) xor 0x5EED)
-    val cx = rx * region + 48 + rnd.nextInt(region - 96)
-    val cz = rz * region + 48 + rnd.nextInt(region - 96)
-    val h = gen.surfaceHeight(cx, cz)
-    if (h <= TerrainGenerator.SEA_LEVEL + 1 || h > 88) return null
-    return when (gen.biomeAt(cx, cz)) {
-        Biome.PLAINS, Biome.SAVANNA, Biome.FOREST, Biome.SNOW, Biome.CHERRY, Biome.JUNGLE, Biome.SWAMP -> intArrayOf(cx, h, cz)
-        else -> null
+    for (attempt in 0 until 6) {
+        val rnd = Random(seed xor (rx * 341873128712L) xor (rz * 132897987541L) xor 0x5EED xor (attempt * 7919L))
+        val cx = rx * region + 48 + rnd.nextInt(region - 96)
+        val cz = rz * region + 48 + rnd.nextInt(region - 96)
+        val h = gen.surfaceHeight(cx, cz)
+        if (h <= TerrainGenerator.SEA_LEVEL + 1 || h > 74) continue
+        // Flat enough all round: no village on a slope, a ridge or a peak.
+        var lo = h; var hi = h
+        for ((dx, dz) in listOf(-22 to 0, 22 to 0, 0 to -22, 0 to 22, -16 to -16, 16 to -16, -16 to 16, 16 to 16)) {
+            val y = gen.surfaceHeight(cx + dx, cz + dz); lo = minOf(lo, y); hi = maxOf(hi, y)
+        }
+        if (hi - lo > 9 || lo <= TerrainGenerator.SEA_LEVEL) continue
+        return when (gen.biomeAt(cx, cz)) {
+            Biome.PLAINS, Biome.SAVANNA, Biome.FOREST, Biome.SNOW, Biome.CHERRY, Biome.JUNGLE, Biome.SWAMP -> intArrayOf(cx, h, cz, 0)
+            Biome.DESERT -> intArrayOf(cx, h, cz, 1)
+            else -> continue
+        }
     }
+    return null
 }
 
 /** Villages, desert temples and dungeons, generated chunk by chunk from a deterministic layout. */
@@ -238,7 +252,7 @@ class Structures(private val seed: Long, private val gen: WorldGenerator, privat
     /** The middle height of a spot and four points around it (a good level for a building), or -1 if it is too steep or wet. */
     private fun siteLevel(x: Int, z: Int, r: Int): Int {
         val hs = intArrayOf(gen.surfaceHeight(x, z), gen.surfaceHeight(x - r, z - r), gen.surfaceHeight(x + r, z - r), gen.surfaceHeight(x - r, z + r), gen.surfaceHeight(x + r, z + r))
-        if (hs.min() <= TerrainGenerator.SEA_LEVEL + 1 || hs.max() - hs.min() > 7) return -1
+        if (hs.min() <= TerrainGenerator.SEA_LEVEL + 1 || hs.max() - hs.min() > 9) return -1
         return hs.sorted()[2]
     }
 
@@ -353,18 +367,21 @@ class Structures(private val seed: Long, private val gen: WorldGenerator, privat
         val region = 144
         if (mode != 2) for (rz in (p.z0 - 64).floorDiv(region)..(p.z0 + 80).floorDiv(region))
             for (rx in (p.x0 - 64).floorDiv(region)..(p.x0 + 80).floorDiv(region)) {
-                val rnd = Random(seed xor (rx * 341873128712L) xor (rz * 132897987541L) xor 0x5EED)
-                val cx = rx * region + 48 + rnd.nextInt(region - 96)
-                val cz = rz * region + 48 + rnd.nextInt(region - 96)
-                if (abs(cx - p.x0 - 8) > 64 || abs(cz - p.z0 - 8) > 64) continue
                 if (gen is FlatGenerator) continue   // no villages in flat worlds
-                val h = gen.surfaceHeight(cx, cz)
-                if (h <= TerrainGenerator.SEA_LEVEL + 1 || h > 88) continue
-                when (gen.biomeAt(cx, cz)) {
-                    Biome.PLAINS, Biome.SAVANNA, Biome.FOREST, Biome.SNOW, Biome.CHERRY, Biome.JUNGLE, Biome.SWAMP -> if (farmsOnly) retire(p, cx, cz) else village(p, cx, cz, rnd)
-                    Biome.DESERT -> if (!farmsOnly) temple(p, cx, h, cz, rnd)
-                    else -> {}
-                }
+                val v = villageIn(seed, gen, rx, rz) ?: continue
+                val cx = v[0]; val cz = v[2]
+                if (abs(cx - p.x0 - 8) > 64 || abs(cz - p.z0 - 8) > 64) continue
+                val rnd = Random(seed xor (cx * 31L) xor (cz * 17L) xor 0x5EED)
+                if (v[3] == 1) {
+                    // A desert village, with a pyramid a little way off.
+                    if (!farmsOnly) {
+                        village(p, cx, cz, rnd, true)
+                        val tx = cx + 44; val tz = cz
+                        val th = gen.surfaceHeight(tx, tz)
+                        levelPad(p, tx, tz, 11, 11, th)
+                        temple(p, tx, th, tz, Random(seed xor (cx * 91L) xor (cz * 53L) xor 0x7E3))
+                    }
+                } else if (farmsOnly) retire(p, cx, cz) else village(p, cx, cz, rnd, false)
             }
         if (farmsOnly || gen is FlatGenerator) return   // no dungeons under flat worlds
         if (mode != 2) {
@@ -638,27 +655,27 @@ class Structures(private val seed: Long, private val gen: WorldGenerator, privat
      * Villages are plain, old-fashioned ones: a cobblestone well on a gravel square, dirt paths with lamp posts, wooden
      * houses with a stone base, windows, a door, a pitched roof and a bed, crop farms, and the blacksmith's stone house.
      */
-    private fun village(p: Put, cx: Int, cz: Int, rnd: Random) {
+    private fun village(p: Put, cx: Int, cz: Int, rnd: Random, desert: Boolean) {
         // Every decision about the village is made the same way in every chunk (the dice are always rolled),
         // so the houses are whole wherever the chunk borders fall.
         world.bigDone.add(Chunk.key(p.chunk.cx, p.chunk.cz) * 31L + ((cx * 73856093L) xor (cz * 19349663L) xor 7L))   // nothing old to take away here
-        val villagers = 3 + rnd.nextInt(3)
+        val villagers = 1 + rnd.nextInt(2)
         val wh = gen.surfaceHeight(cx, cz)
         levelPad(p, cx, cz, 8, 8, wh)
         // The square: gravel with a cobblestone edge, and a well in the middle.
         for (dx in -5..5) for (dz in -5..5) {
             val ring = abs(dx) == 5 || abs(dz) == 5
-            for (y in wh - 3 until wh) set(p, cx + dx, y, cz + dz, Blocks.DIRT)
-            set(p, cx + dx, wh, cz + dz, if (ring) Blocks.COBBLESTONE else if ((dx + dz) % 2 == 0) Blocks.GRAVEL else Blocks.DIRT_PATH)
+            for (y in wh - 3 until wh) set(p, cx + dx, y, cz + dz, if (desert) Blocks.SANDSTONE else Blocks.DIRT)
+            set(p, cx + dx, wh, cz + dz, if (ring) (if (desert) Blocks.SANDSTONE else Blocks.COBBLESTONE) else if ((dx + dz) % 2 == 0) (if (desert) Blocks.SANDSTONE else Blocks.GRAVEL) else Blocks.DIRT_PATH)
             for (y in wh + 1..wh + 6) set(p, cx + dx, y, cz + dz, Blocks.AIR)
         }
         for (dx in -1..1) for (dz in -1..1) {
             val rim = dx != 0 || dz != 0
-            if (rim) set(p, cx + dx, wh + 1, cz + dz, Blocks.COBBLESTONE)
-            else { set(p, cx, wh, cz, Blocks.WATER); set(p, cx, wh - 1, cz, Blocks.WATER); set(p, cx, wh - 2, cz, Blocks.COBBLESTONE) }
+            if (rim) set(p, cx + dx, wh + 1, cz + dz, if (desert) Blocks.SANDSTONE else Blocks.COBBLESTONE)
+            else { set(p, cx, wh, cz, Blocks.WATER); set(p, cx, wh - 1, cz, Blocks.WATER); set(p, cx, wh - 2, cz, if (desert) Blocks.SANDSTONE else Blocks.COBBLESTONE) }
         }
         for ((dx, dz) in listOf(-1 to -1, 1 to -1, -1 to 1, 1 to 1)) { set(p, cx + dx, wh + 2, cz + dz, Blocks.OAK_FENCE); set(p, cx + dx, wh + 3, cz + dz, Blocks.OAK_FENCE) }
-        for (dx in -1..1) for (dz in -1..1) set(p, cx + dx, wh + 4, cz + dz, Blocks.OAK_SLAB)
+        for (dx in -1..1) for (dz in -1..1) set(p, cx + dx, wh + 4, cz + dz, if (desert) Blocks.SANDSTONE_SLAB else Blocks.OAK_SLAB)
         for ((dx, dz) in listOf(-4 to -4, 4 to -4, -4 to 4, 4 to 4)) lamp(p, cx + dx, wh + 1, cz + dz)
         if (p.inside(cx, cz)) repeat(villagers) { world.pendingVillagers.add(Triple(cx + 3, wh + 1, cz + 3)) }
 
@@ -676,7 +693,7 @@ class Structures(private val seed: Long, private val gen: WorldGenerator, privat
                 val hx = cx + (Math.cos(a) * ring).toInt(); val hz = cz + (Math.sin(a) * ring).toInt()
                 var w = 2 + layout.nextInt(2)
                 val roll = layout.nextInt(8)
-                val kind = if (roll < 2) 1 else if (roll < 4) 2 else 0     // house, crop farm or animal pen
+                val kind = if (roll < 1) 1 else if (roll < 3) 2 else 0     // house, crop farm or animal pen
                 if (kind == 2) w = 4
                 val level = siteLevel(hx, hz, w + 2)
                 if (level < 0) continue
@@ -685,11 +702,14 @@ class Structures(private val seed: Long, private val gen: WorldGenerator, privat
                 sites.add(intArrayOf(hx, hz, w, level, kind))
             }
         }
+        // Every village has at least a few houses: farms and pens give way if the dice were unkind.
+        var houseCount = sites.count { it[4] == 0 }
+        for (s in sites) if (houseCount < 4 && s[4] != 0) { s[4] = 0; s[2] = 2 + (s[0] + s[1]) % 2; houseCount++ }
         for (s in sites) levelPad(p, s[0], s[1], s[2] + 3, s[2] + 3, s[3])
         for (s in sites) path(p, cx, cz, s[0], s[1])
         for (s in sites) {
             val hr = Random(seed xor (s[0] * 7349L) xor (s[1] * 9157L) xor 0x40E)
-            when (s[4]) { 1 -> farm(p, s[0], s[1], s[3], hr); 2 -> pen(p, s[0], s[1], s[3], hr, cx, cz); else -> house(p, s[0], s[1], s[3], s[2], hr, cx, cz) }
+            when (s[4]) { 1 -> farm(p, s[0], s[1], s[3], hr); 2 -> pen(p, s[0], s[1], s[3], hr, cx, cz); else -> house(p, s[0], s[1], s[3], s[2], hr, cx, cz, desert) }
         }
     }
 
@@ -723,11 +743,14 @@ class Structures(private val seed: Long, private val gen: WorldGenerator, privat
      * A wooden house, whole from the ground up: a cobblestone base, plank walls with log corners, windows, a door that
      * faces the square, a pitched roof of stairs with closed gable ends, and a bed, a table, a chest and a torch inside.
      */
-    private fun house(p: Put, hx: Int, hz: Int, y0: Int, w: Int, rnd: Random, cx: Int, cz: Int) {   // half width w -> 5x5 or 7x7
-        val wallId = intArrayOf(Blocks.PLANKS, Blocks.SPRUCE_PLANKS, Blocks.BIRCH_PLANKS)[rnd.nextInt(3)]
+    private fun house(p: Put, hx: Int, hz: Int, y0: Int, w: Int, rnd: Random, cx: Int, cz: Int, desert: Boolean = false) {   // half width w -> 5x5 or 7x7
+        val wallPick = intArrayOf(Blocks.PLANKS, Blocks.SPRUCE_PLANKS, Blocks.BIRCH_PLANKS)[rnd.nextInt(3)]
         val roofKind = rnd.nextInt(3)
-        val stair = intArrayOf(Blocks.OAK_STAIRS, Blocks.BRICK_STAIRS, Blocks.COBBLESTONE_STAIRS)[roofKind]
-        val solid = intArrayOf(Blocks.PLANKS, Blocks.BRICKS, Blocks.COBBLESTONE)[roofKind]
+        val wallId = if (desert) Blocks.SANDSTONE else wallPick
+        val stair = if (desert) Blocks.SANDSTONE_STAIRS else intArrayOf(Blocks.OAK_STAIRS, Blocks.BRICK_STAIRS, Blocks.COBBLESTONE_STAIRS)[roofKind]
+        val solid = if (desert) Blocks.SANDSTONE else intArrayOf(Blocks.PLANKS, Blocks.BRICKS, Blocks.COBBLESTONE)[roofKind]
+        val base = if (desert) Blocks.SANDSTONE else Blocks.COBBLESTONE
+        val cornerId = if (desert) Blocks.RED_SANDSTONE else Blocks.LOG
         val chestLoot = listOf(
             Items.find("Bread") to 1..4, Items.find("Apple") to 0..3, Items.find("Wheat") to 0..6,
             Items.find("Iron Ingot") to 0..2, Items.find("Wheat Seeds") to 0..5, Blocks.SAPLING_FIRST to 0..2,
@@ -739,8 +762,8 @@ class Structures(private val seed: Long, private val gen: WorldGenerator, privat
         val (ddx, ddz) = when (doorSide) { 2 -> 0 to w; 3 -> 0 to -w; 4 -> w to 0; else -> -w to 0 }
         // Floor and base.
         for (x in -w..w) for (z in -w..w) {
-            for (y in y0 - 3 until y0) set(p, hx + x, y, hz + z, Blocks.COBBLESTONE)
-            set(p, hx + x, y0, hz + z, if (abs(x) == w || abs(z) == w) Blocks.COBBLESTONE else Blocks.PLANKS)
+            for (y in y0 - 3 until y0) set(p, hx + x, y, hz + z, base)
+            set(p, hx + x, y0, hz + z, if (abs(x) == w || abs(z) == w) base else if (desert) Blocks.SANDSTONE else Blocks.PLANKS)
         }
         // Walls, four high: a cobblestone course, planks above it, log corners, glass panes for windows.
         for (x in -w..w) for (z in -w..w) {
@@ -750,8 +773,8 @@ class Structures(private val seed: Long, private val gen: WorldGenerator, privat
             val window = !corner && (if (abs(z) == w) abs(x) == 1 else abs(z) == 1)
             for (y in y0 + 1..y0 + 4) {
                 val id = when {
-                    corner -> Blocks.LOG
-                    y == y0 + 1 -> Blocks.COBBLESTONE
+                    corner -> cornerId
+                    y == y0 + 1 -> base
                     window && y == y0 + 2 -> Blocks.GLASS_PANE
                     else -> wallId
                 }
@@ -771,6 +794,8 @@ class Structures(private val seed: Long, private val gen: WorldGenerator, privat
         }
         for (x in -w - 1..w + 1) set(p, hx + x, y0 + 5 + w, hz, solid)       // the ridge
         for (x in -w + 1..w - 1) set(p, hx + x, y0 + 4, hz + w, wallId)
+        // A villager lives in every house.
+        if (p.inside(hx, hz)) world.pendingVillagers.add(Triple(hx, y0 + 1, hz))
         // Door and a step.
         set(p, hx + ddx, y0 + 1, hz + ddz, Blocks.OAK_DOOR, doorSide)
         set(p, hx + ddx, y0 + 2, hz + ddz, Blocks.OAK_DOOR, doorSide or Shapes.UPPER)

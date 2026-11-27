@@ -1232,3 +1232,42 @@ class VillagePensTest {
         assertTrue(g.mobs.list.count { it.type == MobType.PIG || it.type == MobType.COW || it.type == MobType.SHEEP || it.type == MobType.CHICKEN } >= minOf(n, 3))
     }
 }
+
+class DesertVillageTest {
+    @Test fun villagesAreOnLowFlatGroundAndEachHouseHasAVillager() {
+        val w = World(21L, kotlin.io.path.createTempDirectory("vlow").toFile(), Dimension.OVERWORLD)
+        var n = 0
+        for (rz in -6..6) for (rx in -6..6) villageIn(21L, w.generator, rx, rz)?.let { v ->
+            n++
+            assertTrue(v[1] <= 74, "no village on a mountain top (${v[1]})")
+        }
+        assertTrue(n > 5, "villages exist ($n)")
+        for (cx in -10..10) for (cz in -10..10) w.ensureLoaded(cx, cz)
+        var doors = 0
+        for (x in -160..160) for (z in -160..160) for (y in 50..110) if (w.getBlock(x, y, z) == Blocks.OAK_DOOR && w.getBlock(x, y - 1, z) != Blocks.OAK_DOOR) doors++
+        assertTrue(w.pendingVillagers.size >= doors, "a villager for every house (${w.pendingVillagers.size} villagers, $doors doors)")
+    }
+
+    @Test fun aDesertVillageHasSandstoneHousesAndAPyramid() {
+        var found: Triple<Long, IntArray, World>? = null
+        loop@ for (seed in 1L..60L) {
+            val w = World(seed, kotlin.io.path.createTempDirectory("dv").toFile(), Dimension.OVERWORLD)
+            for (rz in -4..4) for (rx in -4..4) { val v = villageIn(seed, w.generator, rx, rz); if (v != null && v[3] == 1) { found = Triple(seed, v, w); break@loop } }
+        }
+        assertTrue(found != null, "some world has a desert village")
+        val (_, v, w) = found!!
+        for (dz in -6..6) for (dx in -6..8) w.ensureLoaded((v[0] shr 4) + dx, (v[2] shr 4) + dz)
+        var doors = 0; var sandstone = 0
+        for (x in v[0] - 30..v[0] + 30) for (z in v[2] - 30..v[2] + 30) for (y in v[1] - 14..v[1] + 24) {
+            val b = w.getBlock(x, y, z)
+            if (b == Blocks.OAK_DOOR && w.getBlock(x, y - 1, z) != Blocks.OAK_DOOR) doors++
+            if (b == Blocks.SANDSTONE_STAIRS) sandstone++
+        }
+        assertTrue(doors >= 3, "houses ($doors)")
+        assertTrue(sandstone > 20, "sandstone roofs ($sandstone)")
+        // The pyramid beside it.
+        val th = w.generator.surfaceHeight(v[0] + 44, v[2])
+        assertTrue((th..th + 9).any { w.getBlock(v[0] + 44 + 10, it, v[2]) != Blocks.AIR || w.getBlock(v[0] + 44 + 9, it, v[2]) != Blocks.AIR }, "a pyramid stands beside the village")
+        assertTrue((th + 9 downTo th).any { w.getBlock(v[0] + 45, it, v[2]) in listOf(Blocks.SANDSTONE, Blocks.RED_SANDSTONE) }, "its top")
+    }
+}
