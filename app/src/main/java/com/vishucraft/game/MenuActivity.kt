@@ -337,6 +337,10 @@ class MenuActivity : Activity() {
             buttons.add(b)
             col.addView(b, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dpi(6f) })
         }
+        col.addView(com.vishucraft.game.ui.menuButton(this, "Paint skin (draw on your body)") {
+            com.vishucraft.game.world.SkinPaint.attach(com.vishucraft.game.world.SkinPaint.fileFor(GameActivity.worldsRoot(this)))
+            com.vishucraft.game.ui.SkinEditor.show(this, look, null)
+        }, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dpi(6f) })
         col.addView(com.vishucraft.game.ui.menuButton(this, "Random look") { A.randomize(look, java.util.Random()); A.save(file, look); refresh() },
             LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dpi(6f) })
         android.app.AlertDialog.Builder(this).setTitle("Customize your character")

@@ -133,6 +133,7 @@ class Game(val world: World, val level: LevelData, val input: GameInput, private
     /** The file that keeps your look for all worlds (next to the worlds folder); null when this world is not in one. */
     private val lookFile: File? = saveDir?.parentFile?.takeIf { it.name == "worlds" }?.let { com.vishucraft.game.world.Appearance.fileFor(it) }
     init { com.vishucraft.game.world.Appearance.load(lookFile)?.let { level.appearance = it } }
+    init { com.vishucraft.game.world.SkinPaint.attach(saveDir?.parentFile?.takeIf { it.name == "worlds" }?.let { com.vishucraft.game.world.SkinPaint.fileFor(it) }) }
     private fun saveLook() = com.vishucraft.game.world.Appearance.save(lookFile, level.appearance)
 
     /** Changes one part of the look ([category] in Appearance.categories) to its next (or previous) choice. */

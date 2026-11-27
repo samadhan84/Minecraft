@@ -1271,3 +1271,47 @@ class DesertVillageTest {
         assertTrue((th + 9 downTo th).any { w.getBlock(v[0] + 45, it, v[2]) in listOf(Blocks.SANDSTONE, Blocks.RED_SANDSTONE) }, "its top")
     }
 }
+
+class SkinPaintTest {
+    @Test fun aPaintedSkinShowsOnTheBodyInThreeDimensions() {
+        val R = com.vishucraft.game.render.DollRenderer
+        val look = Appearance.default()
+        SkinPaint.clearAll()
+        val plain = R.render(look, IntArray(4) { -1 }, false, 0f, 56, 100)
+        // Paint the whole front of the body red and the front of the head blue.
+        SkinPaint.fillFace(1, 3, SkinPaint.color(Appearance.C_RED))
+        SkinPaint.fillFace(0, 3, SkinPaint.color(Appearance.C_BLUE))
+        assertTrue(!SkinPaint.isEmpty())
+        val front = R.render(look, IntArray(4) { -1 }, false, 0f, 56, 100)
+        val back = R.render(look, IntArray(4) { -1 }, false, 3.1416f, 56, 100)
+        assertTrue(!front.contentEquals(plain), "the paint shows from the front")
+        val redish = front.count { (it shr 16 and 255) > 150 && (it shr 8 and 255) < 90 }
+        val bluish = front.count { (it and 255) > 150 && (it shr 16 and 255) < 90 }
+        assertTrue(redish > 100, "a red body ($redish)")
+        assertTrue(bluish > 40, "a blue face ($bluish)")
+        // It is only on the front: from behind there is no red.
+        assertEquals(0, back.count { (it shr 16 and 255) > 150 && (it shr 8 and 255) < 90 && (it and 255) < 90 })
+        // Armor goes over the paint.
+        val armored = R.render(look, intArrayOf(2, 2, 2, 2), false, 0f, 56, 100)
+        assertTrue(armored.count { (it shr 16 and 255) > 150 && (it shr 8 and 255) < 90 } < redish / 4, "armor covers the paint")
+        // The game's own model has the shell (so it is painted in the game too).
+        val shells = com.vishucraft.game.render.MobModels.playerModel(look, IntArray(4) { -1 }).size
+        SkinPaint.clearAll()
+        assertTrue(SkinPaint.isEmpty())
+        val bare = com.vishucraft.game.render.MobModels.playerModel(look, IntArray(4) { -1 }).size
+        assertEquals(bare + 6, shells, "six shells when painted")
+    }
+
+    @Test fun theSkinIsSavedAndLoaded() {
+        val dir = kotlin.io.path.createTempDirectory("skin").toFile()
+        val f = SkinPaint.fileFor(dir)
+        SkinPaint.attach(f); SkinPaint.clearAll()
+        SkinPaint.set(2, 4, 3, 5, SkinPaint.color(7)); SkinPaint.save()
+        SkinPaint.clearAll()
+        val other = kotlin.io.path.createTempDirectory("skin2").toFile()
+        SkinPaint.attach(SkinPaint.fileFor(other)); assertTrue(SkinPaint.isEmpty())
+        SkinPaint.attach(f)
+        assertEquals(SkinPaint.color(7), SkinPaint.get(2, 4, 3, 5))
+        SkinPaint.clearAll()
+    }
+}

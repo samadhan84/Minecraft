@@ -28,6 +28,16 @@ object TextureAtlas {
     /** The names of all the tiles (a texture pack has one PNG per name). */
     fun tileNames(): List<String> { pixels; return Tiles.all().keys.sorted() }
 
+    /** Copies the painted skin (world/SkinPaint) into the atlas; the screen picture must then be uploaded again. */
+    fun refreshSkin() {
+        val atlas = pixels
+        for (part in 0 until 4) for (face in 0 until 6) {
+            val index = Tiles.all()[com.vishucraft.game.world.SkinPaint.tileName(part, face)] ?: continue
+            val ox = (index % TILES_PER_ROW) * TILE; val oy = (index / TILES_PER_ROW) * TILE
+            for (y in 0 until TILE) for (x in 0 until TILE) atlas[(oy + y) * SIZE + ox + x] = com.vishucraft.game.world.SkinPaint.get(part, face, x, y)
+        }
+    }
+
     fun setTile(name: String, w: Int, h: Int, argb: IntArray): Boolean {
         if (w <= 0 || h <= 0 || argb.size < w * h) return false
         val index = Tiles.all()[name] ?: return false
@@ -2433,6 +2443,11 @@ object TextureAtlas {
 
     /** Skins for the Flame Spinner, Tear Drifter and Raider. */
     private fun pack4Tile(name: String, t: Tile): Boolean {
+        if (name.startsWith("skin_")) {
+            val part = name.substring(5, 6).toInt(); val face = name.substring(7).toInt()
+            t.fill { x, y -> com.vishucraft.game.world.SkinPaint.get(part, face, x, y) }
+            return true
+        }
         if (name.startsWith("p4_c_") || name.startsWith("p4_armor_")) {
             val armor = name.startsWith("p4_armor_")
             val n = name.substringAfterLast('_').toIntOrNull() ?: 0

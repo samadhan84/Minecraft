@@ -65,8 +65,8 @@ interface NetSupport {
  * platform adds its window, input and sound, and calls [frame] every frame.
  */
 abstract class ClientApp(protected val demo: File?) {
-    protected enum class Menu { TITLE, WORLDS, CREATE, JOIN, SETTINGS, CONTROLS, CONFIRM_DELETE, PASSWORD, LOOK }
-    protected enum class Overlay { NONE, PAUSE, CREATIVE, CONTAINER, SETTINGS, CONTROLS, NAME_MOB, TRADE, ACHIEVEMENTS, SIGN, ENDING, INTERNET, FLIGHTS, FLOORS, METRO, CALL_TRAIN, ROBOT, PASSWORD_ASK, PASSWORD_SET, PASSWORD_REMOVE, LOOK, HARDCORE_OVER, DEATH }
+    protected enum class Menu { TITLE, WORLDS, CREATE, JOIN, SETTINGS, CONTROLS, CONFIRM_DELETE, PASSWORD, LOOK, SKIN }
+    protected enum class Overlay { NONE, PAUSE, CREATIVE, CONTAINER, SETTINGS, CONTROLS, NAME_MOB, TRADE, ACHIEVEMENTS, SIGN, ENDING, INTERNET, FLIGHTS, FLOORS, METRO, CALL_TRAIN, ROBOT, PASSWORD_ASK, PASSWORD_SET, PASSWORD_REMOVE, LOOK, HARDCORE_OVER, DEATH, SKIN }
 
     // ---------------------------------------------------------------- platform parts
     protected abstract val prefs: ClientPrefs
@@ -190,6 +190,7 @@ abstract class ClientApp(protected val demo: File?) {
             Overlay.FLOORS -> floorsScreen(s)
             Overlay.ENDING -> endingScreen()
             Overlay.LOOK -> lookScreen(s)
+            Overlay.SKIN -> skinScreen(s.game.appearance, s.game.inventory.armor) { overlay = Overlay.LOOK }
             Overlay.HARDCORE_OVER -> hardcoreOverScreen(s)
             Overlay.DEATH -> deathScreen(s)
             Overlay.INTERNET -> internetScreen()
@@ -364,6 +365,7 @@ abstract class ClientApp(protected val demo: File?) {
                 ui.text(version, ui.width - ui.textWidth(version, 16f) - 14, 12f, 16f, rgba(230, 230, 230))
             }
             Menu.LOOK -> homeLookScreen()
+            Menu.SKIN -> skinScreen(homeLook, null) { menu = Menu.LOOK }
             Menu.WORLDS -> worldsScreen()
             Menu.PASSWORD -> passwordScreen()
             Menu.CREATE -> createScreen()
@@ -1098,9 +1100,70 @@ abstract class ClientApp(protected val demo: File?) {
             if (ui.button(A.categories[i].title + ": " + A.optionName(game.appearance, i), colX[col], y + row * 46, w, 40f)) game.changeLook(i)
         }
         val by = ui.height - 60f
+        if (ui.button("Paint skin", ui.width / 2 - 100, by - 50, 200f, 40f)) overlay = Overlay.SKIN
         if (ui.button("Random look", ui.width / 2 - 215, by, 140f, 40f)) game.randomLook()
         if (ui.button("Turn around", ui.width / 2 - 65, by, 130f, 40f)) game.viewMode = if (game.viewMode == 2) 1 else 2
         if (ui.button("Done", ui.width / 2 + 75, by, 140f, 40f)) { game.viewMode = lookBefore; overlay = Overlay.PAUSE }
+    }
+
+    protected val skinEd = com.vishucraft.game.world.SkinEditorState()
+
+    /**
+     * The skin painter: pick a part of the body and one of its faces, then paint its 16 x 16 pixels (hold the button and drag).
+     * What you paint shows at once on the turning 3D figure, over your look and under any armor.
+     */
+    protected fun skinScreen(look: IntArray, armor: Array<com.vishucraft.game.world.ItemStack?>?, done: () -> Unit) {
+        val P = com.vishucraft.game.world.SkinPaint
+        val ed = skinEd
+        title("Paint your skin", 20f)
+        // Parts and faces on the left.
+        var y = 70f
+        ui.text("Body part", 20f, y, 14f, rgba(200, 200, 210)); y += 20f
+        for (i in 0 until P.PARTS) { if (ui.button((if (ed.part == i) "> " else "") + P.partNames[i], 20f, y, 150f, 34f)) ed.part = i; y += 38f }
+        y += 8f
+        ui.text("Face", 20f, y, 14f, rgba(200, 200, 210)); y += 20f
+        for (i in 0 until P.FACES) { if (ui.button((if (ed.face == i) "> " else "") + P.faceNames[i], 20f, y, 150f, 34f)) ed.face = i; y += 38f }
+        // The picture to paint.
+        val cell = ((ui.height - 150f) / 16f).coerceAtMost(26f)
+        val gx = 200f; val gy = 70f
+        for (yy in 0 until 16) for (xx in 0 until 16) {
+            val c = P.get(ed.part, ed.face, xx, yy)
+            val back = if ((xx + yy) % 2 == 0) rgba(170, 170, 176) else rgba(140, 140, 148)
+            ui.rect(gx + xx * cell, gy + yy * cell, cell, cell, back)
+            if (c != 0) ui.rect(gx + xx * cell, gy + yy * cell, cell, cell, c)
+        }
+        ui.frame(gx - 2, gy - 2, 16 * cell + 4, 16 * cell + 4, rgba(20, 20, 20), 2f)
+        if (ui.hover(gx, gy, 16 * cell, 16 * cell)) {
+            val px = ((ui.mouseX - gx) / cell).toInt(); val py = ((ui.mouseY - gy) / cell).toInt()
+            if (ui.clicked) ed.begin()
+            if (ui.mouseDown) ed.apply(px, py)
+            ui.frame(gx + px * cell, gy + py * cell, cell, cell, rgba(255, 255, 255), 2f)
+        }
+        // The turning 3D figure.
+        drawLookPreview(look, ui.width - 330f, 90f, 7.5f, armor)
+        // Colours and tools on the right of the picture.
+        val px0 = gx + 16 * cell + 30f
+        var cy = 70f
+        ui.text("Colour", px0, cy, 14f, rgba(200, 200, 210)); cy += 20f
+        val sw = 26f
+        for (i in 0 until 30) {
+            val sx = px0 + (i % 8) * (sw + 4); val sy = cy + (i / 8) * (sw + 4)
+            ui.rect(sx - 2, sy - 2, sw + 4, sw + 4, if (ed.color == i && ed.tool != 2) rgba(255, 255, 255) else rgba(30, 30, 34))
+            ui.rect(sx, sy, sw, sw, P.color(i))
+            if (ui.hover(sx, sy, sw, sw) && ui.clicked) { ed.color = i; if (ed.tool == 2) ed.tool = 0 }
+        }
+        cy += 4 * (sw + 4) + 14f
+        val tools = listOf("Brush", "Fill", "Eraser")
+        for ((i, name) in tools.withIndex()) if (ui.button((if (ed.tool == i) "> " else "") + name, px0 + i * 84f, cy, 80f, 34f)) ed.tool = i
+        cy += 42f
+        if (ui.button("Mirror: " + (if (ed.mirror) "on" else "off"), px0, cy, 164f, 34f)) ed.mirror = !ed.mirror
+        if (ui.button("Undo", px0 + 168f, cy, 80f, 34f)) ed.undoLast()
+        cy += 42f
+        if (ui.button("Fill face", px0, cy, 120f, 34f)) ed.fillFace()
+        if (ui.button("Clear face", px0 + 124f, cy, 124f, 34f)) ed.clearFace()
+        cy += 42f
+        if (ui.button("Clear everything", px0, cy, 248f, 34f)) ed.clearAll()
+        if (ui.button("Done", ui.width / 2 - 70f, ui.height - 52f, 140f, 40f)) { P.save(); done() }
     }
 
     protected var homeLook: IntArray = com.vishucraft.game.world.Appearance.default()
@@ -1131,6 +1194,7 @@ abstract class ClientApp(protected val demo: File?) {
         val scale = ((ui.height - 190f) / 36f).coerceAtMost(11f)
         drawLookPreview(homeLook, ui.width / 2 - 8 * scale, 90f, scale)
         val by = ui.height - 60f
+        if (ui.button("Paint skin", ui.width / 2 - 100, by - 50, 200f, 40f)) { com.vishucraft.game.world.SkinPaint.attach(com.vishucraft.game.world.SkinPaint.fileFor(worldsDir)); menu = Menu.SKIN }
         if (ui.button("Random look", ui.width / 2 - 215, by, 140f, 40f)) { A.randomize(homeLook, java.util.Random()); A.save(A.fileFor(worldsDir), homeLook) }
         if (ui.button("Done", ui.width / 2 + 75, by, 140f, 40f)) menu = Menu.TITLE
     }

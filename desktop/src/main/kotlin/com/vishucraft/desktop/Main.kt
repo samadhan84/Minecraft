@@ -256,6 +256,7 @@ class App(demo: File?) : ClientApp(demo) {
             Overlay.SIGN, Overlay.FLIGHTS, Overlay.FLOORS, Overlay.METRO, Overlay.CALL_TRAIN, Overlay.ROBOT -> if (key == GLFW_KEY_ESCAPE) { ui.focus = null; overlay = Overlay.NONE }
             Overlay.ENDING -> if (key == GLFW_KEY_ESCAPE) overlay = Overlay.NONE
             Overlay.LOOK -> if (key == GLFW_KEY_ESCAPE) { s.game.viewMode = lookBefore; overlay = Overlay.PAUSE }
+            Overlay.SKIN -> if (key == GLFW_KEY_ESCAPE) { com.vishucraft.game.world.SkinPaint.save(); overlay = Overlay.LOOK }
             Overlay.HARDCORE_OVER, Overlay.DEATH -> {}
             Overlay.INTERNET -> if (key == GLFW_KEY_ESCAPE) overlay = Overlay.PAUSE
             Overlay.SETTINGS, Overlay.CONTROLS, Overlay.NAME_MOB, Overlay.ACHIEVEMENTS -> if (key == GLFW_KEY_ESCAPE) { ui.focus = null; overlay = Overlay.PAUSE }
@@ -437,7 +438,17 @@ class App(demo: File?) : ClientApp(demo) {
                 a[com.vishucraft.game.world.Appearance.BUILD] = 2; a[com.vishucraft.game.world.Appearance.MOUTH] = 2
                 g.inventory.armor.fill(null); g.inventory.offhand = null; g.viewMode = 2; lookBefore = 0; overlay = Overlay.LOOK
             } }
-            f == 434 -> { shot("04c4-customize-character"); overlay = Overlay.NONE; session?.game?.viewMode = 0 }
+            f == 434 -> {
+                shot("04c4-customize-character")
+                // Paint a skin: a blue chest with a yellow bolt, a black mask, green sleeves, striped legs.
+                val P = com.vishucraft.game.world.SkinPaint; P.clearAll()
+                P.fillFace(1, 3, P.color(7)); for (i in 0 until 16) { P.set(1, 3, i / 2 + 4, i, P.color(5)); P.set(1, 3, i / 2 + 5, i, P.color(5)) }
+                for (x in 0 until 16) for (y in 6..8) P.set(0, 3, x, y, P.color(1))
+                for (f2 in 4..5) { P.fillFace(2, f2, P.color(6)) }
+                for (y in 0 until 16 step 4) for (x in 0 until 16) { P.set(3, 3, x, y, P.color(3)); P.set(3, 3, x, y + 1, P.color(3)) }
+                overlay = Overlay.SKIN
+            }
+            f == 435 -> { shot("04c5-skin-editor"); overlay = Overlay.NONE; session?.game?.viewMode = 0 }
             f == 436 -> session?.game?.let { g ->
                 // The Sky Drake and a Sky Crystal, for a look at the models.
                 val p = g.player
@@ -932,7 +943,14 @@ class App(demo: File?) : ClientApp(demo) {
                 g.player.x = 33f; g.player.y = y + 1f; g.player.z = 36f; g.player.flying = true; g.player.yaw = kotlin.math.PI.toFloat(); g.player.pitch = 0f
             }
             f == 2676 -> shot("33-boomling")
-            f == 2678 -> glfwSetWindowShouldClose(window, true)
+            f == 2678 -> session?.game?.let { g -> g.viewMode = 2; g.inventory.armor.fill(null); g.player.pitch = -0.05f; g.player.flying = false }
+            f == 2700 -> shot("34-painted-skin")
+            f == 2702 -> session?.game?.let { g ->
+                g.inventory.armor[0] = com.vishucraft.game.world.ItemStack(com.vishucraft.game.world.Items.find("Iron Helmet"), 1)
+                g.inventory.armor[1] = com.vishucraft.game.world.ItemStack(com.vishucraft.game.world.Items.find("Iron Chestplate"), 1)
+            }
+            f == 2720 -> shot("35-painted-skin-armor")
+            f == 2722 -> glfwSetWindowShouldClose(window, true)
         }
     }
 }

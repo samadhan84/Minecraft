@@ -28,6 +28,33 @@ object DollRenderer {
         return map[tile] ?: pack(150, 150, 150)
     }
 
+    /** For each face: the axis (0 x, 1 y, 2 z) the picture runs along horizontally / vertically, and whether it runs backwards. */
+    private val uAxis = IntArray(6); private val uFlip = BooleanArray(6); private val vAxis = IntArray(6); private val vFlip = BooleanArray(6)
+    private var skinTiles: HashMap<Int, Int>? = null
+
+    private fun prepareSkin(): HashMap<Int, Int> {
+        skinTiles?.let { return it }
+        // Work out, from the way the game maps a tile onto each face, which way the pixels run (so a painted skin looks the same here).
+        for (f in 0 until 6) for (which in 0..1) {
+            for (a in 0..2) {
+                var same = true; var opposite = true
+                for (c in 0 until 4) {
+                    val cv = ChunkMesher.CORNERS[f][c][a]; val uv = ChunkMesher.UVS[c][which].toInt()
+                    if (cv != uv) same = false
+                    if (cv != 1 - uv) opposite = false
+                }
+                if (same || opposite) {
+                    if (which == 0) { uAxis[f] = a; uFlip[f] = opposite } else { vAxis[f] = a; vFlip[f] = opposite }
+                    break
+                }
+            }
+        }
+        val m = HashMap<Int, Int>()
+        for (part in 0 until 4) for (face in 0 until 6) m[Tiles.id(com.vishucraft.game.world.SkinPaint.tileName(part, face))] = part * 6 + face
+        skinTiles = m
+        return m
+    }
+
     private fun pack(r: Int, g: Int, b: Int) = (0xFF shl 24) or (r.coerceIn(0, 255) shl 16) or (g.coerceIn(0, 255) shl 8) or b.coerceIn(0, 255)
 
     private fun shade(c: Int, k: Float): Int =
@@ -43,8 +70,10 @@ object DollRenderer {
         for (v in look) key = key * 31 + v
         for (m in armor) key = key * 11 + (m + 1)
         key = key * 2 + (if (shield) 1 else 0)
+        key = key * 2 + (if (com.vishucraft.game.world.SkinPaint.isEmpty()) 0 else 1)
         if (key != modelKey) { modelKey = key; parts = MobModels.playerModel(look, armor, shield) }
         val out = IntArray(w * h)
+        val skins = prepareSkin()
         val s = h / 2.45f
         val cy = cos(yaw); val sy = sin(yaw)
         val dx = sy; val dz = cy
@@ -53,7 +82,7 @@ object DollRenderer {
             for (px in 0 until w) {
                 val u = (px + 0.5f - w / 2f) / s
                 val ox = u * cy - 5f * sy; val oz = -u * sy - 5f * cy
-                var best = Float.MAX_VALUE; var face = -1; var tiles: IntArray? = null; var bb: FloatArray? = null
+                var best = Float.MAX_VALUE; var face = -1; var tiles: IntArray? = null; var bb: FloatArray? = null; var skinColor = 0
                 for (p in parts) {
                     val b = p.b
                     if (y < b[1] || y > b[4]) continue
@@ -74,7 +103,21 @@ object DollRenderer {
                         if (enter > tNear) { tNear = enter; f = if (dz > 0f) 3 else 2 }
                         if (exit < tFar) tFar = exit
                     }
-                    if (tNear <= tFar && tFar > 0f && tNear < best && f >= 0) { best = tNear; face = f; tiles = p.tiles; bb = b }
+                    if (tNear <= tFar && tFar > 0f && tNear < best && f >= 0) {
+                        val skinCode = skins[p.tiles[f]]
+                        if (skinCode != null) {
+                            // A painted shell: only the painted pixels are there.
+                            val hx0 = ox + dx * tNear; val hz0 = oz + dz * tNear
+                            val ua = uAxis[f]; val va = vAxis[f]
+                            val tu = ((if (ua == 0) hx0 else if (ua == 1) y else hz0) - b[ua]) / (b[ua + 3] - b[ua])
+                            val tv = ((if (va == 0) hx0 else if (va == 1) y else hz0) - b[va]) / (b[va + 3] - b[va])
+                            val uu = if (uFlip[f]) 1f - tu else tu; val vv = if (vFlip[f]) 1f - tv else tv
+                            val c = com.vishucraft.game.world.SkinPaint.get(skinCode / 6, skinCode % 6, (uu * 16f).toInt().coerceIn(0, 15), (vv * 16f).toInt().coerceIn(0, 15))
+                            if (c == 0) continue
+                            skinColor = c
+                        } else skinColor = 0
+                        best = tNear; face = f; tiles = p.tiles; bb = b
+                    }
                 }
                 if (tiles != null) {
                     var k = when (face) { 0 -> 1f; 1 -> 0.55f; 2, 3 -> 0.88f; else -> 0.68f }
@@ -83,7 +126,7 @@ object DollRenderer {
                     val hx = ox + dx * best; val hz = oz + dz * best
                     val edge = if (face >= 4) minOf(y - b[1], b[4] - y, hz - b[2], b[5] - hz) else minOf(y - b[1], b[4] - y, hx - b[0], b[3] - hx)
                     if (edge < 0.012f) k *= 0.72f
-                    out[py * w + px] = shade(colorOf(tiles[face]), k)
+                    out[py * w + px] = shade(if (skinColor != 0) skinColor else colorOf(tiles[face]), k)
                 }
             }
         }

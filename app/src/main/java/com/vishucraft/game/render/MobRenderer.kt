@@ -117,6 +117,18 @@ object MobModels {
             4 -> { add(-0.28f, 1.9f, -0.28f, 0.28f, 2.0f, 0.28f, "p4_c_${A.C_GOLD}"); for (x in listOf(-0.26f, -0.09f, 0.1f)) for (z in listOf(-0.26f, 0.1f)) add(x, 2.0f, z, x + 0.16f, 2.14f, z + 0.16f, "p4_c_${A.C_GOLD}") }
             else -> {}
         }
+        // The painted skin (world/SkinPaint) on a thin shell round every body part: unpainted pixels show the look underneath.
+        if (!com.vishucraft.game.world.SkinPaint.isEmpty()) {
+            fun skin(part: Int) = IntArray(6) { f -> t(com.vishucraft.game.world.SkinPaint.tileName(part, f)) }
+            parts.add(Part(grow(floatArrayOf(-0.25f, 1.45f, -0.25f, 0.25f, 1.95f, 0.25f), 0.012f), 1.95f, 0f, 0, skin(0)))
+            parts.add(Part(grow(floatArrayOf(-tw, 0.75f, -0.14f, tw, 1.45f, 0.14f), 0.012f), 1.45f, 0f, 0, skin(1)))
+            for (side in intArrayOf(-1, 1)) {
+                val x0 = if (side < 0) -tw - aw else tw; val x1 = if (side < 0) -tw else tw + aw
+                parts.add(Part(grow(floatArrayOf(x0, 0.75f, -0.11f, x1, 1.45f, 0.11f), 0.012f), 1.4f, 0f, if (side < 0) -1 else 1, skin(2)))
+                val lx0 = if (side < 0) -tw else 0f; val lx1 = if (side < 0) 0f else tw
+                parts.add(Part(grow(floatArrayOf(lx0, 0.12f, -0.125f, lx1, 0.75f, 0.125f), 0.012f), 0.75f, 0f, if (side < 0) 1 else -1, skin(3)))
+            }
+        }
         // A shield in the left hand, held out at the side.
         if (shield) add(-tw - aw - 0.14f, 0.7f, -0.34f, -tw - aw - 0.02f, 1.4f, 0.34f, "p4_shield", -1, 1.4f)
         // Worn armor on top of all that.
@@ -637,6 +649,7 @@ class MobRenderer {
         for (m in mats) key = key * 11 + (m + 1)
         val shield = offhand != null && com.vishucraft.game.world.Items[offhand.id]?.name == "Shield"
         key = key * 2 + (if (shield) 1 else 0)
+        key = key * 2 + (if (com.vishucraft.game.world.SkinPaint.isEmpty()) 0 else 1)
         if (key != playerKey) { playerKey = key; playerParts = MobModels.playerModel(look, mats, shield) }
         glUniform3f(shader.u("uOffset"), 0f, 0f, 0f)
         buf.size = 0

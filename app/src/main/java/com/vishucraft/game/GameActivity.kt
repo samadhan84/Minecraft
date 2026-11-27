@@ -422,6 +422,8 @@ class GameActivity : Activity() {
             glView.queueEvent { game.randomLook(); runOnUiThread { for (i in 0 until A.SIZE) (col.getChildAt(i) as? android.widget.TextView)?.text = A.categories[i].title + ": " + A.optionName(game.appearance, i) } }
         }
         col.addView(random, android.widget.LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dpi(6f) })
+        val paintSkin = menuButton(this, "Paint skin (draw on your body)") { com.vishucraft.game.ui.SkinEditor.show(this, game.appearance, game.inventory.armor) }
+        col.addView(paintSkin, android.widget.LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dpi(6f) })
         val turn = menuButton(this, "Turn around") { glView.queueEvent { game.viewMode = if (game.viewMode == 2) 1 else 2 } }
         col.addView(turn, android.widget.LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dpi(6f) })
         android.app.AlertDialog.Builder(this).setTitle("Customize your character")

@@ -41,6 +41,8 @@ class WorldRenderer(private val game: Game) {
     var fancyFailed = false
         private set
     private var atlasTex = 0
+    private var skinSeen = 0
+    private var skinUploadAt = 0L
     private val dynamic = GpuMesh(GL_DYNAMIC_DRAW)
     private val lines = GpuMesh(GL_DYNAMIC_DRAW)
     private val mobRenderer = MobRenderer().also { r -> r.skyCheck = { x, y, z -> game.mobs.skyExposed(x, y, z) } }
@@ -249,6 +251,17 @@ class WorldRenderer(private val game: Game) {
 
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, atlasTex)
+        // A newly painted skin goes into the picture the screen uses (at most a few times a second).
+        if (skinSeen != com.vishucraft.game.world.SkinPaint.version) {
+            val now = System.currentTimeMillis()
+            if (now - skinUploadAt > 250) {
+                skinSeen = com.vishucraft.game.world.SkinPaint.version; skinUploadAt = now
+                TextureAtlas.refreshSkin()
+                val bmp = Bitmap.createBitmap(TextureAtlas.pixels, TextureAtlas.SIZE, TextureAtlas.SIZE, Bitmap.Config.ARGB_8888)
+                GLUtils.texImage2D(GL_TEXTURE_2D, 0, bmp, 0)
+                bmp.recycle()
+            }
+        }
 
         if (!underwater && dim == com.vishucraft.game.world.Dimension.OVERWORLD) drawSky(ex, ey, ez, daylight)
 

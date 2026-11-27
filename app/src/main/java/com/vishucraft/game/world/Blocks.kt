@@ -24,6 +24,7 @@ object Tiles {
         for (n in 0 until 32) id("p4_c_$n")
         for (n in 0 until 7) id("p4_armor_$n")
         id("p4_shield")
+        for (part in 0 until 4) for (face in 0 until 6) id("skin_${part}_$face")   // the painted skin (see world/SkinPaint)
     }
 }
 
