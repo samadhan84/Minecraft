@@ -1140,7 +1140,7 @@ abstract class ClientApp(protected val demo: File?) {
             ui.frame(gx + px * cell, gy + py * cell, cell, cell, rgba(255, 255, 255), 2f)
         }
         // The turning 3D figure.
-        drawLookPreview(look, ui.width - 330f, 90f, 7.5f, armor)
+        drawLookPreview(look, ui.width - 65f - 8 * 5.5f, 90f, 5.5f, armor)
         // Colours and tools on the right of the picture.
         val px0 = gx + 16 * cell + 30f
         var cy = 70f
