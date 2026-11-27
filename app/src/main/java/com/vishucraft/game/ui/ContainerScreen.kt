@@ -454,8 +454,8 @@ class ContainerScreen(
             // You, in 3D, with your own look and the armor you really wear.
             val gw = 44; val gh = 80
             val yaw = ((System.currentTimeMillis() / 50) % 628) / 100f
-            val shield = g.inventory.offhand?.let { Items[it.id]?.name == "Shield" } == true
-            val pix = com.vishucraft.game.render.DollRenderer.render(g.level.appearance, com.vishucraft.game.render.DollRenderer.armorColors(g.inventory.armor), shield, yaw, gw, gh)
+            val shield = game.inventory.offhand?.let { Items[it.id]?.name == "Shield" } == true
+            val pix = com.vishucraft.game.render.DollRenderer.render(game.level.appearance, com.vishucraft.game.render.DollRenderer.armorColors(game.inventory.armor), shield, yaw, gw, gh)
             val cell = (70f * u - 8f) / gh
             val x0 = bx + 24.5f * u - gw * cell / 2f; val y0 = by + 4f
             val dollPaint = Paint().apply { isAntiAlias = false }
